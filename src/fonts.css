@@ -8,7 +8,7 @@
  * CDN so one-pagers are pixel-identical to the apps.
  *
  *   <link rel="stylesheet" href=".../src/fonts.css">           (CDN)
- *   @import "danieldeusing-design/fonts.css";                  (bundler)
+ *   @import "@danieldeusing/design/fonts.css";                  (bundler)
  *
  * Deliberately NOT part of index.css / the dist bundle — that keeps the core
  * lean and fully offline. Subsets: latin + latin-ext (covers EN/DE/ES/PT).

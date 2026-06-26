@@ -72,12 +72,12 @@ Install, then import the Tailwind entry **after** Tailwind itself in your main C
 
 ```css
 @import "tailwindcss";
-@import "danieldeusing-design/tailwind.css";
+@import "@danieldeusing/design/tailwind.css";
 
 /* REQUIRED so Tailwind sees the core component classes (.prompt, .btn-terminal, …)
    in this package and doesn't tree-shake them away. Adjust the relative depth so it
    resolves to node_modules from this file's location. */
-@source "../node_modules/danieldeusing-design";
+@source "../node_modules/@danieldeusing/design";
 ```
 
 You now get the tokens, base layer, components, **and** Tailwind utilities wired to the live
@@ -89,15 +89,15 @@ theme — `bg-background`, `text-foreground`, `border-border`, `font-mono`, etc.
 Import the build-free bundle once, anywhere your bundler handles CSS:
 
 ```js
-import "danieldeusing-design"; // the "." export = the full bundle (reset + tokens + base + components)
+import "@danieldeusing/design"; // the "." export = the full bundle (reset + tokens + base + components)
 ```
 
-Individual layers are exported too: `danieldeusing-design/tokens.css`, `…/base.css`,
+Individual layers are exported too: `@danieldeusing/design/tokens.css`, `…/base.css`,
 `…/components.css`, `…/reset.css`, `…/fonts.css`.
 
 ## Runtime (optional)
 
-Four dependency-free ES modules, tree-shakeable from `danieldeusing-design/runtime`:
+Four dependency-free ES modules, tree-shakeable from `@danieldeusing/design/runtime`:
 
 | Import | Purpose |
 | --- | --- |
@@ -108,7 +108,7 @@ Four dependency-free ES modules, tree-shakeable from `danieldeusing-design/runti
 | `initResolutionZoom(1920)` | Scale the whole layout up on screens wider than the reference width. |
 
 ```js
-import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal } from "danieldeusing-design/runtime";
+import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal } from "@danieldeusing/design/runtime";
 applyStoredTheme();       // ideally inline, pre-paint
 initThemeSwitcher();
 initDropdowns();

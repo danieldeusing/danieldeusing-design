@@ -38,7 +38,7 @@ I read both sides and confirmed:
 | `Header.astro` `.dropdown-panel--down` (`top:calc(100% + 8px); bottom:auto; left:0; right:auto`) | `src/components.css` `.dropdown-panel--down` | **Byte-identical** |
 | 3 inline `<head>` scripts: theme pre-paint, resolution zoom, terminal typing | `runtime/theme.js`, `runtime/zoom.js`, `runtime/terminal.js` | Logically identical (see PR2) |
 
-**Package public API** (from `danieldeusing-design/package.json` `exports`):
+**Package public API** (from `@danieldeusing/design/package.json` `exports`):
 `"."` → `src/index.css` (build-free bundle: reset+tokens+base+components) ·
 `"./tailwind.css"` → Tailwind v4 entry (tokens+base+components + `@theme inline`) ·
 `"./tokens.css"`, `"./base.css"`, `"./components.css"`, `"./reset.css"`, `"./fonts.css"` ·
@@ -66,13 +66,13 @@ or wherever it sorts):
 
 ```diff
    "dependencies": {
-+    "danieldeusing-design": "file:../../danieldeusing-design",
++    "@danieldeusing/design": "file:../../danieldeusing-design",
      "@astrojs/mdx": "^6.0.2",
 ```
 
 > **Production hardening (do before deploy, not necessarily in PR1):** once
 > `danieldeusing-design` is pushed and tagged, switch this to a pinned ref, e.g.
-> `"danieldeusing-design": "github:danieldeusing/danieldeusing-design#v0.1.0"` or a
+> `"@danieldeusing/design": "github:danieldeusing/danieldeusing-design#v0.1.0"` or a
 > published `"^0.1.0"`. Never `@main`/`@latest` in production. The CDN/README guidance
 > ("pin a release tag") applies equally to the git/npm dep.
 
@@ -82,7 +82,7 @@ Then:
 cd /Users/daniel/Work/danieldeusing/apps/pagr
 pnpm install
 # sanity: the package resolved into pagr's node_modules
-ls node_modules/danieldeusing-design/src/tailwind.css
+ls node_modules/@danieldeusing/design/src/tailwind.css
 ```
 
 `@tailwindcss/typography` and `tw-animate-css` **stay** in pagr's deps — they are not
@@ -121,16 +121,16 @@ package imports and the `@source`:
 /* the danieldeusing terminal design system: tokens (4 themes) + base layer +
    component primitives + the @theme inline map that wires bg-background /
    text-foreground / font-mono / border-border to the live html[data-theme]. */
-@import "danieldeusing-design/tailwind.css";
+@import "@danieldeusing/design/tailwind.css";
 
 /* REQUIRED: Tailwind only scans your own src/ for class names, so without this it
    tree-shakes the package's component classes (.prompt, .btn-terminal, .glow,
    .dropdown, …) that are referenced in the package's own CSS/markup but not in
    pagr's source. Depth: src/styles/ -> src/ -> pagr root (node_modules lives there). */
-@source "../../node_modules/danieldeusing-design";
+@source "../../node_modules/@danieldeusing/design";
 ```
 
-> **Import order matters.** `@import "danieldeusing-design/tailwind.css"` must come
+> **Import order matters.** `@import "@danieldeusing/design/tailwind.css"` must come
 > **after** `@import "tailwindcss"` so the package's base/component rules win over
 > Tailwind Preflight (the README states this explicitly). Keep `tw-animate-css` and the
 > typography `@plugin` where they are.
@@ -208,7 +208,7 @@ viewport and compare — they must be identical.
 ## PR2 — Extract the runtime
 
 Goal: replace the **generic** logic in the inline `<head>` scripts with imports from
-`danieldeusing-design/runtime`, while keeping every **app-specific** behavior local.
+`@danieldeusing/design/runtime`, while keeping every **app-specific** behavior local.
 The package runtime is the same code, so this is also behavior-neutral.
 
 ### What the package runtime provides (and maps to)
@@ -229,7 +229,7 @@ The theme **must** apply before first paint (no flash), so it stays an inline mo
 
 ```astro
 <script>
-  import { applyStoredTheme } from "danieldeusing-design/runtime";
+  import { applyStoredTheme } from "@danieldeusing/design/runtime";
   applyStoredTheme({ faviconHref: (theme) => `/favicon-${theme}.svg` });
 </script>
 ```
@@ -261,7 +261,7 @@ only if verified flash-free. The package function is identical:
 
 ```astro
 <script>
-  import { initResolutionZoom } from "danieldeusing-design/runtime";
+  import { initResolutionZoom } from "@danieldeusing/design/runtime";
   initResolutionZoom(1920);
 </script>
 ```
@@ -274,7 +274,7 @@ itself; nothing is hidden until the class lands). Replace the whole IIFE with:
 
 ```astro
 <script>
-  import { initTerminal } from "danieldeusing-design/runtime";
+  import { initTerminal } from "@danieldeusing/design/runtime";
   initTerminal();
 </script>
 ```
@@ -308,7 +308,7 @@ In `Footer.astro`'s `<script>`, replace the hand-rolled dropdown close-logic (li
 ~195–214) and the theme-switch wiring (lines ~232–244) with package calls:
 
 ```ts
-import { initThemeSwitcher, initDropdowns } from "danieldeusing-design/runtime";
+import { initThemeSwitcher, initDropdowns } from "@danieldeusing/design/runtime";
 
 initDropdowns();
 initThemeSwitcher({ faviconHref: (theme) => `/favicon-${theme}.svg` });
@@ -411,7 +411,7 @@ visually neutral, but call them out so a reviewer isn't surprised:
   identically).
 - **`tw-animate-css` + typography** remain pagr-local imports; the package does not bundle
   them. Order: `@import "tailwindcss"` → `@import "tw-animate-css"` →
-  `@plugin "@tailwindcss/typography"` → `@import "danieldeusing-design/tailwind.css"` →
+  `@plugin "@tailwindcss/typography"` → `@import "@danieldeusing/design/tailwind.css"` →
   `@source …`.
 
 ## 4. Risks & mitigations
@@ -434,7 +434,7 @@ If they ever diverge, keep pagr's copy and reconcile core separately — do **no
 mismatch.
 
 **B. `@source` purge (PR1, step 1.2).** If `@source
-"../../node_modules/danieldeusing-design"` is wrong or omitted, Tailwind tree-shakes the
+"../../node_modules/@danieldeusing/design"` is wrong or omitted, Tailwind tree-shakes the
 package's component classes and the page renders **unstyled prompts/buttons/dropdowns**.
 Mitigation: verify `.prompt`, `.btn-terminal`, `.glow`, `.dropdown` produce visible styles
 in the built output. The depth is two levels (`src/styles/` → `src/` → pagr root). If pagr

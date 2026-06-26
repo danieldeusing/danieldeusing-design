@@ -6,10 +6,10 @@
  * and every component primitive. Works in plain HTML, React, Angular, Vue, a
  * Tauri webview — anywhere CSS @import is understood, with no build step.
  *
- *   import "danieldeusing-design";          // package "." export
+ *   import "@danieldeusing/design";          // package "." export
  *   <link rel="stylesheet" href=".../dist/danieldeusing-design.css">  // CDN
  *
- * Tailwind v4 apps should import "danieldeusing-design/tailwind.css" instead,
+ * Tailwind v4 apps should import "@danieldeusing/design/tailwind.css" instead,
  * which adds the @theme mapping (and skips the reset, since Preflight covers it).
  */
 

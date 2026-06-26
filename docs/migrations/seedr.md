@@ -28,17 +28,17 @@ This document is **PR1**.
 
 ## Critical pre-flight fact: this package is NOT on npm and NOT in seedr's workspace
 
-`danieldeusing-design` is **not published to npm** (verified: `npm view` → 404) and it lives at
+`@danieldeusing/design` is **not published to npm** yet (verified: `npm view` → 404) and it lives at
 `/Users/daniel/Work/danieldeusing/danieldeusing-design`, which is **outside** seedr's
 `pnpm-workspace.yaml` globs (`packages/*`, `apps/*`). So it **cannot** be a `workspace:*`
 dependency. It must be referenced as a **relative `file:` link** — pnpm will symlink it into
-`apps/web/node_modules/danieldeusing-design`, exactly the way `@seedr/shared` is already
+`apps/web/node_modules/@danieldeusing/design`, exactly the way `@seedr/shared` is already
 symlinked into `apps/web/node_modules/@seedr/shared`.
 
 The relative path from `apps/seedr/apps/web` to the package is **`../../../../danieldeusing-design`**.
 
 > If/when the package is later published to npm, swap the `file:` specifier for a pinned
-> version (`"danieldeusing-design": "^0.1.0"`). Nothing else in this plan changes.
+> version (`"@danieldeusing/design": "^0.1.0"`). Nothing else in this plan changes.
 
 ---
 
@@ -54,7 +54,7 @@ The relative path from `apps/seedr/apps/web` to the package is **`../../../../da
   "@seedr/shared": "workspace:*",
   "class-variance-authority": "^0.7.1",
   "clsx": "^2.1.1",
-  "danieldeusing-design": "file:../../../../danieldeusing-design",   // ← add
+  "@danieldeusing/design": "file:../../../../danieldeusing-design",   // ← add
   "fuse.js": "^7.0.0",
   ...
 }
@@ -66,7 +66,7 @@ Then install from the seedr monorepo root:
 cd /Users/daniel/Work/danieldeusing/apps/seedr
 pnpm install
 # verify the symlink landed where Tailwind's @source will look:
-ls -la apps/web/node_modules/danieldeusing-design   # → symlink to ../../../../danieldeusing-design
+ls -la apps/web/node_modules/@danieldeusing/design   # → symlink to ../../../../danieldeusing-design
 ```
 
 **Keep `@fontsource-variable/jetbrains-mono`.** seedr self-hosts the variable font through that
@@ -106,7 +106,7 @@ Replace the top of the file:
 /* AFTER */
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "danieldeusing-design/tailwind.css";
+@import "@danieldeusing/design/tailwind.css";
 
 /* seedr-specific: -500 type-accent classes are referenced only through lib/colors.ts
    string maps (typeTextColors / typeBorderColors), so Tailwind can't see them in markup.
@@ -116,11 +116,11 @@ Replace the top of the file:
 /* REQUIRED: Tailwind must scan the package so core component classes
    (.prompt, .btn-terminal, .glow, .ascii-rule, .dropdown*, .eli5*, …) survive
    tree-shaking. Path is relative to THIS file (src/styles/) → apps/web/node_modules. */
-@source "../../node_modules/danieldeusing-design";
+@source "../../node_modules/@danieldeusing/design";
 ```
 
 > **Import order matters.** `tailwindcss` first (Preflight), then
-> `danieldeusing-design/tailwind.css` (tokens + base + components + the core `@theme inline`
+> `@danieldeusing/design/tailwind.css` (tokens + base + components + the core `@theme inline`
 > map), then seedr's own `@theme` / `@theme inline` / `@utility` blocks below — so seedr's
 > local mappings layer on top of core's.
 
@@ -133,7 +133,7 @@ Replace the top of the file:
 
 Delete **lines 13–147** in their entirety — the `:root` warm palette, the
 `html[data-theme="green"]`/`"mono"` badge-brightening block, and the green/mono/paper palette
-blocks. These are byte-identical to `danieldeusing-design/src/tokens.css`.
+blocks. These are byte-identical to `@danieldeusing/design/src/tokens.css`.
 
 **One nuance to preserve:** the green & mono palette blocks each carry a stray
 `--badge-amber: #f59e0b;` override (index.css lines 95 and 121). That is **not** a core token —
@@ -303,9 +303,9 @@ which is why those blocks are kept.
 ```
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "danieldeusing-design/tailwind.css";   // ← tokens + base + core components + core @theme inline
+@import "@danieldeusing/design/tailwind.css";   // ← tokens + base + core components + core @theme inline
 @source inline("…-500 whitelist…");            // seedr-local
-@source "../../node_modules/danieldeusing-design";  // seedr-local (lets Tailwind keep core classes)
+@source "../../node_modules/@danieldeusing/design";  // seedr-local (lets Tailwind keep core classes)
 
 :root { --badge-* … }                          // seedr-local (2d)
 html[data-theme="green"], html[data-theme="mono"] { --badge-* … }  // seedr-local (2d)

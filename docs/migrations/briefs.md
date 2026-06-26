@@ -21,7 +21,7 @@ A **pure static site** served by Cloudflare Pages — **no build step, no
 package.json, no Tailwind, no bundler.** Everything is hand-authored HTML that
 links plain CSS/JS by relative path. This is the single most important
 constraint for the whole plan: **briefs cannot use the Tailwind v4 entry**
-(`danieldeusing-design/tailwind.css` + `@source`) the way pagr does — there is
+(`@danieldeusing/design/tailwind.css` + `@source`) the way pagr does — there is
 nothing to run `@source` through. briefs must consume the **build-free bundle**
 (`index.css` / the `dist/*.min.css`), exactly like the README's "single HTML
 file" path.
@@ -193,7 +193,7 @@ shape, which this migration does not touch.
 layer + a dependency-free ESM runtime. Confirmed from
 `/Users/daniel/Work/danieldeusing/danieldeusing-design`:
 
-- **npm name** `danieldeusing-design` (unscoped). Exports:
+- **npm name** `@danieldeusing/design` (scoped, in the `danieldeusing` org). Exports:
   `.` → build-free bundle (`src/index.css` = reset + tokens + base + components);
   `./tailwind.css`; `./tokens.css`; `./base.css`; `./components.css`;
   `./reset.css`; `./fonts.css`; `./runtime` (ESM barrel); `./tokens.json`;

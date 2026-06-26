@@ -5,7 +5,7 @@
  * Preflight:
  *
  *   @import "tailwindcss";
- *   @import "danieldeusing-design/tailwind.css";
+ *   @import "@danieldeusing/design/tailwind.css";
  *
  * This brings the tokens, base layer, and component primitives, then maps the
  * tokens into Tailwind's theme via `@theme inline` — so `bg-background`,

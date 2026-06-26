@@ -1,11 +1,12 @@
 name: release
 
-# Publishes to npm on every push to main — but only when package.json's version is
-# not already on the registry (npm cannot republish a version). Bump the version in
-# package.json to cut a release; this workflow then publishes, tags vX.Y.Z, and
-# creates a matching GitHub release (which is the immutable ref jsDelivr serves).
+# Publishes to npm on every push to main — but only when (a) a NPM_TOKEN secret is
+# configured and (b) package.json's version is not already on the registry (npm cannot
+# republish a version). Bump the version in package.json to cut a release; this workflow
+# then publishes, tags vX.Y.Z, and creates a matching GitHub release (the immutable ref
+# jsDelivr serves). Until NPM_TOKEN is set, the workflow skips publishing and stays green.
 #
-# Requires a repository secret NPM_TOKEN (an npm automation token with publish rights).
+# Setup once: add a repository secret NPM_TOKEN (an npm automation token with publish rights).
 
 on:
   push:
@@ -26,14 +27,28 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
+      - name: Detect npm token
+        id: token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::NPM_TOKEN is not set — skipping npm publish. Add the secret to enable releases."
+          fi
+
       - name: Resolve version
         id: meta
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - name: Skip if version already published
-        id: check
+      - name: Decide whether to publish
+        id: decide
         run: |
-          if npm view "danieldeusing-design@${{ steps.meta.outputs.version }}" version >/dev/null 2>&1; then
+          if [ "${{ steps.token.outputs.enabled }}" != "true" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif npm view "danieldeusing-design@${{ steps.meta.outputs.version }}" version >/dev/null 2>&1; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "v${{ steps.meta.outputs.version }} is already on npm — nothing to do."
           else
@@ -41,25 +56,29 @@ jobs:
           fi
 
       - name: Build dist + tokens
-        if: steps.check.outputs.publish == 'true'
+        if: steps.decide.outputs.publish == 'true'
         run: node scripts/build.mjs
 
       - name: Verify committed artifacts are up to date
-        if: steps.check.outputs.publish == 'true'
+        if: steps.decide.outputs.publish == 'true'
         run: git diff --exit-code dist tokens/tokens.json
 
       - name: Publish to npm
-        if: steps.check.outputs.publish == 'true'
+        if: steps.decide.outputs.publish == 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Tag and create GitHub release
-        if: steps.check.outputs.publish == 'true'
+      - name: Tag and create GitHub release (idempotent)
+        if: steps.decide.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="v${{ steps.meta.outputs.version }}"
-          git tag "$tag"
-          git push origin "$tag"
-          gh release create "$tag" --title "$tag" --notes "See CHANGELOG.md for details."
+          if ! git rev-parse "$tag" >/dev/null 2>&1; then
+            git tag "$tag"
+            git push origin "$tag"
+          fi
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --title "$tag" --notes "See CHANGELOG.md for details."
+          fi

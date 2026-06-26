@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The package has no dependencies, so there is nothing to install.
+      - name: Build dist + tokens
+        run: node scripts/build.mjs
+
+      # The dist bundle and tokens.json are committed (jsDelivr serves them). Fail
+      # if a source change landed without rebuilding the committed artifacts.
+      - name: Verify committed artifacts are up to date
+        run: |
+          if ! git diff --exit-code dist tokens/tokens.json; then
+            echo "::error::dist/ or tokens/tokens.json is out of date — run 'npm run build' and commit the result."
+            exit 1
+          fi

@@ -1,0 +1,19 @@
+/*
+ * danieldeusing-design — build-free bundle.
+ *
+ * The no-Tailwind entry point. Import this one file and you get the full
+ * terminal theme: a minimal reset, the four-theme token set, the document base,
+ * and every component primitive. Works in plain HTML, React, Angular, Vue, a
+ * Tauri webview — anywhere CSS @import is understood, with no build step.
+ *
+ *   import "danieldeusing-design";          // package "." export
+ *   <link rel="stylesheet" href=".../dist/danieldeusing-design.css">  // CDN
+ *
+ * Tailwind v4 apps should import "danieldeusing-design/tailwind.css" instead,
+ * which adds the @theme mapping (and skips the reset, since Preflight covers it).
+ */
+
+@import "./reset.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./components.css";

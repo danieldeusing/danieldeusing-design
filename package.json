@@ -1,0 +1,65 @@
+{
+  "name": "danieldeusing-design",
+  "version": "0.1.0",
+  "description": "The danieldeusing terminal design system — framework-agnostic CSS tokens, components, and a vanilla-JS runtime for the CRT/JetBrains-Mono look used across danieldeusing.de, seedr, and briefs.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Daniel Deusing",
+  "homepage": "https://github.com/danieldeusing/danieldeusing-design#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danieldeusing/danieldeusing-design.git"
+  },
+  "bugs": {
+    "url": "https://github.com/danieldeusing/danieldeusing-design/issues"
+  },
+  "keywords": [
+    "design-system",
+    "design-tokens",
+    "css",
+    "tailwindcss",
+    "tailwind-v4",
+    "terminal",
+    "crt",
+    "theme",
+    "danieldeusing"
+  ],
+  "main": "./src/index.css",
+  "style": "./src/index.css",
+  "exports": {
+    ".": "./src/index.css",
+    "./tailwind.css": "./src/tailwind.css",
+    "./index.css": "./src/index.css",
+    "./reset.css": "./src/reset.css",
+    "./fonts.css": "./src/fonts.css",
+    "./tokens.css": "./src/tokens.css",
+    "./base.css": "./src/base.css",
+    "./components.css": "./src/components.css",
+    "./tokens.json": "./tokens/tokens.json",
+    "./runtime": "./runtime/index.js",
+    "./runtime/*": "./runtime/*.js",
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "runtime",
+    "dist",
+    "tokens",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

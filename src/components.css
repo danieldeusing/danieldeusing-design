@@ -1,0 +1,288 @@
+/*
+ * danieldeusing-design — component layer.
+ *
+ * Reusable, framework-agnostic primitives in plain CSS (no Tailwind @apply), so
+ * they render identically in an Astro/React/Angular app, a Tauri webview, or a
+ * single static HTML file. Every value resolves against tokens.css.
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Phosphor glow — for bright, "lit" elements (brand mark, active items).
+   ───────────────────────────────────────────────────────────────────────── */
+.glow {
+  color: var(--primary);
+  text-shadow: 0 0 8px var(--glow);
+}
+.glow-lg {
+  color: var(--primary);
+  text-shadow: 0 0 12px var(--glow);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Shell affordances — `$ command` section headers and `# comment` lines.
+   ───────────────────────────────────────────────────────────────────────── */
+.prompt {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+.prompt::before {
+  content: "$ ";
+  color: var(--primary);
+}
+
+.comment::before {
+  content: "# ";
+  color: var(--border);
+}
+
+/* Blinking block cursor — pair with a brand mark or end-of-line. */
+.cursor-block {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 8px;
+  background: var(--primary);
+  vertical-align: baseline;
+  transform: translateY(0.12em);
+  animation: ddd-blink 1.1s step-end infinite;
+}
+@keyframes ddd-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Primary CTA — `> label` with a phosphor glow that lifts on hover.
+   ───────────────────────────────────────────────────────────────────────── */
+.btn-terminal {
+  display: inline-block;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700;
+  padding: 12px 24px;
+  box-shadow: 0 0 16px var(--glow);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.btn-terminal::before {
+  content: "> ";
+}
+.btn-terminal:hover {
+  box-shadow: 0 0 28px var(--glow);
+  transform: translateY(-2px);
+}
+
+/* Quiet, underlined link that warms to the primary colour on hover. */
+.link-quiet {
+  color: var(--muted-foreground);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  transition: color 0.15s ease;
+}
+.link-quiet:hover {
+  color: var(--primary);
+}
+
+/* ASCII horizontal rule — a clipped, full-width row of box-drawing dashes that
+   reads like a terminal separator. Use on an <hr> or <div>; the dashes are a
+   decorative ::before clipped to the element width. */
+.ascii-rule {
+  margin: 1rem 0;
+  border: 0;
+  color: var(--border);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+}
+.ascii-rule::before {
+  content: "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────";
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Card — bordered surface that warms its border and glows softly on hover.
+   ───────────────────────────────────────────────────────────────────────── */
+.card-terminal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.card-terminal:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 20px var(--glow-soft);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Dropdown — a <details class="dropdown"> with a <summary> trigger and a
+   floating panel. Pairs with runtime/dropdown.js (close-others, click-away,
+   Escape). The panel opens UPWARD by default (for status-bar / footer menus);
+   add .dropdown-panel--down to open below the trigger.
+   ───────────────────────────────────────────────────────────────────────── */
+.dropdown {
+  position: relative;
+}
+.dropdown > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  color: var(--muted-foreground);
+  transition: color 0.15s ease;
+}
+.dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+.dropdown > summary:hover,
+.dropdown[open] > summary {
+  color: var(--primary);
+}
+.dropdown-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  z-index: 50;
+  min-width: 128px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: 0 0 20px var(--glow-soft);
+}
+/* open below the trigger instead of above */
+.dropdown-panel--down {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: 0;
+  right: auto;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 14px;
+  text-align: left;
+  font: inherit;
+  line-height: 1.5;
+  background: none;
+  border: 0;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+.dropdown-item:hover {
+  color: var(--primary);
+  background: var(--muted);
+}
+.dropdown-item[aria-current="true"],
+html:not([data-theme]) .dropdown-item[data-theme-value="warm"],
+html[data-theme="green"] .dropdown-item[data-theme-value="green"],
+html[data-theme="mono"] .dropdown-item[data-theme-value="mono"],
+html[data-theme="paper"] .dropdown-item[data-theme-value="paper"],
+html[data-theme="warm"] .dropdown-item[data-theme-value="warm"] {
+  color: var(--primary);
+  text-shadow: 0 0 8px var(--glow);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ELI5 — an "explain like I'm 5" callout box (first-time-term explainers).
+   ───────────────────────────────────────────────────────────────────────── */
+.eli5 {
+  margin: 1.25em 0;
+  padding: 0.7em 1em;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 7%, var(--card));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius);
+  font-size: 0.92em;
+  line-height: 1.6;
+}
+.eli5::before {
+  content: "ELI5";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.6em;
+  vertical-align: 0.08em;
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  padding: 0.34em 0.6em;
+  border-radius: 5px;
+  background: #b42318;
+  color: #fff;
+}
+.eli5-term {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Animation kill-switch — add html.anim-off (e.g. from a footer "animations
+   off" toggle) to stop ALL motion regardless of the OS reduced-motion setting.
+   runtime/terminal.js also bails when this class is present, so content stays
+   visible. Complements the prefers-reduced-motion handling below.
+   ───────────────────────────────────────────────────────────────────────── */
+html.anim-off *,
+html.anim-off *::before,
+html.anim-off *::after {
+  animation: none !important;
+  transition: none !important;
+}
+html.anim-off .cursor-block {
+  opacity: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Terminal session animation — `$ command` prompts type out, then their
+   section's content reveals like command output. Pairs with
+   runtime/terminal.js, which adds html.term-anim pre-paint. With JS disabled
+   or prefers-reduced-motion, the gate is never added and nothing is hidden, so
+   all content is visible by default (progressive enhancement).
+
+   Markup: a section gets [data-term]; its prompt uses .prompt; each chunk of
+   output gets [data-term-out].
+   ───────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  /* pending prompt: fully invisible (incl. the `$ ` prefix), line box reserved */
+  html.term-anim [data-term] .prompt:not(.term-live),
+  html.term-anim [data-term] .prompt:not(.term-live)::before {
+    color: transparent;
+  }
+  /* pending output: keep layout (no CLS), no interaction until revealed */
+  html.term-anim [data-term] [data-term-out]:not(.term-show) {
+    visibility: hidden;
+  }
+  /* phosphor warm-up flicker as output appears */
+  html.term-anim [data-term] [data-term-out].term-show {
+    animation: ddd-term-output 0.2s steps(3, end) both;
+  }
+  @keyframes ddd-term-output {
+    from {
+      opacity: 0;
+    }
+  }
+  /* caret at the typing edge (created by runtime/terminal.js) */
+  .term-caret {
+    display: inline-block;
+    width: 0.55em;
+    height: 1em;
+    margin-left: 2px;
+    background: var(--primary);
+    vertical-align: baseline;
+    transform: translateY(0.12em);
+  }
+}

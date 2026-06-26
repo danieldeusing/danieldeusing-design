@@ -1,0 +1,176 @@
+<!doctype html>
+<!--
+  danieldeusing-design — one-page documentation template.
+
+  A single self-contained HTML file: the design system loads build-free from the
+  jsDelivr CDN, so this opens directly in a browser with no build step.
+
+  Fill the {{PLACEHOLDERS}} with your content. The CDN URLs are pinned to a release
+  tag (@v0.1.0) — bump that to the latest tag of danieldeusing/danieldeusing-design.
+  Repeat a <section data-term> block per step/topic. Keep the pre-paint scripts and
+  the no-JS fallback intact (everything stays readable with JS off / reduced motion).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{DOC_TITLE}}</title>
+    <meta name="description" content="{{DOC_DESCRIPTION}}" />
+    <meta name="theme-color" content="#f5efe2" />
+
+    <!-- pre-paint: apply the saved theme + animation gate before first paint -->
+    <script>
+      (() => {
+        const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
+        let theme = "warm";
+        try {
+          const stored = localStorage.getItem("theme");
+          if (stored && stored in bg) theme = stored;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg[theme]);
+
+        // animation gate: off if the OS or the user asked for no motion
+        let animOff = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        try {
+          if (localStorage.getItem("anim") === "off") animOff = true;
+        } catch {}
+        if (animOff) document.documentElement.classList.add("anim-off");
+      })();
+    </script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.0/dist/danieldeusing-design.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.0/src/fonts.css"
+    />
+
+    <style>
+      /* Page-only layout. The design system ships the visual identity; a build-free
+         page brings its own layout. */
+      .wrap { max-width: 60rem; margin-inline: auto; padding: 2.5rem 1.5rem 6rem; }
+      header.bar {
+        position: sticky; top: 0; z-index: 30;
+        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--card);
+      }
+      header.bar .brand { display: inline-flex; align-items: center; font-weight: 700; font-size: 1.05rem; }
+      h1.title { font-size: 1.7rem; font-weight: 700; margin: 0.4rem 0 0.4rem; }
+      .lede { color: var(--muted-foreground); max-width: 64ch; }
+      section.doc { margin-top: 2.75rem; }
+      .body { margin-top: 0.85rem; }
+      .body > * + * { margin-top: 0.75rem; }
+      ol.steps { counter-reset: step; padding: 0; }
+      ol.steps > li {
+        position: relative; padding-left: 2.25rem; margin-top: 0.6rem; counter-increment: step;
+      }
+      ol.steps > li::before {
+        content: counter(step); position: absolute; left: 0; top: 0;
+        width: 1.5rem; text-align: right; color: var(--primary); font-weight: 700;
+      }
+      .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+      .pad { padding: 1rem; }
+      .muted { color: var(--muted-foreground); }
+      footer.status {
+        position: fixed; inset-inline: 0; bottom: 0; z-index: 50; min-height: 2rem;
+        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        padding: 0.35rem 1rem; border-top: 1px solid var(--border); background: var(--card); font-size: 0.7rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="bar">
+      <a href="#top" class="brand">
+        <span class="glow">{{WORKFLOW}}</span>
+        <span class="cursor-block" aria-hidden="true"></span>
+      </a>
+      <details class="dropdown">
+        <summary aria-label="theme">
+          <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
+          <span data-theme-label>warm</span>
+          <span aria-hidden="true">▾</span>
+        </summary>
+        <ul class="dropdown-panel dropdown-panel--down" role="list">
+          <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
+          <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
+          <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
+          <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+        </ul>
+      </details>
+    </header>
+
+    <main class="wrap" id="top">
+      <p class="prompt">cat {{WORKFLOW}}.md</p>
+      <h1 class="title">{{DOC_TITLE}}</h1>
+      <p class="lede">{{TAGLINE}}</p>
+
+      <!-- OVERVIEW -->
+      <section class="doc" data-term>
+        <p class="prompt">echo overview</p>
+        <div class="body" data-term-out>
+          <p>{{OVERVIEW}}</p>
+        </div>
+      </section>
+
+      <!-- STEPS — repeat <li> per step -->
+      <section class="doc" data-term>
+        <p class="prompt">cat steps.txt</p>
+        <div class="body" data-term-out>
+          <ol class="steps">
+            <li>{{STEP_1}}</li>
+            <li>{{STEP_2}}</li>
+            <li>{{STEP_3}}</li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- INPUTS / OUTPUTS -->
+      <section class="doc" data-term>
+        <p class="prompt">ls -l io/</p>
+        <div class="body" data-term-out>
+          <hr class="ascii-rule" />
+          <p><strong>Inputs.</strong> {{INPUTS}}</p>
+          <p><strong>Outputs.</strong> {{OUTPUTS}}</p>
+        </div>
+      </section>
+
+      <!-- EXAMPLES — repeat .card-terminal per example -->
+      <section class="doc" data-term>
+        <p class="prompt">ls -l examples/</p>
+        <div class="body" data-term-out>
+          <div class="grid">
+            <article class="card-terminal"><div class="pad"><strong>{{EXAMPLE_1_TITLE}}</strong><p class="muted">{{EXAMPLE_1_BODY}}</p></div></article>
+            <article class="card-terminal"><div class="pad"><strong>{{EXAMPLE_2_TITLE}}</strong><p class="muted">{{EXAMPLE_2_BODY}}</p></div></article>
+          </div>
+        </div>
+      </section>
+
+      <!-- NOTES -->
+      <section class="doc" data-term>
+        <p class="prompt">cat notes.md</p>
+        <div class="body" data-term-out>
+          <p class="eli5"><span class="eli5-term">Note</span> {{NOTES}}</p>
+          <p class="comment muted">{{FOOTER_NOTE}}</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="status">
+      <span class="muted"><span class="glow">[{{WORKFLOW}}]</span> {{STATUS_LINE}}</span>
+      <a class="link-quiet no-underline" href="{{LINK_HREF}}">{{LINK_LABEL}}</a>
+    </footer>
+
+    <script type="module">
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal } from
+        "https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.0/runtime/index.js";
+      applyStoredTheme();
+      initThemeSwitcher();
+      initDropdowns();
+      initTerminal();
+    </script>
+  </body>
+</html>

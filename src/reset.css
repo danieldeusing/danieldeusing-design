@@ -1,0 +1,74 @@
+/*
+ * danieldeusing-design — minimal reset.
+ *
+ * Only loaded on the build-free path (index.css / the dist bundle / CDN), where
+ * there is no Tailwind Preflight to normalize the document. Tailwind v4 apps must
+ * NOT import this — they already get an equivalent reset from Preflight, and
+ * importing it twice would be redundant. Deliberately tiny: it normalizes the box
+ * model and strips default margins so the terminal layout is predictable, and
+ * stops short of a full normalize.css.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  tab-size: 4;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  line-height: 1.5;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+ul,
+ol {
+  list-style: none;
+  padding: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+table {
+  border-collapse: collapse;
+}

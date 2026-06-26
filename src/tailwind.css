@@ -1,0 +1,48 @@
+/*
+ * danieldeusing-design — Tailwind v4 entry point.
+ *
+ * For apps that use Tailwind v4. Import AFTER Tailwind itself so this wins over
+ * Preflight:
+ *
+ *   @import "tailwindcss";
+ *   @import "danieldeusing-design/tailwind.css";
+ *
+ * This brings the tokens, base layer, and component primitives, then maps the
+ * tokens into Tailwind's theme via `@theme inline` — so `bg-background`,
+ * `text-foreground`, `border-border`, `font-mono`, etc. resolve to the live CSS
+ * variables and follow html[data-theme] at runtime. No reset is imported here:
+ * Tailwind's Preflight already normalizes the document.
+ */
+
+@import "./tokens.css";
+@import "./base.css";
+@import "./components.css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-mono);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+}

@@ -1,0 +1,65 @@
+name: release
+
+# Publishes to npm on every push to main — but only when package.json's version is
+# not already on the registry (npm cannot republish a version). Bump the version in
+# package.json to cut a release; this workflow then publishes, tags vX.Y.Z, and
+# creates a matching GitHub release (which is the immutable ref jsDelivr serves).
+#
+# Requires a repository secret NPM_TOKEN (an npm automation token with publish rights).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # push the version tag + create the release
+  id-token: write # npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Resolve version
+        id: meta
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if version already published
+        id: check
+        run: |
+          if npm view "danieldeusing-design@${{ steps.meta.outputs.version }}" version >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "v${{ steps.meta.outputs.version }} is already on npm — nothing to do."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build dist + tokens
+        if: steps.check.outputs.publish == 'true'
+        run: node scripts/build.mjs
+
+      - name: Verify committed artifacts are up to date
+        if: steps.check.outputs.publish == 'true'
+        run: git diff --exit-code dist tokens/tokens.json
+
+      - name: Publish to npm
+        if: steps.check.outputs.publish == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Tag and create GitHub release
+        if: steps.check.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.meta.outputs.version }}"
+          git tag "$tag"
+          git push origin "$tag"
+          gh release create "$tag" --title "$tag" --notes "See CHANGELOG.md for details."

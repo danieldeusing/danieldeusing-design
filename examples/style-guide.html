@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>danieldeusing-design — style guide</title>
+    <meta name="theme-color" content="#f5efe2" />
+
+    <!-- Pre-paint: apply the stored theme before first paint to avoid a flash. -->
+    <script>
+      (() => {
+        const backgrounds = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
+        let theme = "warm";
+        try {
+          const stored = localStorage.getItem("theme");
+          if (stored && stored in backgrounds) theme = stored;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", backgrounds[theme]);
+      })();
+    </script>
+
+    <!-- The whole design system, build-free, from the local dist bundle. -->
+    <link rel="stylesheet" href="../dist/danieldeusing-design.css" />
+
+    <style>
+      /* Page-only layout. The design system ships the visual identity (tokens,
+         base, components); a build-free page brings its own layout. */
+      .wrap { max-width: 64rem; margin-inline: auto; padding: 2rem 1.5rem 6rem; }
+      header.bar {
+        position: sticky; top: 0; z-index: 30;
+        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--card);
+      }
+      section { margin-top: 3rem; }
+      h2.section-title { font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem; }
+      .lede { color: var(--muted-foreground); margin-bottom: 1.25rem; max-width: 60ch; }
+      .grid { display: grid; gap: 0.75rem; }
+      .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid.cols-3 { grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); }
+      .grid.swatches { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+      .stack > * + * { margin-top: 0.75rem; }
+      .row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+      .swatch { border: 1px solid var(--border); }
+      .swatch .chip { height: 3.5rem; }
+      .swatch .meta { padding: 0.5rem 0.6rem; background: var(--card); }
+      .swatch .name { font-weight: 700; }
+      .swatch .val { color: var(--muted-foreground); font-size: 0.7rem; }
+
+      .card-terminal .pad { padding: 1rem; }
+      .muted { color: var(--muted-foreground); }
+      .type-row { display: flex; align-items: baseline; gap: 1rem; }
+      .type-row .label { color: var(--muted-foreground); width: 5rem; flex: none; }
+
+      footer.status {
+        position: fixed; inset-inline: 0; bottom: 0; z-index: 50; height: 2rem;
+        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        padding: 0 1rem; border-top: 1px solid var(--border); background: var(--card);
+        font-size: 0.7rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="bar">
+      <a href="#top" style="display: inline-flex; align-items: center">
+        <span class="glow" style="font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em">danieldeusing-design</span>
+        <span class="cursor-block" aria-hidden="true"></span>
+      </a>
+      <details class="dropdown">
+        <summary>
+          <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
+          <span data-theme-label>warm</span>
+          <span aria-hidden="true">▾</span>
+        </summary>
+        <ul class="dropdown-panel dropdown-panel--down" role="list">
+          <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
+          <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
+          <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
+          <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+        </ul>
+      </details>
+    </header>
+
+    <main class="wrap" id="top">
+      <p class="prompt">cat README.md</p>
+      <h1 style="font-size: 1.6rem; font-weight: 700; margin: 0.5rem 0 0.5rem">The terminal design system</h1>
+      <p class="lede">
+        CRT phosphor on JetBrains Mono, four themes, ASCII affordances. Everything below is rendered by
+        <code>danieldeusing-design.css</code> alone — switch the theme (top-right) to see the tokens cascade.
+      </p>
+
+      <!-- ── Themes / color tokens ─────────────────────────────────────── -->
+      <section data-term>
+        <p class="prompt">ls -l tokens/color</p>
+        <div data-term-out>
+          <div class="grid swatches" style="margin-top: 1rem">
+            <div class="swatch"><div class="chip" style="background: var(--background)"></div><div class="meta"><div class="name">background</div><div class="val">--background</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--foreground)"></div><div class="meta"><div class="name">foreground</div><div class="val">--foreground</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--card)"></div><div class="meta"><div class="name">card</div><div class="val">--card</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--primary)"></div><div class="meta"><div class="name">primary</div><div class="val">--primary</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--secondary)"></div><div class="meta"><div class="name">secondary</div><div class="val">--secondary</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--muted)"></div><div class="meta"><div class="name">muted</div><div class="val">--muted</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--muted-foreground)"></div><div class="meta"><div class="name">muted-fg</div><div class="val">--muted-foreground</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--accent)"></div><div class="meta"><div class="name">accent</div><div class="val">--accent</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--destructive)"></div><div class="meta"><div class="name">destructive</div><div class="val">--destructive</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--border)"></div><div class="meta"><div class="name">border</div><div class="val">--border</div></div></div>
+            <div class="swatch"><div class="chip" style="background: var(--ring)"></div><div class="meta"><div class="name">ring</div><div class="val">--ring</div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Typography ────────────────────────────────────────────────── -->
+      <section data-term>
+        <p class="prompt">cat typography.txt</p>
+        <div data-term-out>
+          <div class="stack" style="margin-top: 1rem">
+            <div class="type-row"><span class="label">2xl</span><span style="font-size: 1.6rem; font-weight: 700">JetBrains Mono</span></div>
+            <div class="type-row"><span class="label">xl</span><span style="font-size: 1.25rem; font-weight: 700">JetBrains Mono</span></div>
+            <div class="type-row"><span class="label">base</span><span>The quick brown fox — 0123456789</span></div>
+            <div class="type-row"><span class="label">glow</span><span class="glow" style="font-weight: 700">phosphor glow</span></div>
+            <div class="type-row"><span class="label">glow-lg</span><span class="glow-lg" style="font-size: 1.25rem; font-weight: 700">phosphor glow</span></div>
+            <div class="type-row"><span class="label">comment</span><span class="comment muted">a dim inline note</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Buttons & links ───────────────────────────────────────────── -->
+      <section data-term>
+        <p class="prompt">./buttons --demo</p>
+        <div data-term-out>
+          <div class="row" style="margin-top: 1rem">
+            <a href="#top" class="btn-terminal">run setup</a>
+            <a href="#top" class="link-quiet">a quiet link</a>
+            <span>inline cursor<span class="cursor-block" aria-hidden="true"></span></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Cards ─────────────────────────────────────────────────────── -->
+      <section data-term>
+        <p class="prompt">ls -l cards/</p>
+        <div data-term-out>
+          <div class="grid cols-3" style="margin-top: 1rem">
+            <article class="card-terminal"><div class="pad stack"><strong>card-terminal</strong><p class="muted">Bordered surface. Hover to warm the border and glow.</p></div></article>
+            <article class="card-terminal"><div class="pad stack"><strong>resolution zoom</strong><p class="muted">Layout authored at 1920px, scaled up on 2K/4K.</p></div></article>
+            <article class="card-terminal"><div class="pad stack"><strong>four themes</strong><p class="muted">warm · green · mono · paper, via data-theme.</p></div></article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Callout ───────────────────────────────────────────────────── -->
+      <section data-term>
+        <p class="prompt">cat eli5.md</p>
+        <div data-term-out>
+          <p class="eli5" style="margin-top: 1rem">
+            <span class="eli5-term">Design tokens</span> are named values (colours, sizes) you reuse everywhere, so changing one
+            place re-themes the whole app. This box is the <code>.eli5</code> component.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="status">
+      <span class="muted"><span class="glow">[style-guide]</span> visitor@danieldeusing:~/design</span>
+      <span class="muted">danieldeusing-design</span>
+    </footer>
+
+    <!-- The runtime: theme switching, dropdown behaviour, terminal animation. -->
+    <script type="module">
+      import { initThemeSwitcher, initDropdowns, initTerminal } from "../runtime/index.js";
+      initThemeSwitcher();
+      initDropdowns();
+      initTerminal();
+    </script>
+  </body>
+</html>

@@ -1,12 +1,20 @@
 name: release
 
-# Publishes to npm on every push to main — but only when (a) a NPM_TOKEN secret is
-# configured and (b) package.json's version is not already on the registry (npm cannot
-# republish a version). Bump the version in package.json to cut a release; this workflow
-# then publishes, tags vX.Y.Z, and creates a matching GitHub release (the immutable ref
-# jsDelivr serves). Until NPM_TOKEN is set, the workflow skips publishing and stays green.
+# Publishes to npm on every push to main — but only when package.json's version is not
+# already on the registry (npm cannot republish a version). Bump the version in
+# package.json to cut a release; this workflow then publishes via npm Trusted Publishing
+# (OIDC — no token), tags vX.Y.Z, and creates a matching GitHub release (the immutable
+# ref jsDelivr serves).
 #
-# Setup once: add a repository secret NPM_TOKEN (an npm automation token with publish rights).
+# One-time setup (Trusted Publishing has a chicken-and-egg for brand-new packages — the
+# trusted publisher is configured on the PACKAGE, which must exist first):
+#   1. Publish 0.1.0 once manually to claim the name:  npm publish --access public
+#   2. On npmjs.com → the package → Settings → Trusted Publisher → GitHub Actions, set:
+#        Organization or user = danieldeusing
+#        Repository           = danieldeusing-design
+#        Workflow filename    = release.yml
+#        Allowed actions      = npm publish
+#   After that, every version bump publishes from CI with no stored token.
 
 on:
   push:
@@ -14,7 +22,7 @@ on:
 
 permissions:
   contents: write # push the version tag + create the release
-  id-token: write # npm provenance
+  id-token: write # OIDC token for npm Trusted Publishing
 
 jobs:
   publish:
@@ -24,31 +32,21 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22 # Trusted Publishing needs Node >= 22.14.0
           registry-url: https://registry.npmjs.org
 
-      - name: Detect npm token
-        id: token
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::NPM_TOKEN is not set — skipping npm publish. Add the secret to enable releases."
-          fi
+      # Trusted Publishing needs npm CLI >= 11.5.1; Node 22 ships an older npm.
+      - name: Upgrade npm to a Trusted-Publishing-capable version
+        run: npm install -g npm@latest
 
       - name: Resolve version
         id: meta
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - name: Decide whether to publish
+      - name: Skip if version already published
         id: decide
         run: |
-          if [ "${{ steps.token.outputs.enabled }}" != "true" ]; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          elif npm view "danieldeusing-design@${{ steps.meta.outputs.version }}" version >/dev/null 2>&1; then
+          if npm view "danieldeusing-design@${{ steps.meta.outputs.version }}" version >/dev/null 2>&1; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "v${{ steps.meta.outputs.version }} is already on npm — nothing to do."
           else
@@ -63,11 +61,11 @@ jobs:
         if: steps.decide.outputs.publish == 'true'
         run: git diff --exit-code dist tokens/tokens.json
 
-      - name: Publish to npm
+      # No NODE_AUTH_TOKEN and no --provenance: Trusted Publishing authenticates via OIDC
+      # and generates provenance automatically.
+      - name: Publish to npm (Trusted Publishing)
         if: steps.decide.outputs.publish == 'true'
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       - name: Tag and create GitHub release (idempotent)
         if: steps.decide.outputs.publish == 'true'

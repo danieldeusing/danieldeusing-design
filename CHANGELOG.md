@@ -9,6 +9,23 @@ immutable tag (`vX.Y.Z`). Pin that tag in production CDN URLs.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-06-26
+
+Sync the core with the canonical terminal animation as it evolved in pagr.
+
+### Added
+
+- **Per-card child-cascade reveal**: a revealed `[data-term-out]` now staggers its direct
+  children (rows/lines) in one by one — applies to every card on every page.
+
+### Changed
+
+- `html.anim-off` now hides the cursor with `display: none` (was `opacity`) and kills only
+  keyframe animations, not transitions.
+- `runtime/terminal.js` gate now reads `localStorage "anim"`: an explicit pick wins over the
+  OS reduced-motion setting (explicit `"on"` animates even under reduced motion), and box
+  reveals run non-blocking so the next prompt keeps typing.
+
 ## [0.1.0] — 2026-06-26
 
 Initial extraction of the terminal design system shared by danieldeusing.de and seedr into a
@@ -35,5 +52,6 @@ standalone, framework-agnostic package.
 - **Docs**: `examples/style-guide.html`, `templates/documentation.html`, and migration plans
   under `docs/migrations/`.
 
-[Unreleased]: https://github.com/danieldeusing/danieldeusing-design/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/danieldeusing/danieldeusing-design/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/danieldeusing/danieldeusing-design/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/danieldeusing/danieldeusing-design/releases/tag/v0.1.0

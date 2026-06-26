@@ -23,8 +23,24 @@
 
 export function initTerminal() {
   if (typeof window === "undefined") return;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  // honour the manual kill-switch (components.css html.anim-off)
+
+  // Animation policy: an explicit pick (localStorage "anim", e.g. from a footer
+  // toggle) wins over the OS setting. "off" — or no pick while the OS prefers
+  // reduced motion — disables every animation by marking html.anim-off
+  // (components.css then kills keyframes and hides the cursor). An explicit "on"
+  // animates even when the OS prefers reduced motion.
+  let animPref = null;
+  try {
+    animPref = localStorage.getItem("anim");
+  } catch {
+    /* localStorage can throw in private mode / sandboxed frames */
+  }
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (animPref === "off" || (animPref === null && prefersReduced)) {
+    document.documentElement.classList.add("anim-off");
+    return;
+  }
+  // already gated off pre-paint (e.g. by an inline script) — respect it
   if (document.documentElement.classList.contains("anim-off")) return;
 
   document.documentElement.classList.add("term-anim");
@@ -75,7 +91,10 @@ export function initTerminal() {
       if (offscreen) prompt.classList.add("term-live");
       else await typePrompt(prompt);
     }
-    await revealOutputs(section, offscreen);
+    // reveal the box and let its rows cascade in, but don't await it: the box
+    // animation runs in parallel so the next prompt keeps typing and nothing
+    // waits on a box finishing.
+    void revealOutputs(section, offscreen);
   };
 
   // sections play one after another, in the order they were triggered

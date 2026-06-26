@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.1.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.1.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -506,10 +506,9 @@ html.anim-off *,
 html.anim-off *::before,
 html.anim-off *::after {
   animation: none !important;
-  transition: none !important;
 }
 html.anim-off .cursor-block {
-  opacity: 1;
+  display: none;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -541,6 +540,21 @@ html.anim-off .cursor-block {
       opacity: 0;
     }
   }
+  /* a revealed box cascades its direct children (rows/lines) in one by one —
+     applies to every card on every page */
+  html.term-anim [data-term] [data-term-out].term-show > * {
+    animation: ddd-term-output 0.25s steps(3, end) both;
+  }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(2) { animation-delay: 0.09s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(3) { animation-delay: 0.18s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(4) { animation-delay: 0.27s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(5) { animation-delay: 0.36s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(6) { animation-delay: 0.45s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(7) { animation-delay: 0.54s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(8) { animation-delay: 0.63s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(9) { animation-delay: 0.72s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(10) { animation-delay: 0.81s; }
+  html.term-anim [data-term] [data-term-out].term-show > *:nth-child(n + 11) { animation-delay: 0.9s; }
   /* caret at the typing edge (created by runtime/terminal.js) */
   .term-caret {
     display: inline-block;

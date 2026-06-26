@@ -1,6 +1,6 @@
 {
   "name": "@danieldeusing/design",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The danieldeusing terminal design system — framework-agnostic CSS tokens, components, and a vanilla-JS runtime for the CRT/JetBrains-Mono look used across danieldeusing.de, seedr, and briefs.",
   "type": "module",
   "license": "MIT",

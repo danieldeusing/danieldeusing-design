@@ -48,9 +48,9 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
       })();
     </script>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/dist/danieldeusing-design.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/dist/danieldeusing-design.min.css" />
     <!-- optional: the real JetBrains Mono webfont (otherwise falls back to Menlo) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/src/fonts.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/src/fonts.css" />
   </head>
   <body>
     <p class="prompt">cat hello.txt</p>
@@ -59,7 +59,7 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
 
     <script type="module">
       import { initThemeSwitcher, initDropdowns, initTerminal } from
-        "https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/runtime/index.js";
       initThemeSwitcher();
       initDropdowns();
       initTerminal();

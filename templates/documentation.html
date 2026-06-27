@@ -1,14 +1,21 @@
 <!doctype html>
 <!--
-  danieldeusing-design — one-page documentation template.
+  danieldeusing-design — one-page documentation template ("danieldeusing-docs").
 
   A single self-contained HTML file: the design system loads build-free from the
   jsDelivr CDN, so this opens directly in a browser with no build step.
 
-  Fill the {{PLACEHOLDERS}} with your content. The CDN URLs are pinned to a release
-  tag (@v0.1.1) — bump that to the latest tag of danieldeusing/danieldeusing-design.
-  Repeat a <section data-term> block per step/topic. Keep the pre-paint scripts and
-  the no-JS fallback intact (everything stays readable with JS off / reduced motion).
+  Fill the {{PLACEHOLDERS}}. The CDN URLs are pinned to a release tag (@v0.1.2) —
+  bump that to the latest tag of danieldeusing/danieldeusing-design.
+
+  Chrome (fixed by the template, do not restyle):
+    - top-left  : the "danieldeusing-docs" wordmark (always).
+    - top-right : a navigation dropdown — INCLUDE ONLY when the doc set has more
+                  than one page; for a single-page doc, delete the <details id="nav">.
+    - bottom-left  : [{{FOLDER}}] {{DOC_TITLE}}  e.g. "[pagr] Source Code documentation".
+    - bottom-right : the link to danieldeusing.de + the theme (page settings) dropdown.
+  Content (you fill): the title, the full-width lede, and the <section> blocks. Every
+  section has an id and a matching entry in the "On this page" table of contents.
 -->
 <html lang="en">
   <head>
@@ -30,147 +37,219 @@
         document.documentElement.dataset.theme = theme;
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg[theme]);
 
-        // animation gate: off if the OS or the user asked for no motion
         let animOff = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         try {
           if (localStorage.getItem("anim") === "off") animOff = true;
         } catch {}
         if (animOff) document.documentElement.classList.add("anim-off");
       })();
+
+      // Resolution-independent zoom: lay out at a fixed 1920px reference, then scale the
+      // whole view up on wider screens so the empty side-margins never exceed their
+      // 1920-reference proportion (a true zoom of everything, never below 1×). Pre-paint
+      // to avoid a flash.
+      (() => {
+        const REFERENCE_WIDTH = 1920;
+        const applyZoom = () => {
+          document.documentElement.style.zoom = String(Math.max(1, window.innerWidth / REFERENCE_WIDTH));
+        };
+        applyZoom();
+        window.addEventListener("resize", applyZoom);
+      })();
     </script>
 
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.1/dist/danieldeusing-design.min.css"
+      href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/dist/danieldeusing-design.min.css"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.1/src/fonts.css"
+      href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/src/fonts.css"
     />
 
     <style>
       /* Page-only layout. The design system ships the visual identity; a build-free
          page brings its own layout. */
-      .wrap { max-width: 60rem; margin-inline: auto; padding: 2.5rem 1.5rem 6rem; }
+      .wrap { max-width: 78rem; margin-inline: auto; padding: 2.5rem 1.5rem 5rem; }
+
+      /* header / footer chrome bars (mirror the pagr/seedr terminal chrome) */
       header.bar {
         position: sticky; top: 0; z-index: 30;
         display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-        padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--card);
+        padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--card);
       }
-      header.bar .brand { display: inline-flex; align-items: center; font-weight: 700; font-size: 1.05rem; }
-      h1.title { font-size: 1.7rem; font-weight: 700; margin: 0.4rem 0 0.4rem; }
-      .lede { color: var(--muted-foreground); max-width: 64ch; }
-      section.doc { margin-top: 2.75rem; }
-      .body { margin-top: 0.85rem; }
-      .body > * + * { margin-top: 0.75rem; }
-      ol.steps { counter-reset: step; padding: 0; }
-      ol.steps > li {
-        position: relative; padding-left: 2.25rem; margin-top: 0.6rem; counter-increment: step;
-      }
-      ol.steps > li::before {
-        content: counter(step); position: absolute; left: 0; top: 0;
-        width: 1.5rem; text-align: right; color: var(--primary); font-weight: 700;
-      }
-      .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
-      .pad { padding: 1rem; }
-      .muted { color: var(--muted-foreground); }
+      header.bar .brand { display: inline-flex; align-items: center; font-weight: 700; font-size: 1rem; }
       footer.status {
         position: fixed; inset-inline: 0; bottom: 0; z-index: 50; min-height: 2rem;
         display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-        padding: 0.35rem 1rem; border-top: 1px solid var(--border); background: var(--card); font-size: 0.7rem;
+        padding: 0.35rem 1.25rem; border-top: 1px solid var(--border); background: var(--card);
+        font-size: 0.7rem;
       }
+      .status-left { color: var(--muted-foreground); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .status-right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+      .sep { width: 1px; height: 0.9rem; background: var(--border); }
+      /* chrome links — never underlined (build-free page: no Tailwind utilities) */
+      .doc-link { color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
+      .doc-link:hover { color: var(--primary); }
+
+      /* content + table-of-contents layout (mirrors danieldeusing.de articles) */
+      .layout { display: grid; gap: 2.5rem; }
+      @media (min-width: 64rem) { .layout { grid-template-columns: minmax(0, 1fr) 13rem; } }
+      .content { min-width: 0; }
+      h1.title { font-size: 1.7rem; font-weight: 700; margin: 0.4rem 0 0.5rem; }
+      .lede { color: var(--muted-foreground); } /* full width — no max-width cap */
+
+      .toc { display: none; }
+      @media (min-width: 64rem) { .toc { display: block; } }
+      .toc-inner { position: sticky; top: 4.5rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
+      .toc-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); }
+      .toc nav { margin-top: 0.6rem; display: flex; flex-direction: column; }
+      .toc a { padding: 0.22rem 0; font-size: 0.76rem; color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
+      .toc a:hover, .toc a.active { color: var(--primary); }
+
+      section.doc { margin-top: 2.5rem; scroll-margin-top: 4rem; }
+      .body { margin-top: 0.85rem; }
+      .body > * + * { margin-top: 0.75rem; }
+
+      /* content components the generator uses */
+      ol.steps { counter-reset: step; padding: 0; }
+      ol.steps > li { position: relative; padding-left: 2.25rem; margin-top: 0.6rem; counter-increment: step; }
+      ol.steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 1.5rem; text-align: right; color: var(--primary); font-weight: 700; }
+      ul.plain { padding-left: 1.1rem; }
+      ul.plain > li { margin-top: 0.3rem; }
+      .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+      .pad { padding: 1rem; }
+      .muted { color: var(--muted-foreground); }
+      code.inline { font-family: inherit; background: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; font-size: 0.92em; }
+      pre.block { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.86rem; line-height: 1.5; background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
+      table.kv { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+      table.kv th, table.kv td { text-align: left; vertical-align: top; padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid var(--border); }
+      table.kv th { color: var(--primary); font-weight: 700; white-space: nowrap; }
     </style>
   </head>
 
   <body>
     <header class="bar">
+      <!-- top-left: ALWAYS danieldeusing-docs -->
       <a href="#top" class="brand">
-        <span class="glow">{{WORKFLOW}}</span>
+        <span class="glow">danieldeusing-docs</span>
         <span class="cursor-block" aria-hidden="true"></span>
       </a>
-      <details class="dropdown">
-        <summary aria-label="theme">
-          <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
-          <span data-theme-label>warm</span>
-          <span aria-hidden="true">▾</span>
-        </summary>
+      <!-- top-right: navigation dropdown — KEEP ONLY for multi-page doc sets; delete for a single page -->
+      <details class="dropdown" id="nav">
+        <summary class="prompt" style="font-weight: 700">ls -l <span aria-hidden="true">▾</span></summary>
         <ul class="dropdown-panel dropdown-panel--down" role="list">
-          <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
-          <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
-          <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
-          <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+          <li><a class="dropdown-item" href="{{NAV_1_HREF}}">{{NAV_1_LABEL}}</a></li>
+          <li><a class="dropdown-item" href="{{NAV_2_HREF}}">{{NAV_2_LABEL}}</a></li>
         </ul>
       </details>
     </header>
 
     <main class="wrap" id="top">
-      <p class="prompt">cat {{WORKFLOW}}.md</p>
-      <h1 class="title">{{DOC_TITLE}}</h1>
-      <p class="lede">{{TAGLINE}}</p>
+      <div class="layout">
+        <div class="content">
+          <p class="prompt">cat {{FOLDER}}/README.md</p>
+          <h1 class="title">{{DOC_TITLE}}</h1>
+          <p class="lede">{{TAGLINE}}</p>
 
-      <!-- OVERVIEW -->
-      <section class="doc" data-term>
-        <p class="prompt">echo overview</p>
-        <div class="body" data-term-out>
-          <p>{{OVERVIEW}}</p>
+          <!-- one <section> per topic; each id must match a TOC entry. -->
+          <section class="doc" id="overview" data-term>
+            <p class="prompt">echo overview</p>
+            <div class="body" data-term-out>
+              <p>{{OVERVIEW}}</p>
+            </div>
+          </section>
+
+          <section class="doc" id="steps" data-term>
+            <p class="prompt">cat steps.txt</p>
+            <div class="body" data-term-out>
+              <ol class="steps">
+                <li>{{STEP_1}}</li>
+                <li>{{STEP_2}}</li>
+              </ol>
+            </div>
+          </section>
+
+          <section class="doc" id="notes" data-term>
+            <p class="prompt">cat notes.md</p>
+            <div class="body" data-term-out>
+              <p class="eli5"><span class="eli5-term">Note</span> {{NOTES}}</p>
+            </div>
+          </section>
         </div>
-      </section>
 
-      <!-- STEPS — repeat <li> per step -->
-      <section class="doc" data-term>
-        <p class="prompt">cat steps.txt</p>
-        <div class="body" data-term-out>
-          <ol class="steps">
-            <li>{{STEP_1}}</li>
-            <li>{{STEP_2}}</li>
-            <li>{{STEP_3}}</li>
-          </ol>
-        </div>
-      </section>
-
-      <!-- INPUTS / OUTPUTS -->
-      <section class="doc" data-term>
-        <p class="prompt">ls -l io/</p>
-        <div class="body" data-term-out>
-          <hr class="ascii-rule" />
-          <p><strong>Inputs.</strong> {{INPUTS}}</p>
-          <p><strong>Outputs.</strong> {{OUTPUTS}}</p>
-        </div>
-      </section>
-
-      <!-- EXAMPLES — repeat .card-terminal per example -->
-      <section class="doc" data-term>
-        <p class="prompt">ls -l examples/</p>
-        <div class="body" data-term-out>
-          <div class="grid">
-            <article class="card-terminal"><div class="pad"><strong>{{EXAMPLE_1_TITLE}}</strong><p class="muted">{{EXAMPLE_1_BODY}}</p></div></article>
-            <article class="card-terminal"><div class="pad"><strong>{{EXAMPLE_2_TITLE}}</strong><p class="muted">{{EXAMPLE_2_BODY}}</p></div></article>
+        <aside class="toc">
+          <div class="toc-inner">
+            <p class="toc-label">On this page</p>
+            <nav>
+              <a href="#overview" data-toc-link="overview">Overview</a>
+              <a href="#steps" data-toc-link="steps">Steps</a>
+              <a href="#notes" data-toc-link="notes">Notes</a>
+            </nav>
           </div>
-        </div>
-      </section>
-
-      <!-- NOTES -->
-      <section class="doc" data-term>
-        <p class="prompt">cat notes.md</p>
-        <div class="body" data-term-out>
-          <p class="eli5"><span class="eli5-term">Note</span> {{NOTES}}</p>
-          <p class="comment muted">{{FOOTER_NOTE}}</p>
-        </div>
-      </section>
+        </aside>
+      </div>
     </main>
 
     <footer class="status">
-      <span class="muted"><span class="glow">[{{WORKFLOW}}]</span> {{STATUS_LINE}}</span>
-      <a class="link-quiet no-underline" href="{{LINK_HREF}}">{{LINK_LABEL}}</a>
+      <!-- bottom-left: [folder] + the doc title -->
+      <span class="status-left"><span class="glow">[{{FOLDER}}]</span> {{DOC_TITLE}}</span>
+      <!-- bottom-right: danieldeusing.de link + theme (page settings) dropdown -->
+      <nav class="status-right">
+        <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+        <span class="sep" aria-hidden="true"></span>
+        <details class="dropdown">
+          <summary aria-label="theme">
+            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
+            <span data-theme-label>warm</span>
+            <span aria-hidden="true">▾</span>
+          </summary>
+          <ul class="dropdown-panel" role="list">
+            <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+          </ul>
+        </details>
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" title="Toggle animations">
+          <span data-anim-box aria-hidden="true">[x]</span>
+          <span>anim</span>
+        </button>
+      </nav>
     </footer>
 
     <script type="module">
-      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal } from
-        "https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.1/runtime/index.js";
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle } from
+        "https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();
       initTerminal();
+      initAnimToggle();
+
+      // table-of-contents scroll-spy: highlight the section currently in view
+      const tocLinks = Array.from(document.querySelectorAll("[data-toc-link]"));
+      const sections = tocLinks
+        .map((link) => document.getElementById(link.dataset.tocLink))
+        .filter(Boolean);
+      if (sections.length) {
+        const setActive = (id) => {
+          for (const link of tocLinks) link.classList.toggle("active", link.dataset.tocLink === id);
+        };
+        const visible = new Set();
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) visible.add(entry.target.id);
+              else visible.delete(entry.target.id);
+            }
+            const topmost = sections.find((section) => visible.has(section.id));
+            if (topmost) setActive(topmost.id);
+          },
+          { rootMargin: "0px 0px -70% 0px" },
+        );
+        for (const section of sections) observer.observe(section);
+      }
     </script>
   </body>
 </html>

@@ -13,4 +13,5 @@
 export * from "./theme.js";
 export * from "./zoom.js";
 export * from "./dropdown.js";
+export * from "./anim.js";
 export * from "./terminal.js";

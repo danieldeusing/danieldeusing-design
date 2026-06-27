@@ -18,6 +18,11 @@
         document.documentElement.dataset.theme = theme;
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", backgrounds[theme]);
       })();
+      // resolution-independent zoom: scale the whole layout up past a 1920px reference
+      (() => {
+        const z = () => { document.documentElement.style.zoom = String(Math.max(1, innerWidth / 1920)); };
+        z(); addEventListener("resize", z);
+      })();
     </script>
 
     <!-- The whole design system, build-free, from the local dist bundle. -->
@@ -68,19 +73,25 @@
         <span class="glow" style="font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em">danieldeusing-design</span>
         <span class="cursor-block" aria-hidden="true"></span>
       </a>
-      <details class="dropdown">
-        <summary>
-          <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
-          <span data-theme-label>warm</span>
-          <span aria-hidden="true">▾</span>
-        </summary>
-        <ul class="dropdown-panel dropdown-panel--down" role="list">
-          <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
-          <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
-          <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
-          <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
-        </ul>
-      </details>
+      <nav style="display: flex; align-items: center; gap: 1.25rem">
+        <details class="dropdown">
+          <summary>
+            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
+            <span data-theme-label>warm</span>
+            <span aria-hidden="true">▾</span>
+          </summary>
+          <ul class="dropdown-panel dropdown-panel--down" role="list">
+            <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+          </ul>
+        </details>
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" title="Toggle animations">
+          <span data-anim-box aria-hidden="true">[x]</span>
+          <span>anim</span>
+        </button>
+      </nav>
     </header>
 
     <main class="wrap" id="top">
@@ -169,10 +180,11 @@
 
     <!-- The runtime: theme switching, dropdown behaviour, terminal animation. -->
     <script type="module">
-      import { initThemeSwitcher, initDropdowns, initTerminal } from "../runtime/index.js";
+      import { initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle } from "../runtime/index.js";
       initThemeSwitcher();
       initDropdowns();
       initTerminal();
+      initAnimToggle();
     </script>
   </body>
 </html>

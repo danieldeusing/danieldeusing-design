@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.1.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.1.2 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -349,6 +349,27 @@ body::after {
   transition: color 0.15s ease;
 }
 .link-quiet:hover {
+  color: var(--primary);
+}
+
+/* Animations on/off toggle — a chrome control (footer/status bar). Pairs with
+   runtime/anim.js and the html.anim-off kill-switch. The [data-anim-box] glyph
+   lights up in the primary colour while animations are enabled. */
+.anim-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  color: var(--muted-foreground);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.anim-toggle:hover {
+  color: var(--primary);
+}
+.anim-toggle[aria-pressed="true"] [data-anim-box] {
   color: var(--primary);
 }
 

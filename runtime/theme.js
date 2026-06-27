@@ -102,6 +102,8 @@ export function initThemeSwitcher(options) {
       const theme = /** @type {HTMLElement} */ (button).dataset.themeValue;
       if (theme) setTheme(/** @type {Theme} */ (theme), options);
       syncLabel();
+      // close the enclosing dropdown after a pick (no-op if not inside one)
+      button.closest("details.dropdown")?.removeAttribute("open");
     });
   });
 }

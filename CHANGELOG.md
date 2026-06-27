@@ -9,6 +9,21 @@ immutable tag (`vX.Y.Z`). Pin that tag in production CDN URLs.
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-06-27
+
+Make the chrome controls reusable so every consumer (apps + one-page docs) shares them.
+
+### Added
+
+- **`.anim-toggle`** component class + **`initAnimToggle()`** runtime — a footer/status-bar
+  "animations on/off" control wired to `html.anim-off` + `localStorage "anim"` (was duplicated
+  inline in each app).
+
+### Changed
+
+- **`initThemeSwitcher()`** now closes the enclosing `<details class="dropdown">` after a theme
+  is picked (no-op when the switcher isn't inside a dropdown).
+
 ## [0.1.1] — 2026-06-26
 
 Sync the core with the canonical terminal animation as it evolved in pagr.
@@ -52,6 +67,7 @@ standalone, framework-agnostic package.
 - **Docs**: `examples/style-guide.html`, `templates/documentation.html`, and migration plans
   under `docs/migrations/`.
 
-[Unreleased]: https://github.com/danieldeusing/danieldeusing-design/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/danieldeusing/danieldeusing-design/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/danieldeusing/danieldeusing-design/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/danieldeusing/danieldeusing-design/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/danieldeusing/danieldeusing-design/releases/tag/v0.1.0

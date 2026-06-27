@@ -32,7 +32,7 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f5efe2" />
 
-    <!-- pre-paint: apply the saved theme before first paint to avoid a flash -->
+    <!-- pre-paint: apply the saved theme + resolution zoom before first paint -->
     <script>
       (() => {
         const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
@@ -41,11 +41,16 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
         document.documentElement.dataset.theme = t;
         document.querySelector('meta[name=theme-color]')?.setAttribute("content", bg[t]);
       })();
+      // resolution-independent zoom: scale the whole layout up past a 1920px reference
+      (() => {
+        const z = () => { document.documentElement.style.zoom = String(Math.max(1, innerWidth / 1920)); };
+        z(); addEventListener("resize", z);
+      })();
     </script>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.1/dist/danieldeusing-design.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/dist/danieldeusing-design.min.css" />
     <!-- optional: the real JetBrains Mono webfont (otherwise falls back to Menlo) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.1/src/fonts.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/src/fonts.css" />
   </head>
   <body>
     <p class="prompt">cat hello.txt</p>
@@ -54,7 +59,7 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
 
     <script type="module">
       import { initThemeSwitcher, initDropdowns, initTerminal } from
-        "https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.1/runtime/index.js";
+        "https://cdn.jsdelivr.net/gh/danieldeusing/danieldeusing-design@v0.1.2/runtime/index.js";
       initThemeSwitcher();
       initDropdowns();
       initTerminal();
@@ -105,14 +110,17 @@ Four dependency-free ES modules, tree-shakeable from `@danieldeusing/design/runt
 | `setTheme(name)` / `initThemeSwitcher()` | Switch themes and wire `[data-theme-value]` buttons + `[data-theme-label]`. |
 | `initTerminal()` | The `$ command` typing animation. No-ops under reduced motion / `html.anim-off`. |
 | `initDropdowns()` | `<details class="dropdown">` behaviour: one-open, click-away, Escape. |
+| `initAnimToggle()` | Wire `[data-anim-toggle]` buttons (`.anim-toggle`) to flip `html.anim-off` + persist it. |
 | `initResolutionZoom(1920)` | Scale the whole layout up on screens wider than the reference width. |
 
 ```js
-import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal } from "@danieldeusing/design/runtime";
+import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initResolutionZoom } from "@danieldeusing/design/runtime";
 applyStoredTheme();       // ideally inline, pre-paint
+initResolutionZoom();     // ideally inline, pre-paint (no flash)
 initThemeSwitcher();
 initDropdowns();
 initTerminal();
+initAnimToggle();
 ```
 
 The runtime is **progressive enhancement**: with JS disabled, or `prefers-reduced-motion`, all

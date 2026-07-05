@@ -60,11 +60,11 @@
 
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/dist/danieldeusing-design.min.css"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.4/dist/danieldeusing-design.min.css"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/src/fonts.css"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.4/src/fonts.css"
     />
 
     <style>
@@ -72,25 +72,7 @@
          page brings its own layout. */
       .wrap { max-width: 78rem; margin-inline: auto; padding: 2.5rem 1.5rem 5rem; }
 
-      /* header / footer chrome bars (mirror the pagr/seedr terminal chrome) */
-      header.bar {
-        position: sticky; top: 0; z-index: 30;
-        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-        padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--card);
-      }
-      header.bar .brand { display: inline-flex; align-items: center; font-weight: 700; font-size: 1rem; }
-      footer.status {
-        position: fixed; inset-inline: 0; bottom: 0; z-index: 50; min-height: 2rem;
-        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-        padding: 0.35rem 1.25rem; border-top: 1px solid var(--border); background: var(--card);
-        font-size: 0.7rem;
-      }
-      .status-left { color: var(--muted-foreground); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .status-right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
-      .sep { width: 1px; height: 0.9rem; background: var(--border); }
-      /* chrome links — never underlined (build-free page: no Tailwind utilities) */
-      .doc-link { color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
-      .doc-link:hover { color: var(--primary); }
+      /* header/footer chrome + nav now ship with the design system (src/chrome.css) */
 
       /* content + table-of-contents layout (mirrors danieldeusing.de articles) */
       .layout { display: grid; gap: 2.5rem; }
@@ -129,20 +111,51 @@
   </head>
 
   <body>
+    <a href="#top" class="skip-link">skip to content</a>
     <header class="bar">
       <!-- top-left: ALWAYS danieldeusing-docs -->
       <a href="#top" class="brand">
         <span class="glow">danieldeusing-docs</span>
         <span class="cursor-block" aria-hidden="true"></span>
       </a>
-      <!-- top-right: navigation dropdown — KEEP ONLY for multi-page doc sets; delete for a single page -->
-      <details class="dropdown" id="nav">
-        <summary class="prompt" style="font-weight: 700">ls -l <span aria-hidden="true">▾</span></summary>
-        <ul class="dropdown-panel dropdown-panel--down" role="list">
-          <li><a class="dropdown-item" href="{{NAV_1_HREF}}">{{NAV_1_LABEL}}</a></li>
-          <li><a class="dropdown-item" href="{{NAV_2_HREF}}">{{NAV_2_LABEL}}</a></li>
+      <!-- top-right: navigation. Desktop = the `ls -l` dropdown; mobile = the
+           burger button toggling a full-width menu with the footer folded in
+           (chrome kit: src/chrome.css + runtime initBurgerNav). For a
+           single-page doc, delete the whole <nav> + burger. -->
+      <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+      </button>
+      <nav aria-label="site" id="site-nav" class="site-nav"><details class="dropdown" id="nav">
+        <summary class="prompt" style="font-weight: 700" aria-label="site navigation">ls -l <span aria-hidden="true">▾</span></summary>
+        <ul class="dropdown-panel dropdown-panel--down ls-panel" role="list">
+          <li><a class="dropdown-item ls-row" href="{{NAV_1_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_1_LABEL}}</span></a></li>
+          <li><a class="dropdown-item ls-row" href="{{NAV_2_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
         </ul>
       </details>
+      <ul class="mobile-nav" role="list">
+        <li><a class="mobile-item ls-row" href="{{NAV_1_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_1_LABEL}}</span></a></li>
+        <li><a class="mobile-item ls-row" href="{{NAV_2_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
+      </ul>
+      <div class="mobile-footer">
+        <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+        <details class="mobile-theme">
+          <summary>
+            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
+            <span data-theme-label>warm</span>
+            <span class="mf-chev" aria-hidden="true">▾</span>
+          </summary>
+          <div class="mf-panel">
+            <button type="button" class="dropdown-item" data-theme-value="warm">warm</button>
+            <button type="button" class="dropdown-item" data-theme-value="green">green</button>
+            <button type="button" class="dropdown-item" data-theme-value="mono">mono</button>
+            <button type="button" class="dropdown-item" data-theme-value="paper">paper</button>
+          </div>
+        </details>
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" title="Toggle animations">
+          <span data-anim-box aria-hidden="true">[x]</span>
+          <span>anim</span>
+        </button>
+      </div></nav>
     </header>
 
     <main class="wrap" id="top">
@@ -219,13 +232,14 @@
     </footer>
 
     <script type="module">
-      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/runtime/index.js";
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav } from
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.4/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();
       initTerminal();
       initAnimToggle();
+      initBurgerNav();
 
       // table-of-contents scroll-spy: highlight the section currently in view
       const tocLinks = Array.from(document.querySelectorAll("[data-toc-link]"));

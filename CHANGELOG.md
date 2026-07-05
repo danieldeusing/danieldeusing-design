@@ -7,6 +7,19 @@ All notable changes to this project are documented here. The format follows
 jsDelivr serves the committed `dist/` bundle per git tag, so every release is cut as an
 immutable tag (`vX.Y.Z`). Pin that tag in production CDN URLs.
 
+## 0.1.4 (2026-07-05)
+
+- **chrome kit** (`src/chrome.css`): the full app chrome as reusable components —
+  sticky `header.bar`, fixed `footer.status`, skip-link/visually-hidden helpers,
+  `ls -l` listing rows (`.ls-row`/`.ls-perm`/`.ls-panel`, right-anchored), and the
+  responsive site nav: desktop dropdown, **mobile burger** (`.nav-burger` +
+  `.site-nav`/`.mobile-nav`) with the **footer folded into the menu**
+  (`.mobile-footer`) and the fixed footer hidden below 48rem — the
+  danieldeusing.de pattern, extracted so apps stop rebuilding it.
+- **runtime**: `initBurgerNav()` (`runtime/nav.js`) — burger toggle,
+  outside-click + Escape close, aria-expanded sync.
+- template updated to use the chrome kit.
+
 ## [Unreleased]
 
 ## [0.1.2] — 2026-06-27

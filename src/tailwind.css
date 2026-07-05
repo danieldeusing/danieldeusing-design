@@ -17,6 +17,7 @@
 @import "./tokens.css";
 @import "./base.css";
 @import "./components.css";
+@import "./chrome.css";
 
 @theme inline {
   --color-background: var(--background);

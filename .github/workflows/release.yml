@@ -36,8 +36,10 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       # Trusted Publishing needs npm CLI >= 11.5.1; Node 22 ships an older npm.
+      # PINNED (not @latest): 2026-07 npm@latest broke provenance publishes with
+      # "Cannot find module 'sigstore'" — 11.5.1 is the known-good TP minimum.
       - name: Upgrade npm to a Trusted-Publishing-capable version
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.5.1
 
       - name: Resolve version
         id: meta

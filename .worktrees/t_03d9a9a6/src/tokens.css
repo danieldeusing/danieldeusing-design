@@ -1,0 +1,116 @@
+/*
+ * danieldeusing-design — design tokens.
+ *
+ * The single source of truth for the "terminal" theme: CRT phosphor on
+ * JetBrains Mono, $-prompts, ASCII rules, scanline overlay. Four variants
+ * selected via html[data-theme]: warm (default), green, mono, paper.
+ * :root holds the warm defaults so the theme works with no attribute set.
+ *
+ * These are plain CSS custom properties — they work in any framework, any
+ * browser, with or without a build step. Load this file first; base.css and
+ * components.css resolve against the variables declared here.
+ */
+
+:root {
+  --background: #f5efe2;
+  --foreground: #43352a;
+  --card: #efe7d4;
+  --card-foreground: #43352a;
+  --popover: #efe7d4;
+  --popover-foreground: #43352a;
+  --primary: #8a4516;
+  --primary-foreground: #f8f3e8;
+  --secondary: #ece3cf;
+  --secondary-foreground: #43352a;
+  --muted: #ece3cf;
+  --muted-foreground: #71614e;
+  --accent: #8a4516;
+  --accent-foreground: #f8f3e8;
+  --destructive: #a02c2c;
+  --border: #d9cdb6;
+  --input: #d9cdb6;
+  --ring: #8a4516;
+
+  --glow: rgba(160, 82, 45, 0.1);
+  --glow-soft: rgba(160, 82, 45, 0.05);
+  --scanline-opacity: 0.15;
+
+  --radius: 0rem;
+
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "Menlo", monospace;
+}
+
+/* CRT phosphor green */
+html[data-theme="green"] {
+  --background: #020604;
+  --foreground: #4fdd7d;
+  --card: #04110a;
+  --card-foreground: #4fdd7d;
+  --popover: #04110a;
+  --popover-foreground: #4fdd7d;
+  --primary: #33ff66;
+  --primary-foreground: #02160a;
+  --secondary: #071509;
+  --secondary-foreground: #4fdd7d;
+  --muted: #071509;
+  --muted-foreground: #3da45e;
+  --accent: #33ff66;
+  --accent-foreground: #02160a;
+  --destructive: #ff5c5c;
+  --border: #1c4a2c;
+  --input: #1c4a2c;
+  --ring: #33ff66;
+  --glow: rgba(51, 255, 102, 0.35);
+  --glow-soft: rgba(51, 255, 102, 0.12);
+  --scanline-opacity: 0.5;
+}
+
+/* white-phosphor terminal */
+html[data-theme="mono"] {
+  --background: #050505;
+  --foreground: #d4d4d4;
+  --card: #0d0d0d;
+  --card-foreground: #d4d4d4;
+  --popover: #0d0d0d;
+  --popover-foreground: #d4d4d4;
+  --primary: #ffffff;
+  --primary-foreground: #050505;
+  --secondary: #111111;
+  --secondary-foreground: #d4d4d4;
+  --muted: #111111;
+  --muted-foreground: #8a8a8a;
+  --accent: #ffffff;
+  --accent-foreground: #050505;
+  --destructive: #ff5c5c;
+  --border: #333333;
+  --input: #333333;
+  --ring: #ffffff;
+  --glow: rgba(255, 255, 255, 0.25);
+  --glow-soft: rgba(255, 255, 255, 0.08);
+  --scanline-opacity: 0.45;
+}
+
+/* black-on-white terminal (e-ink / printout) */
+html[data-theme="paper"] {
+  --background: #fafafa;
+  --foreground: #1f1f1f;
+  --card: #f1f1f1;
+  --card-foreground: #1f1f1f;
+  --popover: #f1f1f1;
+  --popover-foreground: #1f1f1f;
+  --primary: #000000;
+  --primary-foreground: #fafafa;
+  --secondary: #efefef;
+  --secondary-foreground: #1f1f1f;
+  --muted: #efefef;
+  --muted-foreground: #595959;
+  --accent: #000000;
+  --accent-foreground: #fafafa;
+  --destructive: #b3261e;
+  --border: #d4d4d4;
+  --input: #d4d4d4;
+  --ring: #000000;
+  --glow: rgba(0, 0, 0, 0.06);
+  --glow-soft: rgba(0, 0, 0, 0.04);
+  --scanline-opacity: 0.12;
+}

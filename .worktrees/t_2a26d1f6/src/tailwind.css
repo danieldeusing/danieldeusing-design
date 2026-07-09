@@ -18,7 +18,6 @@
 @import "./base.css";
 @import "./components.css";
 @import "./chrome.css";
-@import "./tooltip.css";
 
 @theme inline {
   --color-background: var(--background);

@@ -1,0 +1,16 @@
+/*
+ * tooltip.css — styles for the [data-tip] tooltip system (runtime/tooltip.js).
+ * The panel is a body-level singleton with position:fixed — it can never be
+ * clipped by overflow containers and always sits on top.
+ */
+[data-tip] { cursor: help; }
+span[data-tip], th[data-tip] { border-bottom: 1px dotted var(--muted-foreground); }
+
+#ddtip {
+  position: fixed; z-index: 9999; display: none; max-width: 340px;
+  background: var(--background); color: var(--foreground);
+  border: 1px solid var(--muted-foreground); border-radius: 4px;
+  padding: 7px 10px; font-size: 0.72rem; line-height: 1.45; font-weight: 400;
+  text-align: left; white-space: normal; pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}

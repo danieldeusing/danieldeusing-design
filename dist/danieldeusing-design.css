@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.1.4 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.1.5 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -741,4 +741,22 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
     background: none; border: 0; padding: 0.2rem 0; color: var(--muted-foreground);
     font: inherit; cursor: pointer;
   }
+}
+
+/* ===== tooltip.css ===== */
+/*
+ * tooltip.css — styles for the [data-tip] tooltip system (runtime/tooltip.js).
+ * The panel is a body-level singleton with position:fixed — it can never be
+ * clipped by overflow containers and always sits on top.
+ */
+[data-tip] { cursor: help; }
+span[data-tip], th[data-tip] { border-bottom: 1px dotted var(--muted-foreground); }
+
+#ddtip {
+  position: fixed; z-index: 9999; display: none; max-width: 340px;
+  background: var(--background); color: var(--foreground);
+  border: 1px solid var(--muted-foreground); border-radius: 4px;
+  padding: 7px 10px; font-size: 0.72rem; line-height: 1.45; font-weight: 400;
+  text-align: left; white-space: normal; pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }

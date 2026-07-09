@@ -11,3 +11,6 @@ node_modules/
 # the build outputs in dist/ and tokens/tokens.json ARE committed on purpose
 # (they are what jsDelivr serves and what native consumers read), so they are
 # intentionally NOT ignored here.
+
+# hermes kanban worktrees (tester profile)
+.worktrees/

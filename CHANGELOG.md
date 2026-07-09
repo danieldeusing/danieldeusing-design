@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format follows
 jsDelivr serves the committed `dist/` bundle per git tag, so every release is cut as an
 immutable tag (`vX.Y.Z`). Pin that tag in production CDN URLs.
 
+## 0.1.5 (2026-07-09)
+
+### Added
+- `[data-tip]` tooltip system: `runtime/tooltip.js` (`initTooltips()`) + `src/tooltip.css`.
+  Body-level singleton, `position: fixed`, viewport-clamped (clamps horizontally, flips
+  above when out of room) — tooltips are never cut off and always render on top of any
+  overflow/clip context. Event-delegated (dynamic nodes work), hover + keyboard focus.
+
+### Fixed
+- `.worktrees/` (hermes tester worktrees) untracked + gitignored; was accidentally
+  committed once, never published (npm `files` whitelist).
+
 ## 0.1.4 (2026-07-05)
 
 - **chrome kit** (`src/chrome.css`): the full app chrome as reusable components —

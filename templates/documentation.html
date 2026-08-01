@@ -5,8 +5,8 @@
   A single self-contained HTML file: the design system loads build-free from the
   jsDelivr CDN, so this opens directly in a browser with no build step.
 
-  Fill the {{PLACEHOLDERS}}. The CDN URLs are pinned to a release tag (@v0.1.2) —
-  bump that to the latest tag of danieldeusing/danieldeusing-design.
+  Fill the {{PLACEHOLDERS}}. The CDN URLs are pinned to a published release (@0.1.6) — bump to the current
+  version in package.json (the git tags lag behind releases).
 
   Chrome (fixed by the template, do not restyle):
     - top-left  : the "danieldeusing-docs" wordmark (always).
@@ -60,11 +60,11 @@
 
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.4/dist/danieldeusing-design.min.css"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.6/dist/danieldeusing-design.min.css"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.4/src/fonts.css"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.6/src/fonts.css"
     />
 
     <style>
@@ -104,9 +104,27 @@
       .muted { color: var(--muted-foreground); }
       code.inline { font-family: inherit; background: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; font-size: 0.92em; }
       pre.block { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.86rem; line-height: 1.5; background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
+      /* Wide tables must scroll inside their own container, never the page.
+         Always wrap table.kv (and any custom table variant) like this:
+           <div class="table-scroll"><table class="kv">...</table></div>
+         Without the wrapper, a long code snippet or a multi-item cell forces
+         the table wider than its column and the WHOLE PAGE gains a horizontal
+         scrollbar instead of just the table — easy to miss until content is
+         wide enough to trigger it (many-column tables, file-path lists, long
+         inline code). Never set `white-space: nowrap` on a table cell that can
+         hold more than one short token (e.g. a list of file names) — nowrap on
+         a multi-item cell is what forces the runaway width in the first place. */
+      .table-scroll { overflow-x: auto; max-width: 100%; }
       table.kv { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
       table.kv th, table.kv td { text-align: left; vertical-align: top; padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid var(--border); }
       table.kv th { color: var(--primary); font-weight: 700; white-space: nowrap; }
+
+      /* Mermaid diagrams. Before rendering, the <pre> shows the raw diagram source —
+         so with JS disabled (or if the CDN is unreachable) the page degrades to a
+         readable text diagram instead of an empty box. */
+      pre.mermaid { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.86rem; line-height: 1.5; background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
+      pre.mermaid[data-processed] { white-space: normal; text-align: center; }
+      pre.mermaid svg { max-width: 100%; height: auto; }
     </style>
   </head>
 
@@ -183,6 +201,26 @@
             </div>
           </section>
 
+          <!-- Flow diagrams use Mermaid — never hand-drawn ASCII art.
+               IMPORTANT: inside a <pre>, write line breaks in node labels as the
+               ESCAPED entity &lt;br/&gt;. A raw <br/> would be parsed as an HTML
+               element by the browser, and the renderer (which reads textContent)
+               would receive a label with the break silently stripped out. -->
+          <section class="doc" id="flow" data-term>
+            <p class="prompt">cat flow.mmd</p>
+            <div class="body" data-term-out>
+              <pre class="mermaid">
+flowchart TD
+    A["{{FLOW_START}}"] --> B{"{{FLOW_DECISION}}"}
+    B -- yes --> C["{{FLOW_YES}}"]
+    B -- no --> D["{{FLOW_NO}}"]
+
+    class D warn
+    classDef warn fill:#a02c2c22,stroke:#a02c2c,stroke-width:2px
+</pre>
+            </div>
+          </section>
+
           <section class="doc" id="notes" data-term>
             <p class="prompt">cat notes.md</p>
             <div class="body" data-term-out>
@@ -197,6 +235,7 @@
             <nav>
               <a href="#overview" data-toc-link="overview">Overview</a>
               <a href="#steps" data-toc-link="steps">Steps</a>
+              <a href="#flow" data-toc-link="flow">Flow</a>
               <a href="#notes" data-toc-link="notes">Notes</a>
             </nav>
           </div>
@@ -233,13 +272,90 @@
 
     <script type="module">
       import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.4/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.6/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();
       initTerminal();
       initAnimToggle();
       initBurgerNav();
+
+      // Mermaid diagrams — themed from the design tokens, re-rendered on theme switch.
+      // Delete this block (and the pre.mermaid CSS) if the page has no diagrams.
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.esm.min.mjs";
+
+      const diagrams = Array.from(document.querySelectorAll("pre.mermaid"));
+      if (diagrams.length) {
+        // capture the sources before the first render replaces them with SVG
+        for (const node of diagrams) node.dataset.mermaidSource = node.textContent;
+
+        // Renders are serialized: applyStoredTheme() writes data-theme on startup, so an
+        // unguarded observer would kick off a second pass while the first is still
+        // running — two passes mutating the same nodes stack every diagram into one box.
+        let renderPass = 0;
+        let pending = Promise.resolve();
+
+        const renderDiagrams = () => {
+          pending = pending.then(async () => {
+            const pass = (renderPass += 1);
+            const styles = getComputedStyle(document.documentElement);
+            const token = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+            mermaid.initialize({
+              startOnLoad: false,
+              securityLevel: "strict",
+              fontFamily: token("--font-mono", "monospace"),
+              flowchart: { htmlLabels: true, useMaxWidth: true },
+              themeVariables: {
+                background: token("--background", "#f5efe2"),
+                primaryColor: token("--card", "#efe7d4"),
+                primaryTextColor: token("--foreground", "#43352a"),
+                primaryBorderColor: token("--border", "#d9cdb6"),
+                secondaryColor: token("--muted", "#ece3cf"),
+                tertiaryColor: token("--muted", "#ece3cf"),
+                lineColor: token("--muted-foreground", "#71614e"),
+                textColor: token("--foreground", "#43352a"),
+                mainBkg: token("--card", "#efe7d4"),
+                nodeBorder: token("--border", "#d9cdb6"),
+                clusterBkg: token("--muted", "#ece3cf"),
+                clusterBorder: token("--border", "#d9cdb6"),
+                edgeLabelBackground: token("--background", "#f5efe2"),
+                titleColor: token("--primary", "#8a4516"),
+              },
+            });
+            // render ids must be unique per pass, or a re-render collides with itself
+            for (const [index, node] of diagrams.entries()) {
+              try {
+                const { svg } = await mermaid.render(`mermaid-svg-${index}-${pass}`, node.dataset.mermaidSource);
+                node.innerHTML = svg;
+                node.dataset.processed = "true";
+              } catch {
+                // a broken diagram falls back to its source — it must never blank the box
+                node.textContent = node.dataset.mermaidSource;
+                node.removeAttribute("data-processed");
+              }
+            }
+          });
+          return pending;
+        };
+
+        // Wait for the terminal reveal: a diagram inside a not-yet-revealed
+        // [data-term-out] is visibility:hidden, and Mermaid would size it against a
+        // container it cannot measure properly. With animation off, render at once.
+        if (document.documentElement.classList.contains("anim-off") || window.termContentDone) {
+          void renderDiagrams();
+        } else {
+          window.addEventListener("term:contentdone", () => void renderDiagrams(), { once: true });
+        }
+
+        // re-render with the new palette, but only when the theme actually changed
+        let lastTheme = document.documentElement.dataset.theme;
+        new MutationObserver(() => {
+          const theme = document.documentElement.dataset.theme;
+          if (theme === lastTheme) return;
+          lastTheme = theme;
+          void renderDiagrams();
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+      }
 
       // table-of-contents scroll-spy: highlight the section currently in view
       const tocLinks = Array.from(document.querySelectorAll("[data-toc-link]"));

@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.1.5 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.1.6 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -759,4 +759,357 @@ span[data-tip], th[data-tip] { border-bottom: 1px dotted var(--muted-foreground)
   padding: 7px 10px; font-size: 0.72rem; line-height: 1.45; font-weight: 400;
   text-align: left; white-space: normal; pointer-events: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* ===== print.css ===== */
+/*
+ * danieldeusing-design — print layer.
+ *
+ * Paper is a different device, not a narrow screen. This layer strips the parts
+ * of the terminal look that only exist to sell "a CRT is running" — scanlines,
+ * phosphor glow, sticky chrome, the reveal animation — and lays the content out
+ * as a document: black on white, 12px body text, sane page breaks.
+ *
+ * Load LAST (index.css imports it after every other layer) so its token
+ * overrides win on source order without needing !important on each one.
+ *
+ * Three things here are load-bearing and easy to lose in a refactor:
+ *
+ *   1. The terminal reveal is forced open. runtime/terminal.js only reveals a
+ *      [data-term-out] once its section scrolls into view, so a long page that
+ *      is printed straight after load has most of its content sitting at
+ *      visibility:hidden. Printing it would silently produce blank pages — the
+ *      reader only finds out on paper. Everything is forced visible here
+ *      regardless of animation state.
+ *   2. `zoom` is reset. Pages that use the resolution-independent zoom trick
+ *      (html.style.zoom = innerWidth / 1920) carry that multiplier into the
+ *      print box, which is what makes a printout come out oversized.
+ *   3. Mermaid bakes the ACTIVE theme's colours into the SVG at render time, so
+ *      a diagram rendered under `green`/`mono` is dark-on-dark on paper no
+ *      matter what the page tokens say. The SVG parts are repainted below.
+ */
+
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+
+  /* ── ink-frugal palette, whatever theme is on screen ────────────────────
+     `html[data-theme]` matches the specificity of the themed token blocks in
+     tokens.css and comes later in the bundle, so it wins for every theme. */
+  :root,
+  html,
+  html[data-theme] {
+    --background: #ffffff;
+    --foreground: #111111;
+    --card: #ffffff;
+    --card-foreground: #111111;
+    --popover: #ffffff;
+    --popover-foreground: #111111;
+    --primary: #000000;
+    --primary-foreground: #ffffff;
+    --secondary: #ffffff;
+    --secondary-foreground: #111111;
+    --muted: #ffffff;
+    --muted-foreground: #444444;
+    --accent: #000000;
+    --accent-foreground: #ffffff;
+    --destructive: #7a1c1c;
+    --border: #9a9a9a;
+    --input: #9a9a9a;
+    --ring: #000000;
+    --glow: transparent;
+    --glow-soft: transparent;
+    --scanline-opacity: 0;
+  }
+
+  /* ── document metrics ──────────────────────────────────────────────────
+     The rem baseline is pinned so the design's rem scale lands where it was
+     drawn, and the body size is stated in px so it is 12px on paper whatever
+     the browser's default font size is. `zoom` is a screen-only device. */
+  html {
+    zoom: 1 !important;
+    font-size: 16px;
+    scroll-behavior: auto;
+  }
+
+  body {
+    background: #ffffff;
+    color: var(--foreground);
+    font-size: 12px;
+    line-height: 1.45;
+    overflow: visible;
+  }
+
+  /* CRT scanline overlay: a fixed, full-viewport gradient — on paper it is a
+     grey wash over the page. */
+  body::after {
+    display: none !important;
+  }
+
+  /* ── nothing animates on paper ─────────────────────────────────────────
+     Also the mechanism that un-hides the terminal reveal: the keyframes use
+     `both`, so killing the animation restores the element's own opacity. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  /* ── the reveal must never decide what lands on paper ──────────────────
+     See note 1 at the top of this file. */
+  html.term-anim [data-term] [data-term-out],
+  html.term-anim [data-term] [data-term-out]:not(.term-show),
+  html.term-anim [data-term] [data-term-out] > * {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  html.term-anim [data-term] .prompt:not(.term-live) {
+    color: var(--muted-foreground) !important;
+  }
+  html.term-anim [data-term] .prompt:not(.term-live)::before {
+    color: var(--primary) !important;
+  }
+
+  /* ── screen-only chrome ────────────────────────────────────────────────
+     .toc is the "On this page" navigator: a screen affordance with no meaning
+     on paper, and the first thing that makes a printout look broken. */
+  header.bar,
+  footer.status,
+  .site-nav,
+  .nav-burger,
+  .mobile-nav,
+  .mobile-footer,
+  .skip-link,
+  .dropdown,
+  .dropdown-panel,
+  .anim-toggle,
+  .cursor-block,
+  .term-caret,
+  .ascii-rule,
+  .toc,
+  #ddtip {
+    display: none !important;
+  }
+
+  [data-tip] {
+    cursor: auto;
+  }
+  span[data-tip],
+  th[data-tip] {
+    border-bottom: 0;
+  }
+
+  /* ── layout: the page is the column ────────────────────────────────────
+     .wrap/.layout/.content are the documentation-template vocabulary shipped
+     in templates/documentation.html. */
+  .wrap {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .layout {
+    display: block !important;
+  }
+  .content {
+    min-width: 0;
+  }
+
+  /* ── heading hierarchy against a 12px body ─────────────────────────────
+     24 / 18 / 16 / 14 px. !important because page-level rules give these
+     classes a higher specificity than a bare element selector. */
+  h1,
+  .title {
+    font-size: 1.5rem !important;
+  }
+  h2 {
+    font-size: 1.15rem !important;
+  }
+  h3,
+  .sub {
+    font-size: 1rem !important;
+  }
+  h4 {
+    font-size: 0.9rem !important;
+  }
+
+  .prompt {
+    font-size: 0.7rem;
+  }
+
+  /* ── page breaks ───────────────────────────────────────────────────────
+     A heading (or a `$ command` section header) must never be the last thing
+     on a page. Tables break between rows and repeat their header; everything
+     that reads as one unit stays together. */
+  h1,
+  h2,
+  h3,
+  h4,
+  .prompt,
+  .toc-label {
+    break-after: avoid-page;
+    break-inside: avoid;
+  }
+  p,
+  li,
+  blockquote {
+    orphans: 3;
+    widows: 3;
+  }
+  pre,
+  figure,
+  blockquote,
+  tr,
+  img,
+  .eli5,
+  .card-terminal {
+    break-inside: avoid;
+  }
+  /* NOT svg. A mermaid flowchart is routinely taller than a printed page;
+     `break-inside: avoid` on the SVG pushes it past the page boundary while its
+     wrapper stays behind, which prints an entire page as an empty bordered box.
+     Let the SVG break where the wrapper breaks. */
+  svg {
+    break-inside: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* ── nothing scrolls on paper ──────────────────────────────────────────
+     An overflow-x container has no scrollbar in print: whatever sits past the
+     right edge is simply gone. Let it wrap instead. */
+  .table-scroll,
+  pre,
+  .diagram {
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+  pre {
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere;
+    font-size: 0.75rem !important;
+    background: transparent !important;
+  }
+  pre.mermaid[data-processed] {
+    white-space: normal !important;
+  }
+  code {
+    background: transparent !important;
+    overflow-wrap: anywhere;
+  }
+
+  table {
+    width: 100% !important;
+    table-layout: auto;
+    border-collapse: collapse;
+    font-size: 0.75rem !important;
+  }
+  /* `overflow-wrap: break-word` and NOT `anywhere`: `anywhere` also shrinks a
+     cell's min-content width to one character, and the auto table layout then
+     collapses a short column to nothing ("Orchestrator" set as "Orche/strat/or"
+     down a 6-character column). Only the elements that actually hold
+     unbreakable strings — paths, URLs, identifiers — get to break anywhere. */
+  th,
+  td {
+    overflow-wrap: break-word;
+    white-space: normal !important;
+  }
+  td code,
+  th code,
+  td a,
+  th a {
+    overflow-wrap: anywhere;
+  }
+
+  /* ── links read as text ────────────────────────────────────────────────
+     The URL is deliberately NOT printed after the link. These are internal
+     documents whose links are mostly in-page anchors and hosts already named
+     in the prose; appending every href would add noise and pages without
+     adding information. To turn it on, add:
+       a[href^="http"]::after { content: " (" attr(href) ")"; } */
+  a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  a.card-terminal,
+  a[class*="card"] {
+    text-decoration: none;
+  }
+
+  .glow,
+  .glow-lg {
+    color: inherit;
+  }
+  .btn-terminal {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--foreground);
+  }
+
+  /* ── mermaid diagrams ──────────────────────────────────────────────────
+     See note 3 at the top of this file: the palette is baked into the SVG at
+     render time, so a diagram rendered under a dark theme prints as dark
+     boxes with invisible labels. Repaint the standard mermaid parts. */
+  /* Every diagram is scaled to fit ONE page. Not cosmetic: Chromium will not
+     start an over-tall diagram in the space left on the current page, so an
+     uncapped flowchart (they run to 2500px in a narrow column) prints a blank
+     page, then an empty bordered box, then the diagram — six such pages in the
+     executor design doc alone. `width/height: auto` with both max-* set is what
+     makes the browser scale it proportionally instead of squashing it.
+     A diagram that ends up too small to read is a diagram that is too tall for
+     paper: split it, or lay it out left-to-right. */
+  .mermaid svg {
+    display: block;
+    margin-inline: auto;
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 235mm !important;
+  }
+  .mermaid svg .node rect,
+  .mermaid svg .node polygon,
+  .mermaid svg .node circle,
+  .mermaid svg .node path,
+  .mermaid svg .label-container,
+  .mermaid svg .cluster rect,
+  .mermaid svg .actor,
+  .mermaid svg .note {
+    fill: #ffffff !important;
+    stroke: #333333 !important;
+  }
+  .mermaid svg .edgePath path,
+  .mermaid svg .flowchart-link,
+  .mermaid svg line,
+  .mermaid svg .messageLine0,
+  .mermaid svg .messageLine1 {
+    stroke: #333333 !important;
+  }
+  .mermaid svg .arrowheadPath,
+  .mermaid svg marker path,
+  .mermaid svg marker polygon {
+    fill: #333333 !important;
+    stroke: #333333 !important;
+  }
+  .mermaid svg text,
+  .mermaid svg .nodeLabel,
+  .mermaid svg .edgeLabel,
+  .mermaid svg .cluster-label,
+  .mermaid svg .messageText,
+  .mermaid svg foreignObject div,
+  .mermaid svg foreignObject span,
+  .mermaid svg p {
+    fill: #111111 !important;
+    color: #111111 !important;
+    background: transparent !important;
+  }
+  .mermaid svg .edgeLabel rect,
+  .mermaid svg .edgeLabel foreignObject > div {
+    fill: #ffffff !important;
+    background: #ffffff !important;
+  }
 }

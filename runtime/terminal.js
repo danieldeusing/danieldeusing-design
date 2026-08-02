@@ -19,6 +19,10 @@
  * After the initial on-screen sections finish, it sets window.termContentDone
  * and dispatches a "term:contentdone" event — a hook for chaining a follow-up
  * animation (e.g. a nav that "runs" once the page has finished printing).
+ *
+ * On `beforeprint` the whole session is fast-forwarded, so a page printed while
+ * it is still typing prints complete. src/print.css covers the CSS half of this
+ * (nothing stays hidden); only the truncated prompt text needs JS.
  */
 
 export function initTerminal() {
@@ -103,7 +107,25 @@ export function initTerminal() {
     sequence = sequence.then(() => playSection(section));
   };
 
+  // Printing must never show a half-typed page. src/print.css forces the
+  // revealed state for everything CSS can reach, but a prompt caught mid-type
+  // has been truncated in the DOM — no stylesheet can put those characters
+  // back. Snapshot the text up front and restore it synchronously when the
+  // browser announces a print.
+  const finishForPrint = () => {
+    document.querySelectorAll("[data-term] .prompt").forEach((prompt) => {
+      if (prompt.dataset.termText !== undefined) prompt.textContent = prompt.dataset.termText;
+      prompt.classList.add("term-live");
+    });
+    document.querySelectorAll("[data-term] [data-term-out]").forEach((chunk) => chunk.classList.add("term-show"));
+  };
+
   const start = () => {
+    document.querySelectorAll("[data-term] .prompt").forEach((prompt) => {
+      prompt.dataset.termText = (prompt.textContent || "").trim();
+    });
+    window.addEventListener("beforeprint", finishForPrint);
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {

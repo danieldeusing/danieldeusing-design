@@ -7,6 +7,30 @@ All notable changes to this project are documented here. The format follows
 jsDelivr serves the committed `dist/` bundle per git tag, so every release is cut as an
 immutable tag (`vX.Y.Z`). Pin that tag in production CDN URLs.
 
+## 0.1.6 (2026-08-01)
+
+### Added
+- `src/print.css` — the print layer, imported last by both entry points. Paper is a
+  different device, not a narrow screen: black on white regardless of the active theme,
+  **12px body text** with a proportional heading scale (24/18/16/14px), page margins,
+  sane page breaks (headings never orphaned, tables break between rows and repeat their
+  header), and no screen chrome — the `header.bar`, `footer.status`, `ls -l` dropdown,
+  burger nav, scanline overlay, phosphor glow and the **"On this page" `.toc`** are all
+  dropped from the printout.
+- Three fixes in there are load-bearing and easy to lose in a refactor:
+  - **The terminal reveal is forced open.** `runtime/terminal.js` reveals a
+    `[data-term-out]` only when its section scrolls into view, so a long page printed
+    straight after load had most of its content at `visibility: hidden` — it printed
+    blank, silently, and the reader only found out on paper.
+  - **`zoom` is reset to 1.** Pages using the resolution-independent zoom
+    (`html.style.zoom = innerWidth / 1920`) carried that multiplier into the print box.
+    That is what made printouts come out oversized.
+  - **Mermaid SVGs are repainted for paper.** Mermaid bakes the active theme's colours
+    into the SVG at render time, so a diagram rendered under `green`/`mono` printed as
+    dark boxes with invisible labels no matter what the page tokens said.
+- Overflow containers (`.table-scroll`, `pre`, `.diagram`) wrap instead of scrolling —
+  in print there is no scrollbar, so anything past the right edge was simply lost.
+
 ## 0.1.5 (2026-07-09)
 
 ### Added

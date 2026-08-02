@@ -3,8 +3,9 @@
  *
  * The no-Tailwind entry point. Import this one file and you get the full
  * terminal theme: a minimal reset, the four-theme token set, the document base,
- * and every component primitive. Works in plain HTML, React, Angular, Vue, a
- * Tauri webview — anywhere CSS @import is understood, with no build step.
+ * every component primitive, and the print layer. Works in plain HTML, React,
+ * Angular, Vue, a Tauri webview — anywhere CSS @import is understood, with no
+ * build step.
  *
  *   import "@danieldeusing/design";          // package "." export
  *   <link rel="stylesheet" href=".../dist/danieldeusing-design.css">  // CDN
@@ -19,3 +20,4 @@
 @import "./components.css";
 @import "./chrome.css";
 @import "./tooltip.css";
+@import "./print.css";

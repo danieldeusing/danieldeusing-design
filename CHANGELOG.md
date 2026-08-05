@@ -26,6 +26,17 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.3.3 (2026-08-05)
+
+### Fixed — the seam between the rail and the chrome
+`initLsNav()` set the inset to the chrome's exact measured height, and "exactly flush" turned
+out to be a rounding coin-flip: `offsetHeight` is an INTEGER while the bar's real height is
+fractional (44.97), and a zoomed layout multiplies the error — at `zoom: 1.25` the bar ended at
+56.00 while a 45px inset put the rail at 56.25, a quarter-pixel line of page background that is
+plainly visible on a wide screen. The rail now overlaps the chrome by **1px**. Both chrome
+elements are opaque and sit above it (z-index 30 and 50 vs 25), so a pixel of tuck is invisible
+where a pixel of gap is not — and the result no longer depends on rounding at all.
+
 ## 0.3.2 (2026-08-05)
 
 ### Changed — `ls -l` moves into the header bar, and the rail sits flush

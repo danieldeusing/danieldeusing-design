@@ -50,9 +50,16 @@ function measureChrome() {
   // few px below the bar with a visible seam. offsetHeight is layout px and is
   // the same unit the CSS will be interpreted in.
   const h = (el) => (el ? el.offsetHeight : 0);
-  if (h(bar)) root.style.setProperty("--ls-nav-top", `${h(bar)}px`);
+  // OVERLAP BY 1px rather than trying to meet the chrome exactly. offsetHeight is an
+  // INTEGER while the bar's real height is fractional (44.97), so "exactly flush" is
+  // a rounding coin-flip — and under a zoomed layout the error is multiplied: at
+  // zoom 1.25 the bar ended at 56.00 and a 45px inset put the rail at 56.25, a
+  // quarter-pixel seam of page background that is plainly visible on a wide screen.
+  // Both chrome elements are opaque and sit ABOVE the rail (z-index 30 and 50 vs 25),
+  // so a pixel of tuck is invisible, whereas a pixel of gap is not.
+  if (h(bar)) root.style.setProperty("--ls-nav-top", `${Math.max(0, h(bar) - 1)}px`);
   // A hidden footer (mobile folds it into the burger) reserves nothing.
-  root.style.setProperty("--ls-nav-bottom", `${h(status)}px`);
+  root.style.setProperty("--ls-nav-bottom", `${Math.max(0, h(status) - 1)}px`);
 }
 
 export function initLsNav() {

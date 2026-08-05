@@ -5,7 +5,14 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 jsDelivr serves the committed `dist/` bundle per git tag, so every release is cut as an
-immutable tag (`vX.Y.Z`). Pin that tag in production CDN URLs.
+immutable tag (`vX.Y.Z`).
+
+**Consumers load the UNPINNED url** (`@danieldeusing/design/dist/…`, no `@x.y.z`) — Daniel's
+call, 2026-08-05: one design system, every surface on the current version, no per-surface
+drift to reason about. The trade is deliberate and worth stating: a publish is then instantly
+live everywhere with no staging, so **look at the surfaces after publishing**, and keep new
+CSS backward-compatible with the markup consumers still ship (see 0.2.0's `html:has(.ls-nav)`
+guard for the pattern). Pin a tag only to hold a surface back on purpose.
 
 ## 0.2.0 (2026-08-05)
 

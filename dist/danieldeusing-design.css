@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.3.3 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.3.4 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -908,7 +908,24 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
 /* ── ls-listing rows (shared by the desktop rail + mobile menu) ── */
 .ls-row { display: flex; align-items: baseline; gap: 0.9rem; }
 .ls-perm { color: var(--muted-foreground); font-size: 0.72rem; letter-spacing: 0; }
-.ls-row--sub .ls-name { padding-left: 1rem; }
+
+/* DEPTH IS DRAWN, NOT JUST INDENTED. Whitespace alone did not carry it — with the
+   permission column in front of every row, a child sat only ~1rem right of its
+   parent and the eye had nothing to follow. Three signals now do the work:
+   a vertical guide per level (stacked children form one continuous rule, which is
+   what actually shows WHICH parent a row belongs to), directories in the primary
+   colour and bolder, and leaves left muted. The guide is the load-bearing one —
+   colour alone fails on the two near-black themes and on paper. */
+.ls-row--sub .ls-name {
+  margin-left: 0.55rem; padding-left: 0.75rem;
+  border-left: 1px solid color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+}
+.ls-row--sub2 .ls-name { margin-left: 1.7rem; }
+/* A directory anchors the level beneath it, so it takes the weight and the colour;
+   leaves stay muted. Keyed on a class the renderer emits, not on the trailing slash
+   in the label — CSS cannot select on text content. */
+.ls-panel .ls-name { color: var(--muted-foreground); }
+.ls-panel .ls-row--dir .ls-name { color: var(--primary); font-weight: 700; }
 /* The pre-rail dropdown form. Kept, and scoped to the dropdown panel, because the
    other surfaces still ship that markup — when they unpin they get this file, and
    their nav should stay right-aligned rather than quietly jumping to the left. The

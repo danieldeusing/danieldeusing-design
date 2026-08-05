@@ -26,6 +26,20 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.3.4 (2026-08-05)
+
+### Changed — nesting in the `ls -l` rail is drawn, not just indented
+Whitespace alone was not carrying depth: with a permission column in front of every row a child
+sat ~1rem right of its parent and the eye had nothing to follow. Three signals now:
+- a **vertical guide per level** (`.ls-row--sub`, `.ls-row--sub2`) — stacked children form one
+  continuous rule, which is what actually shows which parent a row belongs to;
+- **directories** take `--primary` and bold via a new `.ls-row--dir` class, keyed on a class the
+  renderer emits rather than the trailing slash in the label (CSS cannot select on text);
+- **leaves** stay `--muted-foreground`.
+
+The guide is the load-bearing one: colour alone fails on the two near-black themes and on paper.
+Depth 2 is now a class instead of inline padding, so both levels are styled in one place.
+
 ## 0.3.3 (2026-08-05)
 
 ### Fixed — the seam between the rail and the chrome

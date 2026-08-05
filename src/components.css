@@ -446,19 +446,30 @@ details.fold > summary:focus-visible {
    would have added five more. */
 .tickstrip:not(:empty) { border: 1px solid var(--border); background: var(--card); margin: 0 0 1.25rem; }
 .ticktable { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.ticktable td { padding: 0.45rem 0.55rem; vertical-align: baseline; border: 0; white-space: nowrap; }
+.ticktable td { padding: 0.5rem 0.75rem; vertical-align: baseline; border: 0; white-space: nowrap; }
 /* Only the last column may grow, so the four fixed columns keep the same width on every row. */
 .ticktable td.tick-stats { width: 100%; white-space: normal; }
 .tick { border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
 .tick:last-child { border-bottom: 0; }
-/* The glyph carries the state WITHOUT colour as well as with it — two of the four themes are
-   near-black and a printout has none, so ● vs ✕ vs ○ has to survive on its own. */
-.tick-dot { font-size: 0.7em; width: 1rem; padding-right: 0 !important; }
-.tick--ok    .tick-dot { color: var(--primary); }
-.tick--stale .tick-dot { color: var(--destructive); }
-.tick--never .tick-dot { color: var(--muted-foreground); }
-.tick-name { font-weight: 700; color: var(--primary); }
+/* State reads THREE ways, so it survives every context: the GLYPH (two themes are near-black and
+   a printout has no colour at all), the COLOUR, and a left edge-marker that makes a bad row
+   findable by shape alone when the strip is scanned rather than read. */
+.tick-dot {
+  font-size: 0.7em; width: 1.5rem; padding-right: 0 !important;
+  border-left: 3px solid transparent; padding-left: 0.6rem !important;
+}
+/* --success is per-theme and AA-measured (0.3.0). `ok` used to borrow --primary — the BRAND
+   colour — so a healthy poller and the page heading were the same ink, and "everything is fine"
+   had to be read rather than seen. */
+.tick--ok    .tick-dot { color: var(--success); border-left-color: color-mix(in srgb, var(--success) 45%, transparent); }
+.tick--stale .tick-dot { color: var(--destructive); border-left-color: var(--destructive); }
+.tick--never .tick-dot { color: var(--muted-foreground); border-left-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent); }
+/* The NAME is an identifier, not an accent. Making it --primary put brand colour on every row of
+   a strip whose entire job is that the exceptions stand out. */
+.tick-name { font-weight: 700; color: var(--foreground); letter-spacing: 0.01em; }
 .tick-last, .tick-next { font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+/* "next 57s" is a prediction; the age beside it is an observation. It should not compete. */
+.tick-next { opacity: 0.72; }
 .tick--stale .tick-last { color: var(--destructive); font-weight: 700; }
 .tick--never .tick-last { font-style: italic; }
 /* The NUMBER is what gets scanned; its label is context. Weight and colour on the value alone
@@ -475,3 +486,48 @@ details.fold > summary:focus-visible {
   .ticktable td { display: inline-block; padding: 0.1rem 0.5rem 0.1rem 0; }
   .ticktable td.tick-stats { display: block; width: auto; }
 }
+
+/* ── zoomable diagrams ────────────────────────────────────────────────────────────────────────
+   An architecture diagram authored for a text column is unreadable at exactly the moment someone
+   needs it. Pair with `initDiagramZoom()`: every `.diagram` becomes a real button that opens
+   full-screen, fitted to the viewport, then zoomable and pannable.
+
+   The affordance has to be visible without hovering — this portal is read from a phone — so the
+   corner hint is always drawn, not revealed on :hover. */
+.dgm-zoomable { position: relative; cursor: zoom-in; }
+.dgm-zoomable::after {
+  content: "⤢"; position: absolute; top: 0.4rem; right: 0.5rem;
+  font-size: 0.85rem; line-height: 1; opacity: 0.45; pointer-events: none;
+  color: var(--muted-foreground);
+}
+.dgm-zoomable:hover::after, .dgm-zoomable:focus-visible::after { opacity: 1; color: var(--primary); }
+.dgm-zoomable:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+
+html.dgm-locked, html.dgm-locked body { overflow: hidden; }
+
+.dgm-overlay {
+  display: none; position: fixed; inset: 0; z-index: 90;
+  background: color-mix(in srgb, var(--background) 96%, transparent);
+  flex-direction: column;
+}
+.dgm-overlay.open { display: flex; }
+.dgm-bar {
+  flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem;
+  padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); background: var(--card);
+}
+.dgm-btn {
+  font: inherit; font-size: 0.82rem; cursor: pointer; padding: 0.3rem 0.7rem; min-height: 32px;
+  background: transparent; border: 1px solid var(--border); color: var(--foreground);
+}
+.dgm-btn:hover { border-color: var(--primary); color: var(--primary); }
+.dgm-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.dgm-close { border-color: color-mix(in srgb, var(--destructive) 55%, transparent); color: var(--destructive); }
+.dgm-close:hover { border-color: var(--destructive); color: var(--destructive); }
+/* The stage clips; the artwork inside it is what moves. Transforming a wrapper rather than the
+   svg keeps mermaid's own geometry untouched. */
+.dgm-stage { flex: 1; overflow: hidden; display: grid; place-items: center; cursor: grab; touch-action: none; }
+.dgm-stage.is-grabbing { cursor: grabbing; }
+.dgm-art { transform-origin: center center; will-change: transform; }
+.dgm-art > svg, .dgm-art > img { display: block; max-width: none; max-height: none; }
+
+@media print { .dgm-overlay, .dgm-zoomable::after { display: none !important; } }

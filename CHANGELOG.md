@@ -26,6 +26,46 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.3.1 (2026-08-05)
+
+### Changed — the rail sits BETWEEN the chrome, and `ls -l` stops moving
+- **The rail no longer overlays the header or the footer.** Daniel: *"the right sidebar then
+  should not overlay footer and header. Footer and header wins."* It now runs from the bottom of
+  the bar to the top of the status line, and both keep their full width. `--ls-nav-top` /
+  `--ls-nav-bottom` are **measured off the real chrome** by `initLsNav()` (re-measured on resize
+  and after webfonts land) rather than guessed at in CSS; the CSS carries fallbacks so a page
+  that never runs the runtime still lays out sensibly.
+- **`ls -l` is at the top right, open or shut** — the rail head and the tab that replaces it share
+  `--ls-nav-top`, so the only thing that changes is which way the arrow points. The previous
+  build centred the tab vertically on the right edge: correct for a drawer handle, wrong here,
+  because it moved the one control the reader is hunting for to a place navigation has never been.
+- Only the **header** gets the negative margin that pulls it back to full width. The footer is
+  `position: fixed` with `inset-inline: 0`, so it ignores the body padding and was already full
+  width — giving it the same margin pushed it 272px PAST the viewport edge (measured 1099px
+  against an 842px viewport). Fixed and in-flow siblings look alike in markup and do not behave
+  alike here.
+
+### Added — zoomable diagrams (`runtime/diagramzoom.js`)
+`initDiagramZoom()` makes every `.diagram` a real button: click or Enter/Space opens it
+full-screen fitted to the viewport, then wheel zooms about the pointer, drag pans, and
+`+`/`-`/`0` plus on-screen controls do the same. Escape or a backdrop click closes and returns
+focus. An architecture diagram authored for a text column is unreadable at exactly the moment
+someone needs it.
+- The svg is **cloned, not moved**: mermaid holds references to the nodes it rendered and re-runs
+  against them when a folded or tabbed diagram becomes visible, so moving the original out of the
+  document and back is how a diagram silently stops updating.
+- The clone is given the original's **measured pixel size**. A mermaid svg is sized by
+  `width="100%"` plus an inline max-width; stripping those to "let it fill" leaves an svg with
+  only a viewBox, which collapses to 0x0 in an auto-sized box — the first build did exactly that
+  and fitted nothing.
+
+### Changed — the ticker strip reads as status, not as brand
+`ok` now uses the new per-theme `--success` instead of `--primary`: a healthy poller and the page
+heading were the same ink, so "everything is fine" had to be read rather than seen. The row name
+drops to `--foreground` for the same reason, each state gains a left edge-marker so a bad row is
+findable by shape when the strip is scanned, and `next` is de-emphasised because it is a
+prediction sitting beside a measurement.
+
 ## 0.3.0 (2026-08-05)
 
 ### Added

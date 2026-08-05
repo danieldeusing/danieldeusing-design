@@ -101,8 +101,20 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
    leaves a small labelled tab on the edge rather than nothing, so a hidden rail
    is still discoverable by someone who did not hide it themselves.
 
+   THE HEADER AND FOOTER WIN. The rail runs BETWEEN them — it never covers the bar
+   or the status line, and both keep their full width. Daniel: "the right sidebar
+   then should not overlay footer and header. Footer and header wins."
+   That also buys the better toggle behaviour: with the rail starting below the
+   bar, `ls -l` sits at ONE fixed spot whether the rail is open or shut, so the
+   only thing that changes is which way the arrow points. The reader never has to
+   go looking for a control that moved.
+
+   --ls-nav-top/--ls-nav-bottom are measured off the real chrome by initLsNav()
+   and written onto <html>; the values here are fallbacks that keep the layout
+   sane if the runtime never arrives.
+
    Width is one token so a consumer can widen it for longer trees. */
-:root { --ls-nav-w: 17rem; }
+:root { --ls-nav-w: 17rem; --ls-nav-top: 3rem; --ls-nav-bottom: 2.2rem; }
 .ls-nav-show { display: none; }
 
 @media (min-width: 48.0625rem) {
@@ -117,19 +129,30 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
   html { --ls-nav-inset: 0rem; }
   html:has(.ls-nav):not([data-ls-nav="off"]) { --ls-nav-inset: var(--ls-nav-w); }
 
-  /* Everything in normal flow shifts left, so content sits against the rail's
-     left edge instead of running under it. The fixed footer has to be told
-     separately: `inset-inline: 0` ignores the body's padding. */
-  /* Deliberately NOT transitioned. Animating padding on <body> reflows the whole
+  /* Content shifts left to sit against the rail's edge — but the CHROME does not.
+     The header bar and the status footer pull back out to full width with a
+     negative margin, so the rail begins below one and ends above the other rather
+     than covering either. Applied to the body rather than to a `main` selector
+     because the design system cannot know a consumer's content wrapper: every
+     block child shifts, and the two that must not are named explicitly.
+
+     Deliberately NOT transitioned. Animating padding on <body> reflows the whole
      document every frame, and the pages this ships to render tables of hundreds of
      rows — the rail's own transform is composited and costs nothing, so the panel
-     slides while the content reflows once. Animating both looked no better and
-     made the containers dashboard stutter on toggle. */
+     slides while the content reflows once. */
   body { padding-right: var(--ls-nav-inset); }
-  footer.status { right: var(--ls-nav-inset); }
+  /* Only the HEADER needs pulling back out. It is `position: sticky`, i.e. still
+     in flow, so the body's padding narrows it. The footer is `position: fixed`
+     with `inset-inline: 0`, which ignores body padding and is already full width
+     — giving it the same negative margin pushed it 272px PAST the viewport edge
+     (measured 1099px against an 842px viewport). Fixed and in-flow siblings look
+     alike in the markup and do not behave alike here. */
+  header.bar { margin-right: calc(-1 * var(--ls-nav-inset)); }
 
+  /* Between the chrome, never over it. */
   .ls-nav {
-    position: fixed; top: 0; right: 0; bottom: 0; width: var(--ls-nav-w); z-index: 45;
+    position: fixed; top: var(--ls-nav-top); right: 0; bottom: var(--ls-nav-bottom);
+    width: var(--ls-nav-w); z-index: 25;
     display: flex; flex-direction: column;
     background: var(--card); border-left: 1px solid var(--border);
   }
@@ -159,13 +182,17 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
     outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: -2px;
   }
 
-  /* The tab that survives hiding. Sits on the right edge, mid-height, and only
-     exists while the rail is away. */
+  /* The tab that survives hiding — TOP RIGHT, in the header band, which is where
+     `ls -l` has always lived (it was a header dropdown before it was a rail) and
+     where the rail's own title sits when it is open. An earlier version centred it
+     vertically on the right edge: correct as a drawer handle, wrong here, because
+     it moved the one control the reader is looking for to a place navigation has
+     never been. Same corner open or closed. */
   html[data-ls-nav="off"] .ls-nav-show {
     display: inline-flex; align-items: center; gap: 0.4rem;
-    position: fixed; top: 50%; right: 0; z-index: 45; transform: translateY(-50%);
+    position: fixed; top: var(--ls-nav-top); right: 0; z-index: 25;
     background: var(--card); border: 1px solid var(--border); border-right: 0;
-    padding: 0.6rem 0.5rem; font-size: 0.8rem;
+    border-top: 0; padding: 0.6rem 0.85rem; font-size: 0.9rem; font-weight: 700;
   }
 }
 

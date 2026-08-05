@@ -28,10 +28,36 @@
  */
 const KEY = "ls-nav";
 
+/*
+ * The rail runs BETWEEN the chrome — it must not cover the header bar or the
+ * status footer. Their heights are a consumer's business and change with the
+ * viewport, so they are measured here and published as --ls-nav-top /
+ * --ls-nav-bottom rather than guessed at in CSS. chrome.css carries fallbacks,
+ * so a page that never runs this still lays out sensibly.
+ *
+ * Keeping `ls -l` at one fixed spot is the point: the rail's head and the tab
+ * that replaces it share --ls-nav-top, so opening and closing changes the arrow
+ * and nothing else moves.
+ */
+function measureChrome() {
+  const root = document.documentElement;
+  const bar = document.querySelector("header.bar");
+  const status = document.querySelector("footer.status");
+  // A hidden footer (mobile folds it into the burger) contributes nothing.
+  const visible = (el) => el && el.getBoundingClientRect().height > 0;
+  if (visible(bar)) root.style.setProperty("--ls-nav-top", `${bar.getBoundingClientRect().height}px`);
+  root.style.setProperty("--ls-nav-bottom", visible(status) ? `${status.getBoundingClientRect().height}px` : "0px");
+}
+
 export function initLsNav() {
   const root = document.documentElement;
   const toggles = document.querySelectorAll("[data-ls-nav-toggle]");
   if (!toggles.length) return;
+
+  measureChrome();
+  addEventListener("resize", measureChrome);
+  // The bar reflows when webfonts land, which changes its height after first paint.
+  if (document.fonts?.ready) document.fonts.ready.then(measureChrome).catch(() => {});
 
   const shown = () => root.dataset.lsNav !== "off";
   const sync = () => {

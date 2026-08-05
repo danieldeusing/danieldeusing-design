@@ -181,6 +181,32 @@ end in `templates/documentation.html`. Follow it exactly; the rail in particular
 try { if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off"; } catch {}
 ```
 
+## This is machine-checked — `bin/design-conformance` in danieldeusing-infra
+
+The rules above are not advice; a cockpit redeploy runs the checker and **fails on a violation**.
+Run it yourself before you get there:
+
+```bash
+cd ~/Work/danieldeusing/danieldeusing-infra
+node bin/design-conformance            # forked components + phantom tokens — must be zero
+node bin/design-conformance --strict   # + the literal-colour backlog
+node bin/design-conformance --list     # what the system currently owns
+```
+
+It reads the owned vocabulary **from the published CSS**, so it cannot fall behind a release the
+way a hand-written list would. Three findings:
+
+| finding | what it means |
+|---|---|
+| **forked component** | your page declares a class the system styles, unscoped, setting a property the system also sets. `.pair details.fold {…}` and `button.doc-link.rowlink {…}` are fine — a page-owned class scopes them. `.legend {…}` is not. |
+| **literal colour** | a hex as the value of a real property. Defining a token (`--grid: #d9cdb6`) and a fallback (`var(--background, #f5efe2)`) are both correct and are not reported. |
+| **phantom token** | `var(--x)` nothing defines — silently dropped, and the element renders at its inherited value, which usually looks *almost* right. |
+
+**A genuine exception is a comment, not a config entry.** Put `design-conformance: <reason>` in
+the comment above the rule and it is waived. Four exist today (a full-bleed data table, WCAG
+tap-target sizing under a coarse pointer, a phone gutter) and each states a real reason. If you
+cannot write the sentence, you do not have an exception — you have a fork.
+
 ## Runtime — `runtime/*.js`, dependency-free ESM, tree-shakeable
 
 | Function | What it does |

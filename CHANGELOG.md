@@ -26,6 +26,32 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.3.0 (2026-08-05)
+
+### Added
+- **`--success` and `--warning`, per theme** — the design system shipped only `--destructive`,
+  so every "good"/"caution" colour downstream had to be a literal, and a literal cannot be
+  correct here. Measured worst case against each theme's `--background`, `--card` AND `--muted`:
+
+  | | warm | green | mono | paper |
+  |---|---|---|---|---|
+  | `--success` | `#1a6b2e` 5.16:1 | `#4ade80` 10.76:1 | `#4ade80` 10.84:1 | `#1a7031` 5.36:1 |
+  | `--warning` | `#845600` 4.97:1 | `#f5b32b` 10.15:1 | `#f5b32b` 10.22:1 | `#8f5d00` 4.89:1 |
+
+  All twelve values (with `--destructive`, 5.68–6.24:1) clear **AA 4.5:1 on every surface**,
+  re-derived from the committed file rather than from the values that were intended.
+
+### Why they have to be per-theme (now written into `tokens.css`)
+The two admissible luminance bands **do not overlap**: a light theme's darkest surface (warm's
+`--muted` `#ece3cf`) demands `L <= 0.1328`, a dark theme's lightest (green's `--muted`
+`#071509`) demands `L >= 0.2021` — a gap of 0.0692 with nothing in it. No single hex can serve
+four themes; every compromise fails both sides. Cockpit's twelve hardcoded accents are the
+worked example: all twelve miss AA on at least one theme and four sit inside the gap, clearing
+neither. This is arithmetic, not taste, which is why each accent is declared four times.
+
+Adding a status colour later: put a **token** here with its measured worst case in a trailing
+comment. Tuning a literal at the call site forks the palette and fixes exactly one theme.
+
 ## 0.2.0 (2026-08-05)
 
 ### Added

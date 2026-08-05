@@ -26,6 +26,44 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.4.0 (2026-08-05)
+
+**Measurements are tokens now, because four surfaces had four answers.** Daniel: *"all pages
+should behave the exact same (danieldeusing.de, cockpit, netmon, container, docs) regarding the
+display and font size … same margins left and right … same font size depending of window size"*.
+
+The audit that preceded this found the divergence real, and found that **none of it was
+expressible here**: no width token, no type scale, so every surface picked a number in isolation
+— cockpit `78rem`, netmon `1180px`, danieldeusing.de `72rem` (Tailwind `max-w-6xl`), the
+containers dashboard none — and netmon additionally set a flat `font: 13px` where everything
+else sat at `0.75rem`. Fixing that as five local edits would have produced five *new* numbers a
+year from now, so the answer moves upstream:
+
+- **`--content-w` (78rem) + `--content-pad` (1.5rem), and a `.wrap` that resolves them.** 78rem
+  is cockpit's — the widest of the four, already tuned against the `ls -l` rail, and from the
+  surface with the most page types; standardising on the narrowest would have reflowed every
+  table. `.wrap` sets the **inline axis only**: vertical rhythm differs legitimately between a
+  doc and a dashboard, and a shared rule that overreaches is precisely what earns a local
+  override. Consumers set `padding-block` — the `padding` **shorthand** resets `padding-inline`
+  and silently takes the margins back.
+- **`--fs-xs … --fs-2xl`, `--lh-tight` / `--lh-base`.** The steps are 1px apart at the bottom on
+  purpose: this is a terminal UI whose useful range is 10–15px, and a geometric ratio scale
+  would give three usable steps then leap past everything that matters. `base.css` resolves the
+  body against `--fs-base` instead of a literal.
+- **Tailwind mapping** — `max-w-content`, `text-fs-*` — so an app consuming via `tailwind.css`
+  reaches the same measurements as one loading the CDN bundle. Tailwind's own `text-xs` /
+  `text-sm` / `text-base` are **deliberately left alone**: this scale bottoms out at 10px for
+  terminal chrome, and remapping the default names would reskin every existing utility in a
+  consuming app on upgrade. Opt in by name.
+
+**The scale is only half of "same font size depending on window size", and the halves are easy
+to conflate.** The scale fixes the **ratios** and does not track the viewport.
+`initResolutionZoom()` (`runtime/zoom.js`, shipped since 0.1.x) is what makes a page track the
+**window**, by laying out at a 1920px reference and zooming above it — and it works only if a
+surface calls it pre-paint from `<head>`. Three of the five did. Scale without zoom is a page
+frozen at one size on a 4K display; zoom without scale is uniform scaling of sizes that disagree
+between pages.
+
 ## 0.3.4 (2026-08-05)
 
 ### Changed — nesting in the `ls -l` rail is drawn, not just indented

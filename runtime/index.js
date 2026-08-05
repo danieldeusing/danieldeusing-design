@@ -16,4 +16,5 @@ export * from "./dropdown.js";
 export * from "./anim.js";
 export * from "./terminal.js";
 export * from "./nav.js";
+export * from "./lsnav.js";
 export * from "./tooltip.js";

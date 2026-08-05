@@ -352,3 +352,126 @@ html.anim-off .cursor-block {
     transform: translateY(0.12em);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   Shared page vocabulary, promoted from the cockpit portal (2026-08-04).
+
+   Each of these was built once in cockpit/pages/portal.css and then wanted by every other
+   surface. They live here so there is ONE definition — the tabs had already drifted into FOUR
+   page style blocks before being consolidated, which is exactly the failure this move prevents.
+   ═════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── tabs ──────────────────────────────────────────────────────────────────────────────────────
+   Daniel: "I am always searching the tabs. They are not falling into my eyes directly."
+
+   They were low-contrast pills at 0.7 opacity, and the SELECTED one differed from the rest only
+   by a slightly darker border and 8% background — so the row read as six equal chips and the eye
+   had to stop and compare them. This inverts it: the inactive tabs recede to plain muted text
+   with no chrome at all, and the active one is the only thing on the row carrying weight, colour
+   and a fill. Nothing to compare — one thing is loud. */
+.tabs {
+  display: flex; flex-wrap: wrap; gap: 0.15rem; margin: 1.35rem 0 0;
+  border-bottom: 2px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+.tab {
+  background: transparent; border: 0; margin-bottom: -2px;
+  font: inherit; font-size: 0.86em; cursor: pointer; padding: 0.5rem 0.95rem;
+  color: var(--muted-foreground); transition: background 0.12s ease, color 0.12s ease;
+}
+.tab:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+/* FILLED, not underlined. An underline plus a colour shift was still one thin rule and a hue
+   change on a row of same-weight words — Daniel was still hunting for the row. A solid block of
+   --primary with the page background as its text is the highest-contrast pair the theme owns
+   (5.6:1 on warm), and it is the only filled thing on the page, so it is found without reading. */
+.tab[aria-selected="true"] { background: var(--primary); color: var(--background); font-weight: 700; }
+.tab:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: -2px; }
+/* 44px on a touch screen — tabs are the primary navigation of these pages, so they are the last
+   control that should be hard to hit. */
+@media (pointer: coarse), (max-width: 40rem) {
+  .tab { padding: 0.7rem 0.8rem; min-height: 44px; }
+}
+section.doc.tab-panel { margin-top: 1.35rem; }
+
+/* ── fold: progressive disclosure whose affordance is always visible ───────────────────────────
+   The detail behind a visual has to open by TAP — these pages are read from a phone, where hover
+   does not exist — and the control has to be findable WITHOUT hovering, or the detail is simply
+   text that was deleted. Hence a permanent ▸ marker and a full-width summary row rather than
+   anything that appears on hover.
+
+   Pair with a `beforeprint` handler that opens every <details>, or a printout silently loses
+   whatever the closed ones were holding. */
+details.fold { border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
+details.fold > summary {
+  display: flex; align-items: center; gap: 0.5rem; cursor: pointer; list-style: none;
+  padding: 0.55rem 0; font-size: 0.85rem; color: var(--muted-foreground);
+}
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::before { content: "\25B8"; flex: none; opacity: 0.6; }
+details.fold[open] > summary::before { content: "\25BE"; }
+details.fold > summary:hover { color: var(--primary); }
+details.fold > summary:focus-visible {
+  outline: 2px solid color-mix(in srgb, currentColor 45%, transparent); outline-offset: 2px;
+}
+.fold-body { font-size: 0.9rem; padding: 0 0 0.7rem 1.1rem; }
+.fold-body > * + * { margin-top: 0.6rem; }
+
+/* ── legend: one rendering of each state, beside the thing it keys ─────────────────────────────
+   An item is `display: block`, NOT flex: a gloss contains <strong>/<code>/<em>, and every one of
+   those would become its own flex item — which is how a single sentence first rendered as four
+   separately-wrapped columns. */
+.legend {
+  list-style: none; padding: 0; margin: 0.7rem 0 0;
+  display: grid; gap: 0.4rem 1.4rem; font-size: 0.86rem;
+}
+@media (min-width: 52rem) { .legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.legend > li { line-height: 1.6; }
+.legend > li > :first-child { margin-right: 0.45rem; }
+
+/* ── ticker strip: one standard header for every poller ────────────────────────────────────────
+   Daniel: "For all pollers / tickers we should make a standard layout ... on top of the pages,
+   compact and like dashboard style."
+
+   Every poller answers the same four questions — what ran, when, when next, what did it count —
+   and each page was answering them in its own prose box, so "is anything stalled?" took four
+   paragraphs instead of one glance.
+
+   A real TABLE, not a grid per row. The first version made each row its own `display: grid`,
+   which cannot align anything across rows: every row sized its columns to its own content, so
+   `next` sat wherever that row's name happened to end and the layout moved when a label changed.
+   One table means one set of column widths for the whole strip, and scanning a column is the only
+   thing the strip is for. Borderless by design — rules between cells draw a grid nobody reads.
+
+   Colour comes only from --primary and --destructive, both per-theme. Hardcoded accents miss AA
+   on at least one theme (measured 2026-08-04), so a strip inventing its own greens and ambers
+   would have added five more. */
+.tickstrip:not(:empty) { border: 1px solid var(--border); background: var(--card); margin: 0 0 1.25rem; }
+.ticktable { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.ticktable td { padding: 0.45rem 0.55rem; vertical-align: baseline; border: 0; white-space: nowrap; }
+/* Only the last column may grow, so the four fixed columns keep the same width on every row. */
+.ticktable td.tick-stats { width: 100%; white-space: normal; }
+.tick { border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.tick:last-child { border-bottom: 0; }
+/* The glyph carries the state WITHOUT colour as well as with it — two of the four themes are
+   near-black and a printout has none, so ● vs ✕ vs ○ has to survive on its own. */
+.tick-dot { font-size: 0.7em; width: 1rem; padding-right: 0 !important; }
+.tick--ok    .tick-dot { color: var(--primary); }
+.tick--stale .tick-dot { color: var(--destructive); }
+.tick--never .tick-dot { color: var(--muted-foreground); }
+.tick-name { font-weight: 700; color: var(--primary); }
+.tick-last, .tick-next { font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+.tick--stale .tick-last { color: var(--destructive); font-weight: 700; }
+.tick--never .tick-last { font-style: italic; }
+/* The NUMBER is what gets scanned; its label is context. Weight and colour on the value alone
+   means a row reads as its numbers first and its wording second. */
+.tick-stats { color: var(--muted-foreground); }
+.tick-stats b { font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+.tick-sep { font-style: normal; opacity: 0.35; margin: 0 0.5rem; }
+/* A stale row earns the only background tint in the strip — an all-tinted strip is one the eye
+   stops reading. */
+.tick--stale { background: color-mix(in srgb, var(--destructive) 8%, transparent); }
+@media (max-width: 40rem) {
+  .ticktable, .ticktable tbody, .tick, .ticktable td { display: block; }
+  .tick { padding: 0.4rem 0.5rem; }
+  .ticktable td { display: inline-block; padding: 0.1rem 0.5rem 0.1rem 0; }
+  .ticktable td.tick-stats { display: block; width: auto; }
+}

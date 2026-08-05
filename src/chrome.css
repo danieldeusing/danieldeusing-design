@@ -1,8 +1,8 @@
 /*
  * chrome.css — the app chrome kit: sticky header bar, fixed status footer,
- * and the responsive site navigation (desktop `ls -l` dropdown, mobile
- * burger with the footer folded in). Extracted from danieldeusing.de and
- * the cockpit portal so every app ships the same chrome without rebuilding it.
+ * and the responsive site navigation (desktop `ls -l` RAIL, mobile burger with
+ * the footer folded in). Extracted from danieldeusing.de and the cockpit portal
+ * so every app ships the same chrome without rebuilding it.
  *
  * Markup contract (see templates/documentation.html for the full example):
  *
@@ -11,7 +11,14 @@
  *     <a href="/" class="brand"><span class="glow">name</span><span class="cursor-block"></span></a>
  *     <button class="nav-burger" data-nav-toggle aria-controls="site-nav" aria-expanded="false">…☰ svg…</button>
  *     <nav aria-label="site" id="site-nav" class="site-nav">
- *       <details class="dropdown" id="nav">…ls-panel with .ls-row items…</details>
+ *       <div class="ls-nav" id="nav">
+ *         <div class="ls-nav-head">
+ *           <span class="ls-nav-title">ls -l</span>
+ *           <button class="ls-nav-hide" data-ls-nav-toggle aria-controls="nav" aria-expanded="true">»</button>
+ *         </div>
+ *         <ul class="ls-panel">….ls-row items…</ul>
+ *       </div>
+ *       <button class="ls-nav-show" data-ls-nav-toggle aria-controls="nav">« ls -l</button>
  *       <ul class="mobile-nav">…same links as .mobile-item ls-rows…</ul>
  *       <div class="mobile-footer">…footer controls folded in…</div>
  *     </nav>
@@ -19,8 +26,15 @@
  *   …
  *   <footer class="status">…status-left + status-right…</footer>
  *
- * Behaviour: pair with `initBurgerNav()` from the runtime (adds the toggle +
- * outside-click close). Breakpoint: 48rem.
+ * Behaviour: pair with `initBurgerNav()` (mobile burger) and `initLsNav()`
+ * (rail show/hide) from the runtime. The rail's SHOWN/HIDDEN state must also be
+ * applied before first paint by an inline <head> script — see the rail section
+ * below for why the runtime cannot be the one to do it:
+ *
+ *   try { if (localStorage.getItem("ls-nav") === "off")
+ *           document.documentElement.dataset.lsNav = "off"; } catch {}
+ *
+ * Breakpoint: 48rem.
  */
 
 /* ── a11y helpers ── */
@@ -60,12 +74,100 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
 .doc-link { color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
 .doc-link:hover { color: var(--primary); }
 
-/* ── ls-listing rows (shared by the desktop dropdown + mobile menu) ── */
+/* ── ls-listing rows (shared by the desktop rail + mobile menu) ── */
 .ls-row { display: flex; align-items: baseline; gap: 0.9rem; }
 .ls-perm { color: var(--muted-foreground); font-size: 0.72rem; letter-spacing: 0; }
 .ls-row--sub .ls-name { padding-left: 1rem; }
-.ls-panel { min-width: 17rem; left: auto !important; right: 0; }
-#nav { position: relative; }
+/* The pre-rail dropdown form. Kept, and scoped to the dropdown panel, because the
+   other surfaces still ship that markup — when they unpin they get this file, and
+   their nav should stay right-aligned rather than quietly jumping to the left. The
+   rail's own <ul> carries `ls-panel` WITHOUT `dropdown-panel`, so it is unaffected. */
+.dropdown-panel.ls-panel { min-width: 17rem; left: auto !important; right: 0; }
+
+/* ── `ls -l` site rail (desktop ≥48rem): sticky, full-height, right-hand panel ──
+   Was a dropdown that had to be re-opened on every page. Daniel: "Always make it
+   sticky (default shown) right side, keep `ls -l`, but not down arrow, but
+   something which tells the user he can hide / minimize."
+
+   SHOWN BY DEFAULT, and the state lives in localStorage under "ls-nav". It is
+   applied by an inline <head> script as `html[data-ls-nav="off"]` BEFORE first
+   paint — not by the runtime — because the runtime is a module at the end of
+   <body>: a reader who hid the rail would otherwise watch it paint and then jump
+   away on every single page load. `initLsNav()` only handles the clicks.
+
+   The affordance is deliberately NOT a caret. A caret means "a menu drops from
+   here", which is the thing this stopped being. Guillemets point the way the
+   panel travels — » pushes it off to the right, « pulls it back — and hiding it
+   leaves a small labelled tab on the edge rather than nothing, so a hidden rail
+   is still discoverable by someone who did not hide it themselves.
+
+   Width is one token so a consumer can widen it for longer trees. */
+:root { --ls-nav-w: 17rem; }
+.ls-nav-show { display: none; }
+
+@media (min-width: 48.0625rem) {
+  /* Room is reserved ONLY when a rail is actually in the page, and the default is
+     zero. This is what makes the stylesheet safe to publish ahead of a consumer's
+     markup: every surface that still ships the old dropdown nav (or no nav at all)
+     keeps its full width instead of growing a 17rem gutter with nothing in it —
+     which is exactly what they would have got the moment they unpinned.
+     It also fails in the right direction: if :has() is unavailable the selector is
+     dropped, the inset stays 0, and the rail overlays content rather than the page
+     reserving space for a rail that never arrives. */
+  html { --ls-nav-inset: 0rem; }
+  html:has(.ls-nav):not([data-ls-nav="off"]) { --ls-nav-inset: var(--ls-nav-w); }
+
+  /* Everything in normal flow shifts left, so content sits against the rail's
+     left edge instead of running under it. The fixed footer has to be told
+     separately: `inset-inline: 0` ignores the body's padding. */
+  /* Deliberately NOT transitioned. Animating padding on <body> reflows the whole
+     document every frame, and the pages this ships to render tables of hundreds of
+     rows — the rail's own transform is composited and costs nothing, so the panel
+     slides while the content reflows once. Animating both looked no better and
+     made the containers dashboard stutter on toggle. */
+  body { padding-right: var(--ls-nav-inset); }
+  footer.status { right: var(--ls-nav-inset); }
+
+  .ls-nav {
+    position: fixed; top: 0; right: 0; bottom: 0; width: var(--ls-nav-w); z-index: 45;
+    display: flex; flex-direction: column;
+    background: var(--card); border-left: 1px solid var(--border);
+  }
+  html:not(.anim-off) .ls-nav,
+  html:not(.anim-off) .ls-nav-show { transition: transform 0.18s ease; }
+  html[data-ls-nav="off"] .ls-nav { transform: translateX(100%); }
+
+  .ls-nav-head {
+    flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    padding: 0.6rem 0.5rem 0.6rem 0.85rem; border-bottom: 1px solid var(--border);
+  }
+  .ls-nav-title { font-weight: 700; font-size: 0.9rem; }
+
+  /* The list is the only thing that scrolls — the head stays put, so the control
+     that hides the rail cannot be scrolled out of reach. */
+  .ls-nav .ls-panel {
+    flex: 1; min-height: 0; overflow-y: auto;
+    list-style: none; margin: 0; padding: 0.5rem 0 1rem;
+  }
+
+  .ls-nav-hide, .ls-nav-show {
+    background: none; border: 0; font: inherit; cursor: pointer; line-height: 1;
+    color: var(--muted-foreground); padding: 0.4rem 0.55rem;
+  }
+  .ls-nav-hide:hover, .ls-nav-show:hover { color: var(--primary); }
+  .ls-nav-hide:focus-visible, .ls-nav-show:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: -2px;
+  }
+
+  /* The tab that survives hiding. Sits on the right edge, mid-height, and only
+     exists while the rail is away. */
+  html[data-ls-nav="off"] .ls-nav-show {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    position: fixed; top: 50%; right: 0; z-index: 45; transform: translateY(-50%);
+    background: var(--card); border: 1px solid var(--border); border-right: 0;
+    padding: 0.6rem 0.5rem; font-size: 0.8rem;
+  }
+}
 
 /* ── burger + mobile menu ── */
 .nav-burger {
@@ -86,7 +188,9 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
     padding: 0.4rem 1.25rem 0.9rem; max-height: calc(100vh - 6rem); overflow-y: auto;
   }
   .site-nav.open { display: block; }
-  .site-nav > .dropdown { display: none; } /* desktop ls-dropdown replaced by the flat list */
+  /* The desktop rail is a desktop idea: a fixed 17rem column would eat a phone.
+     Below the breakpoint the burger owns navigation and the flat list replaces it. */
+  .site-nav > .ls-nav, .ls-nav-show { display: none; }
 
   .mobile-nav { display: flex; flex-direction: column; }
   .mobile-nav .mobile-item {

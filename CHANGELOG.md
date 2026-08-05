@@ -7,6 +7,37 @@ All notable changes to this project are documented here. The format follows
 jsDelivr serves the committed `dist/` bundle per git tag, so every release is cut as an
 immutable tag (`vX.Y.Z`). Pin that tag in production CDN URLs.
 
+## 0.2.0 (2026-08-05)
+
+### Added
+- **`ls -l` site rail** (`src/chrome.css` + `runtime/lsnav.js`) — the navigation that was a
+  dropdown is now a sticky, full-height panel on the **right**, **shown by default**. Content
+  and the fixed footer shift left to sit against its edge. Hiding it leaves a labelled
+  `« ls -l` tab on the screen edge, so a hidden rail stays discoverable by someone who did not
+  hide it. The affordance is a guillemet, never a caret — a caret means "a menu drops from
+  here", which is the thing this stopped being.
+  - State persists in `localStorage` under `ls-nav` and **must be applied by an inline `<head>`
+    script**, not by the runtime: the runtime is a module at the end of `<body>`, so a reader
+    who hid the rail would watch it paint and then jump away on every page load. `initLsNav()`
+    only wires the clicks. The snippet is in the `chrome.css` header comment.
+  - Below the 48rem breakpoint the rail is not rendered; the burger keeps navigation.
+  - The toggle is not animated on `body`/`footer`: animating padding reflows the whole document
+    every frame, and these pages render tables of hundreds of rows. Only the rail's own
+    `transform` transitions, which is composited.
+- **Shared page vocabulary promoted from the cockpit portal** into `src/components.css`:
+  `.tabs`/`.tab` (filled active tab), `.tickstrip`/`.ticktable` (the poller header strip),
+  `details.fold` + `.fold-body`, and `.legend`. Each was built once and then wanted everywhere —
+  the tabs had already drifted into four separate page style blocks before being consolidated.
+
+### Compatibility
+- **Safe to adopt before your markup changes.** The rail reserves its space only through
+  `html:has(.ls-nav)`, so a consumer still shipping the old dropdown nav — or no nav at all —
+  keeps its full width instead of growing a 17rem gutter with nothing in it. The pre-rail
+  `.dropdown-panel.ls-panel` alignment is kept for the same reason. Both verified against a page
+  built from the old markup, which is the case every unpinned surface hits first.
+- `print.css` resets the body shift: hiding a fixed element does not reclaim the room something
+  else was told to leave for it.
+
 ## 0.1.6 (2026-08-01)
 
 ### Added

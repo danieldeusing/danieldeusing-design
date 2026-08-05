@@ -131,6 +131,14 @@
     display: none !important;
   }
 
+  /* The `ls -l` rail sits inside .site-nav, so the rule above already hides it —
+     but the room it reserved is padding on the BODY, and that would print as a
+     17rem gutter down the right of every page. Hiding a fixed element does not
+     reclaim the space something else was told to leave for it. */
+  body {
+    padding-right: 0 !important;
+  }
+
   [data-tip] {
     cursor: auto;
   }

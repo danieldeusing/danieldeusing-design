@@ -103,12 +103,17 @@ await writeFile(join(distDir, "danieldeusing-design.min.css"), banner + minify(b
 const tokensCss = await readFile(join(srcDir, "tokens.css"), "utf8");
 const blockRe = /(:root|html\[data-theme="(\w+)"\])\s*\{([^}]*)\}/g;
 const declRe = /--([\w-]+)\s*:\s*([^;]+);/g;
+// MERGED per theme, not assigned. tokens.css declares `:root` TWICE — once for the warm colours,
+// once for the layout/type scale that is deliberately not per-theme — and an assignment here
+// lets the second block silently replace the first. It did: 0.4.0 shipped a tokens.json whose
+// `warm` theme, the DEFAULT, carried the eleven measurements and not one colour. Nothing broke,
+// because this file feeds native/Figma exports that nobody had regenerated yet — which is the
+// only reason it survived a release.
 const themes = {};
 for (const block of tokensCss.matchAll(blockRe)) {
   const theme = block[2] ?? "warm"; // :root is the warm default
-  const values = {};
+  const values = (themes[theme] ??= {});
   for (const decl of block[3].matchAll(declRe)) values[decl[1]] = decl[2].trim();
-  themes[theme] = values;
 }
 
 const tokensJson = {

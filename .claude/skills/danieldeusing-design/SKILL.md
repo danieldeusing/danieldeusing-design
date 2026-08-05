@@ -85,17 +85,25 @@ dark themes:  lightest surface green --muted #071509  ->  accent L >= 0.2021
 
 A gap of 0.0692 with nothing in it. No single hex can serve four themes — the dark themes need a
 light tint, the light themes a dark one, and every compromise fails both. That is why
-`--destructive`, `--success` and `--warning` are each declared **four times**. Cockpit carried
-twelve hardcoded accents that predated the tokens; every one missed AA on at least one theme and
-four sat inside the gap, clearing neither side.
+`--destructive`, `--success`, `--warning`, `--info` and `--pending` are each declared **four
+times**. Cockpit carried twelve hardcoded accents that predated the tokens; every one missed AA
+on at least one theme and four sat inside the gap, clearing neither side.
 
 - Use the semantic tokens: `--background --foreground --card --card-foreground --popover(-foreground)
   --primary(-foreground) --secondary(-foreground) --muted --muted-foreground --accent(-foreground)
-  --destructive --success --warning --border --input --ring`, plus the CRT atmosphere
-  `--glow --glow-soft --scanline-opacity`, `--radius` (0 everywhere) and `--font-mono`.
+  --destructive --success --warning --info --pending --border --input --ring`, plus the CRT
+  atmosphere `--glow --glow-soft --scanline-opacity`, `--radius` (0 everywhere) and `--font-mono`.
+- **Five status accents, not three** (0.5.0). good / attention / bad is a *verdict* vocabulary and
+  a dashboard mostly shows neither: `--info` is a state, not a verdict (in flight, gated, started
+  by hand, deliberately silent — blue, never an alarm); `--pending` is the *absence* of a verdict
+  (still running, timed out, could not determine — violet, never `--destructive`, because "no
+  answer" is not "bad answer"). Reach for these before inventing a hue.
 - Need a colour the system has no token for? **Add the token here, four times, with its measured
   worst-case contrast ratio in a trailing comment** (see `src/tokens.css`). Do not tune a literal
-  at the call site — that forks the palette and fixes exactly one theme.
+  at the call site — that forks the palette and fixes exactly one theme. But a token here names a
+  **state**; a colour that names a **thing** (a vendor, an agent, a chart series) belongs to the
+  surface that knows what the thing is — per-theme, in that surface's own stylesheet. Cockpit's
+  GitLab orange is the worked example of the second kind.
 - The only legitimate literal is a *fallback inside a var()*: `var(--background, #f5efe2)` takes
   the published token when the stylesheet arrived and the literal when it did not.
   `deploy/netmon/index.html` in `danieldeusing-infra` is the worked example, including why it

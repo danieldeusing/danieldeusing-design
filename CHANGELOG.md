@@ -26,6 +26,43 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.5.0 (2026-08-05)
+
+**`--info` and `--pending`, because three status accents cannot describe a state machine and
+cockpit forked a literal for every state that was missing.** good / attention / bad is a verdict
+vocabulary. It has no word for *in flight* and no word for *no answer yet* — and those are the
+two states a dashboard spends most of its time showing. Lacking a token, cockpit picked hexes:
+`#3f8fd9` and `#1a7f7f` for the first, `#7048e8`, `#9775fa` and `#b05fd9` for the second. Five
+literals, two meanings, and **every one of the five missed AA 4.5:1 on warm — the default
+theme**; `#7048e8` and `#1a7f7f` sat inside the 0.0692 luminance gap and cleared neither side,
+so no amount of tuning at the call site could have saved them. That is the failure this release
+fixes, and the fix has to be here because a per-theme value is the only kind that works.
+
+- **`--info`** — a state, not a verdict: dispatching, gated, started by hand, "silent for a
+  reason". Blue, so it never reads as an alarm.
+  warm `#1c5f9e` 5.17 · green `#4dabf7` 7.57 · mono `#4dabf7` 7.63 · paper `#1c5f9e` 5.74.
+- **`--pending`** — *no* verdict: still running, timed out, could not determine, not recorded.
+  The answer is absent, which is a different thing from the answer being bad, and colouring it
+  red says the opposite. Violet, so it never collapses into `--destructive`.
+  warm `#5f3dc4` 5.58 · green `#b197fc` 7.77 · mono `#b197fc` 7.82 · paper `#5f3dc4` 6.19.
+
+Ratios are the worst of `--background`, `--card` and `--muted` on that theme, measured rather
+than eyeballed — the same three surfaces every other accent here is held to. Both follow the
+shape the arithmetic forces: one value for the two light themes, one for the two near-black ones.
+
+**What does NOT belong here, and the line is worth stating.** Cockpit also hardcodes a GitLab
+orange. It stays in cockpit, per-theme, in cockpit's own stylesheet: a design system that knows
+what GitLab is has a layering bug, and the next vendor would want the same favour. The rule that
+falls out — *a token here names a STATE; a colour that names a THING belongs to the surface that
+knows what the thing is* — is why this release adds two tokens and not three.
+
+**Fixed: `tokens/tokens.json` had been dropping every warm colour since 0.4.0.** Adding the
+layout scale gave `tokens.css` a *second* `:root` block, and the build assigned rather than
+merged — so the second block replaced the first and the default theme exported the eleven
+measurements with **not one colour**. It survived a release because the consumers of that file
+are native/Figma exports nobody had regenerated. The CSS was never affected. Warm now exports
+its full set, and this release's `--info`/`--pending` reach the JSON for all four themes.
+
 ## 0.4.0 (2026-08-05)
 
 **Measurements are tokens now, because four surfaces had four answers.** Daniel: *"all pages

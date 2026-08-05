@@ -48,4 +48,17 @@
   --radius-md: var(--radius);
   --radius-lg: var(--radius);
   --radius-xl: var(--radius);
+  /* Layout + type, so a Tailwind app reaches the same measurements as a plain
+     one: `max-w-content` is the shared column, `text-fs-*` the shared scale.
+     Tailwind's OWN text-xs/sm/base are deliberately left alone — this scale
+     bottoms out at 10px for terminal chrome, and silently remapping the default
+     names would reskin every existing utility in a consuming app. Opt in. */
+  --container-content: var(--content-w);
+  --text-fs-xs: var(--fs-xs);
+  --text-fs-sm: var(--fs-sm);
+  --text-fs-base: var(--fs-base);
+  --text-fs-md: var(--fs-md);
+  --text-fs-lg: var(--fs-lg);
+  --text-fs-xl: var(--fs-xl);
+  --text-fs-2xl: var(--fs-2xl);
 }

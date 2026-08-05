@@ -37,6 +37,21 @@
  * Breakpoint: 48rem.
  */
 
+/* ── the content column ──
+   ONE definition of "how wide is the page, and how far from the edge", because
+   four surfaces each had their own until 2026-08-05 (78rem / 1180px / 72rem /
+   none). Only the INLINE axis is set here: vertical rhythm differs legitimately
+   between a doc and a dashboard, and forcing that too is how a shared rule earns
+   a local override — which is how the drift started in the first place.
+
+   Consumers therefore set `padding-block`, never the `padding` shorthand: the
+   shorthand resets padding-inline to 0 and quietly takes the margins back. */
+.wrap {
+  max-width: var(--content-w);
+  margin-inline: auto;
+  padding-inline: var(--content-pad);
+}
+
 /* ── a11y helpers ── */
 .skip-link {
   position: absolute; left: -999px; top: 0; z-index: 100;

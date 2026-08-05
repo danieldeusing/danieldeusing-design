@@ -7,12 +7,24 @@ All notable changes to this project are documented here. The format follows
 jsDelivr serves the committed `dist/` bundle per git tag, so every release is cut as an
 immutable tag (`vX.Y.Z`).
 
-**Consumers load the UNPINNED url** (`@danieldeusing/design/dist/…`, no `@x.y.z`) — Daniel's
-call, 2026-08-05: one design system, every surface on the current version, no per-surface
-drift to reason about. The trade is deliberate and worth stating: a publish is then instantly
-live everywhere with no staging, so **look at the surfaces after publishing**, and keep new
-CSS backward-compatible with the markup consumers still ship (see 0.2.0's `html:has(.ls-nav)`
-guard for the pattern). Pin a tag only to hold a surface back on purpose.
+**Which url a consumer loads depends on whether its MARKUP is coupled to a release.** Daniel's
+call, 2026-08-05, was "make all unpinned" — one design system, every surface on the current
+version. That holds for surfaces that consume only tokens and visual identity (netmon, the docs
+site, the seedr playgrounds, pagr-docs, morning-briefs): a stale cached stylesheet there just
+means slightly older colours, never a broken page.
+
+**It does NOT hold for a surface whose markup requires a specific release, which must PIN.**
+Learned the hard way the same day: cockpit 2.65.0 shipped the `.ls-nav` rail markup while
+loading the unpinned url — and jsDelivr serves that url with `max-age=604800`, **seven days in
+the browser**. Every browser that had opened cockpit that week kept applying 0.1.6, which
+predates the rail, so the new markup rendered against CSS that had never heard of it: both
+toggles visible, the rail in flow, a 613px header. A release cannot fix that, because the url a
+release publishes to is the one being cached — only changing the url does. Cockpit is therefore
+pinned and bumps its pin with each adoption.
+
+Either way: a publish is instantly live on every unpinned surface with no staging, so **look at
+them after publishing**, and keep new CSS backward-compatible with the markup consumers still
+ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
 ## 0.2.0 (2026-08-05)
 

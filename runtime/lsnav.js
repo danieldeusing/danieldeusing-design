@@ -43,10 +43,16 @@ function measureChrome() {
   const root = document.documentElement;
   const bar = document.querySelector("header.bar");
   const status = document.querySelector("footer.status");
-  // A hidden footer (mobile folds it into the burger) contributes nothing.
-  const visible = (el) => el && el.getBoundingClientRect().height > 0;
-  if (visible(bar)) root.style.setProperty("--ls-nav-top", `${bar.getBoundingClientRect().height}px`);
-  root.style.setProperty("--ls-nav-bottom", visible(status) ? `${status.getBoundingClientRect().height}px` : "0px");
+  // offsetHeight, NOT getBoundingClientRect(). Consumers may set `zoom` on <html>
+  // (cockpit scales the whole layout to the viewport), and getBoundingClientRect
+  // reports VISUAL pixels — already multiplied by the zoom. Writing that number
+  // back as a CSS length zooms it a second time, which left the rail sitting a
+  // few px below the bar with a visible seam. offsetHeight is layout px and is
+  // the same unit the CSS will be interpreted in.
+  const h = (el) => (el ? el.offsetHeight : 0);
+  if (h(bar)) root.style.setProperty("--ls-nav-top", `${h(bar)}px`);
+  // A hidden footer (mobile folds it into the burger) reserves nothing.
+  root.style.setProperty("--ls-nav-bottom", `${h(status)}px`);
 }
 
 export function initLsNav() {

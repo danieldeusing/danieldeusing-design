@@ -5,8 +5,13 @@
   A single self-contained HTML file: the design system loads build-free from the
   jsDelivr CDN, so this opens directly in a browser with no build step.
 
-  Fill the {{PLACEHOLDERS}}. The CDN URLs are pinned to a published release (@0.1.6) — bump to the current
-  version in package.json (the git tags lag behind releases).
+  Fill the {{PLACEHOLDERS}}. The CDN URLs are deliberately UNPINNED — one design system, every
+  surface on the current version (Daniel, 2026-08-05). A surface that ships the system's own
+  MARKUP against a specific release pins instead (cockpit does); see the danieldeusing-design
+  skill. Unpinned costs this page nothing visible ONLY because it is defended twice: the
+  `onerror` snapshot below covers a CDN that cannot be reached, and every token in the <style>
+  block carries a literal fallback for the window where a browser still holds an older build
+  (jsDelivr caches an unpinned url for SEVEN DAYS). Keep both when editing.
 
   Chrome (fixed by the template, do not restyle):
     - top-left  : the "danieldeusing-docs" wordmark (always).
@@ -58,19 +63,43 @@
       })();
     </script>
 
+    <!-- The design system, tracked LIVE (unpinned): a doc always wears the current look.
+         `onerror` swaps in a byte-for-byte snapshot of the release this doc was written
+         against, served from this site — so a reader with no route to the CDN still gets
+         the page as it stood that day. Snapshots are stored ONCE per version under
+         /_design/, not once per doc, and /_design/ is served without a login (a published
+         stylesheet is not a secret, and a client scope must be able to read it too).
+         The version below is the snapshot this doc was written against — bump it (and add
+         the snapshot to danieldeusing-docs) when the design system moves; see the html-doc
+         skill, step 3. NOTE the path is site-absolute: it resolves on
+         docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.6/dist/danieldeusing-design.min.css"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.4.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.6/src/fonts.css"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.4.0.fonts.css'"
     />
 
     <style>
-      /* Page-only layout. The design system ships the visual identity; a build-free
-         page brings its own layout. */
-      .wrap { max-width: 78rem; margin-inline: auto; padding: 2.5rem 1.5rem 5rem; }
+      /* Page-only layout. The design system ships the visual identity AND the measurements
+         (--content-w / --content-pad / --fs-*), so every value below is a TOKEN.
+
+         Each one carries a literal fallback on purpose. This page loads the design system
+         UNPINNED, and jsDelivr serves that url `max-age=604800` — seven days in the browser,
+         12h at the edge — so a reader can be holding a build that predates these tokens
+         (0.2.0 has neither `.wrap` nor `--fs-*`). A bare `var(--content-w)` would resolve to
+         nothing there and the page would go full-bleed with collapsed type. `var(--token,
+         literal)` takes the published value whenever it arrived and the old one when it did
+         not — the same contract as the offline <link> fallback above.
+
+         Note `padding-block` + `padding-inline`, never the `padding` shorthand: the
+         shorthand resets padding-inline and silently drops the left/right margins. */
+      .wrap { max-width: var(--content-w, 78rem); margin-inline: auto;
+              padding-block: 2.5rem 5rem; padding-inline: var(--content-pad, 1.5rem); }
 
       /* header/footer chrome + nav now ship with the design system (src/chrome.css) */
 
@@ -78,15 +107,15 @@
       .layout { display: grid; gap: 2.5rem; }
       @media (min-width: 64rem) { .layout { grid-template-columns: minmax(0, 1fr) 13rem; } }
       .content { min-width: 0; }
-      h1.title { font-size: 1.7rem; font-weight: 700; margin: 0.4rem 0 0.5rem; }
+      h1.title { font-size: var(--fs-2xl, 1.7rem); font-weight: 700; margin: 0.4rem 0 0.5rem; }
       .lede { color: var(--muted-foreground); } /* full width — no max-width cap */
 
       .toc { display: none; }
       @media (min-width: 64rem) { .toc { display: block; } }
       .toc-inner { position: sticky; top: 4.5rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
-      .toc-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); }
+      .toc-label { font-size: var(--fs-sm, 0.66rem); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); }
       .toc nav { margin-top: 0.6rem; display: flex; flex-direction: column; }
-      .toc a { padding: 0.22rem 0; font-size: 0.76rem; color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
+      .toc a { padding: 0.22rem 0; font-size: var(--fs-base, 0.76rem); color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
       .toc a:hover, .toc a.active { color: var(--primary); }
 
       section.doc { margin-top: 2.5rem; scroll-margin-top: 4rem; }
@@ -103,7 +132,7 @@
       .pad { padding: 1rem; }
       .muted { color: var(--muted-foreground); }
       code.inline { font-family: inherit; background: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; font-size: 0.92em; }
-      pre.block { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.86rem; line-height: 1.5; background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
+      pre.block { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-md, 0.86rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
       /* Wide tables must scroll inside their own container, never the page.
          Always wrap table.kv (and any custom table variant) like this:
            <div class="table-scroll"><table class="kv">...</table></div>
@@ -115,14 +144,14 @@
          hold more than one short token (e.g. a list of file names) — nowrap on
          a multi-item cell is what forces the runaway width in the first place. */
       .table-scroll { overflow-x: auto; max-width: 100%; }
-      table.kv { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+      table.kv { width: 100%; border-collapse: collapse; font-size: var(--fs-lg, 0.92rem); }
       table.kv th, table.kv td { text-align: left; vertical-align: top; padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid var(--border); }
       table.kv th { color: var(--primary); font-weight: 700; white-space: nowrap; }
 
       /* Mermaid diagrams. Before rendering, the <pre> shows the raw diagram source —
          so with JS disabled (or if the CDN is unreachable) the page degrades to a
          readable text diagram instead of an empty box. */
-      pre.mermaid { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.86rem; line-height: 1.5; background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
+      pre.mermaid { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-md, 0.86rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
       pre.mermaid[data-processed] { white-space: normal; text-align: center; }
       pre.mermaid svg { max-width: 100%; height: auto; }
     </style>
@@ -272,7 +301,7 @@ flowchart TD
 
     <script type="module">
       import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.6/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();

@@ -225,7 +225,14 @@
 
   /* ── nothing scrolls on paper ──────────────────────────────────────────
      An overflow-x container has no scrollbar in print: whatever sits past the
-     right edge is simply gone. Let it wrap instead. */
+     right edge is simply gone. Let it wrap instead.
+
+     `.tablewrap` is the current name — the wrapper runtime/tablescroll.js puts around
+     every table. `.table-scroll` was the docs site's private name for the same idea
+     before it converged on this one, and it stays listed because pages published under
+     the old name are still on the site and cannot be edited retroactively. Dropping it
+     would silently start clipping their tables on paper. */
+  .tablewrap,
   .table-scroll,
   pre,
   .diagram {

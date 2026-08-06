@@ -26,6 +26,18 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.7.1 (2026-08-06)
+
+**Print: `.tablewrap` was not in the "nothing scrolls on paper" rule.** 0.7.0 introduced the
+class and the print layer still named only `.table-scroll`, the docs site's older private name
+for the same idea. An `overflow-x` container has no scrollbar on paper — whatever sits past the
+right edge is simply gone — so every newly-wrapped table was one `Cmd-P` away from losing its
+last columns silently.
+
+`.table-scroll` stays listed alongside it. Pages published under the old name are still on the
+docs site and cannot be edited retroactively, and dropping the selector would start clipping
+their tables with no visible cause.
+
 ## 0.7.0 (2026-08-06)
 
 Daniel: *"the font size of container-page is different than on all other pages, e.g. cockpit.

@@ -96,9 +96,10 @@
              and the weight); `ls-row--sub` / `ls-row--sub2` draw the nesting. The
              permission string is decoration that carries meaning: drwxr-xr-x has
              children, -rw-r--r-- does not. -->
-        <!-- NOTHING IN THE PACKAGE STYLES `.ls-group` — it renders as a plain inline span.
-             A surface that wants group headings in the rail styles it itself today (netmon
-             does, and says so). Keep the class name so those rules stay portable. -->
+        <!-- `.ls-group` is a heading inside the rail, and since 0.8.0 the package STYLES it.
+             It did not before, so every surface that wanted grouped navigation wrote its own
+             rule and they all differed — if yours still carries one, delete it, it is now a
+             fork. Only a positional tweak (an inset, a first-child) belongs locally. -->
         <li><span class="ls-group"># group</span></li>
         <li class="ls-row"><span class="ls-perm">-rw-r--r--</span><a class="ls-name" href="/page">page</a></li>
         <li class="ls-row ls-row--dir"><span class="ls-perm">drwxr-xr-x</span><a class="ls-name" href="/section/">section/</a></li>

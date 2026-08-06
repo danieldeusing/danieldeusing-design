@@ -25,6 +25,18 @@ For anything about the design system itself — tokens, themes, the component vo
 consumer may and may not redeclare — use the **`danieldeusing-design`** skill next door. This one
 is only about filling the template.
 
+**A published doc is a machine-checked surface.** `danieldeusing-docs/site` and `site-internal`
+are both roots in `bin/design-conformance` (in `danieldeusing-infra`), so a page that redeclares
+one of the system's classes or names a token nothing defines is a *finding*, not a matter of
+taste. Run it before you publish, not after:
+
+```bash
+cd ~/Work/danieldeusing/danieldeusing-infra && node bin/design-conformance
+```
+
+A genuine exception is a `design-conformance: <reason>` comment above the rule — the template
+already carries two, and if you cannot write the sentence you do not have an exception.
+
 ## Steps
 
 1. **Identify the subject.** Determine what to document from the conversation or the path the
@@ -207,47 +219,69 @@ is only about filling the template.
 8. **Offer to publish** to `docs.danieldeusing.de`. Ask first — some docs are local-only. If the
    user declines, stop here and report the local path.
 
-   **a. Ask where it goes.** The published tree is `<context>/<project>/`, mirroring how the
-   estate is organised — e.g. `poi/vu3/`, `danieldeusing/homepage/`, `ihk/einwilligungen/`,
-   `promonco/`. Offer the existing folders (`ls ~/Work/danieldeusing/danieldeusing-docs/site/`)
-   plus a new one; never guess. The filename is the kebab-case slug, `.html`.
+   **a. Ask WHICH SURFACE, then where.** There are **two** trees, and the choice is a security
+   decision, not a filing one — ask, never guess:
+   - **`site-internal/`** → `docs.internal.danieldeusing.de`, tailnet-only. **This is the
+     default and the right answer when in doubt**: client material, private-repo content,
+     review reports, infrastructure notes, anything under NDA. It costs nothing extra — same
+     repo, same login, same publish command.
+   - **`site/`** → `docs.danieldeusing.de`, reachable from the **public internet** behind a
+     password. Only for something you would hand a stranger along with the password.
+
+   Publishing is not reversible: `git rm` does not un-publish, so promoting later
+   (`git mv site-internal/x site/x`) is a one-line decision while demoting is not.
+   Full table: `danieldeusing-infra/docs/runbooks/docs-site.md`.
+
+   Within the chosen tree the path is `<context>/<project>/`, mirroring how the estate is
+   organised — e.g. `poi/vu3/`, `danieldeusing/automation/`. Offer the existing folders
+   (`ls ~/Work/danieldeusing/danieldeusing-docs/{site,site-internal}/`) plus a new one. The
+   filename is the kebab-case slug, `.html`.
 
    **b. Move it in** (`git mv` if it is already tracked, otherwise `mv` — the file lives in the
    docs repo, not next to the subject, so there is exactly one copy):
 
    ```bash
    DOCS=~/Work/danieldeusing/danieldeusing-docs
-   mkdir -p "$DOCS/site/<context>/<project>"
-   mv <written-file> "$DOCS/site/<context>/<project>/<slug>.html"
+   TREE=site            # or site-internal
+   mkdir -p "$DOCS/$TREE/<context>/<project>"
+   mv <written-file> "$DOCS/$TREE/<context>/<project>/<slug>.html"
    ```
 
-   **c. Record it in 1Password** so the doc can be handed to someone. Vault
-   `danieldeusing-agents`, item `docs - <context>/<project>/<slug>`, category LOGIN, with the
-   **URL** and a note naming the credential that opens it.
+   **c. Check the folder is REACHABLE, and record it in 1Password.**
 
-   > **Phase 1 has ONE site-wide password** (`docs - basicauth`, user `daniel`). Do **not**
-   > generate a per-doc password and store it as if it were enforced — nothing would check it,
-   > and an item claiming otherwise is worse than no item. Reference `docs - basicauth` instead.
-   > Per-folder passwords arrive with the phase-2 cockpit manager
-   > (`danieldeusing-infra/docs/runbooks/docs-site.md` §Phase 2); when that lands, this step
-   > generates a real per-folder password and stores the plaintext here with the hash in
-   > `docs-access.json`.
+   > **Access is per-folder scopes in `danieldeusing-docs/docs-access.json`**, enforced by
+   > `deploy/docs/server.py` — the single site-wide password is gone. A scope is a folder, the
+   > users who may open it, and the `surface` it applies to (`public` / `internal` / `both`). It
+   > **fails closed**: a folder no scope covers cannot be opened by anyone, so a doc published
+   > into a brand-new folder is unreachable until a scope covers it. The root scope (`""`) is the
+   > master key and covers everything beneath it, which is why most publishes need no change —
+   > but check rather than assume, and say so in the report if a new scope is needed.
+   > Adding or editing a scope is a repo edit in `docs-access.json`, reviewed like any other.
+
+   Then record it so the doc can be handed to someone: vault `danieldeusing-agents`, item
+   `docs - <context>/<project>/<slug>`, category LOGIN, with the **URL** and a note naming the
+   scope that opens it. Do not invent a password — reference the credential the scope actually
+   lists.
 
    **d. Pull before you push** — other machines publish to this repo too, so a blind push
    fails on a non-fast-forward:
 
    ```bash
-   cd "$DOCS" && git pull --rebase && git add site/ \
+   cd "$DOCS" && git pull --rebase && git add "$TREE/<context>/<project>/<slug>.html" \
      && git commit -m "docs: <what>" && git push
    ```
+
+   Stage the **explicit path**, never `git add -A` or `git add site/`: other machines and agents
+   publish into this repo concurrently, and a catch-all sweeps their in-progress work into your
+   commit.
 
    The push is the deploy: GitHub fires a push webhook, `dd-infra-docs` on ddMini verifies the
    HMAC and re-syncs. Live in a few seconds — no build, no deploy step.
 
-9. **Report.** Give the local path (or the published URL
-   `https://docs.danieldeusing.de/<context>/<project>/<slug>.html` and the 1P item name if it was
-   published), that it opens directly in a browser, and that themes (warm / green / mono / paper)
-   are switchable from the page-settings dropdown in the bottom-right of the footer.
+9. **Report.** Give the local path (or the published URL — `https://docs.internal.danieldeusing.de/…`
+   for `site-internal/`, `https://docs.danieldeusing.de/…` for `site/` — plus the 1P item name if
+   it was published), that it opens directly in a browser, and that themes (warm / green / mono /
+   paper) are switchable from the page-settings dropdown in the bottom-right of the footer.
 
    If published, **verify it actually landed** rather than assuming — `curl -u daniel -s -o
    /dev/null -w '%{http_code}' <url>` should be 200. A push that succeeded while the webhook

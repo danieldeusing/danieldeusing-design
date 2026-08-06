@@ -50,6 +50,10 @@ disagrees with four other pages and, for colour, is provably wrong on at least o
     })();
   </script>
 
+  <!-- UNPINNED — correct ONLY if this page consumes the look and none of the system's markup.
+       The moment you paste in the `ls -l` rail, header.bar or footer.status from the section
+       below, add the `@x.y.z` — see "Pin or unpin". Shipping rail markup against this url is
+       the exact bug that took cockpit apart for a week. -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design/dist/danieldeusing-design.min.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design/src/fonts.css" />
 </head>
@@ -160,7 +164,7 @@ fallbacks, not a copy of the system's rule. See "Measurements" above.)
 
 | Group | Classes | Source |
 | --- | --- | --- |
-| chrome | `.wrap` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
+| chrome | `.wrap` `.tablewrap` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
 | `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`) `.ls-perm` `.ls-name` | `src/chrome.css` |
 | text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
 | blocks | `.card-terminal` `.btn-terminal` `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
@@ -174,8 +178,16 @@ fallbacks, not a copy of the system's rule. See "Measurements" above.)
 `.prompt` already prepends `$ ` — never author a literal leading `$ ` inside one (it doubles).
 
 The chrome has a **markup contract**, documented at the top of `src/chrome.css` and shown end to
-end in `templates/documentation.html`. Follow it exactly; the rail in particular reads state from
-`html[data-ls-nav]` and needs its own pre-paint line:
+end in two templates that ship in the package (`files`), so a consumer reads the canonical markup
+out of its own `node_modules` instead of copying whatever the nearest surface happens to do today
+— which is how the pre-rail dropdown propagated in the first place:
+
+- **`templates/page-chrome.html`** (0.6.0) — the standard chrome ALONE: `header.bar` + the `ls -l`
+  rail + `footer.status`, in that order, with the reasoning for each. Start here for any surface.
+- **`templates/documentation.html`** — a whole page built on it, for a one-file doc.
+
+Follow it exactly; the rail in particular reads state from `html[data-ls-nav]` and needs its own
+pre-paint line:
 
 ```js
 try { if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off"; } catch {}
@@ -194,18 +206,24 @@ node bin/design-conformance --list     # what the system currently owns
 ```
 
 It reads the owned vocabulary **from the published CSS**, so it cannot fall behind a release the
-way a hand-written list would. Three findings:
+way a hand-written list would. Four findings:
 
 | finding | what it means |
 |---|---|
 | **forked component** | your page declares a class the system styles, unscoped, setting a property the system also sets. `.pair details.fold {…}` and `button.doc-link.rowlink {…}` are fine — a page-owned class scopes them. `.legend {…}` is not. |
 | **literal colour** | a hex as the value of a real property. Defining a token (`--grid: #d9cdb6`) and a fallback (`var(--background, #f5efe2)`) are both correct and are not reported. |
+| **bare token on an unpinned surface** | `var(--content-w)` with no literal fallback on a page loading the unpinned url. The served build may predate the token, and then the declaration is dropped entirely — full-bleed page, collapsed type. See "Pin or unpin" below. |
 | **phantom token** | `var(--x)` nothing defines — silently dropped, and the element renders at its inherited value, which usually looks *almost* right. |
 
 **A genuine exception is a comment, not a config entry.** Put `design-conformance: <reason>` in
-the comment above the rule and it is waived. Four exist today (a full-bleed data table, WCAG
-tap-target sizing under a coarse pointer, a phone gutter) and each states a real reason. If you
-cannot write the sentence, you do not have an exception — you have a fork.
+the comment above the rule and it is waived. Nine exist today (a full-bleed data table, WCAG
+tap-target sizing under a coarse pointer, a phone gutter, a deliberately fixed-dark pane…) and
+each states a real reason. If you cannot write the sentence, you do not have an exception — you
+have a fork.
+
+**It only knows three surfaces** — `cockpit`, `netmon` and `docs`, listed in `SURFACES` at the top
+of the script. `apps/pagr`, the seedr playgrounds and `deploy/ci-orchestrator` are unchecked, and
+every one of them has drifted. Adding a surface is one entry in that array.
 
 ## Runtime — `runtime/*.js`, dependency-free ESM, tree-shakeable
 
@@ -220,6 +238,7 @@ cannot write the sentence, you do not have an exception — you have a fork.
 | `initTerminal()` | The `$ command` typing animation; no-ops under reduced motion / `html.anim-off`. Fires `term:contentdone`. |
 | `initAnimToggle()` | Wires `[data-anim-toggle]`, persists `localStorage["anim"]`. |
 | `initDiagramZoom(".diagram")` | Click / Enter / Space opens a diagram full-screen; wheel-zoom about the pointer, drag-pan, `+ - 0`, Escape closes. Clones the svg — mermaid re-runs against the nodes it rendered, so moving the original is how a diagram silently stops updating. |
+| `initTableScroll()` | Gives every unwrapped `<table>` a `.tablewrap` parent so a wide table scrolls itself instead of scrolling the whole PAGE sideways. **The markup contract is nothing** — author a plain `<table>`; already-wrapped tables are left alone, so it is never a migration and is safe to call again after rendering more rows. |
 | `initTooltips()` | `src/tooltip.css` counterpart. |
 
 The runtime is progressive enhancement: with JS off, content is visible and the theme is `warm`.
@@ -228,8 +247,12 @@ The runtime is progressive enhancement: with JS off, content is visible and the 
 
 - **Tokens-only / look-only consumer → UNPINNED** (`…/npm/@danieldeusing/design/dist/…`, no
   `@x.y.z`). One design system, every surface on the current version — Daniel's call, 2026-08-05.
-  A stale cached stylesheet there means slightly older colours, never a broken page. netmon,
-  seedr playgrounds, pagr-docs, morning-briefs.
+  A stale cached stylesheet there means slightly older colours, never a broken page. netmon's
+  `tokens.css` layer, the seedr playgrounds and pagr-docs are on this side today.
+  **This is where a surface SHOULD sit, not a roster of where they are** — audited 2026-08-06,
+  morning-briefs is hard-pinned at **0.1.3** in four `@import url()` lines in its `lib/tokens.css`
+  and `deploy/ci-orchestrator` at **0.1.5**, so neither has had a token since. A pin nobody bumps
+  is the failure mode on this side, exactly as a poisoned cache is on the other.
 - **A surface that ships the system's MARKUP → PIN** and bump the pin in the same commit as the
   markup that needs it. Cockpit — and **the docs site since 2026-08-06**, when its pages adopted
   the rail and the fixed footer. It sat on the unpinned list above right up until that day, which

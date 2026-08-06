@@ -36,11 +36,18 @@
      Both the theme and the rail state must be applied before first paint, or the page
      visibly flashes the default and jumps.
   2. At the end of <body>, import and call the runtime:
-       import { initLsNav, initThemeSwitcher, initDropdowns, initAnimToggle }
+       import { initLsNav, initBurgerNav, initThemeSwitcher, initDropdowns,
+                initAnimToggle, initTableScroll }
          from "@danieldeusing/design/runtime";
+     initBurgerNav() is not optional here: the markup below ships a .nav-burger, and
+     below the 48rem breakpoint that button is the ONLY way to reach the navigation.
+     Without it the burger renders and does nothing, which is worse than no burger.
   3. `initLsNav()` measures header and footer height and publishes --ls-nav-top /
      --ls-nav-bottom, which is how the rail sits BETWEEN the chrome instead of under
      it. A page with no footer.status still works — it just reserves nothing.
+  4. `initTableScroll()` wraps every table so a wide one scrolls itself rather than
+     scrolling the whole page sideways. The markup contract is nothing — author a
+     plain <table>. Call it again after rendering more rows.
 -->
 
 <!-- ─────────────── <head> ─────────────── -->
@@ -89,6 +96,9 @@
              and the weight); `ls-row--sub` / `ls-row--sub2` draw the nesting. The
              permission string is decoration that carries meaning: drwxr-xr-x has
              children, -rw-r--r-- does not. -->
+        <!-- NOTHING IN THE PACKAGE STYLES `.ls-group` — it renders as a plain inline span.
+             A surface that wants group headings in the rail styles it itself today (netmon
+             does, and says so). Keep the class name so those rules stay portable. -->
         <li><span class="ls-group"># group</span></li>
         <li class="ls-row"><span class="ls-perm">-rw-r--r--</span><a class="ls-name" href="/page">page</a></li>
         <li class="ls-row ls-row--dir"><span class="ls-perm">drwxr-xr-x</span><a class="ls-name" href="/section/">section/</a></li>
@@ -96,7 +106,17 @@
       </ul>
     </div>
 
-    <!-- Below 64rem the rail hides and the burger opens this instead. -->
+    <!-- The pre-rail flat list, for a surface that ships NO rail. Below the 48rem breakpoint the
+         burger owns navigation, and since 0.7.2 chrome.css hides this list whenever a .ls-nav is
+         present in the same nav — the rail is the one carrying the structure, so a page with both
+         showed its whole navigation twice, stacked. 0.7.3 then gave the surviving rail rows a
+         44px min-height, because the list being hidden was the finger-sized one.
+
+         So if you keep the rail above, this element is dead markup — it is here only so a
+         pre-rail surface still has somewhere to look. DO NOT ALSO HIDE THE RAIL BELOW THE
+         BREAKPOINT to keep this list instead: chrome.css has already hidden this one, `:has()`
+         still matches a `display:none` rail, and the page ends up with NO navigation at all.
+         (Verified in a browser: rail=none, mobile-nav=none, 0 visible links.) -->
     <ul class="mobile-nav" role="list"></ul>
   </nav>
 </header>

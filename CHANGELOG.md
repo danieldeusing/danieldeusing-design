@@ -26,6 +26,23 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.7.3 (2026-08-06)
+
+**0.7.2 fixed the duplicated mobile nav and left the remaining one unusable on a phone.** With
+`.mobile-nav` hidden, navigation falls to the rail's rows — which are **18px** tall. WCAG 2.2's
+Target Size (Minimum) floor is 24px and the size anyone actually aims with is 44px; the
+`.mobile-item` rows that were just hidden carried 0.65rem of padding precisely for that. So the
+previous release traded a nav that appeared twice for one that is hard to hit, which is the
+worse of the two, and it is invisible on the desktop where the fix was written.
+
+Rail rows below the breakpoint now take `min-height: 44px` — a fixed floor rather than more
+padding, so it holds whatever the row's font size does, and it is the number the guideline
+names. `.ls-name` stretches to fill the row, because a link you have to hit precisely is the
+same problem wearing a bigger box. Group labels are not interactive and are left alone.
+
+Caught by an agent converting danieldeusing.de, which declined to hide `.mobile-nav` locally
+for exactly this reason — the rows it would have dropped were the finger-sized ones.
+
 ## 0.7.2 (2026-08-06)
 
 **On a phone, a page that ships both nav forms showed its navigation TWICE.** `.mobile-nav`

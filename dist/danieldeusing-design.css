@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.7.2 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.7.3 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1209,6 +1209,29 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
 
      :has() degrades to the status quo — no support, no rule, two navs as before. */
   .site-nav:has(> .ls-nav) .mobile-nav { display: none; }
+
+  /* …and the rail's rows have to become TAP TARGETS, or hiding the flat list makes the nav
+     unreachable instead of merely duplicated. `.mobile-item` carried 0.65rem of padding for a
+     finger — 43px. A rail row is 18px, which is below even WCAG 2.2's 24px floor, let alone
+     the 44px anyone actually aims with. That is a worse outcome than the bug being fixed, and
+     it is invisible on the desktop where the fix was written.
+
+     min-height rather than more padding: it is the same 44px whatever the row's font size
+     does, and it is the number the guideline names. `.ls-name` stretches so the whole row is
+     the hit area, not just the word — a link you have to hit precisely is the same problem
+     wearing a bigger box. Group labels are not interactive and keep their own size. */
+  .site-nav > .ls-nav .ls-row {
+    align-items: center;
+    min-height: 44px;
+    border-bottom: 1px solid var(--border);
+  }
+  .site-nav > .ls-nav .ls-row .ls-name {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-height: 44px;
+  }
+  .site-nav > .ls-nav .ls-row:last-child { border-bottom: 0; }
   .mobile-nav .mobile-item {
     display: flex; align-items: baseline; gap: 0.9rem; padding: 0.65rem 0;
     text-decoration: none; color: var(--foreground); font-size: 0.9rem;

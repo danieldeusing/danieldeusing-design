@@ -26,6 +26,24 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.7.2 (2026-08-06)
+
+**On a phone, a page that ships both nav forms showed its navigation TWICE.** `.mobile-nav`
+predates the rail — it was the phone's only navigation back when the desktop nav was a
+dropdown. Every cockpit page ships both, because one `NAV_ITEMS` array renders both, so the
+whole tree appeared stacked on itself inside the burger. The mobile rule has said the flat list
+*"replaces"* the rail since 0.2.0; it never actually hid anything.
+
+`.site-nav:has(> .ls-nav) .mobile-nav { display: none }`. The rail wins because it is the one
+carrying structure — groups, directories, the drawn nesting — while `.mobile-nav` is a flat
+list of the same links. Hiding the OLDER form when the newer one is present is also what keeps
+a pre-rail surface working untouched, and `:has()` degrades to the status quo rather than to a
+page with no navigation at all.
+
+Found by an agent converting the docs pages, which dropped `.mobile-nav` and got one list where
+cockpit had two — the kind of thing that only shows up when two surfaces built from the same
+vocabulary are compared side by side.
+
 ## 0.7.1 (2026-08-06)
 
 **Print: `.tablewrap` was not in the "nothing scrolls on paper" rule.** 0.7.0 introduced the

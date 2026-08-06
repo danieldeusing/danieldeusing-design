@@ -266,9 +266,24 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
   }
   .site-nav.open { display: block; }
   /* The desktop rail is a desktop idea: a fixed 17rem column would eat a phone.
-     Below the breakpoint the burger owns navigation and the flat list replaces it. */
-  .site-nav > .ls-nav, 
+     Below the breakpoint the burger owns navigation — the rail un-fixes and becomes a
+     flat list inside it. */
+  .site-nav > .ls-nav,
   .mobile-nav { display: flex; flex-direction: column; }
+
+  /* ONE nav in the burger, not two. `.mobile-nav` predates the rail: it was the phone's
+     only navigation back when the desktop nav was a dropdown. A page that ships BOTH —
+     which every cockpit page does, because one NAV_ITEMS array renders both — showed its
+     entire navigation twice, stacked, inside the burger. The rule above says the flat list
+     "replaces" the rail and for two releases it simply did not.
+
+     The rail wins because it is the one with the structure: groups, directories, the drawn
+     nesting. `.mobile-nav` is a flat list of the same links. Hiding the OLDER thing when
+     the newer one is present also means a pre-rail surface keeps working untouched, which
+     is what makes this safe to publish ahead of any consumer's markup.
+
+     :has() degrades to the status quo — no support, no rule, two navs as before. */
+  .site-nav:has(> .ls-nav) .mobile-nav { display: none; }
   .mobile-nav .mobile-item {
     display: flex; align-items: baseline; gap: 0.9rem; padding: 0.65rem 0;
     text-decoration: none; color: var(--foreground); font-size: 0.9rem;

@@ -37,6 +37,13 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  /* The other four status accents. They have existed since 0.3.0/0.5.0 and never reached this
+     file, so a Tailwind app could write `text-destructive` and nothing else — and the workaround
+     for that is a literal hex, which is the one thing the colour rules forbid. */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-pending: var(--pending);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

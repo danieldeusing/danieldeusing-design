@@ -26,6 +26,28 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.8.0 (2026-08-06)
+
+Three holes an audit found — each one something the package *claimed* rather than provided.
+
+**`exports` gated away the layers a real consumer stacks.** `files` shipped `chrome.css`,
+`tooltip.css`, `print.css` and `templates/` to npm, but `exports` never listed them, and
+`exports` is what decides whether a subpath resolves. So `@danieldeusing/design/chrome.css` and
+`@danieldeusing/design/templates/page-chrome.html` were both unreachable — **netmon's exact
+stack (`tokens.css` + `chrome.css`, deliberately without `components.css`) was impossible via
+npm**, and only worked because netmon loads from the CDN. The canonical template shipped in the
+tarball and could not be opened. Now exported.
+
+**The Tailwind entry point mapped one status colour of five.** `--color-destructive` was there;
+`--success`, `--warning`, `--info` and `--pending` — shipped in 0.3.0 and 0.5.0 — were not. A
+Tailwind app could write `text-destructive` and nothing else, and the workaround for a missing
+mapping is a literal hex, which is the single thing the colour rules forbid. All four added.
+
+**`.ls-group` was in the canonical template and styled by nothing.** It rendered as a plain
+inline span, so every surface wanting grouped navigation wrote its own rule and they all
+differed — netmon had already noticed and said so in a comment. Shipping a class name without
+the look is worse than not shipping it, because the markup reads as supported.
+
 ## 0.7.3 (2026-08-06)
 
 **0.7.2 fixed the duplicated mobile nav and left the remaining one unusable on a phone.** With

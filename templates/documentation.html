@@ -5,20 +5,27 @@
   A single self-contained HTML file: the design system loads build-free from the
   jsDelivr CDN, so this opens directly in a browser with no build step.
 
-  Fill the {{PLACEHOLDERS}}. The CDN URLs are deliberately UNPINNED — one design system, every
-  surface on the current version (Daniel, 2026-08-05). A surface that ships the system's own
-  MARKUP against a specific release pins instead (cockpit does); see the danieldeusing-design
-  skill. Unpinned costs this page nothing visible ONLY because it is defended twice: the
-  `onerror` snapshot below covers a CDN that cannot be reached, and every token in the <style>
-  block carries a literal fallback for the window where a browser still holds an older build
-  (jsDelivr caches an unpinned url for SEVEN DAYS). Keep both when editing.
+  Fill the {{PLACEHOLDERS}}. The CDN URLs are PINNED to a release, and that is not a
+  style choice — this page ships the design system's own chrome MARKUP (the `ls -l` rail,
+  the fixed footer), so it is coupled to the release that styles it. The unpinned url
+  cannot promise a release: jsDelivr serves it `max-age=604800`, SEVEN DAYS in the
+  browser. Cockpit 2.65.0 shipped rail markup that way and readers kept applying 0.1.6,
+  which predates the rail — a 613px header, the brand floating mid-page. See the
+  danieldeusing-design skill, "Pin or unpin". The page is defended twice more: the
+  `onerror` snapshot below covers a CDN that cannot be reached (SAME release, so the two
+  paths are the same bytes), and every token in the <style> block carries a literal
+  fallback so a doc opened over file:// with no CDN still lays out. Keep all three.
 
-  Chrome (fixed by the template, do not restyle):
-    - top-left  : the "danieldeusing-docs" wordmark (always).
-    - top-right : a navigation dropdown — INCLUDE ONLY when the doc set has more
-                  than one page; for a single-page doc, delete the <details id="nav">.
-    - bottom-left  : [{{FOLDER}}] {{DOC_TITLE}}  e.g. "[pagr] Source Code documentation".
-    - bottom-right : the link to danieldeusing.de + the theme (page settings) dropdown.
+  Chrome — the standard three pieces (templates/page-chrome.html has the reasoning):
+    - header.bar   : the "danieldeusing-docs" wordmark left, the `ls -l` head right.
+    - .ls-nav      : the sticky right RAIL — navigation, always the rail, never a
+                     dropdown. On the docs site it lists the doc's own subtree and
+                     nothing above it: access is per folder, so a rail that enumerated
+                     the estate would tell a scoped reader what else exists.
+    - footer.status: fixed, and the home of EVERY control — bottom-left
+                     [{{FOLDER}}] {{DOC_TITLE}} (e.g. "[pagr] Source Code
+                     documentation"), bottom-right the danieldeusing.de link, the theme
+                     picker and the anim toggle. Nothing operational goes in the header.
   Content (you fill): the title, the full-width lede, and the <section> blocks. Every
   section has an id and a matching entry in the "On this page" table of contents.
 -->
@@ -47,6 +54,13 @@
           if (localStorage.getItem("anim") === "off") animOff = true;
         } catch {}
         if (animOff) document.documentElement.classList.add("anim-off");
+
+        // The `ls -l` rail is SHOWN by default. A reader who hid it must not watch it
+        // paint and then jump away on every single load, so the state is applied HERE —
+        // the runtime module at the end of <body> runs long after first paint.
+        try {
+          if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
+        } catch {}
       })();
 
       // Resolution-independent zoom: lay out at a fixed 1920px reference, then scale the
@@ -63,25 +77,31 @@
       })();
     </script>
 
-    <!-- The design system, tracked LIVE (unpinned): a doc always wears the current look.
-         `onerror` swaps in a byte-for-byte snapshot of the release this doc was written
-         against, served from this site — so a reader with no route to the CDN still gets
-         the page as it stood that day. Snapshots are stored ONCE per version under
-         /_design/, not once per doc, and /_design/ is served without a login (a published
-         stylesheet is not a secret, and a client scope must be able to read it too).
-         The version below is the snapshot this doc was written against — bump it (and add
-         the snapshot to danieldeusing-docs) when the design system moves; see the html-doc
-         skill, step 3. NOTE the path is site-absolute: it resolves on
-         docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
+    <!-- The design system, PINNED — and it must be. This page ships the system's own
+         MARKUP (the `ls -l` rail, the fixed footer), so it is coupled to the release that
+         styles them, and the unpinned url cannot promise a release: jsDelivr serves it
+         `max-age=604800` — SEVEN DAYS in the browser (measured 2026-08-06), 12h at the
+         edge. Cockpit 2.65.0 shipped rail markup on the unpinned url and every browser
+         that had opened it that week kept applying 0.1.6, which predates the rail: both
+         nav toggles on screen, a 613px header, the brand floating mid-page. A release
+         cannot fix that — the url a release publishes to is the one being cached. The
+         pinned url is served `immutable`, so the bytes always match the markup; bump it in
+         the same commit as any markup that needs a newer release.
+         `onerror` swaps in a byte-for-byte snapshot of the SAME release, served from this
+         site, so a reader with no route to the CDN gets an identical page rather than an
+         older one. Snapshots live ONCE per version under /_design/, which is served
+         without a login (a published stylesheet is not a secret, and a folder-scoped
+         reader has to be able to load it too). NOTE the path is site-absolute: it resolves
+         on docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.4.0.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.7.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.7.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.4.0.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.7.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.7.0.fonts.css'"
     />
 
     <style>
@@ -133,18 +153,17 @@
       .muted { color: var(--muted-foreground); }
       code.inline { font-family: inherit; background: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; font-size: 0.92em; }
       pre.block { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-md, 0.86rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
-      /* Wide tables must scroll inside their own container, never the page.
-         Always wrap table.kv (and any custom table variant) like this:
-           <div class="table-scroll"><table class="kv">...</table></div>
-         Without the wrapper, a long code snippet or a multi-item cell forces
-         the table wider than its column and the WHOLE PAGE gains a horizontal
-         scrollbar instead of just the table — easy to miss until content is
-         wide enough to trigger it (many-column tables, file-path lists, long
-         inline code). Never set `white-space: nowrap` on a table cell that can
-         hold more than one short token (e.g. a list of file names) — nowrap on
-         a multi-item cell is what forces the runaway width in the first place. */
-      .table-scroll { overflow-x: auto; max-width: 100%; }
-      table.kv { width: 100%; border-collapse: collapse; font-size: var(--fs-lg, 0.92rem); }
+      /* No table CSS for scrolling or size here on purpose. `initTableScroll()` at the
+         bottom of this file gives every table a `.tablewrap` parent (overflow-x plus a
+         right-edge fade), so a table wider than its column scrolls itself instead of
+         handing the WHOLE PAGE a horizontal scrollbar — the failure that makes a site
+         read as broken, because the header slides off and body text needs two axes.
+         The markup contract is therefore nothing: author a plain <table>.
+         Size is the system's too — 0.7.0 sets `table { font-size: var(--fs-md) }`, so a
+         local font-size here would only reintroduce the 3px disagreement between pages
+         it was added to end. Still never `white-space: nowrap` on a cell that can hold
+         more than one token (a file list): that is what forces the runaway width. */
+      table.kv { width: 100%; border-collapse: collapse; }
       table.kv th, table.kv td { text-align: left; vertical-align: top; padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid var(--border); }
       table.kv th { color: var(--primary); font-weight: 700; white-space: nowrap; }
 
@@ -165,24 +184,38 @@
         <span class="glow">danieldeusing-docs</span>
         <span class="cursor-block" aria-hidden="true"></span>
       </a>
-      <!-- top-right: navigation. Desktop = the `ls -l` dropdown; mobile = the
-           burger button toggling a full-width menu with the footer folded in
-           (chrome kit: src/chrome.css + runtime initBurgerNav). For a
-           single-page doc, delete the whole <nav> + burger. -->
+      <!-- top-right: navigation. Desktop = the sticky `ls -l` RAIL; mobile = the burger
+           toggling a full-width menu with the rail and the footer folded into it (chrome
+           kit: src/chrome.css + runtime initBurgerNav / initLsNav). Never a dropdown: a
+           dropdown answers "where can I go?" only while you hold it open, and covers what
+           you were reading to do it. -->
       <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
       </button>
-      <nav aria-label="site" id="site-nav" class="site-nav"><details class="dropdown" id="nav">
-        <summary class="prompt" style="font-weight: 700" aria-label="site navigation">ls -l <span aria-hidden="true">▾</span></summary>
-        <ul class="dropdown-panel dropdown-panel--down ls-panel" role="list">
-          <li><a class="dropdown-item ls-row" href="{{NAV_1_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_1_LABEL}}</span></a></li>
-          <li><a class="dropdown-item ls-row" href="{{NAV_2_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
+      <nav aria-label="site" id="site-nav" class="site-nav">
+      <!-- `ls -l` lives in the BAR and the rail hangs below it, so the toggle stays in one
+           place whether the rail is open or closed. The guillemet is GENERATED by chrome.css
+           from the state (» open, « closed) — never type one in here. -->
+      <div class="ls-nav-head">
+        <span class="ls-nav-title prompt">ls -l</span>
+        <button type="button" class="ls-nav-toggle" data-ls-nav-toggle aria-controls="nav" aria-expanded="true" aria-label="show or hide navigation" title="show or hide navigation"></button>
+      </div>
+      <!-- One <li> per entry. `ls-row--dir` marks a directory (accent + weight);
+           `ls-row--sub` / `ls-row--sub2` draw the nesting. Keep labels under ~18 characters:
+           the rail is 17rem and .dropdown-item sets `white-space: nowrap`, so a longer one is
+           clipped with nothing to show for it — put the full filename in `title`.
+           On the docs site, list the doc's OWN subtree and nothing above it: access is per
+           folder, so a rail that enumerated the estate would tell a scoped reader what else
+           exists. Below 48rem this folds into the burger — one copy, which is why there is no
+           second <ul class="mobile-nav"> repeating the same links. -->
+      <div class="ls-nav" id="nav">
+        <ul class="ls-panel" role="list">
+          <li><a class="dropdown-item ls-row ls-row--dir" href="{{NAV_1_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_1_LABEL}}</span></a></li>
+          <li><a class="dropdown-item ls-row ls-row--sub" href="{{NAV_2_HREF}}" aria-current="page"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
         </ul>
-      </details>
-      <ul class="mobile-nav" role="list">
-        <li><a class="mobile-item ls-row" href="{{NAV_1_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_1_LABEL}}</span></a></li>
-        <li><a class="mobile-item ls-row" href="{{NAV_2_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
-      </ul>
+      </div>
+      <!-- The footer is display:none below 48rem, so its controls fold in here — a phone
+           reader must still be able to switch theme. -->
       <div class="mobile-footer">
         <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
         <details class="mobile-theme">
@@ -300,14 +333,20 @@ flowchart TD
     </footer>
 
     <script type="module">
-      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design/runtime/index.js";
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll } from
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.7.0/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();
       initTerminal();
       initAnimToggle();
       initBurgerNav();
+      // The rail's show/hide, and it measures the real header/footer heights into
+      // --ls-nav-top / --ls-nav-bottom so the rail sits BETWEEN the chrome, not under it.
+      initLsNav();
+      // Every table gets a .tablewrap parent, so a table wider than its column scrolls
+      // itself instead of pushing the whole page sideways. Already-wrapped ones are skipped.
+      initTableScroll();
 
       // Mermaid diagrams — themed from the design tokens, re-rendered on theme switch.
       // Delete this block (and the pre.mermaid CSS) if the page has no diagrams.

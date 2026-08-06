@@ -228,10 +228,14 @@ The runtime is progressive enhancement: with JS off, content is visible and the 
 
 - **Tokens-only / look-only consumer → UNPINNED** (`…/npm/@danieldeusing/design/dist/…`, no
   `@x.y.z`). One design system, every surface on the current version — Daniel's call, 2026-08-05.
-  A stale cached stylesheet there means slightly older colours, never a broken page. netmon, the
-  docs site, seedr playgrounds, pagr-docs, morning-briefs.
+  A stale cached stylesheet there means slightly older colours, never a broken page. netmon,
+  seedr playgrounds, pagr-docs, morning-briefs.
 - **A surface that ships the system's MARKUP → PIN** and bump the pin in the same commit as the
-  markup that needs it. **Cockpit is the case that proves it:** 2.65.0 shipped the `.ls-nav` rail
+  markup that needs it. Cockpit — and **the docs site since 2026-08-06**, when its pages adopted
+  the rail and the fixed footer. It sat on the unpinned list above right up until that day, which
+  is the shape of this rule: the side a surface belongs on is not a property of the surface, it is
+  a property of what its markup needs, so it changes the day the markup does.
+  **Cockpit is the case that proves it:** 2.65.0 shipped the `.ls-nav` rail
   markup against the unpinned url, and jsDelivr serves that url `cache-control: max-age=604800` —
   **seven days in the browser**. Every browser that had opened cockpit that week kept applying
   0.1.6, which predates the rail: both nav toggles on screen, a 613px header, the brand floating

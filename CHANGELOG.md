@@ -26,6 +26,42 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.6.0 (2026-08-06)
+
+**`templates/page-chrome.html` — the standard chrome, written down.** Daniel, looking at
+netmon: *"1) have `ls -l` right aligned 2) not a dropdown, but a sidebar (as cockpit). This
+should be the case now for all (docs, netmon, cockpit, danieldeusing.de, container …)
+3) have a footer and the theme switcher in the footer instead (also all should have the footer
+and the controls in the footer)"*.
+
+Every surface wears three pieces in one order — `header.bar` (brand left, the `ls -l` head
+right), `.ls-nav` (the sticky right RAIL, always the rail, never a dropdown), and
+`footer.status` (fixed, full width, and the home of EVERY control). The CSS for all of it has
+shipped since 0.2.0. What had never been written down was the ARRANGEMENT, so each surface
+arranged it privately: netmon grew its own header with the theme picker inside it and no footer
+at all, while the docs pages and danieldeusing.de kept the pre-rail dropdown long after cockpit
+moved on. Each was locally reasonable; together they stopped looking like one estate.
+
+The template is the answer to "what does a page look like here?" and it carries the reasoning,
+not just the tags:
+
+- **the rail, not a dropdown** — a dropdown answers "where can I go?" only while you hold it
+  open, and covers what you were reading to do it. The rail is the page's table of contents:
+  always visible, always in the same place, hideable when you want the width back. It is also
+  why the `ls -l` HEAD sits in the header bar and not in the rail — the toggle must stay put
+  whether the rail is open or closed, so opening and closing changes the arrow and nothing else
+  moves.
+- **every control in the footer** — the header names the page, the footer operates it. Theme,
+  language and animation are session preferences, not navigation. Mixing them into the header
+  put a colour picker beside a brand on one surface and nowhere at all on another.
+- **the two pre-paint reads**, inline in `<head>` before any stylesheet: theme and rail state.
+  A module at the end of `<body>` runs after first paint, so a reader who chose green or hid
+  the rail watches the default paint and then jump — on every page load.
+
+`templates/` now ships in the package (`files`), so a consumer can read the canonical markup
+from its own `node_modules` instead of copying whatever the nearest surface happens to do
+today — which is how the pre-rail dropdown propagated in the first place.
+
 ## 0.5.0 (2026-08-05)
 
 **`--info` and `--pending`, because three status accents cannot describe a state machine and

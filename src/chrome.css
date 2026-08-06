@@ -52,6 +52,29 @@
   padding-inline: var(--content-pad);
 }
 
+/* ── wide tables scroll THEMSELVES ──
+   The wrapper runtime/tablescroll.js puts around every table. It exists because a table
+   that is wider than the page is the commonest way a whole PAGE starts scrolling
+   sideways, and that is the one layout failure that reads as broken: the header slides
+   off, the fixed footer stops reaching the edge, and body text needs two axes to read.
+
+   The fade on the right edge is not decoration — a scroll container with a hard edge
+   looks identical to a table that simply ends, so without it people do not know to
+   scroll. It sits above the table and ignores the pointer. `--background` carries a
+   `transparent` fallback so an unpinned surface on an older build fades to nothing
+   rather than painting a grey bar. */
+.tablewrap { position: relative; overflow-x: auto; }
+.tablewrap::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  width: 1.5rem;
+  pointer-events: none;
+  opacity: 0.9;
+  background: linear-gradient(to right, transparent, var(--background, transparent));
+}
+
 /* ── a11y helpers ── */
 .skip-link {
   position: absolute; left: -999px; top: 0; z-index: 100;

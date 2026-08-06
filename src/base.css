@@ -36,6 +36,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ONE SIZE FOR TABLE TEXT, everywhere. A table cell is body copy — it is read, not
+   scanned as chrome — so it takes the body-copy step rather than each surface picking.
+   They had been picking: cockpit's documentation tables sat at 15px while the containers
+   dashboard's sat at 12px, a 3px gap between two pages of the same site. Nobody chose
+   that; the two numbers were set years apart and never compared. A page with a genuine
+   reason to differ still can, but it now has to say so instead of inheriting an accident. */
+table {
+  font-size: var(--fs-md);
+}
+
 /* Tailwind v4's reset drops the default button cursor — restore it for all
    interactive controls (buttons, summaries, role=button). */
 button:not(:disabled),

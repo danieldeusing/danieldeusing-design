@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.6.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.7.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -342,6 +342,16 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ONE SIZE FOR TABLE TEXT, everywhere. A table cell is body copy — it is read, not
+   scanned as chrome — so it takes the body-copy step rather than each surface picking.
+   They had been picking: cockpit's documentation tables sat at 15px while the containers
+   dashboard's sat at 12px, a 3px gap between two pages of the same site. Nobody chose
+   that; the two numbers were set years apart and never compared. A page with a genuine
+   reason to differ still can, but it now has to say so instead of inheriting an accident. */
+table {
+  font-size: var(--fs-md);
 }
 
 /* Tailwind v4's reset drops the default button cursor — restore it for all
@@ -965,6 +975,29 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   max-width: var(--content-w);
   margin-inline: auto;
   padding-inline: var(--content-pad);
+}
+
+/* ── wide tables scroll THEMSELVES ──
+   The wrapper runtime/tablescroll.js puts around every table. It exists because a table
+   that is wider than the page is the commonest way a whole PAGE starts scrolling
+   sideways, and that is the one layout failure that reads as broken: the header slides
+   off, the fixed footer stops reaching the edge, and body text needs two axes to read.
+
+   The fade on the right edge is not decoration — a scroll container with a hard edge
+   looks identical to a table that simply ends, so without it people do not know to
+   scroll. It sits above the table and ignores the pointer. `--background` carries a
+   `transparent` fallback so an unpinned surface on an older build fades to nothing
+   rather than painting a grey bar. */
+.tablewrap { position: relative; overflow-x: auto; }
+.tablewrap::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  width: 1.5rem;
+  pointer-events: none;
+  opacity: 0.9;
+  background: linear-gradient(to right, transparent, var(--background, transparent));
 }
 
 /* ── a11y helpers ── */

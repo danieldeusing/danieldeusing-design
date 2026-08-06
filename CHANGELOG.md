@@ -26,6 +26,45 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.7.0 (2026-08-06)
+
+Daniel: *"the font size of container-page is different than on all other pages, e.g. cockpit.
+Can we adjust but still having a proper table? The table (and all tables everywhere) should be
+scrollable in x direction if content is bigger than width"*.
+
+**`table { font-size: var(--fs-md) }` in base.css.** The type scale in 0.4.0 unified the
+*steps* every surface could choose from; it did not stop them choosing differently. Cockpit's
+documentation tables sat at `--fs-lg` (15px) while the containers dashboard's sat at
+`--fs-base` (12px) — a 3px gap between two pages of the same site, set years apart and never
+compared. A table cell is body copy: it is read, not scanned as chrome, so it takes the
+body-copy step and surfaces stop deciding. One that genuinely differs still can, but it has to
+say so rather than inherit an accident.
+
+**`.tablewrap` + `runtime/tablescroll.js` — no table may push the page sideways.** A table
+wider than the page is the commonest cause of a whole PAGE scrolling horizontally, and that is
+the one layout failure that reads as broken: the header slides off, the fixed footer stops
+reaching the edge, and body text needs two axes to read. The table is what is too wide, so the
+table is what should scroll.
+
+CSS cannot do this alone, which is why it is a runtime and not a rule. `overflow-x` has to sit
+on an element WRAPPING the table; a table cannot wrap itself (`display: block` on a `<table>`
+does make it scrollable and throws away the table layout algorithm, so columns stop aligning
+across rows), and there is no selector for "my parent". So `initTableScroll()` walks the
+document and gives every unwrapped table a `.tablewrap` parent.
+
+The markup contract is therefore **nothing** — author a plain `<table>`. Pages that already
+hand-wrapped theirs are left alone, so adopting this is never a migration, and it is safe to
+call again after rendering more rows.
+
+The right-edge fade is not decoration: a scroll container with a hard edge is
+indistinguishable from a table that simply ends, so without it nobody knows to scroll. It
+carries a `transparent` fallback on `--background` so an unpinned surface on an older build
+fades to nothing rather than painting a grey bar over the last column.
+
+`.tablewrap` had existed twice in cockpit — once in `portal.css` with the fade, once in
+`index.html` with a border and no fade — which is the usual shape of a thing that should have
+been upstream from the start.
+
 ## 0.6.0 (2026-08-06)
 
 **`templates/page-chrome.html` — the standard chrome, written down.** Daniel, looking at

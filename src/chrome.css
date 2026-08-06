@@ -331,6 +331,14 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
   .mobile-nav .mobile-item:active .ls-name,
   .mobile-nav .mobile-item:hover .ls-name { color: var(--primary); }
 
+  /* The rail's collapse toggle has nothing to collapse down here. Below the breakpoint the rail
+     is not a fixed 17rem column — it is inline inside the burger — so the control renders as a
+     bare 16x6px nub with no glyph (its `content` comes from a rule scoped to the desktop query)
+     and clicking it would hide the navigation the reader just opened. A control that renders as
+     working and does nothing is worse than no control; every surface shipping this markup has
+     carried it since the rail landed. */
+  .ls-nav-toggle { display: none; }
+
   /* footer content folded into the burger; the fixed footer disappears */
   footer.status { display: none; }
   .mobile-footer {

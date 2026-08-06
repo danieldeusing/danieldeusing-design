@@ -26,6 +26,23 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.8.1 (2026-08-06)
+
+**On a phone the rail's collapse toggle was a dead 16x6px nub.** Below the 48rem breakpoint the
+rail is not a fixed column — it is inline inside the burger — so there is nothing for the control
+to collapse, and its guillemet comes from a rule scoped to the desktop media query, leaving a
+bare button with no glyph. Clicking it hid the navigation the reader had just opened. A control
+that renders as working and does nothing is worse than no control.
+
+Hidden below the breakpoint. Every surface shipping the rail markup has carried this since the
+rail landed; danieldeusing.de had already worked around it locally, which is now redundant.
+
+Found while converting netmon, where the same audit ALSO reported browser list bullets and a
+40px indent on this markup. **That half does not generalise and is deliberately not fixed here:**
+netmon loads `tokens.css` + `chrome.css` only, with no `reset.css`, so those `ul` defaults are
+netmon's own to handle. Measured against the full bundle at 375px: `list-style-type: none`,
+`padding-inline-start: 0px`.
+
 ## 0.8.0 (2026-08-06)
 
 Three holes an audit found — each one something the package *claimed* rather than provided.

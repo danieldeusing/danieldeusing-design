@@ -26,6 +26,42 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.16.0 (2026-08-07)
+
+### Added — `.btn-terminal--destructive`, the row action that deletes
+
+Daniel: *"We still have wrong remove buttons. We wanted to have the trash icon in red instead as
+normal buttons."* The estate had it wrong in **four** different ways at once, all for the same
+verb: an underlined `remove` text link (`.repo-remove` — a footnote that deletes a credential), a
+bordered ghost button reading `rm` (the word abbreviated to two letters to fit a table cell), a
+muted-grey `remove` on `.doc-link.rowlink`, and a `remove` that was that same ghost button
+spelling the word out. One page said both `rm` and `remove` for the same operation.
+
+None of them said *this destroys something* before it was pressed, which is the only job a
+destructive control has.
+
+**Composed, not split into `--icon` + `--danger`.** `--compact` is the size and nothing else
+because size and colour are genuinely independent — a compact button is wanted in every colour.
+These two are not: the split's products are a red button with no icon and a bin with no warning,
+and nobody wants either.
+
+**The glyph is a CSS mask, not markup.** Three surfaces adopt this, and an SVG pasted into three
+templates is three bins that drift. As a mask it paints in `currentColor`, so it takes
+`--destructive` from the rule and re-takes it on all four themes for free; a `fill=` would have to
+be declared four times or be wrong on two of them. It keeps a 44px target under a coarse pointer
+via `min-*`, so the tap area grows without moving the glyph off centre.
+
+The consumer supplies the accessible name: an icon-only control with no `aria-label` reads as
+nothing to a screen reader and cannot be identified from the keyboard.
+
+### Fixed — a forward link no longer breaks between its label and its arrow
+
+`log → forge →` in cockpit's ci/cd activity table wrapped so an arrow landed alone on the next
+line. Every `→` in the estate is an author-typed U+2192 after an ordinary space — 86 of them in
+cockpit alone, **not one** using a no-break space — so every forward link was one narrow column
+away from the same break. `.doc-link--forward` is `white-space: nowrap` now. Fixing it at the call
+site would have fixed one cell and left the shape of the bug in place everywhere else.
+
 ## 0.15.0 (2026-08-07)
 
 ### Added — `.bleed-rail`, for chrome that must ignore the rail

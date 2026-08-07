@@ -154,7 +154,13 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
    that quietness: a column of grey `open →` reads as disabled text rather than as the way in.
    It carries the accent from rest, not only on hover, because a row action is the reason the
    row is interactive at all and hover cannot advertise itself. */
-.doc-link--forward { color: var(--primary); }
+   THE ARROW IS PART OF THE LABEL, so this never wraps. Every `→` in the estate is an author-typed
+   U+2192 after an ordinary space — 86 of them in cockpit alone, not one using a no-break space —
+   so every forward link was one narrow column away from putting its arrow alone on the next line.
+   ci/cd's activity table is where it showed: `log → forge →` broke mid-arrow. Fixing it here fixes
+   all 86, and fixing it at the call site would have fixed one and left the shape of the bug in
+   place. A row action is one atom; nothing is gained by breaking inside it. */
+.doc-link--forward { color: var(--primary); white-space: nowrap; }
 .doc-link--forward:hover { color: var(--primary); text-decoration: underline; }
 
 /* A group heading inside the rail. It was in the canonical template and styled by NOTHING —

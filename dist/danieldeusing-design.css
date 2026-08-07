@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.15.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.16.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -581,6 +581,51 @@ body::after {
    the font-size appeared to work, because `.btn-terminal` happens not to set one, which is what
    made it look like a class that was working. Position is load-bearing here, not tidiness. */
 .btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-sm); }
+
+/* THE DESTRUCTIVE ROW ACTION — square, red, a bin, and nothing else.
+
+   The row-action rule says a control that MUTATES is a button, and `remove` is the one mutation
+   that pressing again does not undo. The estate shipped it two wrong ways AT ONCE: an underlined
+   `remove` text link — a footnote that deletes a host — and a bordered `rm` button, the right
+   shape wearing a word abbreviated to two letters to fit a table cell, in the same grey as the
+   `open →` beside it. Neither says "this destroys something" before it is pressed, which is the
+   only thing a destructive control has to do.
+
+   COMPOSED ON PURPOSE, rather than split into `--icon` + `--danger`. `--compact` is the size and
+   nothing else because size and colour are genuinely independent — a compact button is wanted in
+   every colour. These two are not: the split's products are a red button with no icon and a bin
+   with no warning, and nobody wants either. One class, one concept, one thing to adopt.
+
+   THE GLYPH IS A MASK, NOT MARKUP. Three surfaces adopt this (cockpit, netmon, docs) and an SVG
+   pasted into three templates is three bins that drift. As a mask it is `currentColor`, so it
+   takes --destructive from this rule and re-takes it on all four themes for free — a fill= would
+   have to be declared four times or be wrong on two of them. */
+.btn-terminal--destructive {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.3rem;
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 45%, var(--border));
+}
+/* An icon button has no text, so the `> ` prefix would be the entire content of the button.
+   --ghost already blanks it; this repeats it so the class is correct on a filled button too. */
+.btn-terminal--destructive::before { content: ""; }
+.btn-terminal--destructive::after {
+  content: ""; display: block; width: 0.875rem; height: 0.875rem;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 3h6v3H9zM4 6h16v2H4zM6 9h12l-1 12H7z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 3h6v3H9zM4 6h16v2H4zM6 9h12l-1 12H7z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.btn-terminal--destructive:hover {
+  border-color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 12%, transparent);
+  box-shadow: none;
+}
+/* 44px on a touch screen. The control is 22px of bin at desktop density, and it DELETES things —
+   the last control in the estate that should be a coin toss under a thumb. Not `width/height`:
+   `min-*` grows the tap target without moving the glyph, which stays centred by the flexbox. */
+@media (pointer: coarse) {
+  .btn-terminal--destructive { min-width: 44px; min-height: 44px; }
+}
 
 /* Quiet, underlined link that warms to the primary colour on hover. */
 .link-quiet {
@@ -1280,7 +1325,13 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
    that quietness: a column of grey `open →` reads as disabled text rather than as the way in.
    It carries the accent from rest, not only on hover, because a row action is the reason the
    row is interactive at all and hover cannot advertise itself. */
-.doc-link--forward { color: var(--primary); }
+   THE ARROW IS PART OF THE LABEL, so this never wraps. Every `→` in the estate is an author-typed
+   U+2192 after an ordinary space — 86 of them in cockpit alone, not one using a no-break space —
+   so every forward link was one narrow column away from putting its arrow alone on the next line.
+   ci/cd's activity table is where it showed: `log → forge →` broke mid-arrow. Fixing it here fixes
+   all 86, and fixing it at the call site would have fixed one and left the shape of the bug in
+   place. A row action is one atom; nothing is gained by breaking inside it. */
+.doc-link--forward { color: var(--primary); white-space: nowrap; }
 .doc-link--forward:hover { color: var(--primary); text-decoration: underline; }
 
 /* A group heading inside the rail. It was in the canonical template and styled by NOTHING —

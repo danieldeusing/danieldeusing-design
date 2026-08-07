@@ -173,10 +173,10 @@ a full-bleed dashboard table rather than redeclaring `.tablewrap`.
 
 | Group | Classes | Source |
 | --- | --- | --- |
-| chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
+| chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.bleed-rail` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
 | `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`) `.ls-perm` `.ls-name` `.ls-group` | `src/chrome.css` |
 | text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
-| blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
+| blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
 | tabs | `.tabs` `.tab` (`[aria-selected]`) `section.doc.tab-panel` | `src/components.css` |
 | status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/components.css` |
 | diagram zoom | `.dgm-zoomable` `.dgm-overlay` `.dgm-stage` `.dgm-bar` `.dgm-btn` `.dgm-close` `.dgm-art` | `src/components.css` |
@@ -199,11 +199,27 @@ something:
 | the action | what to write |
 |---|---|
 | `open →` `log →` `detail` `forge →` — goes somewhere, changes nothing | `<a class="doc-link doc-link--forward">` (or a `<button>` carrying the same classes when the destination is an in-page dialog and there is no url) |
-| `remove` `add` `update` `save` `apply` `dismiss` `enrol` — writes | `<button class="btn-terminal btn-terminal--ghost btn-terminal--compact">` |
+| `add` `update` `save` `apply` `dismiss` `enrol` — writes | `<button class="btn-terminal btn-terminal--ghost btn-terminal--compact">` |
+| `remove` `delete` — **destroys** | `<button class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove <what>">` — see below |
 | the ONE primary action of a view | the same, **filled**: `btn-terminal btn-terminal--compact` |
 | a toggle (`follow`, `live`) | the same button; press = drop `--ghost`, release = add it back. The two states are the two buttons the system already ships, so a toggle never needs a third look. |
 
 Two filled buttons side by side compete, which is the whole reason `--ghost` exists.
+
+**`.btn-terminal--destructive` (0.16.0) is the red bin, and it is the ONLY remove control.** Before
+it, the estate spelled one verb four ways at once: an underlined `remove` text link, a bordered
+ghost button reading `rm`, a muted-grey `remove` on `.doc-link.rowlink`, and the same ghost button
+spelling `remove` out — one page used both `rm` and `remove` for the same operation. It is
+**composed on purpose** rather than split into `--icon` + `--danger`: `--compact` is the size and
+nothing else because size and colour are independent, and these two are not — the split's products
+are a red button with no icon and a bin with no warning. The glyph is a **CSS mask painted in
+`currentColor`**, so no surface writes an SVG and no surface can draw a different bin.
+
+**It takes an `aria-label` — always.** The button has no text, so without one it reads as nothing to
+a screen reader and cannot be identified from the keyboard. Name the target, not the verb:
+`aria-label="remove ddmini"`, not `aria-label="remove"`. `bin/design-conformance` fails a
+`--destructive` button with no accessible name. Under a coarse pointer it grows to 44px via `min-*`,
+so never set a width on it.
 
 **`.doc-link--forward` carries the accent AT REST**, not on hover. `.doc-link` is deliberately
 quiet because it is footer furniture, and row actions inherited that quietness: a column of grey

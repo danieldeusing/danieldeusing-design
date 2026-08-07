@@ -26,6 +26,34 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.13.1 (2026-08-07)
+
+### `.btn-terminal--compact` was not compact — it lost to `.btn-terminal` on source order
+
+The rule shipped **above** `.btn-terminal` in `components.css`. Both are single-class selectors,
+so they carry **equal specificity** and the later declaration wins: `.btn-terminal`'s
+`padding: 12px 24px` overrode the compact `0.28rem 0.7rem`, and every compact button in the estate
+rendered at landing-page CTA size — roughly double a table row.
+
+What let it pass review is that it looked half-right. `font-size` DID apply, because
+`.btn-terminal` happens not to set one, so the class plainly "did something". Measured in a browser
+against the published 0.13.0 bundle: `padding: 12px 24px`, `font-size: 11px`. It moves below
+`.btn-terminal:hover`, and the comment above it now says the position is load-bearing rather than
+tidiness.
+
+Caught while adopting 0.13.0 in cockpit, which had just deleted its local `.btn-compact` in favour
+of this — so the release meant to retire the fork would have shipped a worse button than the fork.
+
+### Also recorded: 0.13.0's rail fix was necessary and not sufficient
+
+`initLsNav()` reads the header's bottom edge correctly now, but it reads it **once, on load** —
+and cockpit's banner is mounted by `alerts.js` after `await fetch("/api/alerts")`, which is later.
+A correct measurement taken before the thing it measures exists is still the wrong number: with a
+141px banner, `--ls-nav-top` stayed at 44 while the header ended at 186. No code change here — the
+consumer that moves the chrome dispatches `resize`, the signal this module already listens for —
+but it is written down, because the 0.13.0 notes claimed the bug was fixed and in the one place it
+was reported it was not.
+
 ## 0.13.0 (2026-08-07)
 
 ### Fixed — the rail broke whenever anything sat above the header

@@ -55,13 +55,6 @@
   .field-row { grid-template-columns: 1fr; gap: 0.2rem; }
 }
 
-/* A ROW-SIZED BUTTON. The system's button is a landing-page CTA at 12px/24px; a table row that
-   offers `remove` needs the same button at the size of its text. This is the size ONLY — colour,
-   corners and the `> ` prefix still come from .btn-terminal / --ghost, so a compact button cannot
-   drift into being a different button. Cockpit had this as a local class; every surface with a
-   table needs it, so it lives here. */
-.btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-sm); }
-
 /* ─────────────────────────────────────────────────────────────────────────
    Shell affordances — `$ command` section headers and `# comment` lines.
    ───────────────────────────────────────────────────────────────────────── */
@@ -139,6 +132,19 @@
   box-shadow: 0 0 28px var(--glow);
   transform: translateY(-2px);
 }
+
+/* A ROW-SIZED BUTTON. The system's button is a landing-page CTA at 12px/24px; a table row that
+   offers `remove` needs the same button at the size of its text. This is the size ONLY — colour,
+   corners and the `> ` prefix still come from .btn-terminal / --ghost, so a compact button cannot
+   drift into being a different button. Cockpit had this as a local class; every surface with a
+   table needs it, so it lives here.
+
+   IT MUST SIT BELOW `.btn-terminal`, and in 0.13.0 it did not. Both are single-class selectors, so
+   they have EQUAL specificity and the later one wins — declared above the CTA, this rule's padding
+   lost to `padding: 12px 24px` and every compact button in the estate rendered at CTA size. Only
+   the font-size appeared to work, because `.btn-terminal` happens not to set one, which is what
+   made it look like a class that was working. Position is load-bearing here, not tidiness. */
+.btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-sm); }
 
 /* Quiet, underlined link that warms to the primary colour on hover. */
 .link-quiet {

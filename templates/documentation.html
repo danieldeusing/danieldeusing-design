@@ -18,10 +18,12 @@
 
   Chrome — the standard three pieces (templates/page-chrome.html has the reasoning):
     - header.bar   : the "danieldeusing-docs" wordmark left, the `ls -l` head right.
-    - .ls-nav      : the sticky right RAIL — navigation, always the rail, never a
-                     dropdown. On the docs site it lists the doc's own subtree and
-                     nothing above it: access is per folder, so a rail that enumerated
-                     the estate would tell a scoped reader what else exists.
+    - .ls-nav      : the sticky right RAIL — OPTIONAL, and most docs delete it. When a
+                     page does navigate somewhere it is always the rail, never a dropdown.
+                     A doc lists only itself, so the rail has one entry, so there is no
+                     rail: keep it only when there is somewhere else to go. Never pad it
+                     with the folder's other docs — access here is per folder, and that
+                     would tell a scoped reader what else exists.
     - footer.status: fixed, and the home of EVERY control — bottom-left
                      [{{FOLDER}}] {{DOC_TITLE}} (e.g. "[pagr] Source Code
                      documentation"), bottom-right the danieldeusing.de link, the theme
@@ -226,7 +228,20 @@
         <span class="ls-nav-title prompt">ls -l</span>
         <button type="button" class="ls-nav-toggle" data-ls-nav-toggle aria-controls="nav" aria-expanded="true" aria-label="show or hide navigation" title="show or hide navigation"></button>
       </div>
-      <!-- One <li> per entry. `ls-row--dir` marks a directory (accent + weight);
+      <!-- MOST DOCS SHOULD DELETE THIS RAIL. A nav whose only entry is the page you are
+           already on is not navigation — it costs 17rem of width to state the obvious. Keep
+           it only when there is somewhere else to GO (sibling docs a reader moves between, or
+           child pages); one entry means delete it, and do NOT pad it out by listing the
+           folder's other docs, which only tells a folder-scoped reader what else is there.
+
+           Deleting means this <div class="ls-nav"> and the <div class="ls-nav-head"> above it,
+           and NOTHING ELSE. The surrounding <nav class="site-nav">, the .nav-burger and the
+           .mobile-footer below all stay: footer.status is display:none under 48rem, so that
+           burger is the only place a phone has the theme picker and the anim toggle. The
+           layout needs no other edit — the system reads html:has(.ls-nav), so with the rail
+           gone --ls-nav-inset falls to 0 and the body reclaims the width itself.
+
+           One <li> per entry. `ls-row--dir` marks a directory (accent + weight);
            `ls-row--sub` / `ls-row--sub2` draw the nesting. Keep labels under ~18 characters:
            the rail is 17rem and .dropdown-item sets `white-space: nowrap`, so a longer one is
            clipped with nothing to show for it — put the full filename in `title`.

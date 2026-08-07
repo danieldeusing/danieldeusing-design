@@ -26,6 +26,28 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.10.1 (2026-08-07)
+
+### The tall-table cap is opt-in — 0.10.0 made it the default and that broke page scrolling
+`--tablewrap-max-h` shipped in 0.10.0 with a `75vh` default, so every table taller than the
+viewport became its own scroll region. That is right for a dashboard, where a table is a panel
+with a fixed slot. It is wrong for a document, and a document is what the doc template mostly
+builds: a page with four long tables became a page with four scroll regions, and a reader
+scrolling with the pointer over one of them moved the TABLE instead of the page.
+`overscroll-behavior: contain` — also 0.10.0 — then refused to hand the scroll back when the
+table hit its end, so the page simply stopped responding to the wheel with nothing on screen to
+explain why. Rows past the cap were hidden with no affordance either: the wrapper's fade is on
+the right edge, for the horizontal case, and there is nothing along the bottom.
+
+The default is now `none` and `overscroll-behavior` is gone. A surface that wants a capped table
+sets `--tablewrap-max-h: 60vh` on the wrapper or a container and gets the sticky header with it.
+`overflow-y: auto` stays: it costs nothing while the wrapper is uncapped, since an unconstrained
+box never scrolls, and it is what makes the opt-in work at all.
+
+Everything 0.10.0 did for READABILITY — cell padding, top-aligned cells, the hairline row rule,
+the header treatment, `width: 100%` — is unchanged. That was the part that fixed the reported
+problem; the cap was an extra nobody asked for.
+
 ## 0.10.0 (2026-08-07)
 
 ### A table is a grid again — cell padding, a hairline between rows, top-aligned cells

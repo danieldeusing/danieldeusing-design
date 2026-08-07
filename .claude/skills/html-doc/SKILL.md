@@ -141,17 +141,32 @@ already carries two, and if you cannot write the sentence you do not have an exc
    - **Table of contents** — for every section add a matching
      `<a href="#SLUG" data-toc-link="SLUG">Label</a>` in the `.toc` nav (the scroll-spy wires itself
      from these). This mirrors the article TOC on danieldeusing.de.
-   - **Navigation (top-right) — the `ls -l` RAIL, never a dropdown.** Fill the `<ul class="ls-panel">`
-     with one `<li>` per entry: `ls-row--dir` for a directory (accent + weight), `ls-row--sub` /
-     `ls-row--sub2` to draw the nesting, `aria-current="page"` on the doc itself. Never delete the
-     rail — a page with no navigation is the reason three published docs had no way back to their
-     own folder. **What it lists:** the doc's own subtree and nothing above it — its folder, its
-     sibling docs, and any child folder. Access on this site is per folder, so a rail that
-     enumerated the estate would tell a scoped reader what else exists. A doc that is genuinely
-     alone still lists its folder (auto-indexed, so the link works) and itself.
-     **Keep labels under ~18 characters**: the rail is 17rem and `.dropdown-item` sets
-     `white-space: nowrap`, so a longer one is clipped with nothing to show for it — put the full
+   - **Navigation (top-right) — the `ls -l` RAIL, and MOST DOCS SHOULD NOT HAVE ONE.**
+     **The rule: a doc lists only ITSELF, so the rail has one entry, so there is no rail.**
+     A navigation whose only destination is the page you are already on is not navigation — it is
+     a 17rem column of furniture that takes width from the content and states the obvious. Ship
+     the rail only when there is somewhere else to GO: a folder with sibling docs a reader is
+     meant to move between, or a doc with child pages. One entry means delete it.
+     **Do not list sibling docs just because they exist in the same folder.** Access on this site
+     is per folder, and a rail that enumerates the neighbours tells a scoped reader what else is
+     there. It is also how a doc grows a nav it never needed.
+     When you DO ship one: one `<li>` per entry, `ls-row--dir` for a directory (accent + weight),
+     `ls-row--sub` / `ls-row--sub2` for nesting, `aria-current="page"` on the doc itself, and
+     **labels under ~18 characters** — the rail is 17rem and `.dropdown-item` sets
+     `white-space: nowrap`, so a longer one is clipped with nothing to show for it; put the full
      filename in `title`.
+
+   - **Deleting the rail — delete the RAIL, not the nav element around it.** Remove exactly two
+     things: the `<div class="ls-nav-head">` (the `$ ls -l` toggle in the header bar) and the
+     `<div class="ls-nav" id="nav">` that follows it. **KEEP `<nav class="site-nav">`, the
+     `.nav-burger` button, and the `.mobile-footer` inside it.** That last one is not optional:
+     `footer.status` is `display: none` below 48rem, so on a phone the burger menu is the ONLY
+     place the theme picker and the anim toggle exist. Deleting the whole `<nav>` because "there
+     is no navigation" silently strips a phone reader of every control on the page.
+     Nothing else needs touching — the system keys its own layout off `html:has(.ls-nav)`, so with
+     the rail gone `--ls-nav-inset` falls to `0`, `body` loses its right padding and the content
+     spans the full width by itself. `initLsNav()` is safe to leave in the runtime call list; with
+     no rail in the page it has nothing to wire.
 
    **Fixed chrome — do NOT change:** the top-left `danieldeusing-docs` wordmark (always); the
    `ls -l` head in the header bar (it sits there, not in the rail, so the toggle stays put whether

@@ -193,6 +193,13 @@ out of its own `node_modules` instead of copying whatever the nearest surface ha
 
 - **`templates/page-chrome.html`** (0.6.0) — the standard chrome ALONE: `header.bar` + the `ls -l`
   rail + `footer.status`, in that order, with the reasoning for each. Start here for any surface.
+  **The rail is conditional, and the other two are not.** A nav whose only entry is the current
+  page is furniture: it costs 17rem of width to tell the reader where they already are. Ship the
+  rail when there is somewhere else to go, and omit it otherwise — the system is built for that,
+  `html:has(.ls-nav)` drops `--ls-nav-inset` to `0` and the page reclaims the width on its own.
+  When you omit it, remove the `.ls-nav-head` and the `.ls-nav` **only**: `nav.site-nav`, the
+  `.nav-burger` and the `.mobile-footer` inside it must stay, because `footer.status` is
+  `display: none` below 48rem and that burger is the only place a phone has the theme picker.
 - **`templates/documentation.html`** — a whole page built on it, for a one-file doc.
 
 Follow it exactly; the rail in particular reads state from `html[data-ls-nav]` and needs its own

@@ -64,22 +64,33 @@
    `transparent` fallback so an unpinned surface on an older build fades to nothing
    rather than painting a grey bar.
 
-   A LONG table scrolls itself too (0.10.0). A 40-row table pushes everything after it
-   below the fold, so the reader loses the header before they reach the rows that need it
-   and there is no way back except scrolling the whole page. `--tablewrap-max-h` caps the
-   wrapper; anything shorter than the cap is untouched, so short tables behave exactly as
-   they did. A surface that genuinely wants an uncapped table — a full-bleed dashboard —
-   sets the token to `none` rather than redeclaring the rule.
+   A tall table CAN scroll itself, but it does NOT by default — `--tablewrap-max-h`
+   defaults to `none` (0.10.1, after 0.10.0 shipped a 75vh cap and it was wrong).
 
-   `overflow: auto` (both axes) also makes the wrapper the scrollport for `position:
-   sticky`, which is what lets the header row below stick to the TABLE rather than to the
-   viewport. Sticking to the viewport is the failure this avoids: the header row would
-   float over the page's own fixed chrome on any page that has some. */
+   The cap is right for a DASHBOARD, where a table is a panel with a fixed slot in a
+   layout. It is wrong for a DOCUMENT, and a document is what this template mostly builds:
+   capping four tables on one page turns four stretches of prose into separate scroll
+   regions, so a reader scrolling with the pointer over a table moves the TABLE instead of
+   the page, and `overscroll-behavior: contain` (also shipped in 0.10.0, also removed) then
+   refuses to hand the scroll back when the table reaches its end. The reader is stuck, and
+   the cause is invisible — the page simply stops responding to the wheel. Rows below the
+   cap are hidden too, with no affordance saying so: the wrapper's fade is on the RIGHT
+   edge, for the horizontal case, and there is nothing along the bottom.
+
+   So a surface that wants a capped table opts in — `--tablewrap-max-h: 60vh` on the
+   wrapper or a container — and everything else keeps one scrollbar per page, which is the
+   behaviour every reader already understands.
+
+   `overflow-y: auto` stays regardless: it costs nothing while the wrapper is uncapped (an
+   unconstrained box never scrolls) and it is what allows the opt-in to work at all. It
+   also makes the wrapper the scrollport for `position: sticky`, so the header row below
+   sticks to the TABLE rather than to the viewport — sticking to the viewport would float
+   the header over the page's own fixed chrome on any page that has some. */
 .tablewrap {
   position: relative;
-  overflow: auto;
-  max-block-size: var(--tablewrap-max-h, 75vh);
-  overscroll-behavior: contain;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-block-size: var(--tablewrap-max-h, none);
 }
 .tablewrap::after {
   content: "";

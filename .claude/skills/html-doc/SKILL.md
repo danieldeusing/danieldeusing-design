@@ -244,10 +244,19 @@ already carries two, and if you cannot write the sentence you do not have an exc
      document.querySelectorAll('.toc nav a').length === document.querySelectorAll('section.doc').length
      ```
      From 0.10.0 the TOC sits against the right edge of the BODY, not of the reading column, so
-     also check there is no dead band beside it — `document.body.getBoundingClientRect().right -
-     toc.getBoundingClientRect().right` should be about one `--content-pad`, not the ~230px it
-     was when the whole grid sat centred inside `.wrap`. Check it at 1920, not at 1280: at 1280
-     the wrap nearly fills the viewport and a centred layout looks correct.
+     also check there is no dead band beside it. **Measure against the body's CONTENT edge, not
+     its border box** — `body` carries `padding-right: var(--ls-nav-inset)` (272px with the rail
+     open), so `getBoundingClientRect().right` sits *under* the rail and a correct layout looks
+     296px off:
+     ```js
+     const b = document.body, bs = getComputedStyle(b);
+     const contentRight = b.getBoundingClientRect().right - parseFloat(bs.paddingRight);
+     contentRight - document.querySelector('.toc').getBoundingClientRect().right  // ≈ --content-pad
+     ```
+     Equivalently, `.ls-nav`'s `left` minus the TOC's `right` is the same number. Expect one
+     `--content-pad` (24px), not the ~230px it was when the whole grid sat centred inside
+     `.wrap`. Check it at 1920, not at 1280: at 1280 the wrap nearly fills the viewport and a
+     centred layout looks correct.
      The last line catches the other recurring slip — a section added without its TOC entry, or a TOC
      entry whose `href`/`data-toc-link` does not match any section `id`, which breaks the scroll-spy.
      A quick structural pre-check costs nothing either: inside the `.layout` region the count of

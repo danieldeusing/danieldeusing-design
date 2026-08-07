@@ -32,8 +32,19 @@ export function initTooltips() {
     let y = r.bottom + 6;
     if (y + t.height > window.innerHeight - margin) y = r.top - t.height - 6;
     if (y < margin) y = margin;
-    tip.style.left = x + "px";
-    tip.style.top = y + "px";
+    // DIVIDE BY THE ZOOM. Consumers set `zoom` on <html> (cockpit scales the whole layout to a
+    // 1920 reference), and the two sides of this calculation live in different coordinate spaces:
+    // getBoundingClientRect() and window.innerWidth are VISUAL px — already multiplied — while
+    // style.left is a CSS length the browser multiplies AGAIN on the way out. So the tooltip
+    // rendered at x*zoom, an error that grows with distance from the origin: measured at zoom
+    // 1.35, an anchor 198px in got a tooltip 69px adrift and one 949px in got 329px, far enough
+    // to leave the viewport entirely.
+    //
+    // Only the WRITE is converted. The clamp above is already correct because both its operands
+    // are visual, and "fixing" it too would break it in the other direction.
+    const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
+    tip.style.left = x / zoom + "px";
+    tip.style.top = y / zoom + "px";
   }
   function hide() {
     anchor = null;

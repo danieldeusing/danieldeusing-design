@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.10.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.10.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -499,6 +499,27 @@ body::after {
 .btn-terminal::before {
   content: "> ";
 }
+/* THE SECONDARY BUTTON. `.btn-terminal` is the loud one — filled --primary, one per view. Every
+   surface that needed a quieter button (refresh, dry run, cancel) invented its own instead, and
+   every one of those invented a border-radius with it. This is that button, square like
+   everything else, so there is nothing left to invent.
+
+   Outlined rather than a lighter fill: two filled buttons side by side compete, and the whole
+   point of the primary is that it is the only filled thing in view. */
+.btn-terminal--ghost {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  font-weight: 400;
+}
+.btn-terminal--ghost::before { content: ""; }
+.btn-terminal--ghost:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  box-shadow: none;
+}
+
 .btn-terminal:hover {
   box-shadow: 0 0 28px var(--glow);
   transform: translateY(-2px);
@@ -635,7 +656,7 @@ body::after {
   list-style: none;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 0;
+  border-radius: var(--radius);
   box-shadow: 0 0 20px var(--glow-soft);
 }
 /* open below the trigger instead of above */
@@ -702,9 +723,9 @@ html[data-theme="warm"] .dropdown-item[data-theme-value="warm"] {
   line-height: 1;
   letter-spacing: 0.04em;
   padding: 0.34em 0.6em;
-  border-radius: 5px;
-  background: #b42318;
-  color: #fff;
+  border-radius: var(--radius);
+  background: var(--destructive);
+  color: var(--primary-foreground);
 }
 .eli5-term {
   font-weight: 700;
@@ -1393,7 +1414,7 @@ span[data-tip], th[data-tip] { border-bottom: 1px dotted var(--muted-foreground)
 #ddtip {
   position: fixed; z-index: 9999; display: none; max-width: 340px;
   background: var(--background); color: var(--foreground);
-  border: 1px solid var(--muted-foreground); border-radius: 4px;
+  border: 1px solid var(--muted-foreground); border-radius: var(--radius);
   padding: 7px 10px; font-size: 0.72rem; line-height: 1.45; font-weight: 400;
   text-align: left; white-space: normal; pointer-events: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);

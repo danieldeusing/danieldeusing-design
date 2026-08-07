@@ -85,6 +85,41 @@ The wrapper is now `overflow: auto` on both axes, which also makes it the scroll
 viewport — sticking to the viewport is the failure this avoids, because the header row would then
 float over the page's own fixed chrome on every page that has some.
 
+## 0.10.0 (2026-08-07)
+
+### Fixed — the tooltip landed in the wrong place on any zoomed page
+
+`runtime/tooltip.js` measured with `getBoundingClientRect()` and `window.innerWidth` — both
+**visual** pixels, already multiplied by an ancestor `zoom` — and then wrote the result into
+`style.left`, a CSS length the browser multiplies **again**. So the tooltip rendered at
+`x * zoom`, an error that grows with distance from the origin.
+
+Measured at zoom 1.35: an anchor 198px in got a tooltip **69px adrift**; one 949px in got
+**329px**, far enough to leave the viewport entirely. After the fix: 0px and −3px, the −3 being
+the right-edge clamp doing its job. Only the write is converted — the clamp is already correct
+because both its operands are visual, and "fixing" it too would break it the other way.
+
+This is the same trap as `runtime/lsnav.js`, which measures with `offsetHeight` for exactly this
+reason. Any code that measures in one space and writes in the other has it.
+
+### Changed — square corners, everywhere, because the token always said so
+
+`--radius` has been `0rem` since the first release and precisely one declaration in the whole
+system used it. The rest hardcoded a number: this file carried a `5px` badge and the tooltip a
+`4px` corner, both visible on screen. They resolve through the token now, so "no rounded corners"
+is a fact rather than an intention.
+
+That badge was also `#b42318` on `#fff` — a literal pair in the one file that argues no literal
+can serve four themes. It takes `--destructive` and `--primary-foreground` now.
+
+### Added — `.btn-terminal--ghost`
+
+`.btn-terminal` is the loud one: filled `--primary`, one per view. Every surface that needed a
+quieter button — refresh, dry run, cancel — invented its own local class instead, and every one
+of those invented a border-radius with it. This is that button, square, so there is nothing left
+to invent. Outlined rather than a lighter fill, because two filled buttons side by side compete
+and the point of the primary is that it is the only filled thing in view.
+
 ## 0.9.0 (2026-08-07)
 
 ### Added — `.tab--info`, because a tab row has two halves

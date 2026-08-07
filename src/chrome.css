@@ -62,8 +62,25 @@
    looks identical to a table that simply ends, so without it people do not know to
    scroll. It sits above the table and ignores the pointer. `--background` carries a
    `transparent` fallback so an unpinned surface on an older build fades to nothing
-   rather than painting a grey bar. */
-.tablewrap { position: relative; overflow-x: auto; }
+   rather than painting a grey bar.
+
+   A LONG table scrolls itself too (0.10.0). A 40-row table pushes everything after it
+   below the fold, so the reader loses the header before they reach the rows that need it
+   and there is no way back except scrolling the whole page. `--tablewrap-max-h` caps the
+   wrapper; anything shorter than the cap is untouched, so short tables behave exactly as
+   they did. A surface that genuinely wants an uncapped table — a full-bleed dashboard —
+   sets the token to `none` rather than redeclaring the rule.
+
+   `overflow: auto` (both axes) also makes the wrapper the scrollport for `position:
+   sticky`, which is what lets the header row below stick to the TABLE rather than to the
+   viewport. Sticking to the viewport is the failure this avoids: the header row would
+   float over the page's own fixed chrome on any page that has some. */
+.tablewrap {
+  position: relative;
+  overflow: auto;
+  max-block-size: var(--tablewrap-max-h, 75vh);
+  overscroll-behavior: contain;
+}
 .tablewrap::after {
   content: "";
   position: absolute;
@@ -73,6 +90,16 @@
   pointer-events: none;
   opacity: 0.9;
   background: linear-gradient(to right, transparent, var(--background, transparent));
+}
+
+/* The header row stays put while the body scrolls under it. `--background` rather than
+   transparent, or the rows would read straight through it. The fallback keeps an
+   unpinned consumer on an older build from painting a transparent header. */
+.tablewrap thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: var(--background, #f5efe2);
 }
 
 /* ── a11y helpers ── */

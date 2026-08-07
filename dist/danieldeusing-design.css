@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.9.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.10.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -352,7 +352,48 @@ body {
    reason to differ still can, but it now has to say so instead of inheriting an accident. */
 table {
   font-size: var(--fs-md);
+  width: 100%;
 }
+
+/* A TABLE MUST BE READABLE AS A GRID, not as a paragraph of drifting words. Until 0.10.0
+   the system set the font size and nothing else, so every table inherited the browser
+   default: zero cell padding and no rule between rows. On a doc table whose cells hold a
+   sentence rather than a number the rows visually merge, and a reader cannot tell which
+   fragment on the right belongs to which label on the left — the wider the table, the
+   worse, because the eye has further to travel with nothing to travel along.
+
+   Three things fix it, and they are deliberately quiet: room to breathe, a hairline
+   between rows, and top-aligned cells so a one-line cell sits level with the first line
+   of a five-line neighbour instead of floating in its middle.
+
+   The rule is `--border` mixed down to ~55%, not `--border` itself: at full strength a
+   line under every row reads as a bordered spreadsheet and fights the terminal look. The
+   mix is a token operation, so it stays correct on all four themes. */
+th,
+td {
+  padding: 0.45rem 0.85rem;
+  text-align: left;
+  vertical-align: top;
+  border-block-end: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+/* The header earns a slightly stronger rule — it is the one row that is chrome. */
+thead th {
+  border-block-end-color: var(--border);
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+/* The last row's rule would otherwise draw a line across the bottom of the table with
+   nothing under it, which reads as a cut-off table. */
+tbody tr:last-child > * {
+  border-block-end: 0;
+}
+
+/* First and last cells align with the surrounding text column instead of being inset by
+   the cell padding — a table then reads as part of the page, not as a floating box. */
+tr > *:first-child { padding-inline-start: 0; }
+tr > *:last-child { padding-inline-end: 0; }
 
 /* Tailwind v4's reset drops the default button cursor — restore it for all
    interactive controls (buttons, summaries, role=button). */
@@ -1002,8 +1043,25 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
    looks identical to a table that simply ends, so without it people do not know to
    scroll. It sits above the table and ignores the pointer. `--background` carries a
    `transparent` fallback so an unpinned surface on an older build fades to nothing
-   rather than painting a grey bar. */
-.tablewrap { position: relative; overflow-x: auto; }
+   rather than painting a grey bar.
+
+   A LONG table scrolls itself too (0.10.0). A 40-row table pushes everything after it
+   below the fold, so the reader loses the header before they reach the rows that need it
+   and there is no way back except scrolling the whole page. `--tablewrap-max-h` caps the
+   wrapper; anything shorter than the cap is untouched, so short tables behave exactly as
+   they did. A surface that genuinely wants an uncapped table — a full-bleed dashboard —
+   sets the token to `none` rather than redeclaring the rule.
+
+   `overflow: auto` (both axes) also makes the wrapper the scrollport for `position:
+   sticky`, which is what lets the header row below stick to the TABLE rather than to the
+   viewport. Sticking to the viewport is the failure this avoids: the header row would
+   float over the page's own fixed chrome on any page that has some. */
+.tablewrap {
+  position: relative;
+  overflow: auto;
+  max-block-size: var(--tablewrap-max-h, 75vh);
+  overscroll-behavior: contain;
+}
 .tablewrap::after {
   content: "";
   position: absolute;
@@ -1013,6 +1071,16 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   pointer-events: none;
   opacity: 0.9;
   background: linear-gradient(to right, transparent, var(--background, transparent));
+}
+
+/* The header row stays put while the body scrolls under it. `--background` rather than
+   transparent, or the rows would read straight through it. The fallback keeps an
+   unpinned consumer on an older build from painting a transparent header. */
+.tablewrap thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: var(--background, #f5efe2);
 }
 
 /* ── a11y helpers ── */

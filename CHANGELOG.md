@@ -26,6 +26,43 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.10.0 (2026-08-07)
+
+### A table is a grid again — cell padding, a hairline between rows, top-aligned cells
+Until now the system set exactly one property on `table`: the font size. Everything else was
+the browser default, which means **zero cell padding and no rule between rows**. On a dashboard
+of short numeric cells nobody noticed. On a doc table whose cells hold a sentence the rows merge
+into a block of prose and the reader cannot tell which fragment on the right belongs to which
+label on the left — and the wider the table, the worse it gets, because the eye has further to
+travel with nothing to travel along. Reported against a 3-column, 17-row findings table where
+every cell was a full sentence: "very hard for me to see which text belongs to which row".
+
+`th, td` now take `0.45rem 0.85rem` of padding, `vertical-align: top` (so a one-line cell sits
+level with the first line of a five-line neighbour instead of floating in its middle), and a
+`border-block-end` of `--border` **mixed down to 55%**. Not `--border` itself: at full strength
+a line under every row reads as a bordered spreadsheet and fights the terminal look. The mix is
+a token operation, so it stays correct on all four themes. `thead th` keeps the undiluted rule
+and `--muted-foreground`; the last body row drops its rule, which would otherwise draw a line
+across the bottom of the table with nothing under it and read as a cut-off table. First and last
+cells lose their outer padding so a table lines up with the text column around it rather than
+sitting in a box.
+
+`table` also takes `width: 100%`, so a table fills its column and wraps inside it instead of
+sizing to its longest cell and pushing the page sideways.
+
+### A long table scrolls itself, and its header stays put
+`.tablewrap` already stopped a WIDE table from scrolling the whole page. A TALL one had the same
+shape of problem and no answer: a 40-row table pushes everything after it below the fold, and the
+header row is gone long before the rows that need it. `--tablewrap-max-h` (default `75vh`) caps
+the wrapper; anything shorter is untouched, so short tables behave exactly as before. A surface
+that genuinely wants an uncapped table — a full-bleed dashboard — sets the token to `none`
+instead of redeclaring the rule.
+
+The wrapper is now `overflow: auto` on both axes, which also makes it the scrollport for
+`position: sticky`. That is what lets `.tablewrap thead th` stick to the TABLE rather than to the
+viewport — sticking to the viewport is the failure this avoids, because the header row would then
+float over the page's own fixed chrome on every page that has some.
+
 ## 0.9.0 (2026-08-07)
 
 ### Added — `.tab--info`, because a tab row has two halves

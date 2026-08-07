@@ -95,13 +95,13 @@
          on docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.7.0/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.7.0.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.10.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.10.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.7.0/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.7.0.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.10.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.10.0.fonts.css'"
     />
 
     <style>
@@ -129,8 +129,28 @@
 
       /* content + table-of-contents layout (mirrors danieldeusing.de articles) */
       .layout { display: grid; gap: 2.5rem; }
-      @media (min-width: 64rem) { .layout { grid-template-columns: minmax(0, 1fr) 13rem; } }
       .content { min-width: 0; }
+
+      /* THE TABLE OF CONTENTS BELONGS AGAINST THE RIGHT EDGE OF THE BODY, not against the
+         right edge of the reading column. Those are the same thing on a laptop and very
+         different on a wide display: with .wrap capped at --content-w the whole grid is
+         centred, so the TOC ends up stranded mid-page with a band of dead space between it
+         and the `ls -l` rail — measured at 1920px, ~230px of nothing.
+
+         So above the breakpoint .wrap stops being the page and becomes just the reading
+         column: the wrapper opens to the full body width, the CONTENT column keeps the
+         --content-w cap so line length is completely unchanged, and space-between pushes
+         the TOC out to the edge. No extra offset is needed for the rail — the design system
+         already reserves it with `body { padding-right: var(--ls-nav-inset) }`, so the body
+         box ends where the rail begins and "flush right" is exactly right. */
+      @media (min-width: 64rem) {
+        .wrap { max-width: none; }
+        .layout {
+          grid-template-columns: minmax(0, var(--content-w, 78rem)) 13rem;
+          justify-content: space-between;
+          column-gap: 3rem;
+        }
+      }
       h1.title { font-size: var(--fs-2xl, 1.7rem); font-weight: 700; margin: 0.4rem 0 0.5rem; }
       .lede { color: var(--muted-foreground); } /* full width — no max-width cap */
 
@@ -339,8 +359,8 @@ flowchart TD
     </footer>
 
     <script type="module">
-      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.7.0/runtime/index.js";
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom } from
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.10.0/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();
@@ -368,6 +388,7 @@ flowchart TD
         // running — two passes mutating the same nodes stack every diagram into one box.
         let renderPass = 0;
         let pending = Promise.resolve();
+        let zoomWired = false;
 
         const renderDiagrams = () => {
           pending = pending.then(async () => {
@@ -407,6 +428,21 @@ flowchart TD
                 node.textContent = node.dataset.mermaidSource;
                 node.removeAttribute("data-processed");
               }
+            }
+            // EVERY DIAGRAM IS ZOOMABLE. A flowchart sized to fit a text column is
+            // unreadable at exactly the moment someone needs to read it, so the system
+            // ships the overlay (click / Enter / Space, wheel-zoom about the pointer,
+            // drag-pan, + - 0, Escape) and a doc has no reason to opt out.
+            //
+            // Wired ONCE, and after the first render rather than before it: the opener
+            // binds a listener per element and is not idempotent, so calling it again on
+            // the theme re-render would open two overlays per click. Re-rendering is safe
+            // regardless — initDiagramZoom CLONES the svg on open, so it always picks up
+            // whatever the <pre> currently holds, and the original nodes mermaid keeps
+            // references to are never moved out of the document.
+            if (!zoomWired) {
+              zoomWired = true;
+              initDiagramZoom("pre.mermaid");
             }
           });
           return pending;

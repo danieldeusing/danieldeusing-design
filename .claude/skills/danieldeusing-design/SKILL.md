@@ -173,10 +173,10 @@ a full-bleed dashboard table rather than redeclaring `.tablewrap`.
 
 | Group | Classes | Source |
 | --- | --- | --- |
-| chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
-| `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`) `.ls-perm` `.ls-name` | `src/chrome.css` |
+| chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
+| `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`) `.ls-perm` `.ls-name` `.ls-group` | `src/chrome.css` |
 | text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
-| blocks | `.card-terminal` `.btn-terminal` `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
+| blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
 | tabs | `.tabs` `.tab` (`[aria-selected]`) `section.doc.tab-panel` | `src/components.css` |
 | status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/components.css` |
 | diagram zoom | `.dgm-zoomable` `.dgm-overlay` `.dgm-stage` `.dgm-bar` `.dgm-btn` `.dgm-close` `.dgm-art` | `src/components.css` |
@@ -186,6 +186,69 @@ a full-bleed dashboard table rather than redeclaring `.tablewrap`.
 | typing animation | the `[data-term]` / `[data-term-out]` contract + the `html.anim-off` kill switch | `src/components.css` |
 
 `.prompt` already prepends `$ ` — never author a literal leading `$ ` inside one (it doubles).
+
+## A row action's SHAPE says whether it changes anything (0.13.0)
+
+The one rule that decides what to reach for. It is not a style preference — it is the only thing
+that tells a reader, before they click, whether this control will take them somewhere or alter
+something:
+
+> **A row action that NAVIGATES is a link. A row action that MUTATES is a button.**
+> Underlined text that deletes something looks like a footnote.
+
+| the action | what to write |
+|---|---|
+| `open →` `log →` `detail` `forge →` — goes somewhere, changes nothing | `<a class="doc-link doc-link--forward">` (or a `<button>` carrying the same classes when the destination is an in-page dialog and there is no url) |
+| `remove` `add` `update` `save` `apply` `dismiss` `enrol` — writes | `<button class="btn-terminal btn-terminal--ghost btn-terminal--compact">` |
+| the ONE primary action of a view | the same, **filled**: `btn-terminal btn-terminal--compact` |
+| a toggle (`follow`, `live`) | the same button; press = drop `--ghost`, release = add it back. The two states are the two buttons the system already ships, so a toggle never needs a third look. |
+
+Two filled buttons side by side compete, which is the whole reason `--ghost` exists.
+
+**`.doc-link--forward` carries the accent AT REST**, not on hover. `.doc-link` is deliberately
+quiet because it is footer furniture, and row actions inherited that quietness: a column of grey
+`open →` reads as *disabled text* rather than as the way in. Hover cannot advertise itself, and a
+row action is the reason the row is interactive at all. Keep plain `.doc-link` for what it was
+built for — the footer, and links inside running prose. A **value** that happens to be clickable
+(a repo name, a PR ref, a path in the identity column) is not an action either; the forward accent
+belongs to the action column.
+
+**`.btn-terminal--compact` is the SIZE and nothing else.** Colour, square corner, the `> ` prefix
+and the glow still come from `.btn-terminal` / `--ghost`, so a compact button cannot drift into
+being a different button. The system's own button is a landing-page CTA at `12px 24px`; a tool row
+puts six side by side and a table cell is half that height. Cockpit carried this as a local
+`.btn-compact` for months — every surface with a table needs it, so it lives here now. **Never
+declare a local one**, and never a local button class at all: five invented classes (`.cfg-btn`,
+`.copy-btn`, `.tbtn`, `.xbtn`, `.fw-btn`) is how 77 rounded corners accumulated on a system whose
+`--radius` has been `0` since its first release.
+
+## `.field-row` — a settings panel is a two-column table, so write it as one
+
+```html
+<div class="field-row">
+  <span class="lbl">review type</span>
+  <div class="field-val">…control(s)…</div>
+</div>
+```
+
+Built as flex rows with a label beside a control, every row starts its value wherever *its own*
+label happens to end — the labels are different lengths, so the eye gets no vertical edge to
+follow and the panel reads as noise. Daniel, looking at exactly that: *"make this more a table
+layout and always do it like this. This currently looks chaotic."* `.field-row` decides the value
+edge once, for every row.
+
+- `.field-val` is a flex box, so several controls on one row **wrap together** instead of each
+  finding its own line.
+- Widen the label column with **`--field-label-w`** (default `8.5rem`) when a panel's labels are
+  genuinely longer. Note the checker cannot see this one: upstream only ever *reads* it (with a
+  fallback), so `bin/design-conformance` reports `var(--field-label-w)` as a **phantom token**.
+  Either set it as a real declaration on the panel first, or avoid it.
+- Deliberately **not** `subgrid`: these rows usually render independently — one block per repo, one
+  per source — so they must align without sharing a parent. The failure mode of a fixed column is
+  "the label column is a bit wide", not a broken layout.
+- Below `40rem` it stacks on its own. A form's submit gets a `.field-row` with an **empty** `.lbl`,
+  so it lands on the same value edge as the fields above it and stacks with them for free — rather
+  than a local margin that writes the label width down a second time.
 
 The chrome has a **markup contract**, documented at the top of `src/chrome.css` and shown end to
 end in two templates that ship in the package (`files`), so a consumer reads the canonical markup
@@ -251,7 +314,7 @@ every one of them has drifted. Adding a surface is one entry in that array.
 | `initResolutionZoom(1920)` | Lays out at the reference width and zooms above it. **Pre-paint from `<head>`** — otherwise the page reflows visibly on load, and it is the half of "same font size on every screen" that the type scale cannot do. |
 | `initDropdowns()` | `<details class="dropdown">`: one-open, click-away, Escape. |
 | `initBurgerNav()` | Mobile burger (breakpoint 48rem) with the footer folded in. |
-| `initLsNav()` | The rail's show/hide, and it **measures** the real chrome into `--ls-nav-top` / `--ls-nav-bottom`. Use `offsetHeight` semantics — `getBoundingClientRect()` returns zoomed visual px and double-counts the zoom. |
+| `initLsNav()` | The rail's show/hide, and it **measures** the real chrome into `--ls-nav-top` / `--ls-nav-bottom`. The top is the header's **bottom edge** (`getBoundingClientRect().bottom / zoom`), not its height — those agree only while nothing sits above the header, and cockpit's alert banner mounts as the first child of `<body>`. A rect is visual px and a CSS length is re-multiplied by any ancestor `zoom`, so **convert, don't avoid** (0.13.0; before that a 73px banner buried the rail's own toggle). Re-measured on `scroll` too, because a sticky header's bottom edge moves as the banner scrolls away. |
 | `initTerminal()` | The `$ command` typing animation; no-ops under reduced motion / `html.anim-off`. Fires `term:contentdone`. |
 | `initAnimToggle()` | Wires `[data-anim-toggle]`, persists `localStorage["anim"]`. |
 | `initDiagramZoom(".diagram")` | Click / Enter / Space opens a diagram full-screen; wheel-zoom about the pointer, drag-pan, `+ - 0`, Escape closes. Clones the svg — mermaid re-runs against the nodes it rendered, so moving the original is how a diagram silently stops updating. |

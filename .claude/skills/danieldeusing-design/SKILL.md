@@ -382,3 +382,13 @@ The runtime is progressive enhancement: with JS off, content is visible and the 
 Trusted Publishing on any push to `main` that bumps `package.json` version; an unchanged version
 is skipped, so docs/skills/template pushes are safe. Write the CHANGELOG entry the way the
 existing ones read: what changed, and the measurement or failure that forced it.
+
+**PUSH `main` FIRST, TAG AFTER npm HAS THE VERSION.** The order is load-bearing and neither the
+CHANGELOG nor this file used to say so. `prepublishOnly` runs `check-release.mjs` inside the
+publish job, and check #2 refuses a version that is **already tagged on origin** — so tagging
+before the workflow finishes makes the release gate block the very publish it is gating. 0.16.0
+failed exactly that way: `✗ v0.16.0 is already a tag on origin — that release was cut.`, npm
+untouched, while the tag sat there implying it had shipped. Recovery is
+`git push origin :refs/tags/vX.Y.Z`, `gh run rerun <id>`, then tag once `npm view` reports the new
+version. The workflow re-creates the tag itself on success, so the manual tag is a no-op — which
+is the clue that it was never yours to push first.

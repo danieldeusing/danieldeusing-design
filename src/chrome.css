@@ -149,6 +149,13 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
 .sep { width: 1px; height: 0.9rem; background: var(--border); }
 .doc-link { color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
 .doc-link:hover { color: var(--primary); }
+/* A FORWARD LINK — `open →`, `log →`, `edit`: the thing in a table row that takes you somewhere.
+   `.doc-link` is deliberately quiet because it is footer furniture, and a row action inherited
+   that quietness: a column of grey `open →` reads as disabled text rather than as the way in.
+   It carries the accent from rest, not only on hover, because a row action is the reason the
+   row is interactive at all and hover cannot advertise itself. */
+.doc-link--forward { color: var(--primary); }
+.doc-link--forward:hover { color: var(--primary); text-decoration: underline; }
 
 /* A group heading inside the rail. It was in the canonical template and styled by NOTHING —
    it rendered as a plain inline span, so every surface that wanted grouped navigation wrote its

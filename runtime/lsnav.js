@@ -43,12 +43,19 @@ function measureChrome() {
   const root = document.documentElement;
   const bar = document.querySelector("header.bar");
   const status = document.querySelector("footer.status");
-  // offsetHeight, NOT getBoundingClientRect(). Consumers may set `zoom` on <html>
-  // (cockpit scales the whole layout to the viewport), and getBoundingClientRect
-  // reports VISUAL pixels — already multiplied by the zoom. Writing that number
-  // back as a CSS length zooms it a second time, which left the rail sitting a
-  // few px below the bar with a visible seam. offsetHeight is layout px and is
-  // the same unit the CSS will be interpreted in.
+  // THE RAIL'S TOP IS THE HEADER'S BOTTOM EDGE, NOT THE HEADER'S HEIGHT. Those are the same
+  // number only when nothing sits above the header — and something does: cockpit's alerts.js
+  // mounts the alert banner as the FIRST CHILD OF BODY. Measured with a 73px banner, the header
+  // ran 73→118 while --ls-nav-top was set to 44 (its height, minus the overlap), so the rail
+  // started 74px too high, inside the banner, with the `ls -l` head and its toggle buried
+  // underneath it. Reported as "the sidebar is broken, I cannot hide it any more".
+  //
+  // getBoundingClientRect().bottom is the only thing that answers "where does the header END on
+  // screen", and it has to be VIEWPORT-relative because the rail is position:fixed. The comment
+  // this replaces was right that rects are VISUAL px and a CSS length is re-multiplied by any
+  // ancestor `zoom` — so the answer is to divide by the zoom, not to avoid the rect. Reading a
+  // height to answer a position question is what made the banner invisible to this code.
+  const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
   const h = (el) => (el ? el.offsetHeight : 0);
   // OVERLAP BY 1px rather than trying to meet the chrome exactly. offsetHeight is an
   // INTEGER while the bar's real height is fractional (44.97), so "exactly flush" is
@@ -57,7 +64,9 @@ function measureChrome() {
   // quarter-pixel seam of page background that is plainly visible on a wide screen.
   // Both chrome elements are opaque and sit ABOVE the rail (z-index 30 and 50 vs 25),
   // so a pixel of tuck is invisible, whereas a pixel of gap is not.
-  if (h(bar)) root.style.setProperty("--ls-nav-top", `${Math.max(0, h(bar) - 1)}px`);
+  if (bar) {
+    root.style.setProperty("--ls-nav-top", `${Math.max(0, bar.getBoundingClientRect().bottom / zoom - 1)}px`);
+  }
   // A hidden footer (mobile folds it into the burger) reserves nothing.
   root.style.setProperty("--ls-nav-bottom", `${Math.max(0, h(status) - 1)}px`);
 }
@@ -69,6 +78,10 @@ export function initLsNav() {
 
   measureChrome();
   addEventListener("resize", measureChrome);
+  // A sticky header's bottom edge MOVES while anything above it scrolls away: with the banner
+  // on screen it sits at banner+header, and once the banner is gone it sits at header. A height
+  // never changed, so this listener was never needed before.
+  addEventListener("scroll", measureChrome, { passive: true });
   // The bar reflows when webfonts land, which changes its height after first paint.
   if (document.fonts?.ready) document.fonts.ready.then(measureChrome).catch(() => {});
 

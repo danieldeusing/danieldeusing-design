@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.12.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.13.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -446,6 +446,50 @@ body::after {
   color: var(--primary);
   text-shadow: 0 0 12px var(--glow);
 }
+
+/* ── FIELD ROWS — a label column and a value column, and they LINE UP ──────────────────────
+   A settings panel is a two-column table whether or not anyone writes it as one. Built as flex
+   rows with a label beside a control, every row starts its value wherever its own label ends:
+
+     review type: [public — posts on the PR]
+     comments: [x] agent info  [x] ELI5
+     login: [gitlab-public]
+
+   which is what a form looks like when nobody decided where the value column is. The labels are
+   different lengths, so the eye gets no vertical edge to follow and the panel reads as noise.
+   A grid decides it once, for every row:
+
+     review type   [public — posts on the PR]
+     comments      [x] agent info  [x] ELI5
+     login         [gitlab-public]
+
+   NOT `subgrid`: these rows are usually rendered independently — one block per repo, one per
+   source — so they have to align without sharing a parent grid. A fixed label column does that,
+   and its failure mode is "the label column is a bit wide", not a broken layout. Override the
+   width per panel with --field-label-w when a panel's labels are genuinely longer. */
+.field-row {
+  display: grid;
+  grid-template-columns: var(--field-label-w, 8.5rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.35rem 0;
+}
+.field-row > .lbl { color: var(--muted-foreground); font-size: var(--fs-sm); text-align: left; }
+/* The value cell: controls sit on one row and wrap together, rather than each finding its own. */
+.field-row > .field-val {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; min-width: 0;
+}
+/* Below the breakpoint an 8.5rem label column costs more than it buys — stack instead. */
+@media (max-width: 40rem) {
+  .field-row { grid-template-columns: 1fr; gap: 0.2rem; }
+}
+
+/* A ROW-SIZED BUTTON. The system's button is a landing-page CTA at 12px/24px; a table row that
+   offers `remove` needs the same button at the size of its text. This is the size ONLY — colour,
+   corners and the `> ` prefix still come from .btn-terminal / --ghost, so a compact button cannot
+   drift into being a different button. Cockpit had this as a local class; every surface with a
+   table needs it, so it lives here. */
+.btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-sm); }
 
 /* ─────────────────────────────────────────────────────────────────────────
    Shell affordances — `$ command` section headers and `# comment` lines.
@@ -1218,6 +1262,13 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
 .sep { width: 1px; height: 0.9rem; background: var(--border); }
 .doc-link { color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
 .doc-link:hover { color: var(--primary); }
+/* A FORWARD LINK — `open →`, `log →`, `edit`: the thing in a table row that takes you somewhere.
+   `.doc-link` is deliberately quiet because it is footer furniture, and a row action inherited
+   that quietness: a column of grey `open →` reads as disabled text rather than as the way in.
+   It carries the accent from rest, not only on hover, because a row action is the reason the
+   row is interactive at all and hover cannot advertise itself. */
+.doc-link--forward { color: var(--primary); }
+.doc-link--forward:hover { color: var(--primary); text-decoration: underline; }
 
 /* A group heading inside the rail. It was in the canonical template and styled by NOTHING —
    it rendered as a plain inline span, so every surface that wanted grouped navigation wrote its

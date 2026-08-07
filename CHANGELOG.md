@@ -26,6 +26,48 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.13.0 (2026-08-07)
+
+### Fixed — the rail broke whenever anything sat above the header
+
+`runtime/lsnav.js` set `--ls-nav-top` from the header's **height**. That is the header's bottom
+edge only while nothing sits above it — and something does: cockpit's `alerts.js` mounts the
+alert banner as the **first child of `<body>`**.
+
+Measured with a 73px banner: the header ran **73→118** while `--ls-nav-top` was **44**, so the
+rail started 74px too high, inside the banner, burying the `ls -l` head and its toggle. Reported
+as *"the sidebar is broken, I cannot hide it any more"* — the toggle was not broken, it was
+underneath the rail.
+
+It now reads `getBoundingClientRect().bottom` — the only thing that answers *where does the
+header end on screen* — divided by the zoom, because a rect is visual px and a CSS length is
+re-multiplied by any ancestor `zoom`. The old comment was right that rects are dangerous under
+zoom and drew the wrong conclusion: the answer is to convert, not to avoid. Verified at zoom 1
+(rail 117, header bottom 118) and at 1.35 (182 vs 183) — a 1px tuck in both.
+
+A `scroll` listener came with it: a sticky header's bottom edge **moves** while the banner
+scrolls away. A height never did, so nothing needed one before.
+
+### Added — `.doc-link--forward`, `.field-row`, `.btn-terminal--compact`
+
+**`.doc-link--forward`** for `open →` / `log →`. `.doc-link` is deliberately quiet because it is
+footer furniture, and row actions inherited that: a column of grey `open →` reads as disabled
+text rather than as the way in. It carries the accent at rest, because a row action is the reason
+the row is interactive and hover cannot advertise itself.
+
+**`.field-row`** is a label column and a value column that line up. A settings panel is a
+two-column table whether or not anyone writes it as one; built as flex rows, each value starts
+wherever its own label happens to end and the panel reads as noise. Not `subgrid` — these rows
+render independently, one block per repo, so they must align without a shared parent.
+
+**`.btn-terminal--compact`** is the size only. Colour, corners and the `> ` prefix still come
+from `.btn-terminal`/`--ghost`, so a compact button cannot drift into being a different button.
+
+### The rule these encode
+A row action that **navigates** is a link (`.doc-link--forward`). A row action that **mutates** —
+`remove`, `add`, `update`, `save` — is a **button**. Underlined text that deletes something looks
+like a footnote.
+
 ## 0.12.1 (2026-08-07)
 
 ### The minimap's label is the system's tooltip, not the browser's

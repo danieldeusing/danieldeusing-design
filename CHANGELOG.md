@@ -26,6 +26,33 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.12.1 (2026-08-07)
+
+### The minimap's label is the system's tooltip, not the browser's
+The bars carried their section name in `title`. The native tooltip waits about a second before
+it appears and renders in the OS's own chrome — useless on a strip whose entire job is to be
+scrubbed, because the reader is two bars further on before the first label arrives. They now
+carry `data-tip`, so they use the tooltip this system already ships (`src/tooltip.css` +
+`initTooltips()`): instant on mouseover, in the page's own type and palette, and delegated, so
+bars built at runtime need no extra wiring. `aria-label` stays — the accessible name was never
+the browser's tooltip's job.
+
+One cascade note: `tooltip.css` is imported after `components.css` and sets `cursor: help` on
+every `[data-tip]`. A bar is clickable, so `.minimap-bar[data-tip]` restates `cursor: pointer` —
+the attribute in the selector buys the specificity and also says why the rule is there.
+
+### A release can no longer ship with a version someone else already used
+Twice on 2026-08-07 both machines wrote the same version: ddAir published 0.11.0 while ddStudio
+was writing 0.11.0 locally, and the collision surfaced only as a rejected push — after the
+CHANGELOG entry, the commit message and every template pin had been written against the wrong
+number. `scripts/check-release.mjs` asks the questions that are not local decisions before the
+work leaves the machine: is this version already on npm, is `v<version>` already tagged on
+origin, does the CHANGELOG have a heading for it, do the template pins match it, and is `dist/`
+what `src/` currently builds to. Network checks degrade to warnings when offline; the local ones
+stay hard. `npm run check:release` runs it, `--next` just prints the next free version, a
+committed `.githooks/pre-push` runs it automatically after `npm run hooks:install`, and
+`prepublishOnly` runs it too so a bad version cannot reach npm even if the hook was never set up.
+
 ## 0.12.0 (2026-08-07)
 
 ### The table of contents becomes a minimap, and the doc gets its column back

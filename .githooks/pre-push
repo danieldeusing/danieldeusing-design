@@ -1,0 +1,24 @@
+#!/bin/sh
+# Refuse to push a release that claims a version someone else already used.
+#
+# Two machines publish this package, and twice on 2026-08-07 both wrote the same
+# number — the collision only showed up as a rejected push, long after the
+# CHANGELOG and the template pins had been written against it. This asks npm and
+# origin first, because "which version is free" was never a local decision.
+#
+# Install once per clone:  npm run hooks:install
+#
+# Only runs when package.json's version actually CHANGED against the upstream
+# branch — a docs, skills or template push is not a release and should not pay
+# for two network round-trips.
+set -e
+
+remote_version=$(git show "@{u}:package.json" 2>/dev/null | sed -n 's/.*"version": "\([^"]*\)".*/\1/p' | head -1 || true)
+local_version=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' package.json | head -1)
+
+if [ -n "$remote_version" ] && [ "$remote_version" = "$local_version" ]; then
+  exit 0
+fi
+
+echo "pre-push: version $remote_version -> $local_version, checking the release is coherent…"
+node scripts/check-release.mjs

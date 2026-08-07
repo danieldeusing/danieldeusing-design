@@ -98,13 +98,13 @@
          on docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.0/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.12.0.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.1/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.12.1.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.0/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.12.0.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.1/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.12.1.fonts.css'"
     />
 
     <style>
@@ -340,8 +340,8 @@ flowchart TD
     </footer>
 
     <script type="module">
-      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom, initMinimap } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.0/runtime/index.js";
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom, initMinimap, initTooltips } from
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.1/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();
@@ -454,6 +454,11 @@ flowchart TD
       // nothing) when there are fewer than two sections, on the same reasoning as a
       // one-entry nav.
       initMinimap({ sections: "section.doc" });
+      // The minimap's bars carry `data-tip`, not `title`: the native tooltip waits about a
+      // second and renders in the OS's chrome, which is useless on a strip meant to be
+      // scrubbed. This shows the section name instantly, in the page's own type. Delegated,
+      // so it covers the bars the minimap just built.
+      initTooltips();
     </script>
   </body>
 </html>

@@ -45,10 +45,18 @@ export function initMinimap(options = {}) {
     bar.type = "button";
     bar.className = "minimap-bar";
     bar.style.setProperty("--minimap-bar-w", `${LEVEL_WIDTH[level] ?? 62}%`);
-    // The label is the accessible name AND the native tooltip: wordless on
-    // screen, never wordless to a screen reader or to a hovering pointer.
+    // The label is the accessible name AND the hover label: wordless on screen,
+    // never wordless to a screen reader or to a hovering pointer.
+    //
+    // `data-tip`, NOT `title`. The native tooltip waits about a second before it
+    // appears, renders in the OS's own chrome, and cannot be styled — on a strip
+    // whose entire job is to be scrubbed, a delay that long means the reader has
+    // moved to the next bar before the first label arrives. The system's tooltip
+    // (src/tooltip.css + initTooltips) shows on mouseover with no delay, in the
+    // page's own type and palette, and is delegated — so bars built here at
+    // runtime need no extra wiring. Call initTooltips() once on the page.
     bar.setAttribute("aria-label", text);
-    bar.title = text;
+    bar.dataset.tip = text;
     bar.addEventListener("click", () => {
       section.scrollIntoView({ behavior: "smooth", block: "start" });
     });

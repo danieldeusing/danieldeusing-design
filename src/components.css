@@ -624,6 +624,13 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   transform-origin: left center;
 }
 .minimap-bar:hover { background: var(--muted-foreground); transform: scaleY(2); }
+
+/* tooltip.css is imported AFTER this file and sets `cursor: help` on every
+   [data-tip]. A bar is clickable — it jumps to its section — so the pointer has
+   to win, and at equal specificity source order would hand it to the later file.
+   The attribute in the selector is what buys the extra specificity, and it is
+   also the honest description: this rule exists because the bar carries a tip. */
+.minimap-bar[data-tip] { cursor: pointer; }
 .minimap-bar:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 .minimap-bar.active { background: var(--primary); transform: scaleY(2); }
 

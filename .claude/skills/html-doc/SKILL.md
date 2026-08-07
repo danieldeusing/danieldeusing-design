@@ -138,9 +138,23 @@ already carries two, and if you cannot write the sentence you do not have an exc
    - `{{FLOW_*}}` — the placeholders of the example diagram in the `#flow` section. Replace the
      whole diagram with the real one, or delete the section (and its TOC entry) if the page has
      no flow to draw.
-   - **Table of contents** — for every section add a matching
-     `<a href="#SLUG" data-toc-link="SLUG">Label</a>` in the `.toc` nav (the scroll-spy wires itself
-     from these). This mirrors the article TOC on danieldeusing.de.
+   - **There is NO table of contents, and the page is ONE CENTRED COLUMN.** Both of those are
+     the same decision. A text "On this page" list repeated the headings the reader was about
+     to scroll past and charged a 13rem column for it — on a wide display that column was the
+     difference between content that fills the page and content stranded beside a strip of
+     nothing. It is replaced by the **minimap** (0.11.0): one bar per section down the left
+     gutter, fixed, 2rem wide, so it costs the column nothing.
+     **The markup contract is nothing.** Give each `<section class="doc">` an `id` and call
+     `initMinimap({ sections: "section.doc" })` — bars, bar-length-by-heading-depth, click-to-jump
+     and the scroll-spy all build themselves. Never hand-author a `.toc`, and never add a
+     per-section entry anywhere: the failure that used to cause (a section added without its TOC
+     link, or a stale `data-toc-link` breaking the scroll-spy) no longer has anywhere to happen.
+   - **Do not override `.wrap`.** The template declares it once as a token declaration with
+     literal fallbacks, and that IS the layout: `--content-w` wide, `margin-inline: auto`, side
+     margins are whatever is left. Every other surface in the estate does exactly this —
+     cockpit's pages declare no `.wrap` rule at all. A doc that widens it, or puts the content in
+     a grid column beside something, ends up left-aligned against the margin while every sibling
+     page is centred, and that difference is visible the moment you have both open.
    - **Navigation (top-right) — the `ls -l` RAIL, and MOST DOCS SHOULD NOT HAVE ONE.**
      **The rule: a doc lists only ITSELF, so the rail has one entry, so there is no rail.**
      A navigation whose only destination is the page you are already on is not navigation — it is
@@ -180,8 +194,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
    first paint: a reader who hid the rail would watch it paint and jump away on every load.
 
    **Every measurement in the page's `<style>` block is a token with a literal fallback.**
-   The local CSS is the page's own *layout* only (`.layout`, `.toc`, `ol.steps`, `table.kv`, …) —
-   never a restyle of the system's own classes. Within it:
+   The local CSS is the page's own *layout* only (`.wrap`, `.content`, `ol.steps`, `table.kv`, …) —
+   never a restyle of the system's own classes. `.minimap` is the SYSTEM's, not the page's: do not
+   declare it locally, the same as any other class in the shared vocabulary. Within it:
    - **No bare numbers.** The column is `max-width: var(--content-w, 78rem)` +
      `padding-inline: var(--content-pad, 1.5rem)`; sizes are `var(--fs-xs … --fs-2xl, <literal>)`
      and `var(--lh-tight|--lh-base, <literal>)`; colours are tokens and never a literal hex.
@@ -192,9 +207,10 @@ already carries two, and if you cannot write the sentence you do not have an exc
      opened over `file://` with no route to the CDN gets no stylesheet at all — the site-absolute
      `onerror` path does not resolve there — and a bare `var(--content-w)` resolves to *nothing*:
      full-bleed page, collapsed type. Use the same literal the published docs use so every page
-     degrades identically — `78rem` / `1.5rem` / `1.7rem` (h1) / `0.66rem` (toc label) /
-     `0.76rem` (toc link) / `0.86rem` (`pre`) / `1.5` (line-height). Tables get no entry: their
-     size is the system's (`table { font-size: var(--fs-md) }`).
+     degrades identically — `78rem` / `1.5rem` / `1.7rem` (h1) / `0.86rem` (`pre`) / `1.5`
+     (line-height). Tables get no entry: their size is the system's
+     (`table { font-size: var(--fs-md) }`). Neither does the minimap — it is fixed, sized in the
+     system's own CSS, and a page that never loads that CSS has no minimap to size.
 
 5. **Draw every diagram with Mermaid.** Flows, sequences, state machines, decision trees and
    architecture sketches go in a `<pre class="mermaid">` block — **never** hand-drawn ASCII art
@@ -244,38 +260,26 @@ already carries two, and if you cannot write the sentence you do not have an exc
      `document.documentElement.scrollWidth <= clientWidth` on the page, and
      `wrap.scrollWidth > wrap.clientWidth` on the `.tablewrap` — the table scrolls, the page does
      not. Do it at a NARROW viewport (~820px): at 1400px many wide tables still fit.
-   - **Assert the page SHELL too, not just the content.** Mermaid and table checks pass happily on a
-     page whose structure is broken, so they are not enough on their own. The classic failure is a
-     dropped `</div>`: the `.content` column never closes, `<aside class="toc">` is swallowed into it
-     instead of being its sibling, and the table of contents silently renders as a block at the
-     BOTTOM of the page instead of the right-hand rail — on a page that otherwise looks fine and
-     passes every other check. At a WIDE viewport (~1280px, above the 64rem breakpoint) assert:
+   - **Assert the page SHELL too, not just the content.** Mermaid and table checks pass happily on
+     a page whose structure is broken, so they are not enough on their own. The classic failure is
+     a dropped `</div>` — the page still renders, still passes every content check, and is quietly
+     mis-laid-out. At a WIDE viewport (1920, not 1280 — at 1280 the wrap nearly fills the screen
+     and almost any layout looks centred) assert:
      ```js
-     const toc = document.querySelector('.toc'), content = document.querySelector('.content');
-     toc.parentElement === document.querySelector('.layout')   // toc is NOT inside .content
-     toc.previousElementSibling === content                    // …it is content's sibling
-     getComputedStyle(document.querySelector('.layout')).gridTemplateColumns.split(' ').length === 2
-     toc.getBoundingClientRect().left >= content.getBoundingClientRect().right - 1  // it is to the RIGHT
-     document.querySelectorAll('.toc nav a').length === document.querySelectorAll('section.doc').length
+     const wrap = document.querySelector('main.wrap'), r = wrap.getBoundingClientRect();
+     const gapL = r.left, gapR = document.documentElement.clientWidth - r.right;
+     Math.abs(gapL - gapR) <= 2                 // the column is CENTRED, not left-aligned
+     r.width <= parseFloat(getComputedStyle(document.documentElement)
+                  .getPropertyValue('--content-w')) * 16 + 2   // still capped at --content-w
+     document.querySelectorAll('.minimap-bar').length ===
+       document.querySelectorAll('section.doc[id]').length     // one bar per section
+     !document.querySelector('.toc')            // no text TOC — it was replaced in 0.11.0
      ```
-     From 0.10.0 the TOC sits against the right edge of the BODY, not of the reading column, so
-     also check there is no dead band beside it. **Measure against the body's CONTENT edge, not
-     its border box** — `body` carries `padding-right: var(--ls-nav-inset)` (272px with the rail
-     open), so `getBoundingClientRect().right` sits *under* the rail and a correct layout looks
-     296px off:
-     ```js
-     const b = document.body, bs = getComputedStyle(b);
-     const contentRight = b.getBoundingClientRect().right - parseFloat(bs.paddingRight);
-     contentRight - document.querySelector('.toc').getBoundingClientRect().right  // ≈ --content-pad
-     ```
-     Equivalently, `.ls-nav`'s `left` minus the TOC's `right` is the same number. Expect one
-     `--content-pad` (24px), not the ~230px it was when the whole grid sat centred inside
-     `.wrap`. Check it at 1920, not at 1280: at 1280 the wrap nearly fills the viewport and a
-     centred layout looks correct.
-     The last line catches the other recurring slip — a section added without its TOC entry, or a TOC
-     entry whose `href`/`data-toc-link` does not match any section `id`, which breaks the scroll-spy.
-     A quick structural pre-check costs nothing either: inside the `.layout` region the count of
-     `<div` and `</div>` must be equal.
+     The centring check is the one that matters: it is exactly what a stray `.wrap` override or a
+     leftover grid column breaks, and it is invisible on a laptop. The bar count catches a section
+     added without an `id`, which is the only way a section can now go missing from the minimap.
+     A structural pre-check costs nothing either: inside `<main class="wrap">` the count of `<div`
+     and `</div>` must be equal.
 
 6. **Preserve graceful degradation.** Keep the pre-paint `<script>` blocks in `<head>` and the
    no-JS / `prefers-reduced-motion` fallbacks intact. Don't strip `aria-*` attributes. The page

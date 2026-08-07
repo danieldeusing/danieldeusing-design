@@ -28,8 +28,9 @@
                      [{{FOLDER}}] {{DOC_TITLE}} (e.g. "[pagr] Source Code
                      documentation"), bottom-right the danieldeusing.de link, the theme
                      picker and the anim toggle. Nothing operational goes in the header.
-  Content (you fill): the title, the full-width lede, and the <section> blocks. Every
-  section has an id and a matching entry in the "On this page" table of contents.
+  Content (you fill): the title, the full-width lede, and the <section> blocks. Give every
+  section an id — the MINIMAP in the left gutter builds itself from them (one bar each,
+  scroll-spy included), so there is no table of contents to keep in sync any more.
 -->
 <html lang="en">
   <head>
@@ -97,13 +98,13 @@
          on docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.10.1/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.10.1.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.12.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.10.1/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.10.1.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.12.0.fonts.css'"
     />
 
     <style>
@@ -129,40 +130,19 @@
 
       /* header/footer chrome + nav now ship with the design system (src/chrome.css) */
 
-      /* content + table-of-contents layout (mirrors danieldeusing.de articles) */
-      .layout { display: grid; gap: 2.5rem; }
+      /* ONE COLUMN, CENTRED — the same shape every other danieldeusing surface has.
+         `.wrap` above is the whole layout: --content-w wide, `margin-inline: auto`, and the
+         side margins are whatever is left. Nothing here overrides it, and nothing should.
+
+         There is no table-of-contents column any more. A text TOC repeated the headings the
+         reader was about to scroll past and charged a whole column of the page for it, and on
+         a wide display that column was the difference between content that fills the page and
+         content stranded beside a strip of nothing. Its two real jobs — how long is this, and
+         where am I — moved to the MINIMAP in the left gutter (src/components.css,
+         initMinimap()), which does them in 2rem and is fixed, so it costs the column nothing. */
       .content { min-width: 0; }
-
-      /* THE TABLE OF CONTENTS BELONGS AGAINST THE RIGHT EDGE OF THE BODY, not against the
-         right edge of the reading column. Those are the same thing on a laptop and very
-         different on a wide display: with .wrap capped at --content-w the whole grid is
-         centred, so the TOC ends up stranded mid-page with a band of dead space between it
-         and the `ls -l` rail — measured at 1920px, ~230px of nothing.
-
-         So above the breakpoint .wrap stops being the page and becomes just the reading
-         column: the wrapper opens to the full body width, the CONTENT column keeps the
-         --content-w cap so line length is completely unchanged, and space-between pushes
-         the TOC out to the edge. No extra offset is needed for the rail — the design system
-         already reserves it with `body { padding-right: var(--ls-nav-inset) }`, so the body
-         box ends where the rail begins and "flush right" is exactly right. */
-      @media (min-width: 64rem) {
-        .wrap { max-width: none; }
-        .layout {
-          grid-template-columns: minmax(0, var(--content-w, 78rem)) 13rem;
-          justify-content: space-between;
-          column-gap: 3rem;
-        }
-      }
       h1.title { font-size: var(--fs-2xl, 1.7rem); font-weight: 700; margin: 0.4rem 0 0.5rem; }
       .lede { color: var(--muted-foreground); } /* full width — no max-width cap */
-
-      .toc { display: none; }
-      @media (min-width: 64rem) { .toc { display: block; } }
-      .toc-inner { position: sticky; top: 4.5rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
-      .toc-label { font-size: var(--fs-sm, 0.66rem); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); }
-      .toc nav { margin-top: 0.6rem; display: flex; flex-direction: column; }
-      .toc a { padding: 0.22rem 0; font-size: var(--fs-base, 0.76rem); color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
-      .toc a:hover, .toc a.active { color: var(--primary); }
 
       /* design-conformance: spacing BETWEEN doc sections on this page template, not a restyle
          of the shared .doc — the system sets its own margin for the standalone case. */
@@ -280,8 +260,7 @@
     </header>
 
     <main class="wrap" id="top">
-      <div class="layout">
-        <div class="content">
+      <div class="content">
           <p class="prompt">cat {{FOLDER}}/README.md</p>
           <h1 class="title">{{DOC_TITLE}}</h1>
           <p class="lede">{{TAGLINE}}</p>
@@ -330,19 +309,6 @@ flowchart TD
               <p class="eli5"><span class="eli5-term">Note</span> {{NOTES}}</p>
             </div>
           </section>
-        </div>
-
-        <aside class="toc">
-          <div class="toc-inner">
-            <p class="toc-label">On this page</p>
-            <nav>
-              <a href="#overview" data-toc-link="overview">Overview</a>
-              <a href="#steps" data-toc-link="steps">Steps</a>
-              <a href="#flow" data-toc-link="flow">Flow</a>
-              <a href="#notes" data-toc-link="notes">Notes</a>
-            </nav>
-          </div>
-        </aside>
       </div>
     </main>
 
@@ -374,8 +340,8 @@ flowchart TD
     </footer>
 
     <script type="module">
-      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.10.1/runtime/index.js";
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom, initMinimap } from
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.12.0/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();
@@ -482,29 +448,12 @@ flowchart TD
         }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
       }
 
-      // table-of-contents scroll-spy: highlight the section currently in view
-      const tocLinks = Array.from(document.querySelectorAll("[data-toc-link]"));
-      const sections = tocLinks
-        .map((link) => document.getElementById(link.dataset.tocLink))
-        .filter(Boolean);
-      if (sections.length) {
-        const setActive = (id) => {
-          for (const link of tocLinks) link.classList.toggle("active", link.dataset.tocLink === id);
-        };
-        const visible = new Set();
-        const observer = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (entry.isIntersecting) visible.add(entry.target.id);
-              else visible.delete(entry.target.id);
-            }
-            const topmost = sections.find((section) => visible.has(section.id));
-            if (topmost) setActive(topmost.id);
-          },
-          { rootMargin: "0px 0px -70% 0px" },
-        );
-        for (const section of sections) observer.observe(section);
-      }
+      // The minimap builds itself from the sections — one bar each, in the left gutter,
+      // with the scroll-spy built in. No markup and no per-section wiring: add a
+      // <section class="doc" id="..."> and it appears. It returns null (and renders
+      // nothing) when there are fewer than two sections, on the same reasoning as a
+      // one-entry nav.
+      initMinimap({ sections: "section.doc" });
     </script>
   </body>
 </html>

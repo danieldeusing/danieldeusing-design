@@ -26,6 +26,32 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.12.0 (2026-08-07)
+
+### The table of contents becomes a minimap, and the doc gets its column back
+The doc template carried an "On this page" list in a 13rem column. It repeated headings the
+reader was about to scroll past, and it charged a column of the page for doing so — on a wide
+display that column was the difference between content that fills the page and content stranded
+beside a strip of nothing. 0.10.0 made it worse by pushing the list to the body's right edge: the
+content then sat hard against the left margin instead of centred, which is not how any other
+surface in the estate lays out. Cockpit's pages declare no `.wrap` override at all; they take the
+system's — `--content-w` wide, `margin-inline: auto`, side margins are whatever is left. The doc
+template now does the same and overrides nothing.
+
+Its two real jobs — how long is this, and where am I — move to `.minimap` + `initMinimap()`: one
+bar per section down the LEFT gutter, fixed, 2rem wide, so it costs the column nothing. Bar
+length encodes heading depth, which is the only structure a wordless strip can carry. Every bar
+is a real `<button>` with the heading as its accessible name and its native tooltip, so the strip
+is tabbable, hoverable and announced — wordless on screen is not wordless underneath. The strip
+scrolls itself and keeps the active bar in view when a document has more sections than fit, and
+it hides below the burger breakpoint, where a fixed gutter is width the content cannot spare.
+
+The markup contract is nothing: `initMinimap({ sections: "section.doc" })` builds it from the
+sections it finds. It returns `null` and renders nothing for fewer than two sections, on the same
+reasoning as a one-entry nav — a map of one place is not a map. That also retires the whole class
+of bug where a section was added without its TOC entry, or a stale `data-toc-link` broke the
+scroll-spy: there is nowhere left for it to happen.
+
 ## 0.11.0 (2026-08-07)
 
 ### A table is a grid again — cell padding, a hairline between rows, top-aligned cells

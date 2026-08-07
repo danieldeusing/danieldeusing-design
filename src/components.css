@@ -569,3 +569,63 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
 .dgm-art > svg, .dgm-art > img { display: block; max-width: none; max-height: none; }
 
 @media print { .dgm-overlay, .dgm-zoomable::after { display: none !important; } }
+
+/* ── document minimap ──
+   One bar per section, down the LEFT gutter, replacing the "On this page" list.
+
+   A text table of contents costs a whole column to repeat headings the reader is
+   about to scroll past anyway, and on a wide screen that column is the difference
+   between content that fills the page and content stranded beside a strip of
+   nothing. The minimap answers the same two questions — how long is this, and
+   where am I — in 2rem, and gives the width back.
+
+   Wordless on screen, never wordless underneath: every bar is a real <button>
+   carrying the heading as its accessible name and its native tooltip, so the
+   strip is tabbable and hoverable. Bar LENGTH encodes heading depth, which is the
+   only structure a wordless strip can still carry.
+
+   Placed between the chrome, like the rail on the other side: initLsNav()
+   measures the real header/footer into --ls-nav-top/--ls-nav-bottom, and those
+   have sane defaults when it never runs. It scrolls itself when a document has
+   more sections than fit, and hides below the burger breakpoint — a fixed gutter
+   on a phone is width the content cannot spare. */
+.minimap {
+  position: fixed;
+  left: 0;
+  top: var(--ls-nav-top, 3rem);
+  bottom: var(--ls-nav-bottom, 2.2rem);
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 2rem;
+  padding: 0.75rem 0 0.75rem 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.minimap::-webkit-scrollbar { display: none; }
+
+@media (min-width: 64rem) {
+  .minimap { display: flex; }
+}
+
+.minimap-bar {
+  flex: 0 0 auto;
+  width: var(--minimap-bar-w, 100%);
+  height: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  background: var(--border);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  transform-origin: left center;
+}
+.minimap-bar:hover { background: var(--muted-foreground); transform: scaleY(2); }
+.minimap-bar:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.minimap-bar.active { background: var(--primary); transform: scaleY(2); }
+
+/* The strip is navigation for a screen. On paper the page IS the map. */
+@media print { .minimap { display: none !important; } }

@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.14.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.15.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1387,7 +1387,17 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
      — giving it the same negative margin pushed it 272px PAST the viewport edge
      (measured 1099px against an 842px viewport). Fixed and in-flow siblings look
      alike in the markup and do not behave alike here. */
-  header.bar { margin-right: calc(-1 * var(--ls-nav-inset)); }
+  header.bar,
+  /* ANY page-level chrome that must span the viewport despite the rail. `body` reserves the
+     rail's width with padding-right, and the header cancels it with a negative margin — but only
+     the header did, so anything else mounted at body level stopped 17rem short while the header
+     beside it ran full width. Cockpit's alert banner is mounted as the first child of <body> and
+     did exactly that: measured at 1440px, its right edge was 1168 against the header's 1440, a
+     272px shortfall that vanished the moment the rail was hidden — which is why it read as "the
+     alert is fine when hidden and wrong when shown".
+     A class rather than naming `.alert-banner` here: the design system should not know what
+     cockpit calls its banner, and the next full-bleed strip should not have to rediscover this. */
+  .bleed-rail { margin-right: calc(-1 * var(--ls-nav-inset)); }
 
   /* Between the chrome, never over it. */
   .ls-nav {

@@ -26,6 +26,22 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.15.0 (2026-08-07)
+
+### Added — `.bleed-rail`, for chrome that must ignore the rail
+
+`body` reserves the rail's width with `padding-right`, and `header.bar` cancels it with a
+negative margin. Only the header did. Anything else mounted at body level stopped **17rem short**
+while the header beside it ran the full width.
+
+Cockpit's alert banner is mounted as the first child of `<body>` and did exactly that. Measured
+at 1440px with the rail shown: the banner's right edge at **1168** against the header's **1440**
+— a 272px shortfall that vanished the moment the rail was hidden, which is why it read as *"the
+alert is fine when hidden and wrong when shown"*.
+
+A class rather than naming `.alert-banner` upstream: the design system should not know what
+cockpit calls its banner, and the next full-bleed strip should not have to rediscover this.
+
 ## 0.14.0 (2026-08-07)
 
 ### Fixed — `--field-label-w` was a phantom, not a token

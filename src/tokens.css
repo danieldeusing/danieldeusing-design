@@ -225,4 +225,11 @@ html[data-theme="paper"] {
 
   --lh-tight: 1.3;      /* headings and single-line chrome */
   --lh-base: 1.5;       /* body copy; matches base.css */
+
+  /* The label column of a .field-row. DECLARED here, not merely read with a fallback in
+     components.css — that is the difference between a token and a phantom. A consumer that
+     overrode `--field-label-w` was flagged by design-conformance's phantom-token check, and
+     correctly: from the outside, a name the system never declares is indistinguishable from a
+     typo. Override it per panel when a panel's labels are genuinely longer. */
+  --field-label-w: 8.5rem;
 }

@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.13.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.14.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -303,6 +303,13 @@ html[data-theme="paper"] {
 
   --lh-tight: 1.3;      /* headings and single-line chrome */
   --lh-base: 1.5;       /* body copy; matches base.css */
+
+  /* The label column of a .field-row. DECLARED here, not merely read with a fallback in
+     components.css — that is the difference between a token and a phantom. A consumer that
+     overrode `--field-label-w` was flagged by design-conformance's phantom-token check, and
+     correctly: from the outside, a name the system never declares is indistinguishable from a
+     typo. Override it per panel when a panel's labels are genuinely longer. */
+  --field-label-w: 8.5rem;
 }
 
 /* ===== base.css ===== */
@@ -466,10 +473,10 @@ body::after {
    NOT `subgrid`: these rows are usually rendered independently — one block per repo, one per
    source — so they have to align without sharing a parent grid. A fixed label column does that,
    and its failure mode is "the label column is a bit wide", not a broken layout. Override the
-   width per panel with --field-label-w when a panel's labels are genuinely longer. */
+   width per panel with --field-label-w (declared in tokens.css) when its labels are longer. */
 .field-row {
   display: grid;
-  grid-template-columns: var(--field-label-w, 8.5rem) minmax(0, 1fr);
+  grid-template-columns: var(--field-label-w) minmax(0, 1fr);
   align-items: center;
   gap: 0.5rem 0.75rem;
   margin: 0.35rem 0;

@@ -37,10 +37,10 @@
    NOT `subgrid`: these rows are usually rendered independently — one block per repo, one per
    source — so they have to align without sharing a parent grid. A fixed label column does that,
    and its failure mode is "the label column is a bit wide", not a broken layout. Override the
-   width per panel with --field-label-w when a panel's labels are genuinely longer. */
+   width per panel with --field-label-w (declared in tokens.css) when its labels are longer. */
 .field-row {
   display: grid;
-  grid-template-columns: var(--field-label-w, 8.5rem) minmax(0, 1fr);
+  grid-template-columns: var(--field-label-w) minmax(0, 1fr);
   align-items: center;
   gap: 0.5rem 0.75rem;
   margin: 0.35rem 0;

@@ -26,6 +26,18 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.14.0 (2026-08-07)
+
+### Fixed — `--field-label-w` was a phantom, not a token
+
+`.field-row` read `var(--field-label-w, 8.5rem)` and nothing ever declared the name. A consumer
+that overrode it got flagged by `design-conformance`'s phantom-token check — **correctly**: from
+outside the package, a name the system never declares is indistinguishable from a typo, and that
+check exists because a mistyped `var()` is silently dropped and renders almost right.
+
+It is declared in `tokens.css` now, so overriding it is a supported thing to do rather than
+something the estate's own linter argues with. A fallback is not a declaration.
+
 ## 0.13.1 (2026-08-07)
 
 ### `.btn-terminal--compact` was not compact — it lost to `.btn-terminal` on source order

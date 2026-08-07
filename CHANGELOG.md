@@ -26,6 +26,21 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.9.0 (2026-08-07)
+
+### Added — `.tab--info`, because a tab row has two halves
+
+A tab row mixes two different kinds of destination: the ones you open to **do** something (run a
+review, edit config, dispatch a job) and the ones you open to **understand** something
+(conformance, how it works). Undifferentiated, "where do I act?" is a reading task every time.
+
+`.tab--info` on the **first** reference tab pushes it and every sibling after it to the right —
+an auto inline-start margin in a flex row absorbs the free space. One class on one element, and
+the split maintains itself as tabs are added to either side.
+
+Dropped below the mobile breakpoint, where the row wraps: an auto margin there would strand one
+tab alone on a line instead of aligning anything.
+
 ## 0.8.1 (2026-08-06)
 
 **On a phone the rail's collapse toggle was a dead 16x6px nub.** Below the 48rem breakpoint the

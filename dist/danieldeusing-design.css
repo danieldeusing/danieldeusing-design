@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.8.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.9.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -773,6 +773,21 @@ html.anim-off .cursor-block {
    (5.6:1 on warm), and it is the only filled thing on the page, so it is found without reading. */
 .tab[aria-selected="true"] { background: var(--primary); color: var(--background); font-weight: 700; }
 .tab:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: -2px; }
+/* A TAB ROW HAS TWO HALVES, and they are not the same kind of thing. On the left are the tabs
+   you go to in order to DO something — run a review, edit config, dispatch a job. On the right
+   are the ones you go to in order to UNDERSTAND something — conformance, how it works. Mixing
+   them in one undifferentiated row makes "where do I act?" a reading task every time.
+
+   `.tab--info` on the FIRST reference tab pushes it and every sibling after it to the right,
+   because an auto inline-start margin in a flex row absorbs all the free space. One class, on
+   one element, and the split maintains itself as tabs are added to either side.
+
+   It is dropped below the mobile breakpoint on purpose: the row wraps there, so an auto margin
+   would strand a single tab alone on its own line rather than aligning anything. */
+.tab--info { margin-inline-start: auto; }
+@media (max-width: 40rem) {
+  .tab--info { margin-inline-start: 0; }
+}
 /* 44px on a touch screen — tabs are the primary navigation of these pages, so they are the last
    control that should be hard to hit. */
 @media (pointer: coarse), (max-width: 40rem) {

@@ -153,7 +153,8 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
    `.doc-link` is deliberately quiet because it is footer furniture, and a row action inherited
    that quietness: a column of grey `open →` reads as disabled text rather than as the way in.
    It carries the accent from rest, not only on hover, because a row action is the reason the
-   row is interactive at all and hover cannot advertise itself. */
+   row is interactive at all and hover cannot advertise itself.
+
    THE ARROW IS PART OF THE LABEL, so this never wraps. Every `→` in the estate is an author-typed
    U+2192 after an ordinary space — 86 of them in cockpit alone, not one using a no-break space —
    so every forward link was one narrow column away from putting its arrow alone on the next line.

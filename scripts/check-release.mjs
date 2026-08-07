@@ -135,6 +135,34 @@ try {
   warnings.push(`could not verify dist/ is current: ${err.message.split("\n")[0]}`);
 }
 
+// ── 6. no prose loose in the stylesheet ──────────────────────────────────────
+// A STRAY `*/` MEANS THE RULE AFTER IT IS GONE, and nothing else says so. 0.16.0
+// shipped exactly this: a comment was extended by pasting more prose after the
+// existing `*/` instead of before it, so six lines of English sat at the top level.
+// CSS does not error on that — it reads the prose as the start of a SELECTOR and
+// keeps consuming until the next `{...}`, which swallowed BOTH `.doc-link--forward`
+// rules whole. The build succeeded, the file looked right in a diff, the rule was
+// present in dist/ when grepped, and `.doc-link--forward` simply did nothing on
+// every surface. It was caught by measuring a real element in a browser
+// (`white-space: normal`, colour still muted) — which is the second time in two
+// days that reading the CSS agreed with itself and the browser disagreed.
+//
+// Same shape as the backtick that took the orchestrator out: a COMMENT IS CODE, and
+// the only safe assumption is that a comment delimiter in the wrong place changes
+// what parses, not just what reads.
+for (const f of ["dist/danieldeusing-design.css", "dist/danieldeusing-design.min.css"]) {
+  const stripped = readFileSync(join(root, f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const at = stripped.indexOf("*/");
+  if (at !== -1) {
+    const near = stripped.slice(Math.max(0, at - 90), at + 2).split("\n").pop().trim();
+    problems.push(
+      `${f} has a '*/' outside any comment — the rule after it is being swallowed.\n` +
+        `      near: …${near}\n` +
+        `      A comment was almost certainly extended AFTER its terminator instead of before it.`,
+    );
+  }
+}
+
 // ── report ───────────────────────────────────────────────────────────────────
 const label = `${NAME}@${VERSION}`;
 for (const n of notes) console.log(`  · ${n}`);

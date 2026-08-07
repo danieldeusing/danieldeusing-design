@@ -26,6 +26,28 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.16.1 (2026-08-07)
+
+### Fixed — `.doc-link--forward` did nothing in 0.16.0, because prose became a selector
+
+0.16.0's own headline fix never applied. The comment above the rule was extended by pasting
+the new paragraph **after** its `*/` instead of before it, so six lines of English sat at the
+top level of the stylesheet. CSS does not error on that: it reads the prose as the beginning of
+a **selector** and keeps consuming until the next `{…}` — which swallowed **both**
+`.doc-link--forward` rules whole. The accent colour went with the nowrap, so forward links across
+the estate silently went back to reading as disabled grey text.
+
+Everything agreed it was fine. The build succeeded, the diff read correctly, and grepping `dist/`
+found the rule present and intact. It was caught by **measuring a real element in a browser** —
+`white-space: normal` and the colour still `--muted-foreground` on a page pinned to 0.16.0 — which
+is the second time in two days that reading the CSS agreed with itself while the browser
+disagreed.
+
+`check-release.mjs` gains check #6: a `*/` left outside any comment in the built CSS fails the
+release and prints the line it is nearest. Same shape as the backtick that took the orchestrator
+out — **a comment is code**, and a delimiter in the wrong place changes what parses, not just
+what reads.
+
 ## 0.16.0 (2026-08-07)
 
 ### Added — `.btn-terminal--destructive`, the row action that deletes

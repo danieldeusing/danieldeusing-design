@@ -106,6 +106,19 @@ already carries two, and if you cannot write the sentence you do not have an exc
      for lists, `table.kv` (see below) for key/value specs, `pre.block` + `code.inline` for code,
      `.grid` + `.card-terminal` for cards, `.eli5` for callouts/tips, `.ascii-rule` for dividers,
      `.link-quiet` for inline links, and `pre.mermaid` for diagrams (see step 5).
+   - **Tables are styled by the SYSTEM from 0.10.0 — author a plain `<table>` and stop there.**
+     Cell padding, top-aligned cells, the hairline between rows, the stronger header rule and
+     `width: 100%` all ship in `src/base.css`. Do not add any of that to the page: a local
+     `td { padding }` is a forked component and the conformance checker reports it. What a PAGE
+     may still own is **column widths**, because only the page knows which column carries the
+     prose — use a `<colgroup>` and keep the wide one from eating the table:
+     ```html
+     <table>
+       <colgroup><col style="width:4rem" /><col /><col style="width:9rem" /></colgroup>
+     ```
+     Give the sentence column no width and let it take the remainder. Without this a
+     three-sentence cell sizes the column to its longest line and squeezes every other column
+     into a vertical stack of single words.
    - **Every table must scroll, never the page — and the markup contract for that is NOTHING.**
      Author a plain `<table>`. `initTableScroll()` (already wired at the bottom of the template)
      gives every table a `.tablewrap` parent: `overflow-x` plus a right-edge fade, because a
@@ -174,6 +187,16 @@ already carries two, and if you cannot write the sentence you do not have an exc
    switch) and the `pre.mermaid` CSS; keep both when the page has diagrams, delete both when it
    has none. Rules that matter:
 
+   - **Every diagram is ZOOMABLE, and the template already wires it (0.10.0).** A flowchart
+     scaled to fit a text column is unreadable at exactly the moment someone needs to read it,
+     so `initDiagramZoom("pre.mermaid")` runs after the first render and the system's overlay
+     does the rest: click / Enter / Space to open, wheel-zoom about the pointer, drag-pan,
+     `+ - 0`, Escape to close. Do not hand-roll a lightbox and do not drop the call when you
+     trim the diagram block — a diagram nobody can enlarge is the failure this exists to
+     prevent. Two things to preserve if you touch that code: it is wired **once** behind a
+     flag (the opener binds a listener per element and is not idempotent, so a second call
+     opens two overlays per click), and it is wired **after** the first render because it
+     clones the rendered `<svg>` — cloning is also why the theme re-render keeps working.
    - **Escape the line breaks.** Inside a `<pre>`, write `&lt;br/&gt;` in node labels, never a
      raw `<br/>`. A raw tag is parsed as an HTML element and the renderer — which reads
      `textContent` — receives the label with the break silently stripped, so every label runs
@@ -220,6 +243,11 @@ already carries two, and if you cannot write the sentence you do not have an exc
      toc.getBoundingClientRect().left >= content.getBoundingClientRect().right - 1  // it is to the RIGHT
      document.querySelectorAll('.toc nav a').length === document.querySelectorAll('section.doc').length
      ```
+     From 0.10.0 the TOC sits against the right edge of the BODY, not of the reading column, so
+     also check there is no dead band beside it — `document.body.getBoundingClientRect().right -
+     toc.getBoundingClientRect().right` should be about one `--content-pad`, not the ~230px it
+     was when the whole grid sat centred inside `.wrap`. Check it at 1920, not at 1280: at 1280
+     the wrap nearly fills the viewport and a centred layout looks correct.
      The last line catches the other recurring slip — a section added without its TOC entry, or a TOC
      entry whose `href`/`data-toc-link` does not match any section `id`, which breaks the scroll-spy.
      A quick structural pre-check costs nothing either: inside the `.layout` region the count of

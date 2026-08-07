@@ -162,9 +162,18 @@ order. Use them as-is; if one is wrong for everybody, fix it *here*. (The one sa
 exception is `.wrap` on an unpinned build-free page — a *token* declaration with literal
 fallbacks, not a copy of the system's rule. See "Measurements" above.)
 
+**Tables are in that set too, by ELEMENT rather than by class (0.10.0).** `table`, `th` and `td`
+carry the system's padding, top alignment, hairline row rule, header treatment and `width: 100%`
+— so a consumer authors a plain `<table>` and adds nothing. A local `td { padding }` or a
+hand-rolled row border is a fork exactly like redeclaring `.legend`, and it will disagree with
+the system at the next release. The two things a PAGE legitimately owns are **column widths**
+(only the page knows which column holds the prose — use a `<colgroup>`) and
+**`--tablewrap-max-h`**, the token that caps a tall table's own scroll area; set it to `none` for
+a full-bleed dashboard table rather than redeclaring `.tablewrap`.
+
 | Group | Classes | Source |
 | --- | --- | --- |
-| chrome | `.wrap` `.tablewrap` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
+| chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
 | `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`) `.ls-perm` `.ls-name` | `src/chrome.css` |
 | text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
 | blocks | `.card-terminal` `.btn-terminal` `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |

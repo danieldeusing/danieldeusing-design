@@ -206,6 +206,24 @@ already carries two, and if you cannot write the sentence you do not have an exc
      `document.documentElement.scrollWidth <= clientWidth` on the page, and
      `wrap.scrollWidth > wrap.clientWidth` on the `.tablewrap` — the table scrolls, the page does
      not. Do it at a NARROW viewport (~820px): at 1400px many wide tables still fit.
+   - **Assert the page SHELL too, not just the content.** Mermaid and table checks pass happily on a
+     page whose structure is broken, so they are not enough on their own. The classic failure is a
+     dropped `</div>`: the `.content` column never closes, `<aside class="toc">` is swallowed into it
+     instead of being its sibling, and the table of contents silently renders as a block at the
+     BOTTOM of the page instead of the right-hand rail — on a page that otherwise looks fine and
+     passes every other check. At a WIDE viewport (~1280px, above the 64rem breakpoint) assert:
+     ```js
+     const toc = document.querySelector('.toc'), content = document.querySelector('.content');
+     toc.parentElement === document.querySelector('.layout')   // toc is NOT inside .content
+     toc.previousElementSibling === content                    // …it is content's sibling
+     getComputedStyle(document.querySelector('.layout')).gridTemplateColumns.split(' ').length === 2
+     toc.getBoundingClientRect().left >= content.getBoundingClientRect().right - 1  // it is to the RIGHT
+     document.querySelectorAll('.toc nav a').length === document.querySelectorAll('section.doc').length
+     ```
+     The last line catches the other recurring slip — a section added without its TOC entry, or a TOC
+     entry whose `href`/`data-toc-link` does not match any section `id`, which breaks the scroll-spy.
+     A quick structural pre-check costs nothing either: inside the `.layout` region the count of
+     `<div` and `</div>` must be equal.
 
 6. **Preserve graceful degradation.** Keep the pre-paint `<script>` blocks in `<head>` and the
    no-JS / `prefers-reduced-motion` fallbacks intact. Don't strip `aria-*` attributes. The page

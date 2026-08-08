@@ -65,6 +65,23 @@ Other entry points: `@danieldeusing/design` (npm, the `.` export = full bundle) 
 classes away) · `@danieldeusing/design/tokens.css` alone, for a surface that wants only the
 palette and none of the look (netmon does exactly this).
 
+**`tokens.css` + `chrome.css`, without `components.css`, is a supported combination** — it is
+what netmon ships (as a committed same-origin snapshot, because it is read during outages). Know
+what that gets you, because the split is not where it looks: `components.css` is effectively
+**not separable**. Taking one component out of it drags base.css's scanline overlay, its table
+type and its control styling onto a surface with its own layout, so in practice a surface either
+takes the whole look or takes none of it.
+
+A tokens+chrome consumer therefore gets the content column (`.wrap`), `.tablewrap`, the a11y
+helpers, `header.bar`, `footer.status`, the `ls -l` rail — **and, since 0.17.0, the ticker strip**
+(`.tickstrip` / `.ticktable` / `.tick*`), which moved out of `components.css` for exactly this
+reason: a tickstrip is page-level status chrome, and the surfaces that most need to say "my
+poller is still running" were the ones that could not load it. It does **not** get `.btn-terminal`,
+`.card-terminal`, `.legend`, `.tabs`, `details.fold`, `.dropdown`, `.field-row` or the diagram
+zoom — those stay in `components.css`. A surface needing that vocabulary must mirror it under its
+OWN class names, never borrow the system's for a stylesheet it does not load; borrowing the name
+is the silent fork `bin/design-conformance` exists to catch.
+
 ## Themes: four, selected by `html[data-theme]`
 
 `warm` (default, warm paper / sepia ink) · `green` (CRT phosphor) · `mono` (white phosphor) ·
@@ -174,11 +191,11 @@ a full-bleed dashboard table rather than redeclaring `.tablewrap`.
 | Group | Classes | Source |
 | --- | --- | --- |
 | chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.bleed-rail` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
-| `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`) `.ls-perm` `.ls-name` `.ls-group` | `src/chrome.css` |
+| `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`, **`[aria-current="page"]`**) `.ls-perm` `.ls-name` `.ls-group` | `src/chrome.css` |
 | text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
 | blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
 | tabs | `.tabs` `.tab` (`[aria-selected]`) `section.doc.tab-panel` | `src/components.css` |
-| status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/components.css` |
+| status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/chrome.css` (moved from components 0.17.0) |
 | diagram zoom | `.dgm-zoomable` `.dgm-overlay` `.dgm-stage` `.dgm-bar` `.dgm-btn` `.dgm-close` `.dgm-art` | `src/components.css` |
 | minimap | `.minimap` `.minimap-bar` (`.active`) | `src/components.css` |
 | dropdown | `.dropdown` `.dropdown-panel` (`--down`) `.dropdown-item` `.anim-toggle` | `src/components.css` |
@@ -237,6 +254,44 @@ puts six side by side and a table cell is half that height. Cockpit carried this
 declare a local one**, and never a local button class at all: five invented classes (`.cfg-btn`,
 `.copy-btn`, `.tbtn`, `.xbtn`, `.fw-btn`) is how 77 rounded corners accumulated on a system whose
 `--radius` has been `0` since its first release.
+
+## The rail marks the current page on `aria-current="page"` (0.19.0) — an ATTRIBUTE, not a class
+
+A rail row that is the page you are on takes `aria-current="page"` **on the `<a>` that carries
+`.ls-row`**, and the styling follows from that alone:
+
+```html
+<li><a class="ls-row ls-row--dir" href="/automation" aria-current="page">
+  <span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">automation/</span></a></li>
+```
+
+**Do not invent a class for this.** The attribute is the standard, it is what a screen reader
+announces, and a page that paints "you are here" without saying it in the accessibility tree has
+solved the problem only for people who can see the colour. danieldeusing.de had `aria-current`
+*and* a private `.ls-here` rule beside it, cockpit had no notion of a current page in its nav at
+all, and the system styled nothing — one consumer solved it, the others lacked the feature, and
+nobody owned it. `.ls-here` is redundant from 0.19.0; delete it rather than aliasing it.
+
+What it draws, and why it is not just a colour: `--primary` plus bold is **already** what
+`.ls-row--dir` takes, so tinting the name is not enough — a current leaf would look like a
+directory and a current directory would get no marking at all. The current row is instead the
+only row with a **left edge marker** and a **background tint** (position and area, not hue) plus a
+trailing `←`. Scoped to `.ls-row`, so the desktop rail and the mobile burger mark it identically.
+
+**Render it, don't hand-write it.** A static `aria-current` in a shared nav is wrong on every page
+but one — the marker has to be derived per page from the current path by whatever emits the nav.
+
+## `.ls-perm` is deliberately dimmer than muted (0.20.0) — don't "fix" it back
+
+`.ls-perm` is `color-mix(in srgb, var(--muted-foreground) 75%, var(--card))`, not
+`--muted-foreground` flat, and the mix ratio is load-bearing. Before 0.20.0 the permission string
+and `.ls-panel .ls-name` were the **same token**, so on a leaf row `drwxr-xr-x` and the page name
+were the same ink at a contrast ratio of exactly **1.00 on all four themes**; on a directory row
+the warm theme put `#71614e` beside `#8a4516` at **1.2:1**, which reads as one colour. 75% is the
+dimmest mix that still clears **3:1 against the panel** on every theme (warm binds, at 3.02) —
+the string carries meaning (a trailing slash plus `drwxr-xr-x` says the thing has contents), so it
+must stay legible, only not compete. Going dimmer drops warm below 3:1. Going back to a flat token
+restores the bug.
 
 ## `.field-row` — a settings panel is a two-column table, so write it as one
 

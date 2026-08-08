@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.17.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.18.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1259,8 +1259,26 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
 .tickstrip:not(:empty) { border: 1px solid var(--border); background: var(--card); margin: 1.6rem 0 1.5rem; }
 .ticktable { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .ticktable td { padding: 0.5rem 0.75rem; vertical-align: baseline; border: 0; white-space: nowrap; }
-/* Only the last column may grow, so the four fixed columns keep the same width on every row. */
-.ticktable td.tick-stats { width: 100%; white-space: normal; }
+/* Only the last column may grow, so the four fixed columns keep the same width on every row.
+
+   RIGHT-ALIGNED (0.18.0). Daniel, on the ci/cd strip: "We should make the '42 runs · 55% pass
+   rate · …' right aligned in the box." Because this column absorbs all the slack, its text sat
+   hard against the `next` column and then trailed off into however much empty cell was left —
+   so the row had one anchored end and one floating middle, and the figures landed in a
+   different place on every viewport. Anchored right, the row reads name-on-the-left,
+   figures-on-the-right, which is how a table of numbers is read everywhere else.
+
+   It is right for a SPARSE row too, which was the thing to check rather than assume: the review
+   drain's single `0 queued` moves from "adrift in the middle of the box" to "against the same
+   edge as every other row's last figure" — more anchored, not less, because the alignment is
+   shared down the column rather than per row.
+
+   Reset to left below 40rem. Down there the cells are no longer a table: `.tick-stats` is a
+   BLOCK on its own line under the inline name/last/next, so right-aligning it would push a
+   single wrapped line to the far edge with nothing above it to line up against — one line
+   pointing the other way from the three it belongs to. Right alignment needs a column to be
+   right-aligned IN, and below the breakpoint there is no column. */
+.ticktable td.tick-stats { width: 100%; white-space: normal; text-align: right; }
 .tick { border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
 .tick:last-child { border-bottom: 0; }
 /* State reads THREE ways, so it survives every context: the GLYPH (two themes are near-black and
@@ -1296,7 +1314,7 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   .ticktable, .ticktable tbody, .tick, .ticktable td { display: block; }
   .tick { padding: 0.4rem 0.5rem; }
   .ticktable td { display: inline-block; padding: 0.1rem 0.5rem 0.1rem 0; }
-  .ticktable td.tick-stats { display: block; width: auto; }
+  .ticktable td.tick-stats { display: block; width: auto; text-align: left; }
 }
 
 /* ── a11y helpers ── */

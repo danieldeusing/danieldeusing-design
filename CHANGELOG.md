@@ -26,6 +26,33 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.18.0 (2026-08-08)
+
+### Changed — the ticker strip's stats column is right-aligned
+
+Daniel, on the ci/cd strip: *"We should make the '42 runs · 55% pass rate · …' right aligned in
+the box."*
+
+`td.tick-stats` carries `width: 100%` so the four fixed columns keep one set of widths on every
+row — which means it absorbs every pixel of slack. Left-aligned, its text therefore started hard
+against the `next` column and trailed off into however much empty cell was left, so the row had
+one anchored end and one floating middle, and the figures landed somewhere different at every
+viewport width. Anchored right, a row reads name on the left and figures on the right, which is
+how a table of numbers is read everywhere else in the estate.
+
+**Checked at both extremes rather than assumed.** The busy case is ci/cd's six figures; the sparse
+case is the review drain's single `0 queued`, and that is the one that could have gone wrong — a
+lone value pinned to a far edge can read as detached from its row. It does not, because the
+alignment is shared down the COLUMN: every row's last figure now ends at the same edge, so a
+sparse row lines up with the busy rows above and below it instead of sitting adrift in the middle
+of the box. It is more anchored, not less.
+
+**Reset to left below 40rem**, where the cells stop being a table: `.tick-stats` becomes a block
+on its own line beneath the inline name/last/next, and right-aligning it would push one wrapped
+line to the far edge with nothing above it to line up against — a line pointing the other way
+from the three it belongs to. Right alignment needs a column to be right-aligned in, and below
+the breakpoint there is no column.
+
 ## 0.17.0 (2026-08-08)
 
 ### Changed — the ticker strip moved from `components.css` to `chrome.css`

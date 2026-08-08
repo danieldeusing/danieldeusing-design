@@ -26,6 +26,43 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.17.0 (2026-08-08)
+
+### Changed — the ticker strip moved from `components.css` to `chrome.css`
+
+Nineteen rules, byte for byte, no behaviour change for anyone loading `dist/`. The move is about
+**who can reach them**.
+
+`components.css` is not separable in practice. A surface that wants one component out of it takes
+base.css's scanline overlay across its charts, its table type and its control styling along with
+it — so a surface with its own layout cannot load it at all, and the estate's one standard answer
+to "is this page's machinery still running?" was unavailable to exactly the surfaces that most
+need to say so.
+
+netmon is the case that forced it. It is read **during an outage**, so it ships `tokens.css` +
+`chrome.css` as a committed same-origin snapshot and deliberately nothing else. For two releases
+it therefore had no tickstrip, and reported its 10-second probe as a bare `tick 14:32:07` in the
+header bar — no age, no cadence, and no way to tell a fresh reading from one frozen four minutes
+ago, on the one page whose entire job is to notice that something stopped.
+
+A tickstrip is **page-level status chrome**: it sits above the content and reports on the page's
+own machinery, which is the same job as the header bar and the status footer, and not the job of a
+card or a button. It was in components.css because that is where it was written, not because that
+is where it belongs.
+
+Consumers of the full bundle see nothing change: `dist/` concatenates both layers, and every rule
+in the block resolves only against tokens (`--border`, `--card`, `--foreground`,
+`--muted-foreground`, `--primary`, `--success`, `--destructive`), so source order cannot change
+what they compute to.
+
+**What a tokens+chrome consumer now gets:** the content column, table scroll, the a11y helpers,
+`header.bar`, `footer.status`, the `ls -l` rail, the burger — and `.tickstrip` / `.ticktable` /
+`.tick*`. One consequence worth stating, because it is the kind that surprises later:
+`bin/design-conformance` in danieldeusing-infra derives each surface's owned vocabulary from the
+CSS that surface actually loads, so from this release a tokens+chrome surface declaring any
+`.tick*` class is reported as a **forked component**. Use the shared classes; scope a genuine
+positional tweak under a surface-owned class.
+
 ## 0.16.1 (2026-08-07)
 
 ### Fixed — `.doc-link--forward` did nothing in 0.16.0, because prose became a selector

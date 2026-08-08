@@ -26,6 +26,39 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.19.0 (2026-08-08)
+
+### Added — the `ls -l` rail marks the current page, keyed on `aria-current="page"`
+
+Daniel: *"We are missing a highlight of the current selection (e.g. if we are in netmon, from
+the nav bar, we do not know that we are in that)."* A navigation that cannot say which row you
+are standing on is a list of links, not a map.
+
+The state of it before this release is the interesting part: **danieldeusing.de had already built
+it privately** (`aria-current="page"` plus a local `.ls-here` rule in its `Header.astro`),
+**cockpit had no concept of a current page in its nav at all**, and the design system styled
+nothing. One consumer solved it, the others lacked the feature, and the system owned neither —
+the same fork-by-omission that produced four copies of `.tab`, except there was nothing to
+compare against so nobody noticed.
+
+**The hook is the attribute, not a class.** `aria-current="page"` is the standard, it is what a
+screen reader announces, and a page that paints "you are here" without saying it in the
+accessibility tree has solved the problem only for people who can see the colour. Marking the row
+correctly now earns the styling for free, and a surface cannot end up with one and not the other.
+No class alias ships: the private `.ls-here` rule is redundant from this release and should be
+deleted rather than aliased.
+
+**It had to be distinguishable from a directory row**, which is the trap the private version fell
+into — `--primary` plus bold is exactly what `.ls-row--dir` already takes, so a current leaf
+became indistinguishable from any directory above it and a current *directory* got no marking at
+all. The current row is therefore the only row with a **left edge marker** and a **background
+tint** (position and area, not hue), plus a trailing `←` so the signal reads as "this row" rather
+than "this region". `box-shadow: inset` rather than `border-left`, or the row's content would sit
+3px right of every other row — a layout shift used as a highlight.
+
+Scoped to `.ls-row`, so the desktop rail and the mobile burger menu mark the current page
+identically. A phone is where "which page am I on?" is hardest to answer.
+
 ## 0.18.0 (2026-08-08)
 
 ### Changed — the ticker strip's stats column is right-aligned

@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.18.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.19.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1404,6 +1404,52 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
    in the label — CSS cannot select on text content. */
 .ls-panel .ls-name { color: var(--muted-foreground); }
 .ls-panel .ls-row--dir .ls-name { color: var(--primary); font-weight: 700; }
+
+/* ── YOU ARE HERE (0.19.0) ──
+   Daniel: "We are missing a highlight of the current selection (e.g. if we are in
+   netmon, from the nav bar, we do not know that we are in that)." A navigation that
+   cannot say which row you are standing on is a list of links, not a map.
+
+   THE HOOK IS `aria-current="page"`, NOT A CLASS, and that is the whole point. It is
+   the standard attribute, it is what a screen reader announces, and a page that paints
+   "you are here" without saying it in the accessibility tree has solved the problem
+   only for people who can see the colour. Marking the row correctly therefore earns the
+   styling for free, and a surface cannot end up with one without the other.
+   danieldeusing.de had already emitted the attribute AND carried a private `.ls-here`
+   rule beside it; that local rule is now redundant and should be deleted.
+
+   It has to be distinguishable from a DIRECTORY row, which is the trap the private
+   version fell into: `--primary` plus bold is exactly what `.ls-row--dir` already
+   takes, so a current leaf became indistinguishable from any directory above it, and a
+   current directory got no marking at all. So the current row is the only row in the
+   rail with a left EDGE MARKER and a background tint — position and area, not hue —
+   which is the same three-channel discipline the tick strip states: shape, colour and,
+   here, the announced attribute. Two of the four themes are near-black and a tint of
+   the theme's own `--primary` over the panel reads on all four.
+
+   Scoped to `.ls-row`, not to `.ls-panel`, so the desktop rail and the mobile menu mark
+   the current page identically — they are the same navigation at two widths, and a
+   phone is where "which page am I on?" is hardest to answer. `box-shadow: inset`
+   rather than a border-left: a border would move the row's content 3px right of every
+   other row, which is a layout shift used as a highlight. */
+.ls-row[aria-current="page"] {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--primary);
+}
+.ls-row[aria-current="page"] .ls-name {
+  color: var(--primary); font-weight: 700; text-shadow: 0 0 8px var(--glow);
+}
+.ls-row[aria-current="page"] .ls-perm { color: color-mix(in srgb, var(--primary) 65%, transparent); }
+/* A glyph as well, because the two signals above are both ambient — a tint and an edge
+   read as "this region", and this needs to read as "this ROW". `←` and not the `*` that
+   marks a current git branch: `*` already means something else in this estate (an outage
+   tick in netmon's issue table, an executable in a real `ls -F`), and an arrow at the
+   row's end points back at the content the rail is describing. `margin-left: auto` in
+   the row's existing flex layout parks it at the far edge and costs no other row a
+   pixel, since only the current row has one. */
+.ls-row[aria-current="page"]::after {
+  content: "←"; margin-left: auto; color: var(--primary);
+}
 /* The pre-rail dropdown form. Kept, and scoped to the dropdown panel, because the
    other surfaces still ship that markup — when they unpin they get this file, and
    their nav should stay right-aligned rather than quietly jumping to the left. The

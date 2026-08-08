@@ -110,15 +110,17 @@ Four dependency-free ES modules, tree-shakeable from `@danieldeusing/design/runt
 | `setTheme(name)` / `initThemeSwitcher()` | Switch themes and wire `[data-theme-value]` buttons + `[data-theme-label]`. |
 | `initTerminal()` | The `$ command` typing animation. No-ops under reduced motion / `html.anim-off`. |
 | `initDropdowns()` | `<details class="dropdown">` behaviour: one-open, click-away, Escape. |
+| `initSelects()` | Replaces the OS dropdown on every `<select>` with the themed listbox — the option list is painted outside the page, so CSS alone can never reach it. Markup contract: none. The `<select>` keeps the value and still fires `input`/`change`, and selects rendered later are enhanced on their own. |
 | `initAnimToggle()` | Wire `[data-anim-toggle]` buttons (`.anim-toggle`) to flip `html.anim-off` + persist it. |
 | `initResolutionZoom(1920)` | Scale the whole layout up on screens wider than the reference width. |
 
 ```js
-import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initResolutionZoom } from "@danieldeusing/design/runtime";
+import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTerminal, initAnimToggle, initResolutionZoom } from "@danieldeusing/design/runtime";
 applyStoredTheme();       // ideally inline, pre-paint
 initResolutionZoom();     // ideally inline, pre-paint (no flash)
 initThemeSwitcher();
 initDropdowns();
+initSelects();
 initTerminal();
 initAnimToggle();
 ```

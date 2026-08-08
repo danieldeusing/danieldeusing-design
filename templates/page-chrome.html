@@ -48,7 +48,7 @@
      jumps. The runtime export exists for surfaces that genuinely cannot inline.
   2. At the end of <body>, import and call the runtime:
        import { initLsNav, initBurgerNav, initThemeSwitcher, initDropdowns,
-                initAnimToggle, initTableScroll }
+                initAnimToggle, initTableScroll, initSelects }
          from "@danieldeusing/design/runtime";
      initBurgerNav() is not optional here: the markup below ships a .nav-burger, and
      below the 48rem breakpoint that button is the ONLY way to reach the navigation.
@@ -59,6 +59,11 @@
   4. `initTableScroll()` wraps every table so a wide one scrolls itself rather than
      scrolling the whole page sideways. The markup contract is nothing — author a
      plain <table>. Call it again after rendering more rows.
+  5. `initSelects()` replaces the OS dropdown on every <select> with the estate's own —
+     the one component CSS alone can never fix, because the option list is drawn outside
+     the page. The markup contract is nothing here either: author a plain <select>, and
+     it stays the element that holds the value and fires input/change. Selects rendered
+     later are picked up on their own, so there is nothing to call again.
 -->
 
 <!-- ─────────────── <head> ─────────────── -->

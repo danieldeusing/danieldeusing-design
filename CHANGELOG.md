@@ -26,6 +26,84 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.21.0 (2026-08-08)
+
+### Added — the estate's own dropdown, because a native one's list belongs to the OS
+
+Daniel, with a screenshot of a macOS select popup sitting in the middle of a terminal UI —
+rounded corners, a blue system highlight, the system font: *"for all dropdowns we want to have
+custom dropdown style, not system style."*
+
+**No stylesheet has ever been able to fix that.** A `<select>`'s option list is painted by the
+operating system, outside the document. Every surface in the estate could style the closed
+control and none of them could touch the open one, which is why the estate contained **five
+separate copies of a `.cfg-sel` rule** — in `automation-config`, `automation-review`,
+`automation-execution`, `automation-cicd` and `docs` — all of them styling the one part that was
+never the problem, and disagreeing about `:disabled` while they did it.
+
+`appearance: base-select` would fix it in Chrome 135+ and nowhere else. Taking it would leave
+Safari and Firefox on the system menu, so the estate would be **inconsistent with itself** —
+strictly worse than being consistently wrong, because a reader can learn one look and cannot
+learn two. So the list is rebuilt in the page instead, and the browser support accepted is
+everything that has `MutationObserver` and `color-mix()`.
+
+**The `<select>` stays, and stays authoritative.** It is not cloned into hidden inputs and not
+replaced: it is still the element that holds the value, that a form submits, that `select.value`
+reads and that emits `input` then `change`. That is the whole reason 28 call sites adopted this
+with **no page edits** — a page script sees exactly the events, in the order, with the
+`event.target`, that it saw from the native control.
+
+`initSelects()` enhances what is on the page **and keeps enhancing**: cockpit rebuilds its config
+tables out of `innerHTML` on every poll, so a widget that snapshotted the options once would work
+until the first refresh and then quietly serve a list from before the last fetch.
+
+Three things were measured rather than eyeballed, and each changed the design:
+
+| | warm | green | mono | paper | |
+|---|---|---|---|---|---|
+| `--border` vs `--background` — why the control's edge is **not** `--border` | 1.37 | 2.00 | 1.61 | 1.42 | all fail 3:1 |
+| the estate's hand-rolled `currentColor 30%` edge | 1.70 | 1.92 | 2.06 | 1.86 | all fail 3:1 |
+| **`--foreground` 60%**, the first step that clears it on all three surfaces | **3.24** | 4.52 | 5.19 | 4.18 | ✓ |
+| `--primary` vs `--popover-foreground` — selected ink beside ordinary ink | **1.65** | **1.31** | **1.48** | **1.27** | unusable |
+| disabled option at 55% / at **65%** | 2.94 / **3.75** | 3.99 / 5.18 | 4.53 / 5.93 | 3.64 / 4.86 | 55% fails warm |
+
+The middle row is the one that decided the component's look. **The selected option cannot be
+marked by colour** — `--primary` against `--popover-foreground` is 1.27:1 on paper, two inks
+nobody can tell apart. Same finding as the rail's current row in 0.19.0 and the same answer:
+position and area. The selected option is the only one with a left edge marker, and it is bold;
+the colour is the third signal rather than the only one.
+
+`--border` is a *container* hairline and is correct for the cards it was made for; a control's
+edge is what says "this is a control", which WCAG 1.4.11 puts at 3:1. Mixed with `transparent`
+rather than with a surface, so it composites correctly on `--background`, `--card` and `--muted`
+alike, and derived from a token so it stays per-theme without a fourth declaration.
+
+Accessibility is the ARIA APG select-only combobox, driven with real key events in headless
+Chrome rather than asserted: Enter/Space/Arrow open, Up/Down move (skipping disabled options),
+Home/End jump, printable characters type ahead with a repeated character cycling as a native
+select does, Enter selects, Escape closes and changes nothing, Tab moves on. **Focus never leaves
+the trigger** — the active option is pointed at with `aria-activedescendant` — so there is nowhere
+for a keyboard user to get stuck, and Escape both `preventDefault`s and `stopPropagation`s so
+dismissing a list inside a modal `<dialog>` does not close the dialog and lose the form.
+
+Three implementation notes that are load-bearing rather than incidental:
+
+- **The panel is `position: fixed` and appended out of the flow** — to the nearest open
+  `<dialog>` when there is one, `<body>` otherwise. Both halves are needed here: cockpit's selects
+  live inside `.tablewrap`, which scrolls and therefore clips, and inside modal dialogs, which are
+  a top layer nothing outside can paint above.
+- **Positioning divides by the html `zoom` on the write, and only on the write.** Third time in
+  this runtime after tooltip.js and lsnav.js: rects and `innerWidth` are visual px, already
+  multiplied, while `style.left` is a CSS length the browser multiplies again. Verified at zoom
+  1.35 — a trigger at visual x 21.59 gets `style.left: 15.9954px`, and 15.9954 × 1.35 = 21.59.
+  The panel's `min-width` comes from `offsetWidth`, which is *already* a layout length and must
+  **not** be divided; mixing the two spaces in one function is the trap.
+- **The real `<select>` is transparent and laid over the trigger, never `display: none`.** Chrome
+  refuses to show a validation bubble on a control it cannot focus and then blocks the submit with
+  no message at all, so hiding it properly would have silently broken every `required` select.
+
+`.select-panel` joins the screen-only chrome hidden by `print.css`.
+
 ## 0.20.0 (2026-08-08)
 
 ### Changed — the rail's permission column sits behind the name instead of beside it

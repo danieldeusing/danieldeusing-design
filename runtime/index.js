@@ -13,6 +13,7 @@
 export * from "./theme.js";
 export * from "./zoom.js";
 export * from "./dropdown.js";
+export * from "./select.js";
 export * from "./anim.js";
 export * from "./terminal.js";
 export * from "./nav.js";

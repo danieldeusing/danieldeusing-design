@@ -363,6 +363,207 @@ html[data-theme="warm"] .dropdown-item[data-theme-value="warm"] {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Select — the estate's own dropdown, because a native one's list CANNOT be
+   styled. Pairs with runtime/select.js.
+
+   THE CONSTRAINT THAT DECIDES EVERYTHING HERE: a `<select>`'s option list is
+   drawn by the OPERATING SYSTEM, outside the page, and no stylesheet reaches
+   it. So every surface in the estate has been rendering a rounded, blue-
+   highlighted, system-font menu out of a terminal UI — the one component that
+   could not be made to look like the rest, no matter what the page declared.
+   `appearance: base-select` would fix it in Chrome 135+ and nowhere else, so
+   Safari would keep the system menu: the estate would then be inconsistent
+   WITH ITSELF, which is worse than being consistently wrong.
+
+   So the list is rebuilt in the page. runtime/select.js keeps the real
+   `<select>` as the value (it is still what a form submits and what page code
+   reads) and paints a button + listbox over it. THE MARKUP CONTRACT IS
+   NOTHING: author a plain `<select>`, exactly as with `<table>`.
+
+   TWO RENDERINGS, ONE DECLARATION. The bare `<select>` (JS off, or before the
+   runtime has run) and the `.select-trigger` that replaces it must be the same
+   control at the same size — a reader who tabs into a page mid-enhancement
+   must not see the box change shape. Splitting their look across two rules is
+   how they would drift, so the closed control is declared ONCE for both, by
+   ELEMENT and by class together. Five copies of `.cfg-sel` in cockpit are what
+   this replaces; none of them agreed about `:disabled`.
+
+   THE BORDER IS 60% OF --foreground, MEASURED, NOT --border. A control's edge
+   is the thing that says "this is a control" and WCAG 1.4.11 wants 3:1 for
+   that; `--border` is a CONTAINER hairline and measures 1.37 / 2.00 / 1.61 /
+   1.42 against `--background` on the four themes — invisible as a control
+   edge, and correct for the cards it was made for. The estate's hand-rolled
+   selects used `currentColor 30%`, which is 1.70 at worst. 60% is the first
+   step that clears 3:1 on all four themes against ALL THREE surfaces a control
+   can land on (worst: warm 3.24 over --background, 3.24 over --muted). Mixed
+   with `transparent` rather than with a surface so it composites correctly
+   wherever it is dropped, and derived from a token so it stays per-theme.
+
+   THE CARET IS TWO GRADIENT HALVES, not an SVG. It has to be `currentColor` —
+   a data-URI with a baked fill would need declaring four times or be wrong on
+   two themes (the luminance gap in tokens.css), and a `::after` is impossible
+   because a `<select>` cannot have generated content. Two abutting squares,
+   each half-filled on the diagonal, draw the same ▾ on both renderings.
+   ───────────────────────────────────────────────────────────────────────── */
+select,
+.select-trigger {
+  appearance: none;
+  -webkit-appearance: none;
+  max-width: 100%;
+  padding: 0.28rem 1.45rem 0.28rem 0.5rem;
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-tight);
+  text-align: left;
+  color: var(--foreground);
+  background-color: transparent;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    right 0.78rem center,
+    right 0.5rem center;
+  background-size: 0.28rem 0.28rem;
+  background-repeat: no-repeat;
+  border: 1px solid color-mix(in srgb, var(--foreground) 60%, transparent);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+select:hover,
+.select-trigger:hover,
+.select-trigger[aria-expanded="true"] {
+  border-color: var(--primary);
+}
+select:disabled,
+.select-trigger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* Open: the caret turns over, so the control says "the list is out" without
+   relying on the panel being in view — it may have flipped above the trigger. */
+.select-trigger[aria-expanded="true"] {
+  background-image:
+    linear-gradient(135deg, transparent 50%, currentColor 50%),
+    linear-gradient(45deg, currentColor 50%, transparent 50%);
+}
+
+/* The wrapper the runtime puts around the pair. It is `relative` so the real
+   `<select>` can be laid exactly over the trigger: NOT `display: none`, and not
+   `visibility: hidden` either — Chrome refuses to show a validation bubble on a
+   control it cannot focus and then blocks the submit with no message at all, so
+   a `required` select would silently stop working. Transparent and over the
+   trigger, the bubble still points at the right box. */
+.select-field {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.select-field > select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+.select-trigger {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+}
+.select-value {
+  /* min-width: 0 is what lets a flex item shrink below its content — without it
+     `text-overflow: ellipsis` never fires and a long option label blows the
+     control out of its column instead of being clipped. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* An empty flex item has no line box, so a select whose current option has no
+   text (`<option value="">`) would render a control HALF THE HEIGHT of the one
+   beside it. A zero-width space gives it a line and no width, and screen readers
+   ignore it — unlike an `&nbsp;`, which they read out. */
+.select-value::after {
+  content: "\200b";
+}
+
+/* THE PANEL IS position: fixed AND APPENDED OUT OF THE FLOW, for two reasons
+   this estate hits constantly: selects live inside `.tablewrap` (which scrolls,
+   so it clips) and inside modal `<dialog>`s (a top layer, which nothing outside
+   can paint above). An absolutely-positioned panel would be cut off in the
+   first and hidden behind the second. runtime/select.js appends it to the
+   nearest open <dialog> when there is one and to <body> otherwise.
+   z-index 60 clears the scanline overlay (40), .dropdown-panel (50) and
+   footer.status (50). */
+.select-panel {
+  position: fixed;
+  z-index: 60;
+  margin: 0;
+  padding: 0.15rem 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-tight);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 1px solid color-mix(in srgb, var(--foreground) 60%, transparent);
+  box-shadow: 0 0 20px var(--glow-soft);
+}
+
+/* SELECTION CANNOT BE A COLOUR HERE, and that is measured, not felt. `--primary`
+   against `--popover-foreground` — the selected option's ink against its
+   neighbours' — is 1.65:1 on warm, 1.31 on green, 1.48 on mono, 1.27 on paper.
+   Two inks a reader cannot tell apart is not a marking. Same finding as the
+   rail's current row (0.19.0), same answer: POSITION AND AREA. The selected
+   option is the only one with a left edge marker, and it is bold; the colour is
+   the third signal, not the only one.
+
+   The keyboard's active option and the mouse's hover are the SAME state on
+   purpose — there is one pointer of attention, and showing two would ask the
+   reader which one Enter is going to take. */
+.select-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.9rem 0.28rem 0.55rem;
+  border-inline-start: 2px solid transparent;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.select-option:hover,
+.select-option[data-active="true"] {
+  background: var(--muted);
+}
+.select-option[aria-selected="true"] {
+  color: var(--primary);
+  font-weight: 700;
+  border-inline-start-color: var(--primary);
+}
+/* 65% of the ink, not 45%: below that warm lands at 2.94:1 and the option stops
+   being readable at all, and "unavailable" still has to be legible to be
+   understood as a choice that exists. 65% measures 3.75 at worst (warm). */
+.select-option[aria-disabled="true"] {
+  color: color-mix(in srgb, var(--popover-foreground) 65%, var(--popover));
+  cursor: default;
+}
+.select-option[aria-disabled="true"]:hover {
+  background: none;
+}
+/* <optgroup> label. Nothing in the estate uses one today; it is here because a
+   listbox that silently drops the grouping a consumer wrote is worse than one
+   that never supported it. */
+.select-group {
+  padding: 0.35rem 0.9rem 0.15rem;
+  color: var(--muted-foreground);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    ELI5 — an "explain like I'm 5" callout box (first-time-term explainers).
    ───────────────────────────────────────────────────────────────────────── */
 .eli5 {

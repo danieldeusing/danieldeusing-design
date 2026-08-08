@@ -188,6 +188,27 @@ the system at the next release. The two things a PAGE legitimately owns are **co
 **`--tablewrap-max-h`**, the token that caps a tall table's own scroll area; set it to `none` for
 a full-bleed dashboard table rather than redeclaring `.tablewrap`.
 
+**`td` deliberately has NO colour, and on a Tailwind-typography surface that is a trapdoor.** The
+system styles `td`'s padding, alignment and rule but never its ink, because a cell is body copy and
+must inherit `body { color: var(--foreground) }` — correct everywhere the page is plain HTML, which
+is cockpit, docs, netmon, ci-orchestrator and the seedr playgrounds (audited 2026-08-08: not one of
+them colours a `td`, and the three cockpit columns that use `--muted-foreground` are deliberate
+de-emphasis measuring 4.67:1 at worst). But `@tailwindcss/typography` puts a `color` on the `.prose`
+ROOT and gives `td` none of its own, so inside an article the cell inherits the plugin's palette
+instead of the body's. danieldeusing.de shipped that: `--tw-prose-invert-body` unmapped meant every
+table cell in a published article rendered Tailwind gray-300 — **1.29:1 on warm and 1.41:1 on
+paper**, invisible in the default theme, while measuring a healthy 13.84:1 on the two dark themes,
+which is why it survived review. A `td` grep finds nothing, because nothing declares it.
+
+So on a Tailwind surface, **map the plugin's whole palette to tokens — every variable, in one
+block — and never patch the elements.** pagr had mapped four of eighteen and patched `prose-p:` /
+`prose-li:` by hand; the casualties were exactly the elements nobody thought to name (`td`, `dd`,
+`caption`, an `<ol>`'s markers at 2.27:1). An unmapped variable is not "close enough" — it is a
+fixed grey against four themes, the same arithmetic that makes every accent in `tokens.css` a
+per-theme declaration. Drop `prose-invert` while you are there: once every value is a token it is
+an extra hop whose name asserts a dark theme, and a variable missed *behind* it fails invisibly on
+the default one.
+
 | Group | Classes | Source |
 | --- | --- | --- |
 | chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.bleed-rail` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |

@@ -26,6 +26,50 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.20.0 (2026-08-08)
+
+### Changed — the rail's permission column sits behind the name instead of beside it
+
+Daniel: *"the folder info should also be in some grey style color so that it does not have the
+same color as the path/folder name."*
+
+The rules looked correct in the source — `.ls-perm` was `--muted-foreground`, a directory name is
+`--primary` and bold — so this was measured before it was changed. Measured, it was worse than it
+reads:
+
+| contrast, `.ls-perm` vs the name beside it | warm | green | mono | paper |
+|---|---|---|---|---|
+| leaf row, **before** | **1.00** | **1.00** | **1.00** | **1.00** |
+| directory row, **before** | **1.20** | 2.34 | 3.45 | 3.00 |
+
+**The leaf row is the severe case and it is not what was reported.** `.ls-perm` and
+`.ls-panel .ls-name` both resolve to `--muted-foreground`, so on every theme `drwxr-xr-x` and the
+page name were literally the same ink — a ratio of exactly 1.00 — and most rows in a rail are
+leaves. It survived review because the two declarations name different rules and only agree once
+the tokens are substituted.
+
+On the **directory** row the warm theme then compounds it: `--muted-foreground` `#71614e` beside
+`--primary` `#8a4516` is a brown-grey next to a brown at 1.2:1, which the eye reads as one colour
+however different the hexes are. That is the specific thing that was reported, and it is a warm
+(and to a lesser extent green) problem — mono and paper were already fine, which is why the fix
+had to push the column back on all four themes rather than re-tint it for one.
+
+Mixed toward `--card` — the surface the panel is drawn on — rather than swapped for another
+token, because the intent is *quieter than muted* and no token means that. **75% is the dimmest
+mix that still clears 3:1 against the panel on every theme** (warm is the binding one, at 3.02).
+It is not decoration: a trailing slash plus `drwxr-xr-x` is what says the thing has contents, so
+it has to stay readable, only not compete.
+
+| after | warm | green | mono | paper |
+|---|---|---|---|---|
+| legibility vs panel | 3.02 | 3.91 | 3.63 | 3.55 |
+| vs leaf name | 1.60 | 1.56 | 1.55 | 1.75 |
+| vs directory name | 1.92 | 3.67 | 5.35 | 5.24 |
+
+The you-are-here row from 0.19.0 tints this same element toward `--primary` and still wins on
+specificity, verified rather than assumed — its perm now stands 1.92 / 3.67 / 5.35 / 5.24 clear of
+the dimmed base, so "here" and "not here" separated further rather than collapsing.
+
 ## 0.19.0 (2026-08-08)
 
 ### Added — the `ls -l` rail marks the current page, keyed on `aria-current="page"`

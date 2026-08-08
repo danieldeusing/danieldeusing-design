@@ -276,7 +276,38 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
 
 /* ── ls-listing rows (shared by the desktop rail + mobile menu) ── */
 .ls-row { display: flex; align-items: baseline; gap: 0.9rem; }
-.ls-perm { color: var(--muted-foreground); font-size: 0.72rem; letter-spacing: 0; }
+/* THE PERMISSION STRING SITS BEHIND THE NAME (0.20.0). Daniel: "the folder info should also
+   be in some grey style color so that it does not have the same color as the path/folder
+   name." It was `--muted-foreground` flat, and measured across the four themes that was worse
+   than it looks in the source:
+
+     contrast between .ls-perm and the NAME beside it, before
+       leaf row:  1.00  1.00  1.00  1.00   ← identical, on EVERY theme
+       dir row:   1.20  2.34  3.45  3.00     (warm / green / mono / paper)
+
+   The leaf case is the severe one and it was invisible in review because the two rules read as
+   different declarations: `.ls-perm` and `.ls-panel .ls-name` are both `--muted-foreground`, so
+   `drwxr-xr-x` and the page name were literally the same ink and the row had no hierarchy at
+   all. Most rows in a rail are leaves. On the DIRECTORY row the warm theme then compounds it —
+   `--muted-foreground` #71614e beside `--primary` #8a4516 is a brown-grey next to a brown, 1.2:1,
+   which the eye reads as one colour even though the hexes differ.
+
+   Mixed toward `--card`, the surface the panel is actually drawn on, rather than swapped for a
+   different token: the point is to push it BACK, and no token in the set means "quieter than
+   muted". 75% is the dimmest mix that still clears 3:1 against the panel on all four themes —
+   warm is the binding one at 3.02 — because this string is not decoration. A trailing slash plus
+   `drwxr-xr-x` is what says the thing has contents, so it has to stay readable, just not compete.
+
+     after:  legibility vs panel  3.02  3.91  3.63  3.55
+             vs leaf name         1.60  1.56  1.55  1.75
+             vs dir name          1.92  3.67  5.35  5.24
+
+   Left at plain `.ls-perm` specificity on purpose: the you-are-here rule below tints this same
+   element toward `--primary`, and it must keep winning. */
+.ls-perm {
+  color: color-mix(in srgb, var(--muted-foreground) 75%, var(--card));
+  font-size: 0.72rem; letter-spacing: 0;
+}
 
 /* DEPTH IS DRAWN, NOT JUST INDENTED. Whitespace alone did not carry it — with the
    permission column in front of every row, a child sat only ~1rem right of its

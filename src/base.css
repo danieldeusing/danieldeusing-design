@@ -87,6 +87,20 @@ tbody tr:last-child > * {
 tr > *:first-child { padding-inline-start: 0; }
 tr > *:last-child { padding-inline-end: 0; }
 
+/* A HIDDEN ROW MUST ACTUALLY BE HIDDEN, and `!important` is what makes that true.
+   The UA's own `[hidden] { display: none }` is a one-attribute selector, so ANY rule that
+   sets `display` on a row outruns it — and the estate has those: a narrow-screen media
+   query that restacks a key/value table as `.ask table.kv tr { display: block }` scores
+   higher and would put every hidden row back on screen, on phones only. Worse than a
+   cosmetic slip, because `hidden` that loses to a stylesheet is still exposed to a screen
+   reader: the table would announce rows nobody can see it announcing.
+
+   This is the mechanism `initTablePagination()` turns a page with, and it is declared
+   here rather than beside the pager because it is a correction to the ELEMENT: a row a
+   consumer hides for its own reasons has exactly the same problem. Same `display: none
+   !important` the print stylesheet and the diagram overlay already use. */
+tr[hidden] { display: none !important; }
+
 /* Tailwind v4's reset drops the default button cursor — restore it for all
    interactive controls (buttons, summaries, role=button). */
 button:not(:disabled),

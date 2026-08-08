@@ -26,6 +26,93 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.22.0 (2026-08-08)
+
+### Added — a long table shows 20 rows, and sorting still sorts all of them
+
+Daniel: *"All tables should be paginated to 20 entries. Sort/Filter and stuff should obviously
+work still fine and not only to the shown 20 entries."* And: *"Give each table also the options
+to switch between 5, 10, 20, 50, 100, 200 entries per page, but default 20. A selection should be
+remembered for each table in localStorage."*
+
+`initTablePagination()` pages every `<table data-table-id>` and remembers the size per table.
+
+**The order is filter, then sort, then slice, and it is guaranteed by construction rather than by
+care.** The natural wrong build of this cuts the data to twenty rows and wires the sort and the
+filter to what is on screen — a table that reorders page 1 while the actual newest row sits on
+page 3, and whose filter finds nothing because the match was never in the slice being searched.
+It looks correct on the first screen, which is why it ships. **This component cannot express that
+mistake: it has no sort and no filter.** It reads a `<tbody>` that something else has already
+produced — and the only way rows get into a tbody is after that something has filtered and sorted
+the full set — then hides all but one window of them. Slicing last is not a rule to remember here;
+it is the only thing the code is able to do, so a page keeps its own sort and filter and needs no
+edit to gain paging.
+
+**Turning the page sets `hidden` on rows and clears it on twenty others. No markup is rebuilt.**
+That matters past speed: cockpit patches its tables in place so a background refresh cannot
+destroy half-typed input, focus, or an opened `<details>`, and a pager that re-rendered on every
+page change would hand all of that straight back.
+
+- **`data-table-id` is required, and a table without one is left completely alone.** The obvious
+  alternative — page path plus the table's index on the page — is a bug with a delay on it: add a
+  table above another one and every reader's "100 per page" silently becomes a different table's
+  setting, with nothing to notice. Missing ids are reported to the console **only when the table
+  was long enough to have been paged**; a warning on the forty short reference tables in the
+  estate is noise that teaches people to ignore the console.
+- **The controls appear only when they can do something** — more rows than fit, or a non-default
+  size in force. That second clause is not decoration: without it, picking 100 on a 30-row table
+  removes the very control that was just used and there is no way back to 20.
+- **The size picker is a bare `<select>`.** `initSelects()` (0.21.0) enhances it like any other,
+  including this one, which is created long after page load. The whole bar invents nothing: the
+  two buttons are `.btn-terminal--ghost.btn-terminal--compact`, the same pair every refresh and
+  cancel in the estate already wears, so there is no new colour and nothing to keep in step. The
+  status text is `--muted-foreground`, 4.84:1 at worst (warm over `--card`).
+- **A stored size is untrusted input** — the store is shared with every other tab, every older
+  build and anyone with a console. `"abc"`, `999`, `""`, `25` and an object all fall back to 20,
+  and localStorage throwing outright (Safari private mode) falls back too rather than refusing to
+  render the table.
+- `tr[hidden] { display: none !important }` in `base.css`, because the UA's own one-attribute
+  rule loses to anything that sets `display` on a row — and the estate has such a rule, in a
+  narrow-screen media query that restacks key/value tables. A `hidden` that loses to a stylesheet
+  is still exposed to a screen reader, so the table would have announced rows nobody could see.
+- `scripts/check-pagination.mjs` (wired into CI) asserts the window covers the set exactly once,
+  clamps an out-of-range page instead of blanking the table, and stays idempotent — which is what
+  makes the MutationObserver watching those rows unable to wake itself. Its three named cases are
+  the brief's: a filter matching only a row on page 3 shows it, a descending sort puts the true
+  global maximum on page 1, and paging never invents, drops or reorders a row. Verified against
+  three mutants (off-by-one `from`, no junk guard, non-idempotent write); each is caught.
+
+### Added — `.btn-terminal--edit`, the same icon button as the bin in an ordinary colour
+
+Daniel, with a screenshot of two wide `edit →` text buttons: *"edit button should simple edit
+icon, such as trash for delete."*
+
+`edit →` was a word and an arrow in a cell next to a bin that is 22px square — two controls doing
+the same job in one column, one four times the width of the other. At 375px the label broke
+mid-word into "edi / t →", which cockpit had propped up with a `white-space: nowrap` rule.
+
+- **Not destructive, and it must not borrow that colour.** Editing is an ordinary action; red is
+  reserved for the press that cannot be taken back. The class carries **no colour at all** —
+  compose with `--ghost` and it is `--primary` on a `--border` outline like every other secondary
+  control (6.23 / 15.18 / 20.38 / 20.12 against `--background` on warm / green / mono / paper;
+  5.59 at worst, on warm over `--muted`).
+- **The glyph is a CSS mask painted with `currentColor`**, exactly as `--destructive` does it and
+  for the reason its comment gives: a pasted SVG is one `fill=` that is wrong on two themes, once
+  per surface that adopts it. A mask re-takes the composed colour on all four for free.
+- Carries `::before { content: "" }` (the `> ` prefix would be the button's entire text content)
+  and the `@media (pointer: coarse)` `min-*` growth to 44px.
+- **`aria-label` is mandatory and must name the target** (`aria-label="edit poi/vu3"`), not repeat
+  the verb — otherwise a column of these is a dozen identical announcements.
+
+### Added — `.btn-terminal:disabled`
+
+The button had no disabled state while the select beside it did, so a control row could show a
+greyed dropdown next to a fully-lit button that does nothing when pressed. `opacity: 0.45;
+cursor: default`, matching `select:disabled`. Declared **below** the hover rules: both are
+(0,2,0), so source order settles it, and above them a disabled button would light up under the
+pointer. Only the opacity is touched — setting `background: transparent` would strip a disabled
+primary button to invisible text.
+
 ## 0.21.0 (2026-08-08)
 
 ### Added — the estate's own dropdown, because a native one's list belongs to the OS

@@ -20,5 +20,6 @@ export * from "./nav.js";
 export * from "./lsnav.js";
 export * from "./diagramzoom.js";
 export * from "./tablescroll.js";
+export * from "./pagination.js";
 export * from "./minimap.js";
 export * from "./tooltip.js";

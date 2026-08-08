@@ -133,6 +133,28 @@
   transform: translateY(-2px);
 }
 
+/* THE BUTTON HAD NO DISABLED STATE — the select next to it did, and they disagreed.
+   `select:disabled` has been `opacity: 0.45; cursor: default` since 0.21.0, so a control row
+   holding a greyed dropdown beside a fully-lit button that does nothing when pressed was saying
+   two different things about the same condition. A pager's `prev` on page one is the case that
+   made it unavoidable: it is disabled far more often than not.
+
+   BELOW the hover rules on purpose. `:disabled` and `--ghost:hover` are both (0,2,0), so equal
+   specificity is settled by source order — declared above them, a disabled button would light up
+   under the pointer and reinstate exactly the lie this removes. Same trap that made every compact
+   button render at CTA size in 0.13.0.
+
+   Opacity and nothing else about the fill: a disabled PRIMARY button must stay filled and just go
+   quiet. Setting `background: transparent` here would strip it to `--primary-foreground` text on
+   the page background — near-invisible on all four themes — so the one property that reads as
+   "off" on both variants is the only one touched. */
+.btn-terminal:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}
+
 /* A ROW-SIZED BUTTON. The system's button is a landing-page CTA at 12px/24px; a table row that
    offers `remove` needs the same button at the size of its text. This is the size ONLY — colour,
    corners and the `> ` prefix still come from .btn-terminal / --ghost, so a compact button cannot
@@ -189,6 +211,49 @@
    `min-*` grows the tap target without moving the glyph, which stays centred by the flexbox. */
 @media (pointer: coarse) {
   .btn-terminal--destructive { min-width: 44px; min-height: 44px; }
+}
+
+/* THE EDIT ROW ACTION — the same icon button as the bin, in the ordinary colour.
+
+   `edit →` was a word and an arrow in a table cell wide enough to hold them, next to a bin that
+   is 22px square. Two controls doing the same job in one column, one of them four times the
+   width of the other, and at 375px the label broke mid-word into "edi / t →" — which is why
+   cockpit carried a `white-space: nowrap` rule to prop it up. An icon says it in the space the
+   bin already proved is enough.
+
+   IT IS NOT DESTRUCTIVE AND MUST NOT BORROW THAT COLOUR. Editing is an ordinary action; red is
+   reserved for the one press that cannot be taken back. So this class carries NO colour at all —
+   compose it with `--ghost` and it is `--primary` on a `--border` outline like every other
+   secondary control, and with nothing and it is the filled primary button. That is also why it is
+   not `--destructive` with the fill swapped: colour is the bin's whole warning, and the delta
+   here is only the glyph and the box that holds it.
+
+   THE GLYPH IS A MASK, for the reason the bin's comment gives: `currentColor` re-takes whatever
+   colour the composition landed on, on all four themes, with nothing declared per-theme. A pasted
+   SVG would be one `fill=` that is wrong on two of them, once per surface that adopts it.
+
+   AN ACCESSIBLE NAME IS MANDATORY — see the bin. Dropping the word "edit" leaves a button whose
+   entire content is a mask, and a mask has no text: a screen reader announces "button", and a
+   column of them announces "button" a dozen times. `aria-label` must name the TARGET
+   ("edit poi/vu3"), not repeat the verb, or the column is a dozen identical announcements
+   instead. `bin/design-conformance` fails an icon button with no accessible name. */
+.btn-terminal--edit {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.3rem;
+}
+/* Kills the `> ` prefix, which would otherwise be the entire text content of an icon button.
+   --ghost already blanks it; repeated here so the class is correct on a filled button too. */
+.btn-terminal--edit::before { content: ""; }
+.btn-terminal--edit::after {
+  content: ""; display: block; width: 0.875rem; height: 0.875rem;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04l-3.75-3.75-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04l-3.75-3.75-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* 44px under a thumb, same as the bin: `min-*` grows the tap target without moving the glyph,
+   which the flexbox keeps centred. Never set a width on it. */
+@media (pointer: coarse) {
+  .btn-terminal--edit { min-width: 44px; min-height: 44px; }
 }
 
 /* Quiet, underlined link that warms to the primary colour on hover. */
@@ -561,6 +626,51 @@ select:disabled,
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   TABLE PAGER — twenty rows at a time, and the reader can say otherwise.
+
+   Built and placed by runtime/pagination.js; a page writes no part of this. It
+   INVENTS NOTHING: the two buttons are `.btn-terminal--ghost.btn-terminal--compact`
+   (the same pair every refresh and cancel in the estate wears) and the size picker
+   is a bare `<select>` that `initSelects()` enhances. So there is no new colour
+   here, no new control, and nothing to keep in step at the next release — only a
+   row that decides where those three things sit.
+
+   Ghost, not filled: a pager is not the primary action of any view it appears in,
+   and two filled buttons side by side compete. The status text is
+   `--muted-foreground` because it is a measurement of the table, not part of it —
+   4.84:1 at worst (warm on --card), so it clears AA while staying quiet.
+
+   The status is left and the controls are right (`margin-inline-start: auto` on the
+   picker pushes the pair over), which puts "where am I" at the start of the line and
+   "take me elsewhere" at the end. It wraps rather than scrolls: on a phone the three
+   parts stack, and a control that has gone off the side of a table is worse than a
+   control on a second line.
+   ───────────────────────────────────────────────────────────────────────── */
+.table-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.9rem;
+  margin-block-start: 0.6rem;
+  font-size: var(--fs-sm);
+}
+.table-pager-status {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.table-pager-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-inline-start: auto;
+  color: var(--muted-foreground);
+}
+.table-pager-nav {
+  display: inline-flex;
+  gap: 0.4rem;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

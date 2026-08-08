@@ -193,12 +193,13 @@ a full-bleed dashboard table rather than redeclaring `.tablewrap`.
 | chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.bleed-rail` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
 | `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`, **`[aria-current="page"]`**) `.ls-perm` `.ls-name` `.ls-group` | `src/chrome.css` |
 | text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
-| blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
+| blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`, `--edit`, `:disabled`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
 | tabs | `.tabs` `.tab` (`[aria-selected]`) `section.doc.tab-panel` | `src/components.css` |
 | status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/chrome.css` (moved from components 0.17.0) |
 | diagram zoom | `.dgm-zoomable` `.dgm-overlay` `.dgm-stage` `.dgm-bar` `.dgm-btn` `.dgm-close` `.dgm-art` | `src/components.css` |
 | minimap | `.minimap` `.minimap-bar` (`.active`) | `src/components.css` |
 | dropdown (a MENU) | `.dropdown` `.dropdown-panel` (`--down`) `.dropdown-item` `.anim-toggle` | `src/components.css` |
+| table pager | `.table-pager` `.table-pager-status` `.table-pager-size` `.table-pager-nav` — **all rendered for you** by `initTablePagination()`; the markup contract is `data-table-id` on the `<table>` and nothing else |
 | select (a VALUE) | the `select` ELEMENT, plus `.select-field` `.select-trigger` `.select-value` `.select-panel` `.select-option` (`[aria-selected]`, `[data-active]`, `[aria-disabled]`) `.select-group` — **all rendered for you**, see below | `src/components.css` |
 | misc | `.dd-dot` `.dd-flag` (`-de/-en/-es/-pt`) | `src/components.css` |
 | typing animation | the `[data-term]` / `[data-term-out]` contract + the `html.anim-off` kill switch | `src/components.css` |
@@ -218,6 +219,7 @@ something:
 |---|---|
 | `open →` `log →` `detail` `forge →` — goes somewhere, changes nothing | `<a class="doc-link doc-link--forward">` (or a `<button>` carrying the same classes when the destination is an in-page dialog and there is no url) |
 | `add` `update` `save` `apply` `dismiss` `enrol` — writes | `<button class="btn-terminal btn-terminal--ghost btn-terminal--compact">` |
+| `edit` — writes, and is the row's own settings | `<button class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--edit" aria-label="edit <what>">` — see below |
 | `remove` `delete` — **destroys** | `<button class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove <what>">` — see below |
 | the ONE primary action of a view | the same, **filled**: `btn-terminal btn-terminal--compact` |
 | a toggle (`follow`, `live`) | the same button; press = drop `--ghost`, release = add it back. The two states are the two buttons the system already ships, so a toggle never needs a third look. |
@@ -238,6 +240,17 @@ a screen reader and cannot be identified from the keyboard. Name the target, not
 `aria-label="remove ddmini"`, not `aria-label="remove"`. `bin/design-conformance` fails a
 `--destructive` button with no accessible name. Under a coarse pointer it grows to 44px via `min-*`,
 so never set a width on it.
+
+**`.btn-terminal--edit` (0.22.0) is the same icon button in the ORDINARY colour.** `edit →` was a
+word and an arrow in a cell beside a bin that is 22px square — two controls doing one job, one four
+times the width of the other, and at 375px the label broke into "edi / t →". Identical mechanism to
+the bin (`currentColor` mask, `::before { content: "" }`, the coarse-pointer `min-*` growth) and one
+deliberate difference: **it carries no colour at all.** Editing is an ordinary action and red is
+reserved for the press that cannot be taken back, so composing it with `--ghost` gives `--primary`
+on a `--border` outline like every other secondary control (5.59:1 at worst — warm over `--muted`).
+Never reach for `--destructive` to get the icon shape. **The `aria-label` is mandatory and names the
+target** (`aria-label="edit poi/vu3"`); without it a column of these announces "button" a dozen
+times over.
 
 **`.doc-link--forward` carries the accent AT REST**, not on hover. `.doc-link` is deliberately
 quiet because it is footer furniture, and row actions inherited that quietness: a column of grey
@@ -344,6 +357,54 @@ every `required` select.
   edge, where WCAG 1.4.11 wants 3:1. 60% is the first step that clears it on all four themes
   against all three surfaces a control can land on (warm binds, at 3.24).
 
+## A long table PAGES to 20 (0.22.0) — one attribute, and it slices LAST
+
+```html
+<table data-table-id="review-activity">
+```
+
+`initTablePagination()` then hides all but 20 rows and puts a bar under the table: `1–20 of 55`,
+a `rows` picker (5/10/20/50/100/200, remembered per table in
+`localStorage["table-rows:<id>"]`), and prev/next. Everything in that bar is already yours — the
+buttons are `.btn-terminal--ghost.btn-terminal--compact` and the picker is a bare `<select>` that
+`initSelects()` enhances — so **there is no new colour and nothing to hand-write.**
+
+**The order is filter → sort → slice, over the FULL dataset, and it is guaranteed by construction.**
+The natural wrong build cuts the data to twenty rows and wires the sort and the filter to the cut:
+page 1 reorders while the actual newest row sits on page 3, and a filter finds nothing because the
+match was never in the slice being searched. It looks right on the first screen, which is why it
+ships. **The component cannot express that mistake — it has no sort and no filter.** It reads a
+`<tbody>` something else already produced and hides all but one window of it. So a page keeps its
+own sort and filter and needs *no edit at all* to gain paging; cockpit's `cockpitTable` still
+filters and sorts `rows`, the full array, and still writes every matching row into the tbody.
+**If you ever make an engine emit only the visible page, you have broken this** — and the guard is
+`bin/cockpit-render-check`'s "the engine hands the pager the WHOLE set".
+
+- **`data-table-id` is REQUIRED and never guessed.** Page path plus table index is the obvious
+  alternative and it is a bug with a delay on it: add a table above another and every reader's
+  "100 per page" silently becomes a different table's setting. A table without an id is left
+  **completely alone** (all rows, no bar) and warns on the console **only if it was long enough to
+  have been paged** — a warning on the forty short tables in the estate teaches people to ignore
+  the console.
+- **Do not paginate a table that cannot outgrow a screen.** Most of the estate's tables are short
+  reference tables — `infra-machines` lists four machines — and controls that can never do
+  anything are noise. Nine tables in cockpit carry an id; the other 36 do not.
+- **The bar appears only when it can act**: more rows than fit, *or* a non-default size in force.
+  That second clause is not decoration — without it, picking 100 on a 30-row table removes the
+  control you just used and there is no way back to 20.
+- **Paging writes `hidden` on rows and rebuilds nothing.** That is what lets it sit under cockpit's
+  in-place patching (`dom-patch.js`), which exists so a refresh cannot destroy half-typed input —
+  a pager that re-rendered the table would hand all of that back. `dom-patch.js` exempts `hidden`
+  on a `<tr>` for the same reason it exempts `open` on a `<details>`: the renderer does not own it.
+- **`tr[hidden] { display: none !important }`** ships in `base.css`, because the UA's
+  one-attribute rule loses to any rule setting `display` on a row — and a `hidden` that loses to a
+  stylesheet is still announced by a screen reader.
+- An engine that renders a "nothing matched" message as a `<tr>` must mark it
+  `data-table-placeholder`, or the pager counts a message as data.
+- **`.table-pager` is NOT for a surface that loads only tokens+chrome.** It is built from
+  `.btn-terminal`, which lives in `components.css`. netmon therefore cannot have this component,
+  and must not borrow its class names — that is the fork `bin/design-conformance` catches.
+
 ## `.field-row` — a settings panel is a two-column table, so write it as one
 
 ```html
@@ -443,6 +504,7 @@ every one of them has drifted. Adding a surface is one entry in that array.
 | `initDiagramZoom(".diagram")` | Click / Enter / Space opens a diagram full-screen; wheel-zoom about the pointer, drag-pan, `+ - 0`, Escape closes. Clones the svg — mermaid re-runs against the nodes it rendered, so moving the original is how a diagram silently stops updating. |
 | `initMinimap({sections})` | Builds the left-gutter minimap: one bar per section, scroll-spy included, bar length by heading depth. Markup contract is NOTHING. Returns `null` for fewer than two sections — a map of one place is not a map. Use it INSTEAD of a text "On this page" column: that column repeated headings the reader was about to scroll past and cost the content its width. |
 | `initTableScroll()` | Gives every unwrapped `<table>` a `.tablewrap` parent so a wide table scrolls itself instead of scrolling the whole PAGE sideways. **The markup contract is nothing** — author a plain `<table>`; already-wrapped tables are left alone, so it is never a migration and is safe to call again after rendering more rows. |
+| `initTablePagination()` | Pages every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. **Markup contract is one attribute**, and a table without it is left alone — the id cannot be guessed without silently reassigning readers' settings when a table moves. It has **no sort and no filter**: it hides all but one window of rows a page has *already* filtered and sorted, so the order is filter → sort → slice over the full set by construction. Turning the page writes `hidden` on rows and rebuilds no markup, so it composes with in-place patching. Tables rendered later are picked up by a MutationObserver. |
 | `initTooltips()` | `src/tooltip.css` counterpart. |
 
 The runtime is progressive enhancement: with JS off, content is visible and the theme is `warm`.

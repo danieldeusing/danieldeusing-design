@@ -198,7 +198,8 @@ a full-bleed dashboard table rather than redeclaring `.tablewrap`.
 | status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/chrome.css` (moved from components 0.17.0) |
 | diagram zoom | `.dgm-zoomable` `.dgm-overlay` `.dgm-stage` `.dgm-bar` `.dgm-btn` `.dgm-close` `.dgm-art` | `src/components.css` |
 | minimap | `.minimap` `.minimap-bar` (`.active`) | `src/components.css` |
-| dropdown | `.dropdown` `.dropdown-panel` (`--down`) `.dropdown-item` `.anim-toggle` | `src/components.css` |
+| dropdown (a MENU) | `.dropdown` `.dropdown-panel` (`--down`) `.dropdown-item` `.anim-toggle` | `src/components.css` |
+| select (a VALUE) | the `select` ELEMENT, plus `.select-field` `.select-trigger` `.select-value` `.select-panel` `.select-option` (`[aria-selected]`, `[data-active]`, `[aria-disabled]`) `.select-group` — **all rendered for you**, see below | `src/components.css` |
 | misc | `.dd-dot` `.dd-flag` (`-de/-en/-es/-pt`) | `src/components.css` |
 | typing animation | the `[data-term]` / `[data-term-out]` contract + the `html.anim-off` kill switch | `src/components.css` |
 
@@ -293,6 +294,56 @@ the string carries meaning (a trailing slash plus `drwxr-xr-x` says the thing ha
 must stay legible, only not compete. Going dimmer drops warm below 3:1. Going back to a flat token
 restores the bug.
 
+## A `<select>` is enhanced AUTOMATICALLY (0.21.0) — write plain HTML, add nothing
+
+```html
+<select data-k="mode">
+  <option value="public" selected>public — posts on the PR</option>
+  <option value="silent">silent — private report only</option>
+</select>
+```
+
+That is the whole markup contract — the same "nothing" as `<table>` and `initTableScroll()`.
+Call `initSelects()` once and every `<select>` on the page, **and every one rendered
+afterwards**, gets the estate's dropdown. Do not add a class, a wrapper, or a data attribute;
+`.select-trigger` / `.select-panel` / `.select-option` are what the runtime *renders*, and a
+page that writes them by hand has hand-rolled the component it was given.
+
+**Why this exists at all, and why CSS could never have done it:** a `<select>`'s option list is
+painted by the OPERATING SYSTEM, outside the document. Rounded corners, a blue system highlight,
+the system font, in the middle of a terminal UI — and unreachable from any stylesheet. Cockpit
+carried **five copies of a `.cfg-sel` rule**, one per page, every one of them styling the closed
+control, which was never the part that looked wrong. `appearance: base-select` reaches the list
+in Chrome 135+ and nowhere else, so taking it would leave Safari and Firefox on the system menu
+and the estate **disagreeing with itself** — worse than being consistently wrong.
+
+**The `<select>` is still the control.** It holds the value, it is what a form submits, what
+`select.value` reads, and what fires `input` then `change` (both, in that order, bubbling, with
+`event.target` the select). That is why 28 call sites adopted this with **zero page edits** — and
+it is the property to preserve if you ever touch this. It is laid transparently over the trigger
+rather than `display: none`, because Chrome refuses to show a validation bubble on a control it
+cannot focus and then blocks the submit **with no message at all**, which would silently break
+every `required` select.
+
+- **Sizing goes on the wrapper, and a page inline `style` is copied there for you.** A width set
+  in the page's own CSS via a class on the `<select>` (`.cfg-sel { width: 100% }`) acts on an
+  element that is no longer in the flow, so it does nothing. Size `.select-field`.
+- **`title` and `data-tip` are copied to the trigger**, or the tooltip would be anchored to
+  something nobody can hover. Labels are found the way the platform finds them —
+  `aria-label`, then `aria-labelledby`, then a `<label>` by `for=` or by wrapping — and the
+  trigger's name becomes *label + current value*, as a native select announces.
+- **The opt-outs are real ones**: `multiple` and `size > 1` are left alone (the platform renders
+  those inline; there is no popup to replace), and `data-select="off"` skips a select entirely.
+- **Selection is NOT marked by colour, and that is arithmetic.** `--primary` against
+  `--popover-foreground` measures 1.65 / 1.31 / 1.48 / **1.27** on warm/green/mono/paper — two
+  inks a reader cannot tell apart. Same finding as the rail's current row, same answer: a left
+  **edge marker** plus **bold**, with the colour as the third signal. Do not "simplify" it back
+  to a tint.
+- **The control's border is `--foreground` at 60%, not `--border`.** `--border` is a container
+  hairline measuring 1.37 / 2.00 / 1.61 / 1.42 against `--background` — invisible as a control
+  edge, where WCAG 1.4.11 wants 3:1. 60% is the first step that clears it on all four themes
+  against all three surfaces a control can land on (warm binds, at 3.24).
+
 ## `.field-row` — a settings panel is a two-column table, so write it as one
 
 ```html
@@ -384,6 +435,7 @@ every one of them has drifted. Adding a surface is one entry in that array.
 | `initThemeSwitcher()` | Wires `[data-theme-value]` buttons and `[data-theme-label]`. |
 | `initResolutionZoom(1920)` | Lays out at the reference width and zooms above it. **Pre-paint from `<head>`** — otherwise the page reflows visibly on load, and it is the half of "same font size on every screen" that the type scale cannot do. |
 | `initDropdowns()` | `<details class="dropdown">`: one-open, click-away, Escape. |
+| `initSelects()` | Replaces the OS dropdown on every `<select>` with the estate's listbox — the one component CSS alone can never reach, because the option list is painted outside the page. **Markup contract is NOTHING**; the `<select>` stays authoritative (value, form submission, `input`+`change`). Keeps enhancing: selects rendered later are picked up by a MutationObserver, so a page that rebuilds its tables out of `innerHTML` needs no second call. Keyboard is the ARIA APG select-only combobox and focus never leaves the trigger. |
 | `initBurgerNav()` | Mobile burger (breakpoint 48rem) with the footer folded in. |
 | `initLsNav()` | The rail's show/hide, and it **measures** the real chrome into `--ls-nav-top` / `--ls-nav-bottom`. The top is the header's **bottom edge** (`getBoundingClientRect().bottom / zoom`), not its height — those agree only while nothing sits above the header, and cockpit's alert banner mounts as the first child of `<body>`. A rect is visual px and a CSS length is re-multiplied by any ancestor `zoom`, so **convert, don't avoid** (0.13.0; before that a 73px banner buried the rail's own toggle). Re-measured on `scroll` too, because a sticky header's bottom edge moves as the banner scrolls away. |
 | `initTerminal()` | The `$ command` typing animation; no-ops under reduced motion / `html.anim-off`. Fires `term:contentdone`. |

@@ -183,10 +183,12 @@ fallbacks, not a copy of the system's rule. See "Measurements" above.)
 carry the system's padding, top alignment, hairline row rule, header treatment and `width: 100%`
 — so a consumer authors a plain `<table>` and adds nothing. A local `td { padding }` or a
 hand-rolled row border is a fork exactly like redeclaring `.legend`, and it will disagree with
-the system at the next release. The two things a PAGE legitimately owns are **column widths**
-(only the page knows which column holds the prose — use a `<colgroup>`) and
-**`--tablewrap-max-h`**, the token that caps a tall table's own scroll area; set it to `none` for
-a full-bleed dashboard table rather than redeclaring `.tablewrap`.
+the system at the next release. The three things a PAGE legitimately owns are **column widths**
+(only the page knows which column holds the prose — use a `<colgroup>`),
+**`--tablewrap-max-h`**, the token that caps a tall table's own scroll area (set it to `none` for
+a full-bleed dashboard table rather than redeclaring `.tablewrap`), and **`--tablewrap-fade`**
+(0.23.0), the colour the right-edge scroll fade blends into — set it whenever the wrapper does
+not sit on `--background`, because on a `--card` surface the default paints a 1.5rem bright band.
 
 **`td` deliberately has NO colour, and on a Tailwind-typography surface that is a trapdoor.** The
 system styles `td`'s padding, alignment and rule but never its ink, because a cell is body copy and
@@ -211,7 +213,7 @@ the default one.
 
 | Group | Classes | Source |
 | --- | --- | --- |
-| chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`) `.bleed-rail` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
+| chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`, `--tablewrap-fade`) `.bleed-rail` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
 | `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`, **`[aria-current="page"]`**) `.ls-perm` `.ls-name` `.ls-group` | `src/chrome.css` |
 | text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
 | blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`, `--edit`, `:disabled`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
@@ -378,6 +380,43 @@ every `required` select.
   edge, where WCAG 1.4.11 wants 3:1. 60% is the first step that clears it on all four themes
   against all three surfaces a control can land on (warm binds, at 3.24).
 
+## A WIDE table scrolls itself (0.23.0) — including one you render after the page loads
+
+`initTableScroll()` gives every `<table>` a `.tablewrap` parent, so a table wider than its column
+scrolls **itself** rather than handing the whole PAGE a horizontal scrollbar — the one layout
+failure that reads as broken, because the header slides off and body text needs two axes. Markup
+contract: nothing. Author a plain `<table>`.
+
+**The thing to rely on: it keeps wrapping.** Call it once; a table rendered from a fetch twenty
+minutes later is wrapped too, by a MutationObserver, exactly like `initSelects()` and
+`initTablePagination()`. Until 0.23.0 it was a single walk at call time, which is why it appeared
+to work for sixteen releases and covered only the tables that are never too wide: a static page
+authors its tables in the markup, and **every table that genuinely overflows is on a dashboard,
+where the tables arrive after the walk has finished.** Cockpit's called it from a deferred module
+during load, while every mount still read `loading…`. So do not "help" by re-calling it after each
+render, and above all do not hand-wrap in the markup to work around the old behaviour — a wrapper
+in the markup is a wrapper the system now has to leave alone forever.
+
+**If your page reconciles markup against the live DOM, teach the reconciler about the wrapper.**
+This is the one integration cost, and it is not optional: a wrapper the runtime inserted is in no
+renderer's markup, so a patcher sees `<div>` where its markup says `<table>` and replaces it —
+killing the table, its row listeners and every half-typed filter on every poll, after which the
+runtime wraps the replacement and the next poll does it again. One rule fixes it: **a `.tablewrap`
+holding a single `<table>` stands in for that table** — for its key, its kind, and as the node
+actually patched — and *only* when the incoming node is a `<table>`, so a renderer that writes its
+own wrapper still lines up. Cockpit's `dom-patch.js` is the worked example, filed beside the two
+exemptions it already had (`open` on a `<details>`, `hidden` on a `<tr>`). A page that assigns
+`innerHTML` outright needs none of this.
+
+**Colour the fade when the wrapper is not on the page background.** `.tablewrap::after` is a
+1.5rem gradient that says "there is more over here", and it blends to `--tablewrap-fade`
+(default `--background`). On a `--card` surface the default is a visible bright band — and it
+paints whether or not the table can actually scroll, because CSS cannot ask "am I scrolling?" on
+every engine. `.tickstrip` sets it upstream; your own card-like container sets it itself.
+
+`--tablewrap-max-h` caps the wrapper's HEIGHT and defaults to `none` on purpose — see the tables
+paragraph under "The shared component vocabulary".
+
 ## A long table PAGES to 20 (0.22.0) — one attribute, and it slices LAST
 
 ```html
@@ -524,7 +563,7 @@ every one of them has drifted. Adding a surface is one entry in that array.
 | `initAnimToggle()` | Wires `[data-anim-toggle]`, persists `localStorage["anim"]`. |
 | `initDiagramZoom(".diagram")` | Click / Enter / Space opens a diagram full-screen; wheel-zoom about the pointer, drag-pan, `+ - 0`, Escape closes. Clones the svg — mermaid re-runs against the nodes it rendered, so moving the original is how a diagram silently stops updating. |
 | `initMinimap({sections})` | Builds the left-gutter minimap: one bar per section, scroll-spy included, bar length by heading depth. Markup contract is NOTHING. Returns `null` for fewer than two sections — a map of one place is not a map. Use it INSTEAD of a text "On this page" column: that column repeated headings the reader was about to scroll past and cost the content its width. |
-| `initTableScroll()` | Gives every unwrapped `<table>` a `.tablewrap` parent so a wide table scrolls itself instead of scrolling the whole PAGE sideways. **The markup contract is nothing** — author a plain `<table>`; already-wrapped tables are left alone, so it is never a migration and is safe to call again after rendering more rows. |
+| `initTableScroll()` | Gives every unwrapped `<table>` a `.tablewrap` parent so a wide table scrolls itself instead of scrolling the whole PAGE sideways. **The markup contract is nothing** — author a plain `<table>`; already-wrapped tables are left alone, so it is never a migration. **Tables rendered LATER are wrapped too** (0.23.0, MutationObserver), so a page that fetches its rows needs no second call. Colour the right-edge fade with `--tablewrap-fade` when the wrapper does not sit on `--background`. |
 | `initTablePagination()` | Pages every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. **Markup contract is one attribute**, and a table without it is left alone — the id cannot be guessed without silently reassigning readers' settings when a table moves. It has **no sort and no filter**: it hides all but one window of rows a page has *already* filtered and sorted, so the order is filter → sort → slice over the full set by construction. Turning the page writes `hidden` on rows and rebuilds no markup, so it composes with in-place patching. Tables rendered later are picked up by a MutationObserver. |
 | `initTooltips()` | `src/tooltip.css` counterpart. |
 

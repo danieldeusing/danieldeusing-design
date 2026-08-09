@@ -26,6 +26,70 @@ Either way: a publish is instantly live on every unpinned surface with no stagin
 them after publishing**, and keep new CSS backward-compatible with the markup consumers still
 ship (0.2.0's `html:has(.ls-nav)` guard is the worked example).
 
+## 0.23.0 (2026-08-09)
+
+### Fixed — the scroll wrapper never reached the tables that are actually too wide
+
+Daniel: *"we still have the issue that when a table does not fit, we cannot scroll the table in x
+direction."*
+
+`initTableScroll()` has shipped since 0.7.0 and its contract was right: a table wider than the
+page should scroll ITSELF, because a page that scrolls sideways reads as broken — the header
+slides off, the fixed footer stops reaching the edge, and body text needs two axes. What it
+actually did was walk the document **once, at call time**.
+
+That covers exactly the tables that do not need it. A static page authors its tables in the
+markup, so the walk finds them; the docs site and the infrastructure reference pages have worked
+this whole time. **Every table that is genuinely too wide is on a dashboard, and a dashboard's
+tables arrive from a fetch** — after the walk has finished. Cockpit calls this from a deferred
+module during page load, while every mount still reads `loading…`: the walk found nothing, the
+tables appeared unwrapped a moment later, and stayed that way for the life of the page. Measured
+in a browser at 375px, the whole document scrolled sideways
+(`documentElement.scrollWidth > clientWidth`) — the precise failure the function exists to
+prevent, in the feature that prevents it.
+
+Sixteen releases, and it looked like a working capability the whole time, because the surfaces
+where it works are the ones you look at first. `initSelects` (0.21.0) and `initTablePagination`
+(0.22.0) had both already hit this and both answered with a MutationObserver; this is the third
+and the answer is the same one. The markup contract is unchanged — author a plain `<table>` —
+and the guard that made re-calling safe (`table.closest(".tablewrap")`) is what stops the
+observer waking on its own output.
+
+**A reconciler has to know about the wrapper, and this is the part to carry across if you build
+another consumer.** A wrapper the runtime inserts appears in no renderer's markup, so an
+in-place patcher that diffs markup against the live DOM sees a `<div>` where its markup says
+`<table>` and replaces it — destroying the table, its row listeners and every half-typed filter
+on every poll, after which the runtime wraps the replacement and the next poll does it again.
+That is worse than a table that does not scroll. Proven in a real browser rather than argued:
+with cockpit's `dom-patch.js` unmodified, a second patch left `first === second` false and a row
+listener dead. The fix is one rule — `.tablewrap` STANDS IN FOR the table inside it, for its key,
+its kind and as the node actually patched, and only against an incoming `<table>`, so a renderer
+that writes its own wrapper is untouched. Cockpit carries it beside the two exemptions it already
+had (`open` on a `<details>`, `hidden` on a `<tr>`), all three saying the same thing: the
+renderer does not own this.
+
+New: `scripts/check-tablescroll.mjs`, which drives a headless chromium over the DevTools protocol
+with no dependency and no stub DOM. MutationObserver, `closest()` and live child lists are the
+subject here, so a hand-written fake would only assert that the fake behaves. Six of its nine
+checks were red against 0.22.0. It skips loudly when the machine has no browser.
+
+### Fixed — the scroll fade blended to the page even when the wrapper sat on a card
+
+`--tablewrap-fade`, read by `.tablewrap::after` and defaulting to `--background` as before. The
+fade exists to say "there is more over here", and it painted `--background` wherever the wrapper
+sat: on a `--card` surface that is a 1.5rem bright band, and it paints whether or not the table
+can actually scroll. netmon had already found this and was carrying `.card .tablewrap::after` as
+a private override; that is now a value the surface sets rather than a rule it re-declares.
+
+CSS cannot ask "am I scrolling?" portably — `container-type: scroll-state` is Chrome-only, and a
+fix that lands on one engine leaves the estate disagreeing with itself, the same reason
+`appearance: base-select` was refused in 0.21.0.
+
+`.tickstrip` sets it for itself, because from this release the runtime wraps the strip's table
+too. That is wanted — `.ticktable td` is `white-space: nowrap`, so between 40rem and roughly
+900px the strip really can be wider than the page — and without the token it would have put a
+pale band down the right edge of a `--card` box on every page in the estate.
+
 ## 0.22.0 (2026-08-08)
 
 ### Added — a long table shows 20 rows, and sorting still sorts all of them

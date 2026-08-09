@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.22.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.23.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1526,6 +1526,17 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   overflow-y: auto;
   max-block-size: var(--tablewrap-max-h, none);
 }
+/* THE FADE HAS TO DISAPPEAR INTO WHATEVER THE WRAPPER SITS ON, and that is not always the page.
+   It blends to `--background`, which is invisible on the page and a 1.5rem bright band on any
+   `--card` surface — and the fade paints whether or not the table is actually scrolling, so on a
+   short table inside a card it is a stripe that means nothing. (CSS cannot ask "am I scrolling?"
+   portably: `container-type: scroll-state` is Chrome-only, and a fix that lands on one engine
+   leaves the estate disagreeing with itself, the same reason `appearance: base-select` was
+   refused.) So the colour is a token the surface sets — netmon had already discovered this and
+   was carrying `.card .tablewrap::after` as a private override.
+
+   It matters more from 0.23.0, because `initTableScroll()` now reaches tables that arrive after
+   load — including the ticker strip's, which is a `--card` box on every page in the estate. */
 .tablewrap::after {
   content: "";
   position: absolute;
@@ -1534,7 +1545,7 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   width: 1.5rem;
   pointer-events: none;
   opacity: 0.9;
-  background: linear-gradient(to right, transparent, var(--background, transparent));
+  background: linear-gradient(to right, transparent, var(--tablewrap-fade, var(--background, transparent)));
 }
 
 /* The header row stays put while the body scrolls under it. `--background` rather than
@@ -1581,7 +1592,16 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
    change what they resolve to. */
 /* Breathing room above: the strip follows the page's lede, and butted straight up against a
    paragraph it read as part of the prose rather than as instrumentation. */
-.tickstrip:not(:empty) { border: 1px solid var(--border); background: var(--card); margin: 1.6rem 0 1.5rem; }
+/* `--tablewrap-fade`: the strip is a --card box, and from 0.23.0 initTableScroll() wraps the table
+   inside it (the cells are `nowrap`, so between 40rem and roughly 900px the strip really can be
+   wider than the page). Without this the scroll fade would blend to --background and paint a pale
+   band down the strip's right edge on every page in the estate. */
+.tickstrip:not(:empty) {
+  --tablewrap-fade: var(--card);
+  border: 1px solid var(--border);
+  background: var(--card);
+  margin: 1.6rem 0 1.5rem;
+}
 .ticktable { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .ticktable td { padding: 0.5rem 0.75rem; vertical-align: baseline; border: 0; white-space: nowrap; }
 /* Only the last column may grow, so the four fixed columns keep the same width on every row.

@@ -4,6 +4,45 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.26.0 (2026-08-11)
+
+### Text inputs finally have a declaration, and every control is one height
+
+Daniel: *"select should have the same height as input fields (everywhere) ... it might be better to
+increase the height of the input instead of decreasing the height of the selects. Like this it would
+also fit with the buttons."*
+
+**The asymmetry was the bug.** This file styled `select` and said **nothing whatever about `input`** —
+zero rules. So every consumer hand-rolled its own box (cockpit's `.cfg-in`, redeclared per page: the
+same five-copies-that-disagree shape the select rule was itself written to end), and any input
+*without* that class fell straight through to the user agent's default.
+
+Measured on the built stylesheet, warm theme, before this release:
+
+| control | height |
+|---|---|
+| `select` / `.select-trigger` | 25.23px |
+| `.cfg-in` (cockpit's hand-rolled input) | 25.22px |
+| **`input[type="search"]`** — every column filter in every cockpit table | **24.00px** |
+| `.btn-terminal--compact` | **27.44px** |
+
+Three heights for controls that sit on one row, and the widest gap was on the one control nobody had
+declared. The button is now the reference and the controls rise to meet it (`padding-block` 0.28rem →
+0.35rem on the closed select, and the same box on text inputs), rather than the button shrinking — a
+filter box, a dropdown and a `refresh` button share a row constantly.
+
+**Type-scoped, never bare `input`.** A bare selector would catch checkboxes and radios, and the estate
+is full of them — every repository row on cockpit's `/automation/config` carries one. Handing those a
+padded 27px box would not be a restyle, it would be a broken form. Only the types that render a text
+field are selected, plus `:not([type])`, which is a valid text input. `textarea` takes the box but
+keeps `--lh-base`: `--lh-tight` is for single-line chrome, and multi-line prose at 1.3 is unreadable.
+
+The edge is the same 60%-of-`--foreground` the select already used, for the same measured reason —
+`--border` is a container hairline and misses WCAG 1.4.11's 3:1 for a control edge on all four themes.
+
+**Consumers get this by loading 0.26.0**; no markup changes. Cockpit's per-page `.cfg-in` copies are
+now redundant and should be deleted in the adopting pass rather than left to disagree again.
+
 ## 0.25.0 (2026-08-11)
 
 ### The tooltip marker is an ⓘ, never an underline

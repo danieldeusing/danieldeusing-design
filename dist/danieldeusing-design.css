@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.25.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.26.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -920,12 +920,78 @@ html[data-theme="warm"] .dropdown-item[data-theme-value="warm"] {
    because a `<select>` cannot have generated content. Two abutting squares,
    each half-filled on the diagonal, draw the same ▾ on both renderings.
    ───────────────────────────────────────────────────────────────────────── */
+/* ── TEXT INPUTS, and why they were the last control with no declaration ─────
+   Until 0.26.0 this file styled `select` and said NOTHING about `input`. That
+   asymmetry is the whole bug: every consumer hand-rolled its own box (cockpit's
+   `.cfg-in`, redeclared per page — the same five-copies-that-disagree shape the
+   select rule below was written to end), and any input WITHOUT that class fell
+   through to the user agent's default. Measured on the real stylesheet, warm
+   theme: select 25.23px, `.cfg-in` 25.22px, a bare `input[type=search]` — every
+   column filter in every cockpit table — 24.00px, and `.btn-terminal--compact`
+   27.44px. Three heights for controls that sit on one row.
+
+   ONE BOX FOR EVERY CONTROL, AT THE BUTTON'S HEIGHT. Daniel, 2026-08-11: "select
+   should have the same height as input fields (everywhere) ... it might be better
+   to increase the height of the input instead of decreasing the height of the
+   selects. Like this it would also fit with the buttons." So the button is the
+   reference and the controls rise to meet it rather than the button shrinking — a
+   filter box, a dropdown and a `refresh` button share a row constantly.
+
+   TYPE-SCOPED, NEVER BARE `input`. A bare selector would catch checkboxes and
+   radios, and this estate is full of them (every repository row on
+   /automation/config carries one) — handing those a padded 27px box would not be
+   a restyle, it would be a broken form. Only the types that render a text field
+   are listed, plus `:not([type])`, which is a valid text input.
+
+   `textarea` takes the box but NOT the tight line-height: --lh-tight is for
+   single-line chrome, and multi-line prose set at 1.3 is unreadable. */
+input[type="text"],
+input[type="search"],
+input[type="url"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="date"],
+input:not([type]),
+textarea {
+  max-width: 100%;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-tight);
+  color: var(--foreground);
+  background-color: transparent;
+  /* The same 60%-of-foreground edge as the select below, for the same measured
+     reason: --border is a container hairline and misses WCAG 1.4.11's 3:1 for a
+     control edge on all four themes. A control is a control. */
+  border: 1px solid color-mix(in srgb, var(--foreground) 60%, transparent);
+  transition: border-color 0.15s ease;
+}
+textarea { line-height: var(--lh-base); }
+input[type="text"]:hover,
+input[type="search"]:hover,
+input[type="url"]:hover,
+input[type="email"]:hover,
+input[type="password"]:hover,
+input[type="number"]:hover,
+input[type="tel"]:hover,
+input[type="date"]:hover,
+input:not([type]):hover,
+textarea:hover { border-color: var(--primary); }
+input:disabled,
+textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+
 select,
 .select-trigger {
   appearance: none;
   -webkit-appearance: none;
   max-width: 100%;
-  padding: 0.28rem 1.45rem 0.28rem 0.5rem;
+  /* 0.35rem, not 0.28rem, since 0.26.0 — this is what lifts the closed control
+     onto the button's height so a filter box, a dropdown and a button line up.
+     It changes BOTH renderings at once, which is exactly why they are declared
+     together. */
+  padding: 0.35rem 1.45rem 0.35rem 0.5rem;
   font: inherit;
   font-size: var(--fs-sm);
   line-height: var(--lh-tight);

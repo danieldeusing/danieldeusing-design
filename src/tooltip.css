@@ -30,7 +30,7 @@ button[data-tip]::after {
   content: "\FE0E\24D8";          /* ⓘ, with VS15 so it stays a glyph and never an emoji */
   margin-inline-start: 0.35em;
   color: var(--muted-foreground);
-  font-size: 0.9em;
+  font-size: 0.9em;   /* not-text: the ⓘ glyph */
   font-weight: 400;
   /* The glyph is decoration: it must not be dragged into a copied selection, and it must not shift
      the baseline of the label it follows. */
@@ -46,7 +46,7 @@ button[data-tip]::after {
   position: fixed; z-index: 9999; display: none; max-width: 340px;
   background: var(--background); color: var(--foreground);
   border: 1px solid var(--muted-foreground); border-radius: var(--radius);
-  padding: 7px 10px; font-size: 0.72rem; line-height: 1.45; font-weight: 400;
+  padding: 7px 10px; font-size: var(--fs-base); line-height: 1.45; font-weight: 400;
   text-align: left; white-space: normal; pointer-events: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }

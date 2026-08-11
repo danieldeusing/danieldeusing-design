@@ -4,6 +4,47 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.27.0 (2026-08-11)
+
+### One size for text. The four that were one pixel apart are gone.
+
+Daniel, looking at a repository card in cockpit: *"why in details we have different font sizes?
+Actually why in cockpit we have different font sizes at all for text (title okay)"*. That card was
+rendering text at **10.2px, 10.8px, 10.88px, 11px, 12px and 13px at once**, measured in a browser.
+
+**BREAKING: `--fs-xs`, `--fs-sm` and `--fs-md` are removed.** Not renamed, not aliased — a
+compatibility alias would have kept every existing near-miss working and changed nothing. Anything
+that used them wants `--fs-base`.
+
+The scale had four steps for text at **10 / 11 / 12 / 13px**. That is not a hierarchy: differences
+that small cannot be told apart on sight, so nothing ever *chose* between them — each surface picked
+whichever felt right when it was written, and 578 hand-rolled `font-size` declarations grew across
+the estate while every conformance check passed, because none of them had an opinion about type.
+
+The fix is not discipline, it is removing the choice. With one text size there is no near-miss to
+pick and `font-size` stops being a decision anybody makes while writing a component. What survives
+is the part that genuinely is a hierarchy — three heading steps, each a clear jump rather than a
+nudge. Something that must read as quieter than body text uses `--muted-foreground` and weight:
+colour separates a label from its value far better than one pixel, and it keeps working at any zoom.
+
+### The table rule was the loudest instance, and its own comment said so
+
+`base.css` set `table { font-size: var(--fs-md) }` — 13px — directly under a comment reading *"A
+table cell is body copy … so it takes the body-copy step"*. The comment and the code had disagreed
+since the rule was written, and the comment was the one telling the truth. Every table in the estate
+therefore rendered one step **louder** than the body around it; in a cockpit form row that put cells
+at 13px beside an 11px label, so the caption read as a footnote to the data it introduced.
+
+### Also
+
+- The system's own 14 hand-rolled text sizes are now `--fs-base` (`.prompt`, `.tab`, `.legend`,
+  `details.fold`, `.eli5`, `.dgm-btn`, `.ticktable`, `.ls-perm`, the tooltip bubble, the mobile nav).
+- Five sizes deliberately stay hand-rolled and now say why inline (`/* not-text: … */`): four glyph
+  pseudo-elements (`ⓘ`, `⤢`, the ELI5 marker, the tickstrip edge marker) and the wordmark. A glyph
+  is sized against its own drawing, not as typography.
+- `print.css` keeps its own scale — paper is a different medium and was always deliberate.
+- The Tailwind bridge drops `--text-fs-xs`, `-sm` and `-md` with the tokens behind them.
+
 ## 0.26.0 (2026-08-11)
 
 ### Text inputs finally have a declaration, and every control is one height

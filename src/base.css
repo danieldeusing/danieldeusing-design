@@ -41,9 +41,17 @@ body {
    They had been picking: cockpit's documentation tables sat at 15px while the containers
    dashboard's sat at 12px, a 3px gap between two pages of the same site. Nobody chose
    that; the two numbers were set years apart and never compared. A page with a genuine
-   reason to differ still can, but it now has to say so instead of inheriting an accident. */
+   reason to differ still can, but it now has to say so instead of inheriting an accident.
+
+   ⚠️ This rule said `--fs-md` (13px) until 2026-08-11, while the sentence above it said "body
+   copy" — the comment and the code had disagreed since the day the rule was written, and the
+   comment was the one telling the truth about the intent. So every table in the estate rendered
+   one step LOUDER than the body around it, and in a cockpit form row that put the cells at 13px
+   beside an 11px label: the caption read as a footnote to the data it was introducing. Nobody
+   asked for that emphasis. It existed because the scale had a 13px step and a table is the
+   obvious place to spend one. */
 table {
-  font-size: var(--fs-md);
+  font-size: var(--fs-base);
   width: 100%;
 }
 

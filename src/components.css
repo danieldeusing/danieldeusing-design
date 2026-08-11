@@ -45,7 +45,7 @@
   gap: 0.5rem 0.75rem;
   margin: 0.35rem 0;
 }
-.field-row > .lbl { color: var(--muted-foreground); font-size: var(--fs-sm); text-align: left; }
+.field-row > .lbl { color: var(--muted-foreground); font-size: var(--fs-base); text-align: left; }
 /* The value cell: controls sit on one row and wrap together, rather than each finding its own. */
 .field-row > .field-val {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; min-width: 0;
@@ -59,7 +59,7 @@
    Shell affordances — `$ command` section headers and `# comment` lines.
    ───────────────────────────────────────────────────────────────────────── */
 .prompt {
-  font-size: 0.75rem;
+  font-size: var(--fs-base);
   font-weight: 700;
   color: var(--muted-foreground);
 }
@@ -166,7 +166,7 @@
    lost to `padding: 12px 24px` and every compact button in the estate rendered at CTA size. Only
    the font-size appeared to work, because `.btn-terminal` happens not to set one, which is what
    made it look like a class that was working. Position is load-bearing here, not tidiness. */
-.btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-sm); }
+.btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-base); }
 
 /* THE DESTRUCTIVE ROW ACTION — square, red, a bin, and nothing else.
 
@@ -508,7 +508,7 @@ textarea {
   max-width: 100%;
   padding: 0.35rem 0.5rem;
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
   line-height: var(--lh-tight);
   color: var(--foreground);
   background-color: transparent;
@@ -543,7 +543,7 @@ select,
      together. */
   padding: 0.35rem 1.45rem 0.35rem 0.5rem;
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
   line-height: var(--lh-tight);
   text-align: left;
   color: var(--foreground);
@@ -636,7 +636,7 @@ select:disabled,
   overflow-y: auto;
   overscroll-behavior: contain;
   list-style: none;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
   line-height: var(--lh-tight);
   color: var(--popover-foreground);
   background: var(--popover);
@@ -689,7 +689,7 @@ select:disabled,
 .select-group {
   padding: 0.35rem 0.9rem 0.15rem;
   color: var(--muted-foreground);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-base);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -721,7 +721,7 @@ select:disabled,
   align-items: center;
   gap: 0.45rem 0.9rem;
   margin-block-start: 0.6rem;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
 }
 .table-pager-status {
   margin: 0;
@@ -750,7 +750,7 @@ select:disabled,
   border: 1px solid var(--border);
   border-left: 3px solid var(--primary);
   border-radius: var(--radius);
-  font-size: 0.92em;
+  font-size: var(--fs-base);
   line-height: 1.6;
 }
 .eli5::before {
@@ -761,7 +761,7 @@ select:disabled,
   margin-right: 0.6em;
   vertical-align: 0.08em;
   font-family: var(--font-mono);
-  font-size: 0.72em;
+  font-size: 0.72em;   /* not-text: the ELI5 marker glyph, sized against its own box */
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -868,7 +868,7 @@ html.anim-off .cursor-block {
 }
 .tab {
   background: transparent; border: 0; margin-bottom: -2px;
-  font: inherit; font-size: 0.86em; cursor: pointer; padding: 0.5rem 0.95rem;
+  font: inherit; font-size: var(--fs-base); cursor: pointer; padding: 0.5rem 0.95rem;
   color: var(--muted-foreground); transition: background 0.12s ease, color 0.12s ease;
 }
 .tab:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
@@ -911,7 +911,7 @@ section.doc.tab-panel { margin-top: 1.35rem; }
 details.fold { border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
 details.fold > summary {
   display: flex; align-items: center; gap: 0.5rem; cursor: pointer; list-style: none;
-  padding: 0.55rem 0; font-size: 0.85rem; color: var(--muted-foreground);
+  padding: 0.55rem 0; font-size: var(--fs-base); color: var(--muted-foreground);
 }
 details.fold > summary::-webkit-details-marker { display: none; }
 details.fold > summary::before { content: "\25B8"; flex: none; opacity: 0.6; }
@@ -920,7 +920,7 @@ details.fold > summary:hover { color: var(--primary); }
 details.fold > summary:focus-visible {
   outline: 2px solid color-mix(in srgb, currentColor 45%, transparent); outline-offset: 2px;
 }
-.fold-body { font-size: 0.9rem; padding: 0 0 0.7rem 1.1rem; }
+.fold-body { font-size: var(--fs-base); padding: 0 0 0.7rem 1.1rem; }
 .fold-body > * + * { margin-top: 0.6rem; }
 
 /* ── legend: one rendering of each state, beside the thing it keys ─────────────────────────────
@@ -929,7 +929,7 @@ details.fold > summary:focus-visible {
    separately-wrapped columns. */
 .legend {
   list-style: none; padding: 0; margin: 0.7rem 0 0;
-  display: grid; gap: 0.4rem 1.4rem; font-size: 0.86rem;
+  display: grid; gap: 0.4rem 1.4rem; font-size: var(--fs-base);
 }
 @media (min-width: 52rem) { .legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .legend > li { line-height: 1.6; }
@@ -945,7 +945,7 @@ details.fold > summary:focus-visible {
 .dgm-zoomable { position: relative; cursor: zoom-in; }
 .dgm-zoomable::after {
   content: "⤢"; position: absolute; top: 0.4rem; right: 0.5rem;
-  font-size: 0.85rem; line-height: 1; opacity: 0.45; pointer-events: none;
+  font-size: 0.85rem; line-height: 1; opacity: 0.45; pointer-events: none;   /* not-text: the ⤢ corner hint */
   color: var(--muted-foreground);
 }
 .dgm-zoomable:hover::after, .dgm-zoomable:focus-visible::after { opacity: 1; color: var(--primary); }
@@ -964,7 +964,7 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); background: var(--card);
 }
 .dgm-btn {
-  font: inherit; font-size: 0.82rem; cursor: pointer; padding: 0.3rem 0.7rem; min-height: 32px;
+  font: inherit; font-size: var(--fs-base); cursor: pointer; padding: 0.3rem 0.7rem; min-height: 32px;
   background: transparent; border: 1px solid var(--border); color: var(--foreground);
 }
 .dgm-btn:hover { border-color: var(--primary); color: var(--primary); }

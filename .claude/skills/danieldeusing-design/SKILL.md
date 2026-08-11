@@ -142,15 +142,42 @@ where everything else sat at `0.75rem` — because the system offered no token t
 
 ```css
 --content-w: 78rem;     --content-pad: 1.5rem;
---fs-xs: 0.625rem;  /* 10px — micro-labels, badges, meta lines */
---fs-sm: 0.6875rem; /* 11px — secondary / muted copy */
---fs-base: 0.75rem; /* 12px — body; base.css sets it on <body> */
---fs-md: 0.8125rem; /* 13px — emphasised body, card headings, table headers */
+--fs-base: 0.75rem; /* 12px — ALL normal text. The only size you write. */
 --fs-lg: 0.9375rem; /* 15px — h3 / section heads */
 --fs-xl: 1.125rem;  /* 18px — h2 / page title */
 --fs-2xl: 1.5rem;   /* 24px — h1 / hero, display only */
 --lh-tight: 1.3;    --lh-base: 1.5;
 ```
+
+### ONE SIZE FOR TEXT (0.27.0, Daniel) — `--fs-xs`, `--fs-sm` and `--fs-md` are GONE
+
+Body, tables, labels, badges, notes, buttons, form controls, meta lines: **all `--fs-base`.** If you
+are reaching for a `font-size` on anything a person reads, the answer is already decided. The only
+sizes left are the three heading steps, and each is a jump rather than a nudge.
+
+**Do not re-derive the old scale from memory.** It had four text steps at 10 / 11 / 12 / 13px, and
+this very section used to defend them: *"steps are 1px apart at the bottom on purpose."* That
+reasoning was wrong in a way only usage could show. Differences that small cannot be told apart on
+sight, so nothing ever **chose** between them — every surface picked whichever felt right when it was
+written, and **578 hand-rolled `font-size` declarations** grew across the estate while every
+conformance check passed, because none of them had an opinion about type. One cockpit repository card
+rendered text at 10.2px, 10.8px, 10.88px, 11px, 12px and 13px at once. Daniel found it by looking:
+*"why in details we have different font sizes?"*
+
+The fix is not discipline, it is **removing the choice**. With one text size there is no near-miss to
+pick, and `font-size` stops being a decision anybody makes while writing a component.
+
+- **Must read as quieter?** `--muted-foreground`, `opacity`, or weight. Colour separates a label from
+  its value far better than one pixel ever did, and it survives zoom and a printout.
+- **Must read as louder?** Then it is a heading — `--fs-lg`/`-xl`/`-2xl`, or `font-weight`.
+- **A glyph is not text.** A `content:`-drawn pseudo-element (`ⓘ`, `⤢`, a marker) is sized against its
+  own drawing and may keep a hand-rolled `em`. Say so inline: `/* not-text: … */`. Five in the system
+  do; nothing else may.
+- **`table` is `--fs-base`.** It was `--fs-md` until 0.27.0, sitting under a comment that already said
+  *"a table cell is body copy"* — so every table in the estate rendered one step louder than the body
+  around it and louder than the label naming it. Do not re-add a table size.
+- **`em` compounds, `rem` does not.** Mixing them is how `0.85em`, `0.9em` and `0.68rem` landed as
+  three near-identical pixel values inside one card. Write the token, not a ratio.
 
 - **`.wrap` resolves the column** (`max-width: var(--content-w); margin-inline: auto;
   padding-inline: var(--content-pad)`). Use it, and never restate a bare `78rem` locally. A
@@ -162,10 +189,12 @@ where everything else sat at `0.75rem` — because the system offered no token t
   resets `padding-inline` to 0 and silently takes the shared margins back.
 - A page that genuinely is not a column (a full-bleed dashboard table) sets `max-width: none`
   deliberately. It does not invent a fifth number.
-- Steps are 1px apart at the bottom on purpose: a terminal UI's useful range is 10–15px, and a
-  geometric ratio scale would give three usable steps then leap past everything that matters.
-- Tailwind apps get `max-w-content` and `text-fs-*`. Tailwind's own `text-xs/sm/base` are
-  deliberately **not** remapped — opt in by name.
+- There is exactly **one** text step and three heading steps. The bottom of the scale used to be
+  four sizes 1px apart, defended here as deliberate; see "ONE SIZE FOR TEXT" above for what usage
+  showed instead.
+- Tailwind apps get `max-w-content` and `text-fs-base` / `-lg` / `-xl` / `-2xl`. `text-fs-xs`, `-sm`
+  and `-md` went with the tokens behind them. Tailwind's own `text-xs/sm/base` are deliberately
+  **not** remapped — opt in by name.
 - **The scale is only half of "same size on every screen".** It fixes the *ratios* and does not
   track the viewport. `initResolutionZoom()` makes the page track the *window*. Scale without zoom
   = frozen at one size on a 4K display; zoom without scale = uniform scaling of sizes that

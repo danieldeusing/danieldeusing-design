@@ -215,10 +215,24 @@ html[data-theme="paper"] {
      four widths in the first place. */
   --content-pad: 1.5rem;
 
-  --fs-xs: 0.625rem;    /* 10px — table micro-labels, badge text, meta lines */
-  --fs-sm: 0.6875rem;   /* 11px — secondary and muted copy */
-  --fs-base: 0.75rem;   /* 12px — body. THE reference; base.css sets it on <body> */
-  --fs-md: 0.8125rem;   /* 13px — emphasised body, card headings, table headers */
+  /* ONE SIZE FOR TEXT (Daniel, 2026-08-11). There used to be four — `--fs-xs` 10px, `--fs-sm`
+     11px, `--fs-base` 12px, `--fs-md` 13px — and they are gone, not renamed.
+
+     They were never a hierarchy. Four sizes one pixel apart cannot be told apart on sight, so
+     nothing in the estate ever CHOSE between them: every surface picked whichever felt right at
+     the time, and one repository card ended up rendering text at 10.2px, 10.8px, 10.88px, 11px,
+     12px and 13px at once. Differences that small do not read as emphasis, they read as a page
+     that has not been finished — which is exactly how Daniel found this, by looking at a card and
+     asking why the words were different sizes.
+
+     The fix is not discipline, it is REMOVING THE CHOICE. With one text size there is no near-miss
+     to pick, and `font-size` stops being a decision anybody makes while writing a component.
+
+     What survives is the part that is genuinely a hierarchy: three heading steps, each a clear
+     jump rather than a nudge. If something needs to be quieter than body text, that is what
+     `--muted-foreground` and `opacity` are for — colour and weight separate a label from its value
+     far better than one pixel ever did, and they keep working at any zoom. */
+  --fs-base: 0.75rem;   /* 12px — ALL normal text: body, tables, labels, badges, notes, controls */
   --fs-lg: 0.9375rem;   /* 15px — h3 / section heads */
   --fs-xl: 1.125rem;    /* 18px — h2 / page title */
   --fs-2xl: 1.5rem;     /* 24px — h1 / hero, display only */

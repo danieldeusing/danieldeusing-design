@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.26.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.27.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -293,10 +293,24 @@ html[data-theme="paper"] {
      four widths in the first place. */
   --content-pad: 1.5rem;
 
-  --fs-xs: 0.625rem;    /* 10px — table micro-labels, badge text, meta lines */
-  --fs-sm: 0.6875rem;   /* 11px — secondary and muted copy */
-  --fs-base: 0.75rem;   /* 12px — body. THE reference; base.css sets it on <body> */
-  --fs-md: 0.8125rem;   /* 13px — emphasised body, card headings, table headers */
+  /* ONE SIZE FOR TEXT (Daniel, 2026-08-11). There used to be four — `--fs-xs` 10px, `--fs-sm`
+     11px, `--fs-base` 12px, `--fs-md` 13px — and they are gone, not renamed.
+
+     They were never a hierarchy. Four sizes one pixel apart cannot be told apart on sight, so
+     nothing in the estate ever CHOSE between them: every surface picked whichever felt right at
+     the time, and one repository card ended up rendering text at 10.2px, 10.8px, 10.88px, 11px,
+     12px and 13px at once. Differences that small do not read as emphasis, they read as a page
+     that has not been finished — which is exactly how Daniel found this, by looking at a card and
+     asking why the words were different sizes.
+
+     The fix is not discipline, it is REMOVING THE CHOICE. With one text size there is no near-miss
+     to pick, and `font-size` stops being a decision anybody makes while writing a component.
+
+     What survives is the part that is genuinely a hierarchy: three heading steps, each a clear
+     jump rather than a nudge. If something needs to be quieter than body text, that is what
+     `--muted-foreground` and `opacity` are for — colour and weight separate a label from its value
+     far better than one pixel ever did, and they keep working at any zoom. */
+  --fs-base: 0.75rem;   /* 12px — ALL normal text: body, tables, labels, badges, notes, controls */
   --fs-lg: 0.9375rem;   /* 15px — h3 / section heads */
   --fs-xl: 1.125rem;    /* 18px — h2 / page title */
   --fs-2xl: 1.5rem;     /* 24px — h1 / hero, display only */
@@ -356,9 +370,17 @@ body {
    They had been picking: cockpit's documentation tables sat at 15px while the containers
    dashboard's sat at 12px, a 3px gap between two pages of the same site. Nobody chose
    that; the two numbers were set years apart and never compared. A page with a genuine
-   reason to differ still can, but it now has to say so instead of inheriting an accident. */
+   reason to differ still can, but it now has to say so instead of inheriting an accident.
+
+   ⚠️ This rule said `--fs-md` (13px) until 2026-08-11, while the sentence above it said "body
+   copy" — the comment and the code had disagreed since the day the rule was written, and the
+   comment was the one telling the truth about the intent. So every table in the estate rendered
+   one step LOUDER than the body around it, and in a cockpit form row that put the cells at 13px
+   beside an 11px label: the caption read as a footnote to the data it was introducing. Nobody
+   asked for that emphasis. It existed because the scale had a 13px step and a table is the
+   obvious place to spend one. */
 table {
-  font-size: var(--fs-md);
+  font-size: var(--fs-base);
   width: 100%;
 }
 
@@ -495,7 +517,7 @@ body::after {
   gap: 0.5rem 0.75rem;
   margin: 0.35rem 0;
 }
-.field-row > .lbl { color: var(--muted-foreground); font-size: var(--fs-sm); text-align: left; }
+.field-row > .lbl { color: var(--muted-foreground); font-size: var(--fs-base); text-align: left; }
 /* The value cell: controls sit on one row and wrap together, rather than each finding its own. */
 .field-row > .field-val {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; min-width: 0;
@@ -509,7 +531,7 @@ body::after {
    Shell affordances — `$ command` section headers and `# comment` lines.
    ───────────────────────────────────────────────────────────────────────── */
 .prompt {
-  font-size: 0.75rem;
+  font-size: var(--fs-base);
   font-weight: 700;
   color: var(--muted-foreground);
 }
@@ -616,7 +638,7 @@ body::after {
    lost to `padding: 12px 24px` and every compact button in the estate rendered at CTA size. Only
    the font-size appeared to work, because `.btn-terminal` happens not to set one, which is what
    made it look like a class that was working. Position is load-bearing here, not tidiness. */
-.btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-sm); }
+.btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-base); }
 
 /* THE DESTRUCTIVE ROW ACTION — square, red, a bin, and nothing else.
 
@@ -958,7 +980,7 @@ textarea {
   max-width: 100%;
   padding: 0.35rem 0.5rem;
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
   line-height: var(--lh-tight);
   color: var(--foreground);
   background-color: transparent;
@@ -993,7 +1015,7 @@ select,
      together. */
   padding: 0.35rem 1.45rem 0.35rem 0.5rem;
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
   line-height: var(--lh-tight);
   text-align: left;
   color: var(--foreground);
@@ -1086,7 +1108,7 @@ select:disabled,
   overflow-y: auto;
   overscroll-behavior: contain;
   list-style: none;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
   line-height: var(--lh-tight);
   color: var(--popover-foreground);
   background: var(--popover);
@@ -1139,7 +1161,7 @@ select:disabled,
 .select-group {
   padding: 0.35rem 0.9rem 0.15rem;
   color: var(--muted-foreground);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-base);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1171,7 +1193,7 @@ select:disabled,
   align-items: center;
   gap: 0.45rem 0.9rem;
   margin-block-start: 0.6rem;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
 }
 .table-pager-status {
   margin: 0;
@@ -1200,7 +1222,7 @@ select:disabled,
   border: 1px solid var(--border);
   border-left: 3px solid var(--primary);
   border-radius: var(--radius);
-  font-size: 0.92em;
+  font-size: var(--fs-base);
   line-height: 1.6;
 }
 .eli5::before {
@@ -1211,7 +1233,7 @@ select:disabled,
   margin-right: 0.6em;
   vertical-align: 0.08em;
   font-family: var(--font-mono);
-  font-size: 0.72em;
+  font-size: 0.72em;   /* not-text: the ELI5 marker glyph, sized against its own box */
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -1318,7 +1340,7 @@ html.anim-off .cursor-block {
 }
 .tab {
   background: transparent; border: 0; margin-bottom: -2px;
-  font: inherit; font-size: 0.86em; cursor: pointer; padding: 0.5rem 0.95rem;
+  font: inherit; font-size: var(--fs-base); cursor: pointer; padding: 0.5rem 0.95rem;
   color: var(--muted-foreground); transition: background 0.12s ease, color 0.12s ease;
 }
 .tab:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
@@ -1361,7 +1383,7 @@ section.doc.tab-panel { margin-top: 1.35rem; }
 details.fold { border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
 details.fold > summary {
   display: flex; align-items: center; gap: 0.5rem; cursor: pointer; list-style: none;
-  padding: 0.55rem 0; font-size: 0.85rem; color: var(--muted-foreground);
+  padding: 0.55rem 0; font-size: var(--fs-base); color: var(--muted-foreground);
 }
 details.fold > summary::-webkit-details-marker { display: none; }
 details.fold > summary::before { content: "\25B8"; flex: none; opacity: 0.6; }
@@ -1370,7 +1392,7 @@ details.fold > summary:hover { color: var(--primary); }
 details.fold > summary:focus-visible {
   outline: 2px solid color-mix(in srgb, currentColor 45%, transparent); outline-offset: 2px;
 }
-.fold-body { font-size: 0.9rem; padding: 0 0 0.7rem 1.1rem; }
+.fold-body { font-size: var(--fs-base); padding: 0 0 0.7rem 1.1rem; }
 .fold-body > * + * { margin-top: 0.6rem; }
 
 /* ── legend: one rendering of each state, beside the thing it keys ─────────────────────────────
@@ -1379,7 +1401,7 @@ details.fold > summary:focus-visible {
    separately-wrapped columns. */
 .legend {
   list-style: none; padding: 0; margin: 0.7rem 0 0;
-  display: grid; gap: 0.4rem 1.4rem; font-size: 0.86rem;
+  display: grid; gap: 0.4rem 1.4rem; font-size: var(--fs-base);
 }
 @media (min-width: 52rem) { .legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .legend > li { line-height: 1.6; }
@@ -1395,7 +1417,7 @@ details.fold > summary:focus-visible {
 .dgm-zoomable { position: relative; cursor: zoom-in; }
 .dgm-zoomable::after {
   content: "⤢"; position: absolute; top: 0.4rem; right: 0.5rem;
-  font-size: 0.85rem; line-height: 1; opacity: 0.45; pointer-events: none;
+  font-size: 0.85rem; line-height: 1; opacity: 0.45; pointer-events: none;   /* not-text: the ⤢ corner hint */
   color: var(--muted-foreground);
 }
 .dgm-zoomable:hover::after, .dgm-zoomable:focus-visible::after { opacity: 1; color: var(--primary); }
@@ -1414,7 +1436,7 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); background: var(--card);
 }
 .dgm-btn {
-  font: inherit; font-size: 0.82rem; cursor: pointer; padding: 0.3rem 0.7rem; min-height: 32px;
+  font: inherit; font-size: var(--fs-base); cursor: pointer; padding: 0.3rem 0.7rem; min-height: 32px;
   background: transparent; border: 1px solid var(--border); color: var(--foreground);
 }
 .dgm-btn:hover { border-color: var(--primary); color: var(--primary); }
@@ -1668,7 +1690,7 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   background: var(--card);
   margin: 1.6rem 0 1.5rem;
 }
-.ticktable { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.ticktable { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .ticktable td { padding: 0.5rem 0.75rem; vertical-align: baseline; border: 0; white-space: nowrap; }
 /* Only the last column may grow, so the four fixed columns keep the same width on every row.
 
@@ -1696,7 +1718,7 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
    a printout has no colour at all), the COLOUR, and a left edge-marker that makes a bad row
    findable by shape alone when the strip is scanned rather than read. */
 .tick-dot {
-  font-size: 0.7em; width: 1.5rem; padding-right: 0 !important;
+  font-size: 0.7em; width: 1.5rem; padding-right: 0 !important;   /* not-text: the row edge-marker */
   border-left: 3px solid transparent; padding-left: 0.6rem !important;
 }
 /* --success is per-theme and AA-measured (0.3.0). `ok` used to borrow --primary — the BRAND
@@ -1746,7 +1768,7 @@ header.bar {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--card);
 }
-header.bar .brand { display: inline-flex; align-items: center; font-weight: 700; font-size: 1rem; }
+header.bar .brand { display: inline-flex; align-items: center; font-weight: 700; font-size: 1rem; }   /* not-text: the wordmark */
 header.bar .brand, header.bar .brand a { color: inherit; text-decoration: none; }
 header.bar .dropdown summary { padding: 0.6rem 0.4rem; }
 .bar-right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
@@ -1756,7 +1778,7 @@ footer.status {
   position: fixed; inset-inline: 0; bottom: 0; z-index: 50; min-height: 2rem;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   padding: 0.35rem 1.25rem; border-top: 1px solid var(--border); background: var(--card);
-  font-size: 0.7rem;
+  font-size: var(--fs-base);
 }
 footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0.4rem; }
 .status-left { color: var(--muted-foreground); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1787,7 +1809,7 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
 .ls-group {
   display: block;
   padding: 0.55rem 0 0.15rem;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-base);
   letter-spacing: 0.08em;
   color: var(--muted-foreground);
   opacity: 0.75;
@@ -1826,7 +1848,7 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
    element toward `--primary`, and it must keep winning. */
 .ls-perm {
   color: color-mix(in srgb, var(--muted-foreground) 75%, var(--card));
-  font-size: 0.72rem; letter-spacing: 0;
+  font-size: var(--fs-base); letter-spacing: 0;
 }
 
 /* DEPTH IS DRAWN, NOT JUST INDENTED. Whitespace alone did not carry it — with the
@@ -1991,7 +2013,7 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
     display: inline-flex; align-items: center; gap: 0.5rem;
     margin-left: 0.75rem;
   }
-  .ls-nav-title { font-weight: 700; font-size: 0.9rem; }
+  .ls-nav-title { font-weight: 700; font-size: var(--fs-base); }
 
   /* The list is the only thing that scrolls — the head stays put, so the control
      that hides the rail cannot be scrolled out of reach. */
@@ -2078,7 +2100,7 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
   .site-nav > .ls-nav .ls-row:last-child { border-bottom: 0; }
   .mobile-nav .mobile-item {
     display: flex; align-items: baseline; gap: 0.9rem; padding: 0.65rem 0;
-    text-decoration: none; color: var(--foreground); font-size: 0.9rem;
+    text-decoration: none; color: var(--foreground); font-size: var(--fs-base);
     border-bottom: 1px solid var(--border);
   }
   .mobile-nav li:last-child .mobile-item { border-bottom: 0; }
@@ -2098,7 +2120,7 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
   .mobile-footer {
     display: flex; flex-direction: column; gap: 0.55rem;
     margin-top: 0.8rem; border-top: 1px solid var(--border); padding-top: 0.8rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
   }
   .mobile-footer .doc-link { padding: 0.2rem 0; }
   .mobile-footer .mobile-theme summary {
@@ -2149,7 +2171,7 @@ button[data-tip]::after {
   content: "\FE0E\24D8";          /* ⓘ, with VS15 so it stays a glyph and never an emoji */
   margin-inline-start: 0.35em;
   color: var(--muted-foreground);
-  font-size: 0.9em;
+  font-size: 0.9em;   /* not-text: the ⓘ glyph */
   font-weight: 400;
   /* The glyph is decoration: it must not be dragged into a copied selection, and it must not shift
      the baseline of the label it follows. */
@@ -2165,7 +2187,7 @@ button[data-tip]::after {
   position: fixed; z-index: 9999; display: none; max-width: 340px;
   background: var(--background); color: var(--foreground);
   border: 1px solid var(--muted-foreground); border-radius: var(--radius);
-  padding: 7px 10px; font-size: 0.72rem; line-height: 1.45; font-weight: 400;
+  padding: 7px 10px; font-size: var(--fs-base); line-height: 1.45; font-weight: 400;
   text-align: left; white-space: normal; pointer-events: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }

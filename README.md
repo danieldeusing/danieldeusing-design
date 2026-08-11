@@ -173,7 +173,7 @@ silent accessibility regression that reads as a tidy-up in the diff:
 
 The panel sets `aria-describedby` on the anchor while it is shown and removes it on hide, so a
 `data-tip` is announced the way a `title` was. An `<option>`'s `title`/`data-tip` is carried onto the
-rendered `.select-option` by `initSelects()` — before 0.24.0 it was dropped, so per-option
+rendered `.select-option` by `initSelects()` — before 0.25.0 it was dropped, so per-option
 explanations were unreachable no matter which attribute they used.
 
 ## Repo layout

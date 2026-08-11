@@ -330,7 +330,7 @@ the string carries meaning (a trailing slash plus `drwxr-xr-x` says the thing ha
 must stay legible, only not compete. Going dimmer drops warm below 3:1. Going back to a flat token
 restores the bug.
 
-## A hover is `data-tip` — NEVER the native `title` (0.24.0, Daniel)
+## A hover is `data-tip` — NEVER the native `title` (0.25.0, Daniel)
 
 ```html
 <span data-tip="Explanation shown instantly on hover">metric</span>
@@ -429,7 +429,7 @@ every `required` select.
   in the page's own CSS via a class on the `<select>` (`.cfg-sel { width: 100% }`) acts on an
   element that is no longer in the flow, so it does nothing. Size `.select-field`.
 - **`title` and `data-tip` are copied to the trigger**, or the tooltip would be anchored to
-  something nobody can hover — and **since 0.24.0 an `<option>`'s pair is copied onto its rendered
+  something nobody can hover — and **since 0.25.0 an `<option>`'s pair is copied onto its rendered
   `.select-option` too**. Before that it was dropped: the panel replaces the native option list, so
   every per-option explanation ever written was unreachable, in either attribute. Labels are found
   the way the platform finds them — `aria-label`, then `aria-labelledby`, then a `<label>` by `for=`
@@ -632,7 +632,7 @@ every one of them has drifted. Adding a surface is one entry in that array.
 | `initMinimap({sections})` | Builds the left-gutter minimap: one bar per section, scroll-spy included, bar length by heading depth. Markup contract is NOTHING. Returns `null` for fewer than two sections — a map of one place is not a map. Use it INSTEAD of a text "On this page" column: that column repeated headings the reader was about to scroll past and cost the content its width. |
 | `initTableScroll()` | Gives every unwrapped `<table>` a `.tablewrap` parent so a wide table scrolls itself instead of scrolling the whole PAGE sideways. **The markup contract is nothing** — author a plain `<table>`; already-wrapped tables are left alone, so it is never a migration. **Tables rendered LATER are wrapped too** (0.23.0, MutationObserver), so a page that fetches its rows needs no second call. Colour the right-edge fade with `--tablewrap-fade` when the wrapper does not sit on `--background`. |
 | `initTablePagination()` | Pages every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. **Markup contract is one attribute**, and a table without it is left alone — the id cannot be guessed without silently reassigning readers' settings when a table moves. It has **no sort and no filter**: it hides all but one window of rows a page has *already* filtered and sorted, so the order is filter → sort → slice over the full set by construction. Turning the page writes `hidden` on rows and rebuilds no markup, so it composes with in-place patching. Tables rendered later are picked up by a MutationObserver. |
-| `initTooltips()` | One viewport-clamped panel for every `[data-tip]`, including nodes rendered later. Shows **instantly**, on hover AND focus, and sets `aria-describedby` on the anchor while open (0.24.0) so it is announced the way a `title` is. `src/tooltip.css` counterpart. **This REPLACES the native `title` — see below.** |
+| `initTooltips()` | One viewport-clamped panel for every `[data-tip]`, including nodes rendered later. Shows **instantly**, on hover AND focus, and sets `aria-describedby` on the anchor while open (0.25.0) so it is announced the way a `title` is. `src/tooltip.css` counterpart. **This REPLACES the native `title` — see below.** |
 
 The runtime is progressive enhancement: with JS off, content is visible and the theme is `warm`.
 

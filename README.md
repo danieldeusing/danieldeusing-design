@@ -150,6 +150,32 @@ Plain-CSS primitives in [`src/components.css`](src/components.css), usable anywh
 the `[data-term]` / `[data-term-out]` typing-animation contract · the `html.anim-off`
 kill-switch.
 
+## Tooltips: `data-tip`, never `title`
+
+```html
+<span data-tip="Explanation shown instantly on hover">metric</span>
+```
+
+`initTooltips()` renders one viewport-clamped panel for every `[data-tip]` on the page, including
+nodes added later. **Do not use the native `title` attribute for explanatory text.** A `title` waits
+about a second before appearing, is unstyled, is unreachable by keyboard on most engines, and does
+not exist at all on a touch screen — so on a phone the explanation is simply gone.
+
+**`title` does two unrelated jobs, and only one of them is a tooltip.** Getting this wrong is a
+silent accessibility regression that reads as a tidy-up in the diff:
+
+| the element | what `title` was doing | what to write |
+| --- | --- | --- |
+| has visible text | a description | `data-tip` |
+| an icon button, no text | the accessible **name** | `aria-label` |
+| an icon button that also wants a hover | both | `aria-label` **and** `data-tip` |
+| `<iframe>` / `<svg>` | the accessible name | leave `title` — there is no hover to replace |
+
+The panel sets `aria-describedby` on the anchor while it is shown and removes it on hide, so a
+`data-tip` is announced the way a `title` was. An `<option>`'s `title`/`data-tip` is carried onto the
+rendered `.select-option` by `initSelects()` — before 0.24.0 it was dropped, so per-option
+explanations were unreachable no matter which attribute they used.
+
 ## Repo layout
 
 ```

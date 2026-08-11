@@ -330,6 +330,44 @@ the string carries meaning (a trailing slash plus `drwxr-xr-x` says the thing ha
 must stay legible, only not compete. Going dimmer drops warm below 3:1. Going back to a flat token
 restores the bug.
 
+## A hover is `data-tip` — NEVER the native `title` (0.24.0, Daniel)
+
+```html
+<span data-tip="Explanation shown instantly on hover">metric</span>
+```
+
+`initTooltips()` handles every `[data-tip]`, including nodes rendered later. **Never use `title` for
+explanatory text on any danieldeusing surface.** The browser's tooltip waits about a second, is
+unstyled, is unreachable by keyboard on most engines, and **does not exist on a touch screen** —
+cockpit is read from a phone over the tailnet, so there the explanation is simply gone.
+
+**`title` does TWO unrelated jobs and only one of them is a tooltip.** This is the part that makes
+a bulk conversion dangerous, because getting it wrong is an accessibility regression that reads as
+a tidy-up in the diff:
+
+| the element | what `title` was doing | write |
+| --- | --- | --- |
+| has visible text | a description | `data-tip` |
+| an icon button with no text | the accessible **NAME** | `aria-label` |
+| an icon button that also wants a hover | both | `aria-label` **and** `data-tip` |
+| `<iframe>` / `<svg>` | the accessible name | leave `title` — no hover to replace |
+
+Converted estate-wide on 2026-08-10: **108 in cockpit and 3 in netmon**. Two traps found doing it,
+both of which would have shipped silently:
+
+- **`.anim-toggle` had a `title` and no `aria-label` on 35 pages** — its content is an aria-hidden
+  glyph, so `title` WAS the name. A blind rename leaves 35 buttons announced as "button". It now
+  carries both, and so does `templates/page-chrome.html`, which is where all 35 came from.
+- **`role="tooltip"` on the panel described nothing.** Nothing pointed the anchor at it, so
+  `data-tip` was announced to no one while the `title` it replaces IS announced — the swap would
+  have traded a slow tooltip for a silent one. `show()` now sets `aria-describedby` and `hide()`
+  removes it, including when moving between anchors.
+
+**netmon carries its own inline copy** of this component (it loads tokens+chrome, never
+components.css). When `runtime/tooltip.js` changes, `deploy/netmon/index.html` changes with it —
+that duplication is deliberate but it is not automatic. `bin/cockpit-render-check` fails a native
+`title` on any cockpit page or on netmon, and fails an icon toggle that lost its name.
+
 ## A `<select>` is enhanced AUTOMATICALLY (0.21.0) — write plain HTML, add nothing
 
 ```html
@@ -365,9 +403,12 @@ every `required` select.
   in the page's own CSS via a class on the `<select>` (`.cfg-sel { width: 100% }`) acts on an
   element that is no longer in the flow, so it does nothing. Size `.select-field`.
 - **`title` and `data-tip` are copied to the trigger**, or the tooltip would be anchored to
-  something nobody can hover. Labels are found the way the platform finds them —
-  `aria-label`, then `aria-labelledby`, then a `<label>` by `for=` or by wrapping — and the
-  trigger's name becomes *label + current value*, as a native select announces.
+  something nobody can hover — and **since 0.24.0 an `<option>`'s pair is copied onto its rendered
+  `.select-option` too**. Before that it was dropped: the panel replaces the native option list, so
+  every per-option explanation ever written was unreachable, in either attribute. Labels are found
+  the way the platform finds them — `aria-label`, then `aria-labelledby`, then a `<label>` by `for=`
+  or by wrapping — and the trigger's name becomes *label + current value*, as a native select
+  announces.
 - **The opt-outs are real ones**: `multiple` and `size > 1` are left alone (the platform renders
   those inline; there is no popup to replace), and `data-select="off"` skips a select entirely.
 - **Selection is NOT marked by colour, and that is arithmetic.** `--primary` against
@@ -565,7 +606,7 @@ every one of them has drifted. Adding a surface is one entry in that array.
 | `initMinimap({sections})` | Builds the left-gutter minimap: one bar per section, scroll-spy included, bar length by heading depth. Markup contract is NOTHING. Returns `null` for fewer than two sections — a map of one place is not a map. Use it INSTEAD of a text "On this page" column: that column repeated headings the reader was about to scroll past and cost the content its width. |
 | `initTableScroll()` | Gives every unwrapped `<table>` a `.tablewrap` parent so a wide table scrolls itself instead of scrolling the whole PAGE sideways. **The markup contract is nothing** — author a plain `<table>`; already-wrapped tables are left alone, so it is never a migration. **Tables rendered LATER are wrapped too** (0.23.0, MutationObserver), so a page that fetches its rows needs no second call. Colour the right-edge fade with `--tablewrap-fade` when the wrapper does not sit on `--background`. |
 | `initTablePagination()` | Pages every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. **Markup contract is one attribute**, and a table without it is left alone — the id cannot be guessed without silently reassigning readers' settings when a table moves. It has **no sort and no filter**: it hides all but one window of rows a page has *already* filtered and sorted, so the order is filter → sort → slice over the full set by construction. Turning the page writes `hidden` on rows and rebuilds no markup, so it composes with in-place patching. Tables rendered later are picked up by a MutationObserver. |
-| `initTooltips()` | `src/tooltip.css` counterpart. |
+| `initTooltips()` | One viewport-clamped panel for every `[data-tip]`, including nodes rendered later. Shows **instantly**, on hover AND focus, and sets `aria-describedby` on the anchor while open (0.24.0) so it is announced the way a `title` is. `src/tooltip.css` counterpart. **This REPLACES the native `title` — see below.** |
 
 The runtime is progressive enhancement: with JS off, content is visible and the theme is `warm`.
 

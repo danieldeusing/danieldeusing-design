@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.24.0 (2026-08-11)
+
+### A hover is `data-tip`, and the native `title` is gone from the estate
+
+Daniel: use the custom hover everywhere, never the system one. A `title` waits about a second before
+appearing, is unstyled, is unreachable by keyboard on most engines, and **does not exist at all on a
+touch screen** — cockpit is read from a phone over the tailnet, so there the explanation was simply
+gone. 108 native titles in cockpit and 3 in netmon were converted in one pass.
+
+**`title` does two unrelated jobs, and the conversion is not a rename.** On an element with visible
+text it is a description (`data-tip`); on an icon button with no text it is the accessible NAME
+(`aria-label`). `.anim-toggle` was the second kind on 35 pages with no `aria-label` at all, so a
+blind rename would have left 35 buttons announced as "button" — a silent accessibility regression
+that reads as a tidy-up in the diff. `templates/page-chrome.html`, where all 35 came from, now
+carries both.
+
+- **`initTooltips()` sets `aria-describedby` on the anchor while the panel is open**, and removes it
+  on hide and when moving between anchors. `role="tooltip"` alone describes nothing: the panel was a
+  div no screen reader reached, so `data-tip` was announced to nobody while the `title` it replaces
+  IS announced. Without this, converting an estate from `title` to `data-tip` — the entire point of
+  the component — trades a slow tooltip for a silent one.
+- **`initSelects()` carries an `<option>`'s `title`/`data-tip` onto its rendered `.select-option`.**
+  The panel replaces the native option list, so per-option explanations were unreachable in either
+  attribute; every one written so far had been doing nothing. Same reasoning the trigger's own copy
+  has always stated: a tooltip anchored to something nobody can hover never shows.
+
+
 jsDelivr serves the committed `dist/` bundle per git tag, so every release is cut as an
 immutable tag (`vX.Y.Z`).
 

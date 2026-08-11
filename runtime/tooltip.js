@@ -4,6 +4,18 @@
  * Markup contract:
  *   <span data-tip="Explanation shown on hover">metric</span>
  *
+ * THIS REPLACES THE NATIVE `title`, AND THAT IS THE POINT. A `title` is the browser's tooltip: it
+ * appears after roughly a second of hovering, is unstyled, cannot be reached by keyboard on most
+ * engines, and does not exist at all on a touch screen. `data-tip` shows INSTANTLY, wears the
+ * estate's own look, opens on focus as well as hover, and is clamped into the viewport.
+ *
+ * NAME vs DESCRIPTION — the distinction that makes the swap safe, and the one it is easy to get
+ * wrong. `title` does two unrelated jobs, and only one of them belongs here:
+ *   · on an element with visible text, `title` is a DESCRIPTION → `data-tip`.
+ *   · on an icon button with no text, `title` is the element's accessible NAME → `aria-label`.
+ *     Replacing that one with `data-tip` alone leaves a button announced as "button".
+ * An icon button that also wants a hover takes BOTH: `aria-label` names it, `data-tip` explains it.
+ *
  * One singleton panel (`#ddtip`, styled in src/tooltip.css) is appended to
  * <body> and positioned with `position: fixed`, so it escapes every overflow/
  * clip context and always renders on top. Placement prefers below the anchor,
@@ -20,7 +32,17 @@ export function initTooltips() {
 
   let anchor = null;
   function show(el) {
+    // POINT THE ANCHOR AT THE PANEL. `role="tooltip"` alone describes nothing: without
+    // aria-describedby the panel is a div a screen reader never reaches, so `data-tip` was
+    // announced to nobody while the native `title` it replaces IS announced. Any estate converting
+    // `title` to `data-tip` — which is the whole point of this component — would have been trading
+    // a slow tooltip for a silent one.
+    //
+    // Set per show and REMOVED on hide rather than written once at init: a stale describedby
+    // pointing at a hidden panel makes every anchor claim a description it is not showing.
+    if (anchor && anchor !== el) anchor.removeAttribute("aria-describedby");
     anchor = el;
+    el.setAttribute("aria-describedby", "ddtip");
     tip.textContent = el.getAttribute("data-tip");
     tip.style.display = "block";
     tip.style.left = "0px";
@@ -47,6 +69,7 @@ export function initTooltips() {
     tip.style.top = y / zoom + "px";
   }
   function hide() {
+    if (anchor) anchor.removeAttribute("aria-describedby");
     anchor = null;
     tip.style.display = "none";
   }

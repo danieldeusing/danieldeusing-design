@@ -215,6 +215,14 @@ function buildPanel(instance) {
     item.setAttribute("role", "option");
     item.setAttribute("aria-selected", String(index === instance.select.selectedIndex));
     if (option.disabled) item.setAttribute("aria-disabled", "true");
+    // PER-OPTION TOOLTIPS, for the reason the trigger's own copy above states: a tooltip anchored
+    // to a control nobody can hover never shows. The native option list is replaced by this panel,
+    // so an `<option title="…">` was not merely styled differently — it was unreachable, and every
+    // one written so far has been silently doing nothing.
+    for (const attribute of ["title", "data-tip"]) {
+      const text = option.getAttribute(attribute);
+      if (text !== null) item.setAttribute(attribute, text);
+    }
     item.textContent = label(option);
     item.dataset.index = String(index);
     instance.items[index] = item;

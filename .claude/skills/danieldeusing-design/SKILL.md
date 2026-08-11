@@ -336,6 +336,32 @@ restores the bug.
 <span data-tip="Explanation shown instantly on hover">metric</span>
 ```
 
+### The marker is an ⓘ, NEVER an underline (0.25.0, Daniel)
+
+**Write nothing extra — the ⓘ comes from the stylesheet.** `span`, `th` and `button` carrying
+`data-tip` get it from `::after`, so every existing call site gained one on upgrade.
+
+```html
+<span data-tip="…">budget</span>          <!-- renders: budget ⓘ -->
+<span data-tip="…">budget ⓘ</span>        <!-- WRONG — two glyphs -->
+```
+
+Until 0.25.0 this was a dotted `border-bottom`, and an underline is the wrong signal twice over: it
+is the web's mark for a LINK, so a dotted one reads as a link that is broken or disabled, and it
+vanishes in a table header or against a busy row — which is exactly where these sit. Two cockpit
+pages had already hand-rolled the ⓘ, which is the estate telling you the answer; 0.25.0 made it the
+system's, and those local copies were deleted in the same pass.
+
+**Never write the glyph in markup.** If you are typing `ⓘ` or `&#9432;` on a danieldeusing surface,
+the stylesheet is already doing it and you are about to ship two.
+
+**An element that is already its own affordance opts out** — a minimap bar jumps to a section, a
+chart segment names a series, and neither is an invitation to hover for prose:
+
+```html
+<span data-tip="…" data-tip-bare>2026-08-11</span>   <!-- tip, no glyph -->
+```
+
 `initTooltips()` handles every `[data-tip]`, including nodes rendered later. **Never use `title` for
 explanatory text on any danieldeusing surface.** The browser's tooltip waits about a second, is
 unstyled, is unreachable by keyboard on most engines, and **does not exist on a touch screen** —

@@ -4,7 +4,43 @@
  * clipped by overflow containers and always sits on top.
  */
 [data-tip] { cursor: help; }
-span[data-tip], th[data-tip] { border-bottom: 1px dotted var(--muted-foreground); }
+
+/*
+ * THE MARKER IS AN ⓘ, NEVER AN UNDERLINE (Daniel, 2026-08-11).
+ *
+ * This used to be `border-bottom: 1px dotted`, and an underline is the wrong signal twice over: it
+ * is the web's mark for a LINK, so a dotted one reads as "a link that is broken or disabled", and
+ * it is invisible in a table header or against a busy row — exactly where these tips live. The
+ * estate already had the right answer in two cockpit pages, hand-rolled: a small ⓘ after the label.
+ * This makes it the system's answer, so every consumer gets it from one place and nobody writes a
+ * third variant.
+ *
+ * SCOPED to the elements that carry INFORMATIONAL text — the same span/th the underline was on,
+ * plus button, which is what cockpit's accessible variant uses. A `[data-tip]` on something already
+ * meaningful on its own (the minimap bar jumps to a section; a chart segment names a series) must
+ * not grow a glyph, so the marker is opt-in by element type rather than applied to everything.
+ *
+ * `::after` rather than markup so no consumer has to change: 154 call sites across cockpit, netmon,
+ * docs and danieldeusing.de already say `data-tip="…"` and every one of them gets the icon by
+ * loading this file.
+ */
+span[data-tip]::after,
+th[data-tip]::after,
+button[data-tip]::after {
+  content: "\FE0E\24D8";          /* ⓘ, with VS15 so it stays a glyph and never an emoji */
+  margin-inline-start: 0.35em;
+  color: var(--muted-foreground);
+  font-size: 0.9em;
+  font-weight: 400;
+  /* The glyph is decoration: it must not be dragged into a copied selection, and it must not shift
+     the baseline of the label it follows. */
+  user-select: none;
+  vertical-align: baseline;
+}
+
+/* Opt OUT, for a [data-tip] whose element is already its own affordance. */
+.minimap-bar[data-tip]::after,
+[data-tip][data-tip-bare]::after { content: none; }
 
 #ddtip {
   position: fixed; z-index: 9999; display: none; max-width: 340px;

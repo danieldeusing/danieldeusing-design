@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.25.0 (2026-08-11)
+
+### The tooltip marker is an ⓘ, never an underline
+
+Daniel: the estate already had an info icon for this, so the underlined text is redundant — use the
+icon everywhere and never the underline.
+
+`span[data-tip]`, `th[data-tip]` and `button[data-tip]` now render a muted ⓘ from `::after`. It
+replaces the dotted `border-bottom`, which was the wrong signal twice over: an underline is the
+web's mark for a LINK, so a dotted one reads as a link that is broken or disabled, and it disappears
+entirely in a table header or against a busy row — which is exactly where these tips live.
+
+**No consumer had to change.** The marker is `::after` rather than markup, so all 154 existing
+`data-tip` call sites across cockpit, netmon, docs and danieldeusing.de gained the icon by loading
+this release. Three hand-rolled ⓘ in cockpit (`automation-config`, `automation-cicd`,
+`automation-review`) were deleted in the same pass — they were the estate arriving at the right
+answer locally, and leaving them would have rendered two glyphs.
+
+Opt out with `data-tip-bare` for an element that is already its own affordance — a minimap bar jumps
+to a section, a chart segment names a series, and neither is an invitation to hover for prose.
+`.minimap-bar` opts out by name. Print drops the glyph, as it dropped the underline: paper cannot be
+hovered.
+
 ## 0.24.0 (2026-08-11)
 
 ### A hover is `data-tip`, and the native `title` is gone from the estate

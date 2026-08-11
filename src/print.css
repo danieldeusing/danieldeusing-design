@@ -143,9 +143,12 @@
   [data-tip] {
     cursor: auto;
   }
-  span[data-tip],
-  th[data-tip] {
-    border-bottom: 0;
+  /* The ⓘ is an invitation to hover, and paper cannot be hovered — so the marker goes, exactly as
+     the dotted underline it replaced did. The tip TEXT was never printed either way. */
+  span[data-tip]::after,
+  th[data-tip]::after,
+  button[data-tip]::after {
+    content: none;
   }
 
   /* ── layout: the page is the column ────────────────────────────────────

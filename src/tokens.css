@@ -235,6 +235,19 @@ html[data-theme="paper"] {
   --fs-base: 0.75rem;   /* 12px — ALL normal text: body, tables, labels, badges, notes, controls */
   --fs-lg: 0.9375rem;   /* 15px — h3 / section heads */
   --fs-xl: 1.125rem;    /* 18px — h2 / page title */
+
+  /* ── VERTICAL RHYTHM BETWEEN SECTIONS ──────────────────────────────────────
+     The reset zeroes every margin (`* { margin: 0 }`) and nothing here ever put
+     heading spacing back, so for as long as this package has existed each
+     surface has invented its own gap. cockpit carries
+     `section.doc { margin-top: 2.5rem }` privately in portal.css; the family
+     financing page had nothing at all and read as one unbroken column. Two
+     surfaces, two answers, and the drift is invisible until they are seen side
+     by side — which is the whole reason this package exists.
+
+     2.5rem is cockpit's existing value, promoted rather than invented, so the
+     surface that already had a considered answer does not move. */
+  --space-section: 2.5rem;
   --fs-2xl: 1.5rem;     /* 24px — h1 / hero, display only */
 
   --lh-tight: 1.3;      /* headings and single-line chrome */

@@ -98,13 +98,13 @@
          on docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.27.0/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.27.0.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.28.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.28.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.27.0/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.27.0.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.28.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.28.0.fonts.css'"
     />
 
     <style>
@@ -298,7 +298,9 @@ flowchart TD
     B -- no --> D["{{FLOW_NO}}"]
 
     class D warn
-    classDef warn fill:#a02c2c22,stroke:var(--destructive, #a02c2c),stroke-width:2px
+    %% Literal hex only: a comma inside var() splits Mermaid's style list and the
+    %% whole diagram fails to parse, falling back to its source silently.
+    classDef warn fill:#a02c2c22,stroke:#a02c2c,stroke-width:2px
 </pre>
             </div>
           </section>
@@ -341,7 +343,7 @@ flowchart TD
 
     <script type="module">
       import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom, initMinimap, initTooltips } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.27.0/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.28.0/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();

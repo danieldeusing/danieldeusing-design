@@ -4,6 +4,38 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.28.0 (2026-08-15)
+
+### Sections have a gap. It is the system's now, not each surface's.
+
+Daniel, on the family financing dashboard: *"We need more space between sections."* The page was
+right to look cramped — it had no section spacing at all, and neither did this package.
+
+`reset.css` sets `* { margin: 0 }` and nothing ever put heading spacing back. So every surface has
+been inventing its own answer in private: cockpit carries `section.doc { margin-top: 2.5rem }` and
+`section.doc h2 { margin: 0.3rem 0 0 }` in `portal.css`, and the family site had nothing whatsoever.
+Two surfaces, two answers, and the difference is invisible until they are opened side by side —
+which is the exact drift this package exists to remove.
+
+**New token `--space-section`, default `2.5rem`.** Cockpit's existing value, promoted rather than
+invented, so the surface that already had a considered answer does not move a pixel.
+
+**New rules, all at specificity ZERO.** Every selector is wrapped in `:where()`, which is what makes
+this safe to add to a package five surfaces already depend on: any declaration a surface already
+carries beats these outright, with no `!important` and no load-order argument. Nothing that had an
+answer changes; only surfaces that had none gain one.
+
+- `section + section` and `section.doc` get `--space-section` above them
+- `h2` gets `--space-section`, `h3` gets 60% of it — but never as the first child of its container,
+  where the container's own spacing already provides the gap and doubling the two is the usual
+  reason a first section sits oddly low
+- a `p`, `table`, `.tablewrap`, `svg` or `.legend` directly after a heading gets `0.6rem`, because
+  content belongs to the heading above it — the rhythm is BETWEEN sections, not inside them
+
+If your surface still declares its own section or heading margins, it is now a fork: delete it and
+take the token, or retune `--space-section` locally if that surface genuinely needs a different
+density.
+
 ## 0.27.0 (2026-08-11)
 
 ### One size for text. The four that were one pixel apart are gone.

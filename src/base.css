@@ -139,3 +139,40 @@ body::after {
   background: var(--primary);
   color: var(--primary-foreground);
 }
+
+
+/* ── SECTION AND HEADING RHYTHM ────────────────────────────────────────────────
+   Wrapped in :where(), so every one of these rules has specificity ZERO. That is
+   deliberate and it is what makes this safe to add to a package five surfaces
+   already depend on: any existing declaration a surface carries — cockpit's
+   `section.doc h2 { margin: 0.3rem 0 0 }`, for instance — beats these without
+   needing !important or a load-order argument. Nothing that already had an
+   answer changes; only surfaces that had NO answer gain one.
+
+   Sections and headings, not a generic `* + *` stack, because the gap that reads
+   as "a new part of the page starts here" is a different quantity from the gap
+   between two paragraphs, and collapsing them is what makes a long page feel
+   like an undifferentiated column. */
+:where(section) + :where(section),
+:where(section.doc) {
+  margin-block-start: var(--space-section);
+}
+
+/* A heading that opens its container needs no gap above it — the container's own
+   spacing already provides it, and doubling the two is the usual cause of a
+   first section sitting oddly low. */
+:where(section, .wrap, .body) > :where(h2) {
+  margin-block-start: var(--space-section);
+}
+:where(section, .wrap, .body) > :where(h3) {
+  margin-block-start: calc(var(--space-section) * 0.6);
+}
+:where(section, .wrap, .body) > :where(h2, h3):first-child {
+  margin-block-start: 0;
+}
+
+/* A table or a chart immediately under its heading belongs to that heading, so
+   the gap there is small — the rhythm is BETWEEN sections, not inside them. */
+:where(h2, h3) + :where(p, table, .tablewrap, svg, .legend) {
+  margin-block-start: 0.6rem;
+}

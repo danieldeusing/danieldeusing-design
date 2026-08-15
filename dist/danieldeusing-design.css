@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.28.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.28.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -516,6 +516,25 @@ body::after {
 /* A table or a chart immediately under its heading belongs to that heading, so
    the gap there is small — the rhythm is BETWEEN sections, not inside them. */
 :where(h2, h3) + :where(p, table, .tablewrap, svg, .legend) {
+  margin-block-start: 0.6rem;
+}
+
+/* …and the same gap when a NOTE sits between the two. `h2 + p` and `h2 + table`
+   were both covered above, but the very common shape
+
+     <h2>spend by category</h2>
+     <p class="comment">Trailing twelve months.</p>
+     <table>…</table>
+
+   fell through: `p + table` had no rule, the reset zeroes margins, and the note
+   rendered flush against the table at 0px — measured on the family financing
+   page, which worked around it privately with its own class. That is the drift
+   this section exists to remove, so the rule belongs here.
+
+   Deliberately not scoped to `.comment`: the shape is "explanatory line, then the
+   thing it explains", and the class the line happens to carry is not what makes
+   it true. */
+:where(p) + :where(table, .tablewrap, svg, .legend) {
   margin-block-start: 0.6rem;
 }
 

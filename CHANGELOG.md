@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.28.1 (2026-08-15)
+
+### A note between a heading and its table gets the same gap the table would have
+
+0.28.0 gave `h2 + p` and `h2 + table` a 0.6rem gap, and missed the shape that sits between them:
+
+```html
+<h2>spend by category</h2>
+<p class="comment">Trailing twelve months.</p>
+<table>…</table>
+```
+
+`p + table` had no rule, the reset zeroes every margin, and the note rendered flush against the
+table — measured at 0px on the family financing page, which worked around it with a private class
+of its own. A surface inventing a gap in private is the exact drift 0.28.0 was written to remove,
+so the rule belongs here rather than there.
+
+Not scoped to `.comment`: the shape is "an explanatory line, then the thing it explains", and the
+class the line happens to carry is not what makes that true. Zero specificity like the rest of the
+block, so any surface that already had an answer keeps it.
+
 ## 0.28.0 (2026-08-15)
 
 ### Sections have a gap. It is the system's now, not each surface's.

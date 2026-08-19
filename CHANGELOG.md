@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.32.0 (2026-08-19)
+
+### `data-table-search="off"` — for a page whose own search is richer
+
+`initTableTools()` always added a search box over every column's rendered text. That is
+the wrong trade where a page already searches something the table does not show: the
+contacts book greps a haystack built from descriptions and conversation summaries, so
+replacing its box would silently stop finding a thing that was *said*. Two search boxes
+over one table is worse than either.
+
+`data-table-search="off"` suppresses the built-in box and nothing else — per-column
+filters, sort and the view bar are unchanged, and the bar then never claims a search it
+has no field to show.
+
 ## 0.31.0 (2026-08-19)
 
 ### The table tools survive a re-render, and a detail row follows its parent

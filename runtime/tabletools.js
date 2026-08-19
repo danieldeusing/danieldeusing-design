@@ -477,6 +477,18 @@ function enhance(table) {
   // that need one. Same reasoning as the pager's anchor, opposite side.
   const anchor = table.closest(".tablewrap") || table;
 
+  /*
+   * `data-table-search="off"` — for a page whose OWN search is richer than this
+   * one can be. The contacts book searches a haystack built from descriptions
+   * and conversation summaries, none of which is in a cell; replacing it with a
+   * box that only sees rendered text would silently stop finding a thing that
+   * was said. Two search boxes over one table is worse than either.
+   *
+   * The per-column filters, the sort and the view bar are unaffected — this
+   * turns off the built-in box only, and the bar then never claims a search.
+   */
+  const wantsSearch = table.getAttribute("data-table-search") !== "off";
+
   const toolbar = document.createElement("div");
   toolbar.className = "tbl-toolbar";
   const search = document.createElement("input");
@@ -490,8 +502,12 @@ function enhance(table) {
     inst.view.search = search.value.trim().toLowerCase();
     save(inst); applyTableView(table);
   });
-  toolbar.appendChild(search);
-  inst.searchInput = search;
+  if (wantsSearch) {
+    toolbar.appendChild(search);
+    inst.searchInput = search;
+  } else {
+    inst.view.search = "";       // a restored search with no box is invisible in force
+  }
 
   const bar = document.createElement("div");
   bar.className = "tbl-view";
@@ -505,7 +521,7 @@ function enhance(table) {
   });
   inst.bar = bar;
 
-  anchor.before(toolbar);
+  if (wantsSearch) anchor.before(toolbar);
   anchor.before(bar);
 
   // snapshot() builds the header controls itself when they are absent, and it

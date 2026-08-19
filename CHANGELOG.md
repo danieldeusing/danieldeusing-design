@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.33.0 (2026-08-19)
+
+### An active filter marks its own column — the `.tbl-view` bar is gone
+
+0.30.0 put "what is in force" in a strip above the table, promoted from cockpit's
+`.act-view`. Daniel rejected it, and the objection is right: a separate strip is a
+second place to look, it costs a line of vertical space on every filtered table, and
+it prints `relationship = family` a long way from the relationship column.
+
+A filtering column now marks itself — the header takes the primary colour and an
+underline, and carries a **badge with the selected value**. The badge is a button that
+clears that column's filter, so the way back is attached to the thing it undoes rather
+than parked at the end of a strip. The header also cannot be scrolled off a long table,
+which the bar could.
+
+`.tbl-view`, `.tbl-view-lead` and `.tbl-view-chip` are removed along with the reset
+button; `th.is-filtered` and `.tbl-badge` replace them. The badge and its underline
+print, because a silently filtered table on paper is the same failure with no way to
+interrogate it.
+
 ## 0.32.0 (2026-08-19)
 
 ### `data-table-search="off"` — for a page whose own search is richer

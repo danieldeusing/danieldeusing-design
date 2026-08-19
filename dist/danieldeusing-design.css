@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.32.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.33.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1695,39 +1695,40 @@ th[aria-sort]:not([aria-sort="none"]) .tbl-sort { opacity: 1; color: var(--prima
   max-inline-size: 100%;
 }
 
-/* ── WHAT IS IN FORCE, AND THE WAY BACK ───────────────────────────────────────
-   A table that is already withholding rows for a reason nobody on screen gave is
-   the failure this prevents: an empty table and a filtered one look nearly
-   identical. The bar names every filter and any non-default sort, and carries
-   the only way back.
+/* ── WHAT IS IN FORCE GOES ON THE COLUMN ──────────────────────────────────────
+   Not a bar above the table (Daniel, 2026-08-19). A separate strip is a second
+   place to look, costs a line of vertical space on every filtered table, and
+   prints "relationship = family" a long way from the relationship column. The
+   header is where the reader already is when they wonder where a row went — and
+   unlike a bar it cannot be scrolled off a long table.
 
-   `[hidden]` IS NOT OPTIONAL. `[hidden] { display: none }` is a UA rule at the
-   lowest specificity, so `display: flex` here would beat it and the bar would
-   render on every table whether or not anything was in force — the indicator
-   wearing the very fault it reports. */
-.tbl-view {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin-block-end: 0.6rem;
-  padding: 0.35rem 0.6rem;
-  font-size: var(--fs-base);
-  border-inline-start: 3px solid var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, var(--background));
+   The badge is a BUTTON that clears the column's filter, so the way back is
+   attached to the thing it undoes rather than parked at the end of a strip. */
+th.is-filtered {
+  color: var(--primary);
+  box-shadow: inset 0 -2px 0 var(--primary);
 }
-.tbl-view[hidden] { display: none; }
-.tbl-view-lead { color: var(--primary); font-weight: 700; }
-.tbl-view-lead::before { content: "▸ "; }
-.tbl-view-chip {
-  border: 1px solid var(--border);
-  background: var(--card);
-  padding: 0.05rem 0.4rem;
+.tbl-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25em;
+  margin-inline-start: 0.4rem;
+  max-inline-size: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  font: inherit;
+  font-size: var(--fs-base);
+  line-height: 1.2;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--background));
+  border: 1px solid var(--primary);
+  padding: 0 0.35em;
+  cursor: pointer;
 }
-/* The way out sits at the far end of the line it undoes, and falls in beside the
-   chips when the row wraps on a phone rather than stranding itself on a line. */
-.tbl-view [data-view-reset] { margin-inline-start: auto; }
+.tbl-badge::after { content: "×"; opacity: 0.7; }
+.tbl-badge:hover { background: color-mix(in srgb, var(--primary) 22%, var(--background)); }
+.tbl-badge:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 
 @media (pointer: coarse) {
   .tbl-sort, .tbl-filter > summary { min-inline-size: 44px; min-block-size: 44px;
@@ -1735,8 +1736,11 @@ th[aria-sort]:not([aria-sort="none"]) .tbl-sort { opacity: 1; color: var(--prima
 }
 @media print {
   .tbl-toolbar, .tbl-tools { display: none !important; }
-  /* The bar PRINTS. A printed table that is silently filtered is the same
-     failure on paper, with no way to interrogate it at all. */
+  /* The BADGE prints, and the underline with it. A printed table that is
+     silently filtered is the same failure on paper, with no way to interrogate
+     it at all — so the one part that says which rows are missing stays. */
+  .tbl-badge { border-color: currentColor; background: none; }
+  .tbl-badge::after { content: ""; }
 }
 
 /* ===== chrome.css ===== */

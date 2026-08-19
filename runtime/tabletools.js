@@ -230,7 +230,7 @@ export function applyTableView(table) {
   inst.lastWritten = [...body.rows];
 
   paintHeader(inst);
-  paintBar(inst);
+  paintHeaderBadges(inst);
 }
 
 function paintHeader(inst) {
@@ -243,46 +243,45 @@ function paintHeader(inst) {
   }
 }
 
-function paintBar(inst) {
-  const view = inst.view, bar = inst.bar;
-  const chips = [];
-  const chip = (text, title) => {
-    const s = document.createElement("span");
-    s.className = "tbl-view-chip";
-    s.textContent = text;
-    if (title) s.title = title;
-    return s;
-  };
-  const active = activeFilters(inst, view);
+/*
+ * WHAT IS IN FORCE GOES ON THE COLUMN, not in a bar above the table (Daniel,
+ * 2026-08-19). A separate strip is a second place to look, it costs a line of
+ * vertical space on every filtered table, and it says "relationship = family"
+ * a long way from the relationship column. The header is where the reader
+ * already is when they wonder where a row went.
+ *
+ * So a filtering column wears two things: a highlight, and a badge carrying the
+ * value. The badge is a button — clicking it clears that column's filter, which
+ * is the way back the bar used to provide, now attached to the thing it undoes.
+ */
+function paintHeaderBadges(inst) {
   for (const col of inst.columns) {
-    const value = active[col.key];
-    if (!value) continue;
+    const value = inst.view.filters[col.key];
+    col.th.classList.toggle("is-filtered", Boolean(value));
+    let badge = col.badge;
+    if (!value) {
+      if (badge) { badge.remove(); col.badge = null; }
+      continue;
+    }
+    if (!badge || !badge.isConnected) {
+      badge = document.createElement("button");
+      badge.type = "button";
+      badge.className = "tbl-badge";
+      badge.addEventListener("click", (event) => {
+        event.stopPropagation();
+        inst.view.filters[col.key] = "";
+        if (col.filterInput) col.filterInput.value = "";
+        save(inst); applyTableView(inst.table);
+      });
+      col.th.appendChild(badge);
+      col.badge = badge;
+    }
     const exact = col.filter === "pick";
-    chips.push(chip(col.label + (exact ? " = " : " ~ ") + value,
-      exact ? `${col.label} is exactly “${value}”` : `${col.label} contains “${value}”`));
+    badge.textContent = value;
+    badge.title = (exact ? `${col.label} is exactly “${value}”` : `${col.label} contains “${value}”`)
+                  + " — click to clear";
+    badge.setAttribute("aria-label", `clear the ${col.label} filter`);
   }
-  if (view.search) chips.push(chip("search ~ " + view.search, `any column contains “${view.search}”`));
-  if (view.sortKey !== inst.defaultSortKey || view.dir !== inst.defaultDir) {
-    const col = inst.columns.find((c) => c.key === view.sortKey);
-    if (col) chips.push(chip(`sorted by ${col.label} ${view.dir === 1 ? "▲" : "▼"}`,
-      `sorted by ${col.label}, ${view.dir === 1 ? "ascending" : "descending"}`));
-  }
-
-  bar.textContent = "";
-  if (!chips.length) { bar.hidden = true; return; }
-  const lead = document.createElement("span");
-  lead.className = "tbl-view-lead";
-  lead.title = "This table remembers its filters and its sort in this browser. Reset view puts it back to the order and the rows it ships with.";
-  lead.textContent = "saved view";
-  bar.appendChild(lead);
-  for (const c of chips) bar.appendChild(c);
-  const reset = document.createElement("button");
-  reset.type = "button";
-  reset.className = "btn-terminal btn-terminal--ghost btn-terminal--compact";
-  reset.setAttribute("data-view-reset", "");
-  reset.textContent = "reset view";
-  bar.appendChild(reset);
-  bar.hidden = false;
 }
 
 function buildHeaderControls(inst) {
@@ -412,6 +411,7 @@ function snapshot(inst) {
       col.filterInput = prev.filterInput;
       col.sortBtn = prev.sortBtn;
       col.filterWrap = prev.filterWrap;
+      col.badge = prev.badge;
     }
     inst.columns = fresh;
     if (!inst.table.querySelector(".tbl-tools")) buildHeaderControls(inst);
@@ -509,20 +509,8 @@ function enhance(table) {
     inst.view.search = "";       // a restored search with no box is invisible in force
   }
 
-  const bar = document.createElement("div");
-  bar.className = "tbl-view";
-  bar.hidden = true;
-  bar.addEventListener("click", (event) => {
-    if (!event.target.closest("[data-view-reset]")) return;
-    inst.view = defaults(inst);
-    if (inst.searchInput) inst.searchInput.value = "";
-    for (const col of inst.columns) if (col.filterInput) col.filterInput.value = "";
-    save(inst); applyTableView(table);
-  });
-  inst.bar = bar;
 
   if (wantsSearch) anchor.before(toolbar);
-  anchor.before(bar);
 
   // snapshot() builds the header controls itself when they are absent, and it
   // must run FIRST: a `pick` column's option list is derived from the rows, so

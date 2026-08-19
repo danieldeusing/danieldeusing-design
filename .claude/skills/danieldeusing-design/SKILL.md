@@ -605,11 +605,16 @@ reads as a form to fill in, and the estate grew four incompatible versions of it
 cockpit's `tr.act-filters`, cockpit's older `tr.filters`, and the family contacts table's
 bare boxes, which is the one that prompted this rule.
 
-**3. What is in force must be on screen, with the way back.** `initTableTools()` renders
-`.tbl-view` above the table: a chip per active filter (`relationship = family`,
-`search ~ pix`), a chip for a non-default sort, and a `reset view` button. The filtering
-column also marks itself in the header, because the bar can be scrolled off a long table
-and the header cannot.
+**3. What is in force marks its own column.** A filtering column's header takes the
+primary colour and an underline and carries a **badge with the selected value**; the
+badge is a button that clears that filter. Sort direction shows as `▲`/`▼` on the same
+header.
+
+**Not a bar above the table.** 0.30.0 shipped one — a `.tbl-view` strip with a chip per
+filter — and it was removed in 0.33.0. A separate strip is a second place to look, costs
+a line of vertical space on every filtered table, prints `relationship = family` a long
+way from the relationship column, and can be scrolled off a long table. The header
+cannot. Do not reintroduce one.
 
 This is not decoration. The view is remembered per table across a browser restart, so a
 reader can arrive at a table that is already withholding rows for a reason nobody on

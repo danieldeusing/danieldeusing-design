@@ -231,6 +231,18 @@ export function applyTableView(table) {
 
   paintHeader(inst);
   paintHeaderBadges(inst);
+
+  /*
+   * A page that prints its own "N of M" has to be told, or it reports the count
+   * from before the filter and quietly contradicts the table under it. Both
+   * family pages do exactly that — the contacts book's "6 of 1167" and the
+   * ledger's "N of M rows · net €X" are computed by the page, from the page's
+   * own filtering, and neither can see a column filter applied here.
+   */
+  table.dispatchEvent(new CustomEvent("tbl:applied", {
+    bubbles: true,
+    detail: { shown: keep.length, hidden: drop.length, total: inst.allRows.length },
+  }));
 }
 
 function paintHeader(inst) {

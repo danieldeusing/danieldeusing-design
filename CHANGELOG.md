@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.35.0 (2026-08-19)
+
+### `tbl:applied` — so a page's own row count cannot contradict the table
+
+A page that prints its own "N of M" computes it from its own filtering and cannot see a
+column filter applied here, so the line goes stale the moment one is used. Both family
+pages do this: the contacts book's "6 of 1167 · 1036 quiet hidden" and the ledger's
+"N of M rows · net €X".
+
+`initTableTools()` now dispatches `tbl:applied` on the table after every apply, with
+`detail: { shown, hidden, total }`. A page that keeps its own count listens and rewrites
+it; a page that does not is unaffected.
+
 ## 0.34.0 (2026-08-19)
 
 ### The filter badge sits on the label's line

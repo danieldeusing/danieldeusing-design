@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.34.0 (2026-08-19)
+
+### The filter badge sits on the label's line
+
+A narrow column wrapped the badge underneath its label and made that one header
+taller than its neighbours, which reads as a layout fault rather than as state.
+`th:has(.tbl-tools)` no longer wraps, so the column takes the width its header needs;
+the badge is capped at 7rem with an ellipsis, so that width stays bounded.
+
 ## 0.33.0 (2026-08-19)
 
 ### An active filter marks its own column — the `.tbl-view` bar is gone

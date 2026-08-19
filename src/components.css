@@ -1135,12 +1135,18 @@ th.is-filtered {
   color: var(--primary);
   box-shadow: inset 0 -2px 0 var(--primary);
 }
+/* THE BADGE SITS ON THE LABEL'S LINE (Daniel, 2026-08-19). Without this a narrow
+   column — `relationship` is 12% on the contacts book — wraps the badge under the
+   label and makes that one header taller than its neighbours, which reads as a
+   layout fault rather than as state. The column simply gets as wide as its header
+   needs; the badge is bounded below, so "as wide as it needs" stays bounded too. */
+th:has(.tbl-tools) { white-space: nowrap; }
 .tbl-badge {
   display: inline-flex;
   align-items: baseline;
   gap: 0.25em;
   margin-inline-start: 0.4rem;
-  max-inline-size: 10rem;
+  max-inline-size: 7rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

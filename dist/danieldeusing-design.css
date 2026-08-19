@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.28.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.29.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -287,6 +287,38 @@ html[data-theme="paper"] {
      A page whose content genuinely is not a column (a full-bleed dashboard
      table) sets `max-width: none` deliberately; it does not pick another number. */
   --content-w: 78rem;
+
+  /* ── SCALE ABOVE THE REFERENCE WIDTH ───────────────────────────────────────
+     Everything in this package is stated in rem, so moving the root font size
+     moves the type, the content column and the vertical rhythm together. That
+     is how a 4K or 8K panel gets a bigger page rather than a postage stamp of
+     12px text in the middle of it.
+
+     WHY NOT `zoom`, WHICH THIS REPLACES. `initResolutionZoom()` did the same
+     arithmetic geometrically, and a geometric scale gives the page a pixel grid
+     that no longer matches the browser's. Anything injected into the document
+     from outside — a password manager's dropdown, a translation bar — reads a
+     field's position through the BROWSER's grid and writes it back into the
+     PAGE's grid, where it is multiplied by the scale factor. Measured on the
+     family login page: 1Password's dropdown landed 1.9x down and across from
+     the field it belonged to, on a window that zoomed 1.89x. Scaling the unit
+     instead of the space has no second grid, so there is nothing to mismatch.
+
+     THE ARITHMETIC IS DELIBERATELY THE OLD ONE. Above 1920 this reduces to
+     100vw/120, i.e. exactly `16px * innerWidth/1920` — the same curve
+     initResolutionZoom drew, so no surface changes size on the day it migrates.
+     Below 1920 the calc goes negative and max() holds it at 1rem, matching the
+     old `Math.max(1, ...)` floor.
+
+     THE `1rem` TERM IS LOAD-BEARING, not decoration. On the root element `rem`
+     resolves against the browser's default font size, so a reader who has set
+     a larger default still gets it honoured and browser text zoom keeps working
+     (WCAG 1.4.4). A bare `100vw/120` would be pixel-exact and quietly override
+     both.
+
+     This lives in tokens.css rather than base.css because netmon loads
+     tokens.css + its own frozen chrome.css and never sees base.css. */
+  font-size: max(1rem, calc(1rem + (100vw - 1920px) / 120));
   /* Horizontal breathing room, i.e. Daniel's "same margins left and right".
      Vertical padding stays a page's own business — a doc and a dashboard do
      not want the same headroom, and pretending otherwise is what produced the
@@ -2281,9 +2313,12 @@ button[data-tip]::after {
  *      visibility:hidden. Printing it would silently produce blank pages — the
  *      reader only finds out on paper. Everything is forced visible here
  *      regardless of animation state.
- *   2. `zoom` is reset. Pages that use the resolution-independent zoom trick
- *      (html.style.zoom = innerWidth / 1920) carry that multiplier into the
- *      print box, which is what makes a printout come out oversized.
+ *   2. The screen's wide-display scaling is undone. Since 0.29.0 that scaling is
+ *      the fluid ROOT FONT SIZE in tokens.css, and pinning `font-size: 16px`
+ *      below is what neutralises it — a 4K screen would otherwise put 48px body
+ *      text on paper. The `zoom: 1` reset is kept beside it for any surface
+ *      still carrying the old `html.style.zoom = innerWidth / 1920` block,
+ *      which had the same effect on the print box.
  *   3. Mermaid bakes the ACTIVE theme's colours into the SVG at render time, so
  *      a diagram rendered under `green`/`mono` is dark-on-dark on paper no
  *      matter what the page tokens say. The SVG parts are repainted below.
@@ -2326,7 +2361,8 @@ button[data-tip]::after {
   /* ── document metrics ──────────────────────────────────────────────────
      The rem baseline is pinned so the design's rem scale lands where it was
      drawn, and the body size is stated in px so it is 12px on paper whatever
-     the browser's default font size is. `zoom` is a screen-only device. */
+     the browser's default font size is. Both the fluid root size and `zoom` are
+     screen-only devices; paper has no viewport width to track. */
   html {
     zoom: 1 !important;
     font-size: 16px;

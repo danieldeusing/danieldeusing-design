@@ -189,9 +189,11 @@ already carries two, and if you cannot write the sentence you do not have an exc
    the `[x] anim` toggle — because the header names the page and the footer operates it, one place
    on every surface; the `.mobile-footer` copy of those controls inside the nav (the fixed footer
    is `display:none` below 48rem, so without it a phone reader cannot switch theme); and the
-   pre-paint `<head>` scripts — theme, animation gate, **the `ls-nav` read** and
-   **`initResolutionZoom`**. Those stay inline because a module at the end of `<body>` runs after
-   first paint: a reader who hid the rail would watch it paint and jump away on every load.
+   pre-paint `<head>` scripts — theme, animation gate and **the `ls-nav` read**. Those stay
+   inline because a module at the end of `<body>` runs after first paint: a reader who hid the
+   rail would watch it paint and jump away on every load. **There is no zoom script** (0.29.0):
+   wide-screen scaling is the fluid root font size in `tokens.css`, so it is CSS and needs no
+   pre-paint block. Do not copy one in from an older page — it would scale the page twice.
 
    **Every measurement in the page's `<style>` block is a token with a literal fallback.**
    The local CSS is the page's own *layout* only (`.wrap`, `.content`, `ol.steps`, `table.kv`, …) —

@@ -17,9 +17,12 @@
  *      visibility:hidden. Printing it would silently produce blank pages — the
  *      reader only finds out on paper. Everything is forced visible here
  *      regardless of animation state.
- *   2. `zoom` is reset. Pages that use the resolution-independent zoom trick
- *      (html.style.zoom = innerWidth / 1920) carry that multiplier into the
- *      print box, which is what makes a printout come out oversized.
+ *   2. The screen's wide-display scaling is undone. Since 0.29.0 that scaling is
+ *      the fluid ROOT FONT SIZE in tokens.css, and pinning `font-size: 16px`
+ *      below is what neutralises it — a 4K screen would otherwise put 48px body
+ *      text on paper. The `zoom: 1` reset is kept beside it for any surface
+ *      still carrying the old `html.style.zoom = innerWidth / 1920` block,
+ *      which had the same effect on the print box.
  *   3. Mermaid bakes the ACTIVE theme's colours into the SVG at render time, so
  *      a diagram rendered under `green`/`mono` is dark-on-dark on paper no
  *      matter what the page tokens say. The SVG parts are repainted below.
@@ -62,7 +65,8 @@
   /* ── document metrics ──────────────────────────────────────────────────
      The rem baseline is pinned so the design's rem scale lands where it was
      drawn, and the body size is stated in px so it is 12px on paper whatever
-     the browser's default font size is. `zoom` is a screen-only device. */
+     the browser's default font size is. Both the fluid root size and `zoom` are
+     screen-only devices; paper has no viewport width to track. */
   html {
     zoom: 1 !important;
     font-size: 16px;

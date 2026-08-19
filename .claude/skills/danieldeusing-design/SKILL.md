@@ -195,10 +195,17 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
 - Tailwind apps get `max-w-content` and `text-fs-base` / `-lg` / `-xl` / `-2xl`. `text-fs-xs`, `-sm`
   and `-md` went with the tokens behind them. Tailwind's own `text-xs/sm/base` are deliberately
   **not** remapped — opt in by name.
-- **The scale is only half of "same size on every screen".** It fixes the *ratios* and does not
-  track the viewport. `initResolutionZoom()` makes the page track the *window*. Scale without zoom
-  = frozen at one size on a 4K display; zoom without scale = uniform scaling of sizes that
-  disagree between pages. Every surface needs both.
+- **The scale fixes the *ratios*; the ROOT FONT SIZE makes them track the window.** Since 0.29.0
+  `tokens.css` sets `font-size: max(1rem, calc(1rem + (100vw - 1920px) / 120))` on the root, so
+  every rem in the package — type, `--content-w`, `--space-section` — grows together above 1920.
+  A 4K screen gets a bigger page, not a postage stamp of 12px text. It needs no script and
+  cannot be forgotten, which is the point: the old `initResolutionZoom()` failed silently when a
+  page was written without it.
+- **Never set `zoom` on a page.** It scales the coordinate *space*, so the page's pixel grid stops
+  matching the browser's, and anything injected from outside — a password manager's dropdown, a
+  translation bar — is positioned through one grid and written into the other. Measured on the
+  family login page: 1Password's dropdown landed 1.9x down and across from its field. Scaling the
+  unit has no second grid. A page that sets `style.zoom` on top of 0.29.0 scales TWICE.
 
 ## The shared component vocabulary — a consumer must NOT redeclare any of it
 
@@ -650,7 +657,7 @@ every one of them has drifted. Adding a surface is one entry in that array.
 | --- | --- |
 | `applyStoredTheme()` / `setTheme()` / `getStoredTheme()` | Apply + persist the theme. **Pre-paint from `<head>`.** |
 | `initThemeSwitcher()` | Wires `[data-theme-value]` buttons and `[data-theme-label]`. |
-| `initResolutionZoom(1920)` | Lays out at the reference width and zooms above it. **Pre-paint from `<head>`** — otherwise the page reflows visibly on load, and it is the half of "same font size on every screen" that the type scale cannot do. |
+| `initResolutionZoom(1920)` | **Deprecated in 0.29.0 — does nothing.** Wide-screen scaling is the fluid root font size in `tokens.css`, so there is no script to call and no pre-paint flash to avoid. Still exported so a pin can be bumped without editing `<head>` in the same commit. Delete the call and any inline zoom IIFE with it. |
 | `initDropdowns()` | `<details class="dropdown">`: one-open, click-away, Escape. |
 | `initSelects()` | Replaces the OS dropdown on every `<select>` with the estate's listbox — the one component CSS alone can never reach, because the option list is painted outside the page. **Markup contract is NOTHING**; the `<select>` stays authoritative (value, form submission, `input`+`change`). Keeps enhancing: selects rendered later are picked up by a MutationObserver, so a page that rebuilds its tables out of `innerHTML` needs no second call. Keyboard is the ARIA APG select-only combobox and focus never leaves the trigger. |
 | `initBurgerNav()` | Mobile burger (breakpoint 48rem) with the footer folded in. |

@@ -65,19 +65,6 @@
           if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
         } catch {}
       })();
-
-      // Resolution-independent zoom: lay out at a fixed 1920px reference, then scale the
-      // whole view up on wider screens so the empty side-margins never exceed their
-      // 1920-reference proportion (a true zoom of everything, never below 1×). Pre-paint
-      // to avoid a flash.
-      (() => {
-        const REFERENCE_WIDTH = 1920;
-        const applyZoom = () => {
-          document.documentElement.style.zoom = String(Math.max(1, window.innerWidth / REFERENCE_WIDTH));
-        };
-        applyZoom();
-        window.addEventListener("resize", applyZoom);
-      })();
     </script>
 
     <!-- The design system, PINNED — and it must be. This page ships the system's own
@@ -98,13 +85,13 @@
          on docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.28.1/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.28.1.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.29.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.29.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.28.1/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.28.1.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.29.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.29.0.fonts.css'"
     />
 
     <style>
@@ -343,7 +330,7 @@ flowchart TD
 
     <script type="module">
       import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom, initMinimap, initTooltips } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.28.1/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.29.0/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();

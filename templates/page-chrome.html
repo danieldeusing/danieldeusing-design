@@ -33,19 +33,13 @@
 
   ── WHAT YOU MUST WIRE UP (the CSS alone is not enough) ──
   1. Pre-paint, INLINE in <head>, before any stylesheet — see the <head> block below.
-     The theme, the rail state AND the resolution zoom must all be applied before first
-     paint, or the page visibly flashes the default and jumps.
+     The theme and the rail state must be applied before first paint, or the page
+     visibly flashes the default and jumps.
 
-     THE ZOOM IS THE ONE PEOPLE FORGET, and it fails silently. It lays the page out at a
-     1920px reference and scales up beyond it, so a surface without it renders SMALLER
-     than every other one on a wide screen — and nothing looks broken, it just looks
-     wrong next to its siblings. Cockpit's containers dashboard shipped without it and
-     nobody noticed until the `ls -l` rail — the one component that renders identically
-     on every page — appeared side by side at two different sizes.
-
-     Use the inline block below, NOT `initResolutionZoom()` imported at the end of
-     <body>: a module there runs after first paint, so the page paints unscaled and then
-     jumps. The runtime export exists for surfaces that genuinely cannot inline.
+     THERE IS NO ZOOM BLOCK ANY MORE (0.29.0). Scaling above 1920 is CSS now — the
+     root font size in tokens.css — so it needs no script and cannot be forgotten.
+     If you are copying an older page, DELETE its zoom IIFE: a page that still
+     assigns `document.documentElement.style.zoom` on top of 0.29.0 scales TWICE.
   2. At the end of <body>, import and call the runtime:
        import { initLsNav, initBurgerNav, initThemeSwitcher, initDropdowns,
                 initAnimToggle, initTableScroll, initSelects }
@@ -82,17 +76,6 @@
     try {
       if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
     } catch {}
-  })();
-  // The 1920px reference every surface lays out against. Never below 1x: up to that width the
-  // page keeps its normal responsive layout, and only wider screens scale — a true zoom of
-  // everything, so graphics and text keep their proportions instead of drifting apart.
-  (() => {
-    const REFERENCE_WIDTH = 1920;
-    const applyZoom = () => {
-      document.documentElement.style.zoom = String(Math.max(1, window.innerWidth / REFERENCE_WIDTH));
-    };
-    applyZoom();
-    window.addEventListener("resize", applyZoom);
   })();
 </script>
 

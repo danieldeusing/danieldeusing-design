@@ -4,6 +4,60 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.29.0 (2026-08-19)
+
+### Wide screens scale in CSS now, and `zoom` is gone
+
+`initResolutionZoom()` laid every page out against a 1920px reference and applied
+`html.style.zoom` above it. That is replaced by one declaration in `tokens.css`:
+
+```css
+font-size: max(1rem, calc(1rem + (100vw - 1920px) / 120));
+```
+
+**Nothing changes size.** Above 1920 the expression reduces to `100vw/120`, which is
+exactly `16px * innerWidth/1920` — the curve `initResolutionZoom` drew. Verified live at
+1280, 1920, 2560, 3440, 3840, 5120 and 7680: the computed root font size matches the old
+zoom factor at every one, and `--content-w` stays 65% of the screen throughout.
+
+**Why it changed.** `zoom` scales the coordinate *space*, leaving the page with a pixel
+grid that no longer matches the browser's. Anything injected into the document from
+outside — a password manager, a translation bar, any extension overlay — measures a field
+through the browser's grid and writes the answer back into the page's, where it is
+multiplied a second time. Measured on the family login page: 1Password's dropdown landed
+1.9x down and across from the field it belonged to, on a window whose zoom factor was
+1.89. The estate had already paid for this three times inside this runtime —
+`tooltip.js`, `lsnav.js` and `select.js` each divide by the zoom before writing a length.
+Scaling the unit instead of the space removes the second grid, so there is nothing left
+to compensate for.
+
+**The rule lives in `tokens.css`, not `base.css`,** because netmon loads `tokens.css` plus
+its own frozen `chrome.css` and never sees `base.css`.
+
+**The `1rem` term is load-bearing.** On the root element `rem` resolves against the
+browser's default font size, so a reader who has set a larger default still gets it, and
+browser text zoom keeps working (WCAG 1.4.4). A bare `100vw/120` would be pixel-exact and
+silently override both.
+
+### Migrating a surface
+
+This release is **not breaking**. `initResolutionZoom()` is still exported and is now a
+no-op, so a pin can be bumped before the `<head>` is touched.
+
+**But delete the inline zoom IIFE in the same commit as the pin bump.** A page that still
+assigns `document.documentElement.style.zoom` while loading 0.29.0 scales TWICE — once
+geometrically and once through the root font size.
+
+The three `zoom`-compensating divisions in the runtime are deliberately **kept**: they
+resolve to 1 once no consumer sets zoom, and they remain correct for a surface that has
+not migrated yet.
+
+### Also
+
+- `templates/page-chrome.html` no longer carries a pre-paint zoom block.
+- `print.css` keeps `zoom: 1 !important` for un-migrated surfaces; its `font-size: 16px`
+  pin is what neutralises the new fluid scale on paper.
+
 ## 0.28.1 (2026-08-15)
 
 ### A note between a heading and its table gets the same gap the table would have

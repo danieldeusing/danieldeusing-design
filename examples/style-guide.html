@@ -18,11 +18,6 @@
         document.documentElement.dataset.theme = theme;
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", backgrounds[theme]);
       })();
-      // resolution-independent zoom: scale the whole layout up past a 1920px reference
-      (() => {
-        const z = () => { document.documentElement.style.zoom = String(Math.max(1, innerWidth / 1920)); };
-        z(); addEventListener("resize", z);
-      })();
     </script>
 
     <!-- The whole design system, build-free, from the local dist bundle. -->

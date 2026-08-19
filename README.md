@@ -113,12 +113,11 @@ Four dependency-free ES modules, tree-shakeable from `@danieldeusing/design/runt
 | `initSelects()` | Replaces the OS dropdown on every `<select>` with the themed listbox — the option list is painted outside the page, so CSS alone can never reach it. Markup contract: none. The `<select>` keeps the value and still fires `input`/`change`, and selects rendered later are enhanced on their own. |
 | `initTablePagination()` | Page every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. It has no sort and no filter — it hides all but one window of the rows a page has **already** filtered and sorted, so the order is always filter → sort → slice over the full set. A table without a `data-table-id` is left alone. |
 | `initAnimToggle()` | Wire `[data-anim-toggle]` buttons (`.anim-toggle`) to flip `html.anim-off` + persist it. |
-| `initResolutionZoom(1920)` | Scale the whole layout up on screens wider than the reference width. |
+| `initResolutionZoom(1920)` | **Deprecated since 0.29.0 — a no-op.** Scaling above 1920 is CSS now (the fluid root font size in `tokens.css`), so it needs no script. Kept exported so a surface can bump its pin without editing its `<head>` in the same commit. Delete the call, and any inline pre-paint zoom block with it: a page that still sets `style.zoom` on top of 0.29.0 scales twice. |
 
 ```js
-import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTablePagination, initTerminal, initAnimToggle, initResolutionZoom } from "@danieldeusing/design/runtime";
+import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTablePagination, initTerminal, initAnimToggle } from "@danieldeusing/design/runtime";
 applyStoredTheme();       // ideally inline, pre-paint
-initResolutionZoom();     // ideally inline, pre-paint (no flash)
 initThemeSwitcher();
 initDropdowns();
 initSelects();

@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.29.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.30.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1619,6 +1619,125 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
 
 /* The strip is navigation for a screen. On paper the page IS the map. */
 @media print { .minimap { display: none !important; } }
+
+/* ── TABLE TOOLS: search on top, sort + filter in the header ──────────────────
+   Paired with runtime/tabletools.js. The estate grew four generations of table
+   filtering before this existed — cockpit's `tr.act-filters`, cockpit's older
+   `tr.filters`, the family contacts table's bare box row — and each spent a
+   whole row of vertical space advertising a capability idle on most visits.
+
+   Two controls in the <th> cost nothing when unused and sit on the column they
+   act on. The filter is a `details.dropdown`, the SYSTEM's dropdown, so
+   one-open / click-away / Escape come from initDropdowns() and are not
+   reimplemented here. Only the parts that are genuinely table-specific are
+   declared below. */
+.tbl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-end: 0.5rem;
+}
+.tbl-search {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font: inherit;
+  font-size: var(--fs-base);
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+}
+.tbl-search:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+/* The header cell keeps its label on the baseline and parks the controls at its
+   trailing edge, so a column of numbers still reads as a column of numbers. */
+.tbl-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-inline-start: 0.4rem;
+  vertical-align: baseline;
+}
+.tbl-sort,
+.tbl-filter > summary {
+  background: transparent;
+  border: 0;
+  padding: 0 0.15rem;
+  font: inherit;
+  font-size: var(--fs-base);
+  line-height: 1;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.tbl-sort:hover,
+.tbl-filter > summary:hover,
+th[aria-sort]:not([aria-sort="none"]) .tbl-sort { opacity: 1; color: var(--primary); }
+.tbl-sort:focus-visible,
+.tbl-filter > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; opacity: 1; }
+
+/* A COLUMN THAT IS FILTERING SAYS SO ON ITSELF, not only in the bar above. The
+   bar can be scrolled off a long table; the header cannot, because it is what
+   the reader is looking at when they wonder where a row went. */
+.tbl-filter.is-on > summary { opacity: 1; color: var(--primary); }
+.tbl-filter.is-on > summary::after { content: "•"; margin-inline-start: 0.1em; }
+
+.tbl-filter-panel { padding: 0.4rem; max-block-size: 60vh; overflow-y: auto; }
+.tbl-filter-input {
+  font: inherit;
+  font-size: var(--fs-base);
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.4rem;
+  inline-size: 12rem;
+  max-inline-size: 100%;
+}
+
+/* ── WHAT IS IN FORCE, AND THE WAY BACK ───────────────────────────────────────
+   A table that is already withholding rows for a reason nobody on screen gave is
+   the failure this prevents: an empty table and a filtered one look nearly
+   identical. The bar names every filter and any non-default sort, and carries
+   the only way back.
+
+   `[hidden]` IS NOT OPTIONAL. `[hidden] { display: none }` is a UA rule at the
+   lowest specificity, so `display: flex` here would beat it and the bar would
+   render on every table whether or not anything was in force — the indicator
+   wearing the very fault it reports. */
+.tbl-view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-block-end: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  font-size: var(--fs-base);
+  border-inline-start: 3px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--background));
+}
+.tbl-view[hidden] { display: none; }
+.tbl-view-lead { color: var(--primary); font-weight: 700; }
+.tbl-view-lead::before { content: "▸ "; }
+.tbl-view-chip {
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 0.05rem 0.4rem;
+  white-space: nowrap;
+}
+/* The way out sits at the far end of the line it undoes, and falls in beside the
+   chips when the row wraps on a phone rather than stranding itself on a line. */
+.tbl-view [data-view-reset] { margin-inline-start: auto; }
+
+@media (pointer: coarse) {
+  .tbl-sort, .tbl-filter > summary { min-inline-size: 44px; min-block-size: 44px;
+    display: inline-flex; align-items: center; justify-content: center; }
+}
+@media print {
+  .tbl-toolbar, .tbl-tools { display: none !important; }
+  /* The bar PRINTS. A printed table that is silently filtered is the same
+     failure on paper, with no way to interrogate it at all. */
+}
 
 /* ===== chrome.css ===== */
 /*

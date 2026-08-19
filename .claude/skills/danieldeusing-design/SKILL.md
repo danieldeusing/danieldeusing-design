@@ -568,6 +568,58 @@ filters and sorts `rows`, the full array, and still writes every matching row in
   `.btn-terminal`, which lives in `components.css`. netmon therefore cannot have this component,
   and must not borrow its class names — that is the fork `bin/design-conformance` catches.
 
+## A table gets a SEARCH, a FILTER and a SORT — and says which are on (0.29.0, Daniel)
+
+Three rules, in order. The first one is the one people skip.
+
+**1. Use a table when the data is a table, and not otherwise.** Rows that share a set of
+fields, compared down columns — accounts, contacts, containers, transactions. If a reader
+would never compare two rows field by field, it is a list, a definition list or a set of
+cards, and forcing it into a table buys a header row nobody reads. The test is whether
+sorting by a column would mean anything.
+
+**2. Every table that is one gets all three, from the system.** One `data-table-tools`
+attribute and `initTableTools()`:
+
+```html
+<table data-table-id="household-contacts" data-table-tools data-sort-key="name">
+  <thead><tr>
+    <th data-col="name">name</th>
+    <th data-col="rel" data-filter="pick">relationship</th>
+    <th data-col="amount" data-sort-type="num">amount</th>
+  </tr></thead>
+  <tbody>…</tbody>
+</table>
+```
+
+- A search box above the table, matching every column at once.
+- Per column, two controls **in the `<th>`**: sort, and a filter that opens a dropdown.
+  `data-filter="pick"` builds the list from the column's own cells, so it can never offer
+  a value the table does not contain; the default is a contains-box.
+- `data-value` on a `<td>` sorts by something the cell does not print — an ISO date under
+  a friendly one, cents under a formatted amount.
+
+**Do NOT write a row of filter boxes under the header.** That shape is what this replaces.
+It spends a whole row of vertical space advertising a capability idle on most visits, it
+reads as a form to fill in, and the estate grew four incompatible versions of it —
+cockpit's `tr.act-filters`, cockpit's older `tr.filters`, and the family contacts table's
+bare boxes, which is the one that prompted this rule.
+
+**3. What is in force must be on screen, with the way back.** `initTableTools()` renders
+`.tbl-view` above the table: a chip per active filter (`relationship = family`,
+`search ~ pix`), a chip for a non-default sort, and a `reset view` button. The filtering
+column also marks itself in the header, because the bar can be scrolled off a long table
+and the header cannot.
+
+This is not decoration. The view is remembered per table across a browser restart, so a
+reader can arrive at a table that is already withholding rows for a reason nobody on
+screen gave — and an empty table and a filtered one look nearly identical. The bar says
+which it is. It is derived from the view's *deviation from the table's defaults*, never
+from "was this restored", so it cannot go stale while the filter is still in force.
+
+It composes with the pager (0.22.0): filtered-out rows are detached from the tbody, so
+the pager slices exactly the matching set and needs to know nothing about filtering.
+
 ## `.field-row` — a settings panel is a two-column table, so write it as one
 
 ```html
@@ -660,6 +712,7 @@ every one of them has drifted. Adding a surface is one entry in that array.
 | `initResolutionZoom(1920)` | **Deprecated in 0.29.0 — does nothing.** Wide-screen scaling is the fluid root font size in `tokens.css`, so there is no script to call and no pre-paint flash to avoid. Still exported so a pin can be bumped without editing `<head>` in the same commit. Delete the call and any inline zoom IIFE with it. |
 | `initDropdowns()` | `<details class="dropdown">`: one-open, click-away, Escape. |
 | `initSelects()` | Replaces the OS dropdown on every `<select>` with the estate's listbox — the one component CSS alone can never reach, because the option list is painted outside the page. **Markup contract is NOTHING**; the `<select>` stays authoritative (value, form submission, `input`+`change`). Keeps enhancing: selects rendered later are picked up by a MutationObserver, so a page that rebuilds its tables out of `innerHTML` needs no second call. Keyboard is the ARIA APG select-only combobox and focus never leaves the trigger. |
+| `initTableTools()` | Search box, per-column sort + filter dropdown in the `<th>`, and the `.tbl-view` bar naming what is in force. Detaches filtered-out rows so the pager slices the matching set. View remembered per table under `table-view:<id>`. |
 | `initBurgerNav()` | Mobile burger (breakpoint 48rem) with the footer folded in. |
 | `initLsNav()` | The rail's show/hide, and it **measures** the real chrome into `--ls-nav-top` / `--ls-nav-bottom`. The top is the header's **bottom edge** (`getBoundingClientRect().bottom / zoom`), not its height — those agree only while nothing sits above the header, and cockpit's alert banner mounts as the first child of `<body>`. A rect is visual px and a CSS length is re-multiplied by any ancestor `zoom`, so **convert, don't avoid** (0.13.0; before that a 73px banner buried the rail's own toggle). Re-measured on `scroll` too, because a sticky header's bottom edge moves as the banner scrolls away. |
 | `initTerminal()` | The `$ command` typing animation; no-ops under reduced motion / `html.anim-off`. Fires `term:contentdone`. |

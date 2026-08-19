@@ -6,8 +6,8 @@
  *
  *   import { applyStoredTheme, initThemeSwitcher } from "@danieldeusing/design/runtime";
  *
- * The CSS works on its own; this layer adds theme switching, the resolution
- * zoom, dropdown behaviour, and the terminal typing animation.
+ * The CSS works on its own; this layer adds theme switching, dropdown
+ * behaviour, table tools and the terminal typing animation.
  */
 
 export * from "./theme.js";
@@ -23,3 +23,4 @@ export * from "./tablescroll.js";
 export * from "./pagination.js";
 export * from "./minimap.js";
 export * from "./tooltip.js";
+export * from "./tabletools.js";

@@ -4,6 +4,51 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.30.0 (2026-08-19)
+
+### A table has a search, a filter and a sort — and says which are on
+
+`initTableTools()` plus one `data-table-tools` attribute gives any table a search box
+above it, a sort control and a filter dropdown **in each `<th>`**, and a `.tbl-view` bar
+naming everything currently in force with a `reset view` button.
+
+**Why this is in the system and not in a page.** Every surface had been growing its own.
+cockpit's `table-view.js` opens by explaining that `cockpitTable` "is copied into four
+pages and has drifted into three generations"; the family contacts table grew a bare row
+of filter boxes because nothing said what a table should look like. Consolidating inside
+one surface fixed it for that surface. This is the same move one level up — and the
+storage key is deliberately cockpit's own (`table-view:<id>`), so a reader's saved views
+survive the migration.
+
+**The filter row is replaced, not restyled.** A `<tr class="filters">` spends a whole row
+of vertical space advertising a capability that is idle on most visits, and reads as a
+form to fill in. Two controls in the `<th>` cost nothing unused and sit on the column
+they act on. The dropdown is the system's own `details.dropdown`, so one-open,
+click-away and Escape come from `initDropdowns()` and are not reimplemented.
+
+**It composes with the pager rather than fighting it.** `pagination.js` pages by setting
+`hidden` on out-of-window rows; if filtering also used `hidden` the two would overwrite
+each other. A filtered-out row is instead DETACHED from the tbody, so the pager sees
+exactly the matching set — the arrangement it already documents ("filter and sort produce
+the rows, the pager slices them") — and needs to know nothing about this file.
+
+**Two behaviours inherited from cockpit's engine, both load-bearing.** A stored view is
+normalised against the columns that exist *today*, because localStorage outlives the
+code and a remembered sortKey naming a renamed column would otherwise throw where the
+table should be. And the bar is derived from the view's deviation from the table's
+defaults, never from "was this restored" — a restored-only marker vanishes the moment the
+reader touches a filter, while the filter is still in force.
+
+**A blank cell sorts last in BOTH directions.** Caught by the fixture, not by review: the
+direction multiplier was being applied outside the comparator, which inverted the blank
+rule along with everything else and put every blank row first when sorting descending.
+
+### Also
+
+- Three table rules added to the skill: when a table is the right shape at all, that
+  every table gets all three controls from the system, and that what is in force must be
+  visible with a way back.
+
 ## 0.29.0 (2026-08-19)
 
 ### Wide screens scale in CSS now, and `zoom` is gone

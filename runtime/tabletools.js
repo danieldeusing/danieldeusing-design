@@ -49,6 +49,16 @@ const instances = new WeakMap();
 
 const textOf = (el) => (el ? (el.textContent || "").trim() : "");
 
+/* A header cell's own words, without the controls injected into it. */
+const labelOf = (th) => {
+  let out = "";
+  for (const node of th.childNodes) {
+    if (node.nodeType === 1 && node.classList && node.classList.contains("tbl-tools")) continue;
+    out += node.textContent || "";
+  }
+  return out.trim();
+};
+
 /* Sort value: `data-value` wins so a column can sort by something it does not
    print (an ISO date under a friendly one, cents under a formatted amount). */
 const cellValue = (row, index) => {
@@ -94,7 +104,10 @@ function columnsOf(table) {
     if (!key) continue;                       // a column opted out is left alone
     out.push({
       key, index: i, th,
-      label: th.getAttribute("data-col-label") || textOf(th),
+      // The label must EXCLUDE the controls this file injects into the same cell.
+      // textOf(th) after a snapshot picks up the sort and filter glyphs, and the
+      // view bar then reads "sorted by name↕⌕ ▼". data-col-label wins when set.
+      label: th.getAttribute("data-col-label") || labelOf(th),
       type: th.getAttribute("data-sort-type") || "text",
       filter: th.getAttribute("data-filter") || "text",
     });
@@ -181,20 +194,40 @@ export function applyTableView(table) {
   const body = table.tBodies[0];
   if (!body) return;
 
-  const all = inst.allRows.slice();
   const keep = [], drop = [];
-  for (const row of all) (matches(inst, row) ? keep : drop).push(row);
+  for (const row of inst.allRows) (matches(inst, row) ? keep : drop).push(row);
 
   const col = inst.columns.find((c) => c.key === inst.view.sortKey);
   if (col) {
     keep.sort((a, b) => compare(cellValue(a, col.index), cellValue(b, col.index), col.type, inst.view.dir));
   }
 
-  // Written in one pass so the pager's observer wakes once, not per row.
+  /*
+   * A DETAIL ROW IS NOT A ROW. An expandable table puts a second <tr> under the
+   * one it belongs to — the contacts book's per-person panel, spanning every
+   * column. Treated as data it would be filtered on its own text and sorted away
+   * from its parent, which is how a detail panel ends up under a stranger.
+   *
+   * So `data-row-for="<key>"` marks a child of `data-row-key="<key>"`: it is
+   * excluded from matching and from the sort, and simply follows its parent
+   * wherever the parent lands. A child whose parent is filtered out goes with it.
+   */
   const frag = document.createDocumentFragment();
-  for (const row of keep) frag.appendChild(row);
-  for (const row of drop) if (row.parentNode) row.parentNode.removeChild(row);
+  for (const row of keep) {
+    frag.appendChild(row);
+    for (const child of inst.childrenOf.get(row) || []) frag.appendChild(child);
+  }
+  for (const row of drop) {
+    for (const child of inst.childrenOf.get(row) || []) child.remove();
+    row.remove();
+  }
   body.appendChild(frag);
+  // What we just wrote, so the observer can tell OUR output from a real
+  // re-render. A synchronous "applying" flag cannot: MutationObserver delivers
+  // asynchronously, so the flag is already back to false when the callback
+  // runs, and the observer re-enters forever. pagination.js avoids the same
+  // trap by writing only real changes; this is that discipline for a reorder.
+  inst.lastWritten = [...body.rows];
 
   paintHeader(inst);
   paintBar(inst);
@@ -328,6 +361,98 @@ function buildHeaderControls(inst) {
   }
 }
 
+/*
+ * Re-read the rows and the header from the DOM as it is NOW.
+ *
+ * Every table in this estate that is worth filtering is rendered from data and
+ * rewritten wholesale — `contact-rows.innerHTML = …` on the contacts book,
+ * cockpit's in-place patcher on its automation tables, a 30-second poll behind
+ * both. A component that snapshotted its rows once would hold a list of detached
+ * <tr>s after the first repaint and quietly filter nothing, and its header
+ * controls would be gone with the <thead> that carried them.
+ */
+function snapshot(inst) {
+  const body = inst.table.tBodies[0];
+  if (!body) return;
+  const rows = [...body.rows];
+  inst.childrenOf = new Map();
+  inst.allRows = [];
+  const byKey = new Map();
+  for (const row of rows) {
+    const parentKey = row.getAttribute("data-row-for");
+    if (parentKey === null) {
+      inst.allRows.push(row);
+      const key = row.getAttribute("data-row-key");
+      if (key !== null) byKey.set(key, row);
+    }
+  }
+  for (const row of rows) {
+    const parentKey = row.getAttribute("data-row-for");
+    if (parentKey === null) continue;
+    const parent = byKey.get(parentKey);
+    // An orphan detail row — parent filtered out by the page itself, or a stale
+    // key — is left as ordinary content rather than dropped. Removing a row
+    // because its key did not resolve would delete data over a typo.
+    if (!parent) { inst.allRows.push(row); continue; }
+    if (!inst.childrenOf.has(parent)) inst.childrenOf.set(parent, []);
+    inst.childrenOf.get(parent).push(row);
+  }
+  // The <thead> may have been replaced too, so the column objects must be
+  // re-read and the controls re-injected onto the cells that exist now.
+  const fresh = columnsOf(inst.table);
+  if (fresh.length) {
+    // Carry the CONTROLS across, not just the inputs. columnsOf() builds new
+    // column objects, and paintHeader() writes the sort glyph and the active-filter
+    // mark through col.sortBtn / col.filterWrap — drop those and the header stops
+    // reporting the state it is actually in. Measured: aria-sort said "ascending"
+    // while the button still showed the neutral glyph.
+    for (const col of fresh) {
+      const prev = inst.columns.find((c) => c.key === col.key);
+      if (!prev) continue;
+      col.filterInput = prev.filterInput;
+      col.sortBtn = prev.sortBtn;
+      col.filterWrap = prev.filterWrap;
+    }
+    inst.columns = fresh;
+    if (!inst.table.querySelector(".tbl-tools")) buildHeaderControls(inst);
+    else refreshPickOptions(inst);
+  }
+}
+
+/*
+ * A `pick` list is derived from the column's own cells, so it has to be rebuilt
+ * when those cells change — a re-render that introduces a new relationship would
+ * otherwise leave a dropdown that cannot offer it, and the reader would conclude
+ * the value does not exist. Rebuilt only when the set actually differs, so an
+ * open dropdown is not torn out from under the pointer on every poll.
+ */
+function refreshPickOptions(inst) {
+  for (const col of inst.columns) {
+    if (col.filter !== "pick" || !col.filterWrap) continue;
+    const seen = new Map();
+    for (const row of inst.allRows) {
+      const raw = cellValue(row, col.index);
+      if (raw) seen.set(raw.toLowerCase(), raw);
+    }
+    const wanted = [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    const panel = col.filterWrap.querySelector(".tbl-filter-panel");
+    if (!panel) continue;
+    const current = [...panel.querySelectorAll(".dropdown-item")].slice(1).map((b) => b.textContent);
+    if (current.length === wanted.length && current.every((v, i) => v === wanted[i][1])) continue;
+    for (const b of [...panel.querySelectorAll(".dropdown-item")].slice(1)) b.remove();
+    for (const [lower, label] of wanted) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "dropdown-item"; b.textContent = label;
+      b.addEventListener("click", () => {
+        inst.view.filters[col.key] = lower;
+        col.filterWrap.open = false;
+        save(inst); applyTableView(inst.table);
+      });
+      panel.appendChild(b);
+    }
+  }
+}
+
 function enhance(table) {
   if (instances.has(table)) return;
   const columns = columnsOf(table);
@@ -338,7 +463,9 @@ function enhance(table) {
   const inst = {
     table, columns,
     id: table.getAttribute("data-table-id") || "",
-    allRows: [...body.rows],
+    allRows: [],
+    childrenOf: new Map(),
+    lastWritten: [],
     defaultSortKey: table.getAttribute("data-sort-key") || columns[0].key,
     defaultDir: table.getAttribute("data-sort-dir") === "desc" ? -1 : 1,
   };
@@ -381,11 +508,37 @@ function enhance(table) {
   anchor.before(toolbar);
   anchor.before(bar);
 
-  buildHeaderControls(inst);
+  // snapshot() builds the header controls itself when they are absent, and it
+  // must run FIRST: a `pick` column's option list is derived from the rows, so
+  // building the controls against an empty set yields a dropdown offering only
+  // "(any)".
+  snapshot(inst);
   for (const col of inst.columns) {
     if (col.filterInput) col.filterInput.value = inst.view.filters[col.key] || "";
   }
   applyTableView(table);
+
+  /*
+   * WATCHING THE TABLE, NOT THE TBODY — a renderer is entitled to replace the
+   * tbody node rather than fill it, and an observer bound to the old one would
+   * be left watching a detached element. Same reasoning as pagination.js.
+   *
+   * The guard is an IDENTITY CHECK against the row order we last wrote, not a
+   * flag. applyTableView() moves every row, so without a guard this re-enters
+   * forever — and a synchronous flag cannot close it, because MutationObserver
+   * delivers asynchronously and the flag is already cleared by then. Measured:
+   * the first version hung the page.
+   */
+  inst.observer = new MutationObserver(() => {
+    const body = table.tBodies[0];
+    if (!body) return;
+    const now = body.rows;
+    const last = inst.lastWritten || [];
+    if (now.length === last.length && last.every((row, i) => now[i] === row)) return;
+    snapshot(inst);
+    applyTableView(table);
+  });
+  inst.observer.observe(table, { childList: true, subtree: true });
 }
 
 /**

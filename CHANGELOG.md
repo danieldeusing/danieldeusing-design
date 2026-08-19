@@ -4,6 +4,39 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.31.0 (2026-08-19)
+
+### The table tools survive a re-render, and a detail row follows its parent
+
+0.30.0 shipped `initTableTools()` against static markup. Every table in this estate
+that is worth filtering is not static: the contacts book does
+`contact-rows.innerHTML = …` on each keystroke, cockpit patches its automation tables
+in place behind a 30-second poll. A component that snapshotted its rows once held a
+list of detached `<tr>`s after the first repaint and silently filtered nothing.
+
+**Re-render resilience.** The table is observed; when the rows are not the ones we
+last wrote, they are re-read and the view re-applied. The guard is an IDENTITY CHECK
+against that last write, not a flag — `MutationObserver` delivers asynchronously, so
+a synchronous "I am applying" flag is already cleared when the callback runs. The
+first version used a flag and hung the page.
+
+**`data-row-for` / `data-row-key`.** An expandable table puts a second `<tr>` under
+the one it belongs to. Treated as data it gets filtered on its own text and sorted
+away from its parent, which is how a detail panel ends up under a stranger. A child
+row is now excluded from matching and sorting and simply follows its parent; an
+orphan is left as ordinary content rather than deleted over a typo.
+
+**A `pick` list tracks the data behind it.** Its options are derived from the
+column's own cells, so they are rebuilt when those cells change — and only when the
+set actually differs, so an open dropdown is not torn away on every poll.
+
+### Fixed
+
+- The column label excluded the controls injected into the same `<th>`; the view bar
+  had begun reading `sorted by name↕⌕ ▼`.
+- Column objects rebuilt on a re-render lost their control references, so the header
+  showed `aria-sort="ascending"` while the button still wore the neutral glyph.
+
 ## 0.30.0 (2026-08-19)
 
 ### A table has a search, a filter and a sort — and says which are on

@@ -289,7 +289,12 @@ function paintHeaderBadges(inst) {
       col.badge = badge;
     }
     const exact = col.filter === "pick";
-    badge.textContent = value;
+    // The stored value is lower-cased because that is what matching needs. Showing
+    // it back would print "cash" where the dropdown offered "Cash" — the badge is
+    // the reader's own choice quoted back at them, so it uses their casing.
+    badge.textContent = (exact && col.pickLabels && col.pickLabels.get(value))
+      || (col.filterInput && col.filterInput.value.trim())
+      || value;
     badge.title = (exact ? `${col.label} is exactly “${value}”` : `${col.label} contains “${value}”`)
                   + " — click to clear";
     badge.setAttribute("aria-label", `clear the ${col.label} filter`);
@@ -334,6 +339,7 @@ function buildHeaderControls(inst) {
         const raw = cellValue(row, col.index);
         if (raw) seen.set(raw.toLowerCase(), raw);
       }
+      col.pickLabels = seen;
       const any = document.createElement("button");
       any.type = "button"; any.className = "dropdown-item"; any.textContent = "(any)";
       any.addEventListener("click", () => {
@@ -424,6 +430,7 @@ function snapshot(inst) {
       col.sortBtn = prev.sortBtn;
       col.filterWrap = prev.filterWrap;
       col.badge = prev.badge;
+      col.pickLabels = prev.pickLabels;
     }
     inst.columns = fresh;
     if (!inst.table.querySelector(".tbl-tools")) buildHeaderControls(inst);
@@ -446,6 +453,7 @@ function refreshPickOptions(inst) {
       const raw = cellValue(row, col.index);
       if (raw) seen.set(raw.toLowerCase(), raw);
     }
+    col.pickLabels = seen;
     const wanted = [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
     const panel = col.filterWrap.querySelector(".tbl-filter-panel");
     if (!panel) continue;

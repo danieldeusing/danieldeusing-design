@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.36.0 (2026-08-19)
+
+### The filter badge quotes the reader's own casing
+
+A filter value is stored lower-cased because that is what matching needs, and the badge
+printed it back verbatim — so picking `Cash` from the dropdown produced a badge reading
+`cash`, and `Sicredi · Daniel` came back mangled. The badge now shows the option's own
+label for a `pick` column, or exactly what was typed for a text one.
+
 ## 0.35.0 (2026-08-19)
 
 ### `tbl:applied` — so a page's own row count cannot contradict the table

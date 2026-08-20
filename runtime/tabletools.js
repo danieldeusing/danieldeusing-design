@@ -598,6 +598,29 @@ function enhance(table) {
 }
 
 /**
+ * Put a table back to the view it ships with — default sort, no filters, no search.
+ *
+ * For a page that owns a CLEAR ALL of its own. cockpit's container list has one, next to its
+ * host and tag chips, and those are page-level filters this component knows nothing about. With
+ * no way to reach the column filters, that button would clear three of the four things in force
+ * and leave the fourth — a control that lies about what it did.
+ *
+ * This is NOT the reset button removed in 0.33.0. That one was the component putting its own
+ * affordance on every table; this is a page that already has one asking to be included.
+ *
+ * @param {HTMLTableElement} table
+ */
+export function resetTableView(table) {
+  const inst = instances.get(table);
+  if (!inst) return;
+  inst.view = defaults(inst);
+  if (inst.searchInput) inst.searchInput.value = "";
+  for (const col of inst.columns) if (col.filterInput) col.filterInput.value = "";
+  save(inst);
+  applyTableView(table);
+}
+
+/**
  * Give every `<table data-table-tools>` a search box, per-column sort and filter
  * controls in its header, and a bar naming whatever is currently in force.
  *

@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.39.0 (2026-08-19)
+
+### `resetTableView(table)` — for a page that owns a "clear all"
+
+cockpit's container list has one, beside its host and tag chips, and those are page-level
+filters this component knows nothing about. With no way to reach the column filters, that
+button would clear three of the four things in force and leave the fourth — a control
+that lies about what it did.
+
+This is **not** the reset button removed in 0.33.0. That was the component putting its own
+affordance on every table; this is a page that already has one asking to be included.
+
 ## 0.38.0 (2026-08-19)
 
 ### A card has padding

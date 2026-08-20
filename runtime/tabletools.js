@@ -613,6 +613,11 @@ function enhance(table) {
 export function resetTableView(table) {
   const inst = instances.get(table);
   if (!inst) return;
+  // RE-READ THE ROWS FIRST. A page with its own clear-all typically re-renders as part of it, so
+  // by the time this is called the rows held from the last apply can be detached nodes. Appending
+  // those on top of the ones the page just drew DUPLICATES the table: cockpit's container list
+  // went from 27 rows to 54 on a single click of "clear all".
+  snapshot(inst);
   inst.view = defaults(inst);
   if (inst.searchInput) inst.searchInput.value = "";
   for (const col of inst.columns) if (col.filterInput) col.filterInput.value = "";

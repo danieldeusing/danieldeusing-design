@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.40.0 (2026-08-19)
+
+### `resetTableView` re-reads the rows before applying
+
+A page with its own clear-all usually re-renders as part of it, so the rows held from the
+last apply can be detached by the time the reset runs. Appending those on top of what the
+page has just drawn duplicates the table — cockpit's container list went from 27 rows to
+54 on one click.
+
 ## 0.39.0 (2026-08-19)
 
 ### `resetTableView(table)` — for a page that owns a "clear all"

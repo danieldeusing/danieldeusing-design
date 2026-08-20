@@ -409,6 +409,18 @@ chart segment names a series, and neither is an invitation to hover for prose:
 <span data-tip="…" data-tip-bare>2026-08-11</span>   <!-- tip, no glyph -->
 ```
 
+**A tip never covers an open select (0.41.0, Daniel).** The tip panel is `position: fixed;
+z-index: 9999` so it can never be clipped by an overflow container; `.select-panel` is 60. With a
+listbox open and the pointer near a `[data-tip]` — very often the ⓘ inside the trigger's own label —
+the tip painted straight over the options. `initTooltips()` now refuses to show while a
+`.select-panel` exists, and a `pointerdown` anywhere hides one already up.
+
+**You get this for free; do not re-solve it per page.** In particular do not raise a select's
+z-index above the tip to "win" — the two are not competing for the same moment. While a listbox is
+open the choices ARE the content, and an aside about the control you already opened is not worth one
+covered option. Repositioning was rejected for the same reason: a panel can be full-width and
+viewport-tall, so "flip it to the other side" is not a promise that can be kept.
+
 `initTooltips()` handles every `[data-tip]`, including nodes rendered later. **Never use `title` for
 explanatory text on any danieldeusing surface.** The browser's tooltip waits about a second, is
 unstyled, is unreachable by keyboard on most engines, and **does not exist on a touch screen** —

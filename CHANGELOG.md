@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.37.0 (2026-08-19)
+
+### `data-sort-value` — when a column filters on one thing and orders by another
+
+`data-value` served both filtering and sorting, which is right until a column wants them
+to differ. cockpit's tables are full of columns that do: `duration` filters on `1m 30s`
+(what the reader sees and types) and must order on the millisecond count, or `9s` files
+after `10m`; `ref` filters on the branch *and* the PR number but orders by the branch
+alone.
+
+`data-sort-value` overrides ordering only, falling back to `data-value` and then to the
+cell's text. A cell needing neither still says nothing.
+
 ## 0.36.0 (2026-08-19)
 
 ### The filter badge quotes the reader's own casing

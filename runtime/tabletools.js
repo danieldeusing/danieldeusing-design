@@ -59,13 +59,32 @@ const labelOf = (th) => {
   return out.trim();
 };
 
-/* Sort value: `data-value` wins so a column can sort by something it does not
-   print (an ISO date under a friendly one, cents under a formatted amount). */
+/*
+ * What a cell is WORTH, for filtering and for sorting — and they are not always
+ * the same fact.
+ *
+ * `data-value` overrides the printed text, so a column can match on something it
+ * does not show. `data-sort-value` overrides it again for ordering only, because
+ * a column can legitimately want to be filtered one way and ordered another:
+ * cockpit's `duration` filters on "1m 30s" (what the reader sees and types) and
+ * must sort on the millisecond count, or 9s files after 10m. Its `ref` column
+ * filters on the branch AND the PR number, but orders by the branch alone.
+ *
+ * Falling back value -> text at each step means a cell that needs neither says
+ * nothing, which is most of them.
+ */
 const cellValue = (row, index) => {
   const cell = row.cells[index];
   if (!cell) return "";
   const explicit = cell.getAttribute("data-value");
   return explicit === null ? textOf(cell) : explicit.trim();
+};
+
+const cellSortValue = (row, index) => {
+  const cell = row.cells[index];
+  if (!cell) return "";
+  const explicit = cell.getAttribute("data-sort-value");
+  return explicit === null ? cellValue(row, index) : explicit.trim();
 };
 
 /*
@@ -199,7 +218,8 @@ export function applyTableView(table) {
 
   const col = inst.columns.find((c) => c.key === inst.view.sortKey);
   if (col) {
-    keep.sort((a, b) => compare(cellValue(a, col.index), cellValue(b, col.index), col.type, inst.view.dir));
+    keep.sort((a, b) => compare(cellSortValue(a, col.index), cellSortValue(b, col.index),
+                               col.type, inst.view.dir));
   }
 
   /*

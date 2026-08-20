@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.38.0 (2026-08-19)
+
+### A card has padding
+
+`.card-terminal` had none, so every card in the estate put its content flush against its
+own border. Each surface was free to add its own and most did not — the same drift the
+one-size type scale was introduced to end. A card is a box with something in it, and the
+gap between the box and the something is the card's business rather than the caller's.
+
+`0.85rem 1.1rem`, in rem so it tracks the root font size: on a 4K screen the breathing
+room grows with the text it is holding off the edge. No surface redeclared
+`.card-terminal`, so nothing double-pads.
+
+### `data-filter="none"` — sortable, but not filterable
+
+A real kind of column rather than an oversight. cockpit's `duration` is the case: a filter
+box matching `1m 30s` filters on the formatting rather than on the length, so the column
+offers ordering only. Opting it out of `data-col` entirely would take its sort away with
+its filter — which is precisely the regression that appeared when cockpit's shared engine
+was first wired, quietly making every duration column unorderable.
+
 ## 0.37.0 (2026-08-19)
 
 ### `data-sort-value` — when a column filters on one thing and orders by another

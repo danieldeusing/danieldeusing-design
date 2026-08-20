@@ -340,6 +340,18 @@ function buildHeaderControls(inst) {
     col.sortBtn = sort;
     tools.appendChild(sort);
 
+    /*
+     * `data-filter="none"` — SORTABLE BUT NOT FILTERABLE, which is a real kind of column rather
+     * than an oversight. cockpit's `duration` is the case: a box matching "1m 30s" filters on the
+     * formatting rather than on the length. Opting the column out of `data-col` entirely would
+     * take its SORT away with the filter, which is exactly the regression that surfaced when this
+     * was first wired — every duration column quietly stopped being orderable.
+     */
+    if (col.filter === "none") {
+      col.th.appendChild(tools);
+      continue;
+    }
+
     const wrap = document.createElement("details");
     wrap.className = "dropdown tbl-filter";
     const summary = document.createElement("summary");

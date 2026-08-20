@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.37.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.38.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -914,6 +914,18 @@ body::after {
 .card-terminal {
   background: var(--card);
   border: 1px solid var(--border);
+  /* PADDING BELONGS TO THE CARD (Daniel, 2026-08-19). It had none, so every card in the
+     estate put its content flush against its own border — the contacts tiles on the family
+     site were the ones that showed it: a label starting hard on the left edge and a figure
+     under it doing the same.
+
+     Each surface was free to add its own and most did not, which is the same drift the
+     one-size type scale was introduced to end. A card is a box with something in it; the
+     gap between the box and the something is the card's business, not the caller's.
+
+     Stated in rem so it tracks the root font size with everything else — on a 4K screen the
+     breathing room grows with the text it is holding away from the edge. */
+  padding: 0.85rem 1.1rem;
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;

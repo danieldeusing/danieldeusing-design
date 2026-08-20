@@ -207,6 +207,17 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   family login page: 1Password's dropdown landed 1.9x down and across from its field. Scaling the
   unit has no second grid. A page that sets `style.zoom` on top of 0.29.0 scales TWICE.
 
+## A card has its own padding (0.38.0, Daniel) — do NOT add your own
+
+`.card-terminal` pads itself, `0.85rem 1.1rem`. Before 0.38.0 it had none and every surface
+either added padding or, more often, did not — which is why the family contacts tiles shipped
+with their label starting hard against the border.
+
+So a card is `<div class="card-terminal">` with content in it, and nothing else. Do not wrap the
+content in a padded inner div, and do not redeclare `.card-terminal` to adjust the value —
+`bin/design-conformance` treats that as the fork it is. A card that genuinely needs to be flush
+(a full-bleed chart, an image) sets `padding: 0` on its own class, deliberately and once.
+
 ## The shared component vocabulary — a consumer must NOT redeclare any of it
 
 If a class below appears in your page's own `<style>`, that is a bug in waiting: the system's

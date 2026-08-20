@@ -115,4 +115,24 @@ export function initTooltips() {
   // The scroll handler above re-shows from `anchor`, which would put the tip straight back while
   // the panel scrolled; show()'s own guard refuses that, so the two rules do not fight.
   document.addEventListener("pointerdown", hide, true);
+
+  // AND THE ORDERING CASE, which the two rules above do not cover between them.
+  //
+  // A real click on a select trigger fires mousedown -> FOCUS -> mouseup -> click, and the listbox
+  // only opens on `click`. So `focusin` reaches show() while no `.select-panel` exists yet: the
+  // guard sees a clean document, the tip appears, and the panel then opens underneath it. The
+  // pointerdown hide above fires even earlier, so it cannot help either — the tip is re-shown after
+  // it. That is why the first fix passed a synthetic test and failed on the real page: dispatching
+  // pointerdown-then-click skips the focus event that a genuine click puts between them.
+  //
+  // So watch for the panel ARRIVING rather than asking whether it is there. This is the only one of
+  // the three rules that is ordering-independent, and it is what actually closes the bug.
+  new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        if (node.matches?.(".select-panel") || node.querySelector?.(".select-panel")) { hide(); return; }
+      }
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
 }

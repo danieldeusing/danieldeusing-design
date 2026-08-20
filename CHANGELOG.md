@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.41.1 (2026-08-20)
+
+### The 0.41.0 select/tooltip fix did not hold on a real click
+
+0.41.0 guarded `show()` on "does a `.select-panel` exist" and hid on `pointerdown`. Neither covers
+the ordering a genuine click actually produces: mousedown -> **focus** -> mouseup -> click, with the
+listbox opening only on `click`. So `focusin` reaches `show()` while no panel exists yet — the guard
+sees a clean document, the tip appears, and the panel opens underneath it. The `pointerdown` hide
+fires even earlier, so it cannot help; the tip is re-shown after it.
+
+It passed its test because the test dispatched `pointerdown` then `click` synthetically, skipping
+the focus event a real click puts between them. Re-tested by driving an actual mouse: panel open,
+tip visible, rectangles overlapping — the reported bug, reproduced.
+
+Now a MutationObserver hides the tip when a `.select-panel` ARRIVES, rather than asking whether one
+is already there. That is the only one of the three rules that is ordering-independent, and it is
+what closes the bug. Verified with real clicks: panel open, tip hidden, no overlap; and hovering
+after the panel closes still shows the tip.
+
 ## 0.41.0 (2026-08-15)
 
 ### A tooltip never covers an open select

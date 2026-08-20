@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.41.0 (2026-08-15)
+
+### A tooltip never covers an open select
+
+The tip panel is `position: fixed; z-index: 9999` so it can never be clipped by an overflow
+container; `.select-panel` is z-index 60. So whenever a listbox was open and the pointer was near a
+`[data-tip]` — very often the ⓘ sitting inside the trigger's own label — the tip painted straight
+over the options being chosen from.
+
+Suppressed rather than re-positioned. A tip that flips to the other side still fights a panel that
+can be full-width and viewport-tall, and "somewhere else on screen" is not a promise repositioning
+can keep. While a listbox is open the choices ARE the content; an aside about the control you have
+already opened is not worth one covered option.
+
+Two halves, because there are two ways to end up overlapping: `show()` refuses while a
+`.select-panel` exists, and a `pointerdown` anywhere hides a tip that is already up — which is the
+ordinary path when the ⓘ is inside the trigger you just clicked. The scroll handler re-shows from
+its anchor and would have put the tip back mid-scroll; `show()`'s guard refuses that too, so the
+two rules do not fight.
+
+Detected through the DOM (`document.querySelector(".select-panel")`) rather than by importing
+select.js: the panel only exists while open, so its presence IS the state — no shared variable, no
+import cycle, and it stays correct for anything else that renders a `.select-panel`.
+
 ## 0.40.0 (2026-08-19)
 
 ### `resetTableView` re-reads the rows before applying

@@ -31,7 +31,26 @@ export function initTooltips() {
   document.body.appendChild(tip);
 
   let anchor = null;
+
+  // A TOOLTIP MUST NEVER COVER AN OPEN SELECT (Daniel, screenshot 2026-08-15).
+  //
+  // The tip panel is `position: fixed; z-index: 9999` — deliberately above everything, so it can
+  // never be clipped by an overflow container. `.select-panel` is z-index 60. So when a select's
+  // listbox is open and the pointer is anywhere near a `[data-tip]` — very often the ⓘ INSIDE the
+  // trigger's own label — the tip paints straight over the options you are trying to read.
+  //
+  // Suppressing beats re-positioning. A tip that flips to the other side still fights a panel that
+  // can be full-width and viewport-tall, and "somewhere else on screen" is not a promise this can
+  // keep. While a listbox is open the choices ARE the content; an informational aside about the
+  // control you already opened is not worth a single covered option.
+  //
+  // Checked through the DOM rather than by importing select.js: the panel only exists while open,
+  // so its presence IS the state. No shared module variable, no import cycle, and it stays correct
+  // for any future component that renders a `.select-panel`.
+  const selectIsOpen = () => Boolean(document.querySelector(".select-panel"));
+
   function show(el) {
+    if (selectIsOpen()) return;
     // POINT THE ANCHOR AT THE PANEL. `role="tooltip"` alone describes nothing: without
     // aria-describedby the panel is a div a screen reader never reaches, so `data-tip` was
     // announced to nobody while the native `title` it replaces IS announced. Any estate converting
@@ -85,4 +104,15 @@ export function initTooltips() {
   });
   document.addEventListener("focusout", hide);
   document.addEventListener("scroll", () => anchor && show(anchor), true);
+  // The guard in show() stops a tip APPEARING over an open listbox; this is the other half — a tip
+  // already on screen when the select opens. The ⓘ frequently sits inside the trigger's own label,
+  // so "hovering the tip, then clicking to open" is the ordinary path, not an edge case.
+  //
+  // pointerdown on the document, not a select-specific hook: pressing anything is a statement that
+  // you are done reading and want to act, and an informational aside should not outlive that. It
+  // also keeps this decoupled — no event contract with select.js to keep in step.
+  //
+  // The scroll handler above re-shows from `anchor`, which would put the tip straight back while
+  // the panel scrolled; show()'s own guard refuses that, so the two rules do not fight.
+  document.addEventListener("pointerdown", hide, true);
 }

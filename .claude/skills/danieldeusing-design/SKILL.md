@@ -534,11 +534,30 @@ own wrapper still lines up. Cockpit's `dom-patch.js` is the worked example, file
 exemptions it already had (`open` on a `<details>`, `hidden` on a `<tr>`). A page that assigns
 `innerHTML` outright needs none of this.
 
-**Colour the fade when the wrapper is not on the page background.** `.tablewrap::after` is a
-1.5rem gradient that says "there is more over here", and it blends to `--tablewrap-fade`
-(default `--background`). On a `--card` surface the default is a visible bright band — and it
-paints whether or not the table can actually scroll, because CSS cannot ask "am I scrolling?" on
-every engine. `.tickstrip` sets it upstream; your own card-like container sets it itself.
+**The fades are MEASURED, not decorative (0.43.0).** The runtime writes `data-scroll` on the
+wrapper — `none`, `start`, `middle` or `end` — and chrome.css paints from it: nothing on a table
+that cannot scroll, a right fade when there is more to the right, a **left** fade when there is
+more to the left, and both when you are somewhere in the middle. Until 0.43.0 `::after` painted
+always, so "there is more over here" was said equally by a table with six hidden columns and by
+one with none; an indicator that is always on is not an indicator, and cockpit lost a whole column
+behind it. A wrapper with no `data-scroll` — nothing ran the runtime, or the wrapper has no layout
+box yet — paints nothing, because a fade is a promise and silence is the safe way to break none.
+
+**If your page reconciles markup, `data-scroll` is runtime-owned** — the same exemption as
+`tabindex`/`aria-hidden` on a wrapped `<select>`. A patcher that strips it takes the fades off on
+every poll.
+
+**Colour the fade when the wrapper is not on the page background.** The gradient blends to
+`--tablewrap-fade` (default `--background`), which is a visible bright band on a `--card` surface.
+`.tickstrip` sets it upstream; your own card-like container sets it itself.
+
+**The horizontal scrollbar is permanent, and the two APIs cancel each other.** macOS overlay
+scrollbars are invisible until you scroll, so `.tablewrap` styles `::-webkit-scrollbar` to opt
+Chrome and Safari into a persistent slim bar. Do not "complete" this by adding `scrollbar-width`:
+setting it to anything but `auto` makes Chrome ignore every `::-webkit-scrollbar` rule, and
+`scrollbar-width: thin` is still an overlay scrollbar on macOS — so declaring both gives back the
+invisible scrollbar and looks like a fix (measured: webkit alone 8px of gutter, both together 0).
+The standard properties live behind `@supports not selector(::-webkit-scrollbar)` for Firefox.
 
 `--tablewrap-max-h` caps the wrapper's HEIGHT and defaults to `none` on purpose — see the tables
 paragraph under "The shared component vocabulary".

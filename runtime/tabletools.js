@@ -216,10 +216,29 @@ export function applyTableView(table) {
   const keep = [], drop = [];
   for (const row of inst.allRows) (matches(inst, row) ? keep : drop).push(row);
 
+  /*
+   * A PINNED ROW OUTRANKS THE SORT. `data-pin` marks a row that belongs at the top
+   * whatever column is ordering the table — cockpit's approvals record uses it for an
+   * ask still waiting on a human, where the highlight IS the signal: no coloured row
+   * at the top means nothing is waiting, which is read at a glance rather than counted.
+   *
+   * It has to live HERE rather than in the caller, because the caller renders once and
+   * this re-sorts the DOM on every header click. A pin the sort does not know about
+   * survives exactly until the reader sorts by something, and a marker that means
+   * something until you touch the table teaches that it never meant anything.
+   *
+   * Ahead of the comparator, never instead of it: pinned rows are still ordered among
+   * themselves by the chosen column.
+   */
+  const pinRank = (row) => (row.hasAttribute("data-pin") ? 0 : 1);
   const col = inst.columns.find((c) => c.key === inst.view.sortKey);
   if (col) {
-    keep.sort((a, b) => compare(cellSortValue(a, col.index), cellSortValue(b, col.index),
-                               col.type, inst.view.dir));
+    keep.sort((a, b) => pinRank(a) - pinRank(b) ||
+      compare(cellSortValue(a, col.index), cellSortValue(b, col.index), col.type, inst.view.dir));
+  } else if (keep.some((row) => pinRank(row) === 0)) {
+    // No sort in force: the caller's own order stands, pins lifted out of it. Array sort is
+    // stable, so everything keeps its relative place inside each group.
+    keep.sort((a, b) => pinRank(a) - pinRank(b));
   }
 
   /*
@@ -613,11 +632,23 @@ function enhance(table) {
 export function resetTableView(table) {
   const inst = instances.get(table);
   if (!inst) return;
-  // RE-READ THE ROWS FIRST. A page with its own clear-all typically re-renders as part of it, so
-  // by the time this is called the rows held from the last apply can be detached nodes. Appending
-  // those on top of the ones the page just drew DUPLICATES the table: cockpit's container list
-  // went from 27 rows to 54 on a single click of "clear all".
-  snapshot(inst);
+  // RE-READ THE ROWS, BUT ONLY IF THE PAGE ACTUALLY REDREW THEM. A page with its own clear-all
+  // typically re-renders as part of it, so the rows held from the last apply can be detached nodes
+  // by the time this is called. Appending those on top of the ones the page just drew DUPLICATES
+  // the table: cockpit's container list went from 27 rows to 54 on a single click of "clear all".
+  //
+  // Snapshotting UNCONDITIONALLY has the opposite failure, and it is worse because it is silent: a
+  // filter removes its non-matching rows from the DOM rather than hiding them, so a reset called
+  // without a re-render adopts the component's OWN filtered output as the full set and the rows it
+  // withheld are gone for good. "Put the table back" would then be the one action that destroys it.
+  //
+  // `lastWritten` tells them apart — it is what this component put in the body, and it is the same
+  // signal the MutationObserver uses to know its own output from a real re-render.
+  const body = table.tBodies[0];
+  const stillOurs = body && inst.lastWritten &&
+    body.rows.length === inst.lastWritten.length &&
+    inst.lastWritten.every((row, i) => body.rows[i] === row);
+  if (!stillOurs) snapshot(inst);
   inst.view = defaults(inst);
   if (inst.searchInput) inst.searchInput.value = "";
   for (const col of inst.columns) if (col.filterInput) col.filterInput.value = "";

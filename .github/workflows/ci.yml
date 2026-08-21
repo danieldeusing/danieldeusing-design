@@ -25,6 +25,18 @@ jobs:
       - name: Check pagination
         run: node scripts/check-pagination.mjs
 
+      # The table component's MEMORY: a stored view is untrusted input and it names columns, which
+      # get renamed. Drives a real headless chromium because the subject is localStorage, live
+      # .value properties and a MutationObserver — it SKIPS loudly where no browser exists rather
+      # than going red for its own reasons.
+      - name: Check table tools
+        run: node scripts/check-tabletools.mjs
+
+      # The scroll wrapper reaching tables that did not exist when it was called. Same harness and
+      # the same skip. Never wired into CI when it was written, so it had been running nowhere.
+      - name: Check table scroll
+        run: node scripts/check-tablescroll.mjs
+
       # The dist bundle and tokens.json are committed (jsDelivr serves them). Fail
       # if a source change landed without rebuilding the committed artifacts.
       - name: Verify committed artifacts are up to date

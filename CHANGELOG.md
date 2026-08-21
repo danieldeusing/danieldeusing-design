@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.42.0 (2026-08-21)
+
+### A pinned row outranks the sort
+
+`data-pin` on a `<tr>` now sorts it above the rest whatever column is ordering the table, and the
+pinned rows are still ordered among themselves by that column. cockpit's approvals record is the
+caller: an ask still waiting on a human sits at the top and is coloured, so "nothing is waiting" is
+read as the ABSENCE of a highlighted row rather than counted off a list.
+
+It has to live in the comparator rather than in the caller. The caller renders once; this component
+re-sorts the DOM on every header click, so a pin it does not know about survives exactly until the
+reader sorts by something — and a marker that stops meaning anything when you touch the table never
+meant anything.
+
+### `resetTableView` could destroy the rows it was asked to restore
+
+It re-read the rows from the DOM before resetting, unconditionally. That is right for the caller it
+was written for — a page whose own clear-all re-renders first, where the rows the component is
+holding are detached nodes and appending them would DUPLICATE the table (cockpit's container list
+went 27 -> 54 on one click). It is silently destructive for a caller that does not re-render: a
+column filter REMOVES its non-matching rows rather than hiding them, so the re-read adopted the
+component's own filtered output as the full set and the withheld rows were gone. "Put the table
+back" was the one action that could take it apart.
+
+The two are now told apart by `lastWritten` — what this component itself put in the body, the same
+signal the MutationObserver already uses to know its own output from a real re-render. Both
+directions are asserted.
+
+### `scripts/check-tabletools.mjs`, and two checks that were running nowhere
+
+The saved-view behaviour moved here from cockpit in its `3bad5d6`, and the seven cases that covered
+it were deleted there rather than ported — so for several releases the memory, the stale-column
+guards and the reset had no test in either repo. 33 checks now cover the store round trip, a view
+that outlives its columns, a rename, junk in the store, the reset reaching the CONTROLS by property
+rather than attribute, and the pin above.
+
+Only `check-pagination.mjs` was wired into CI; `check-tablescroll.mjs` had never been. Both browser
+checks now run there, and both SKIP loudly where no chromium exists rather than going red for their
+own reasons.
+
 ## 0.41.1 (2026-08-20)
 
 ### The 0.41.0 select/tooltip fix did not hold on a real click

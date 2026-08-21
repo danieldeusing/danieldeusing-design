@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.44.1 (2026-08-21)
+
+### A rail group header lines up with the rows under it
+
+`.ls-group` had `padding-inline: 0` while every row beneath it takes `padding: 5px 14px` from
+`.dropdown-item`, so a group label sat 14px to the left of the rows it heads — a hanging indent
+nobody chose. Daniel found it on the family site, whose rail uses this class as intended.
+
+Cockpit never showed the fault because it renders its group rows from a private inline style
+instead of the class, which is exactly the fork the template tells surfaces to delete; it can now
+drop that and use `.ls-group` like everyone else.
+
 ## 0.44.0 (2026-08-21)
 
 ### The content column is 92rem, not 78rem

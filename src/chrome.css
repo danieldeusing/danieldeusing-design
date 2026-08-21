@@ -343,9 +343,16 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
    own rule and they all differed. netmon had already noticed and said so in a comment; cockpit
    had its own. Shipping the name without the look is worse than not shipping it, because the
    markup reads as supported. */
+/* THE GROUP HEADER LINES UP WITH THE ROWS UNDER IT (0.44.1). It had `padding-inline: 0` while
+   every row below it gets `padding: 5px 14px` from `.dropdown-item`, so `# household` sat 14px
+   to the LEFT of the rows it heads — a hanging indent nobody chose. Cockpit never showed the
+   fault because it renders its group rows from a private inline style instead of this class;
+   family used the class as intended and got the defect. The inline value is matched to
+   `.dropdown-item`'s 14px deliberately: these two are read as one column and there is no shared
+   token for the rail's inline gutter. */
 .ls-group {
   display: block;
-  padding: 0.55rem 0 0.15rem;
+  padding: 0.55rem 0.875rem 0.15rem;
   font-size: var(--fs-base);
   letter-spacing: 0.08em;
   color: var(--muted-foreground);

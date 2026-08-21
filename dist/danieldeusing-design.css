@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.42.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.43.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1855,27 +1855,86 @@ th:has(.tbl-tools) { white-space: nowrap; }
   overflow-x: auto;
   overflow-y: auto;
   max-block-size: var(--tablewrap-max-h, none);
+  /* A SCROLLBAR YOU CAN SEE WITHOUT TOUCHING ANYTHING. macOS defaults to overlay scrollbars, which
+     appear while you scroll and fade out after — so a table with hidden columns showed no scrollbar,
+     no gutter, and (before the fades below started measuring) no honest fade either. There was
+     literally nothing on screen saying the table went further right; cockpit's review table hid its
+     `links` column that way for weeks. Styling `::-webkit-scrollbar` is what opts Safari and Chrome
+     out of overlay behaviour into a permanent one.
+
+     THE TWO APIS CANCEL EACH OTHER, which is not obvious and cost a measurement to find: setting
+     `scrollbar-width` to anything other than `auto` makes Chrome ignore every `::-webkit-scrollbar`
+     rule on the element, and `scrollbar-width: thin` on macOS is still an overlay scrollbar. So
+     declaring both — the obvious way to cover all three engines — produces the SAME invisible
+     scrollbar we started with, and looks like a fix. Measured on the review table: webkit rules
+     alone gave an 8px permanent gutter, both together gave 0.
+
+     Hence the @supports guard. Firefox does not implement `::-webkit-scrollbar`, so the query is
+     false in Chrome and Safari (which take the webkit rules below) and true in Firefox (which
+     takes the standard properties and has no webkit rules to lose). */
+}
+@supports not selector(::-webkit-scrollbar) {
+  .tablewrap {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+.tablewrap::-webkit-scrollbar {
+  height: 0.55rem;
+  width: 0.55rem;
+}
+.tablewrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tablewrap::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+.tablewrap:hover::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
 }
 /* THE FADE HAS TO DISAPPEAR INTO WHATEVER THE WRAPPER SITS ON, and that is not always the page.
    It blends to `--background`, which is invisible on the page and a 1.5rem bright band on any
-   `--card` surface — and the fade paints whether or not the table is actually scrolling, so on a
-   short table inside a card it is a stripe that means nothing. (CSS cannot ask "am I scrolling?"
-   portably: `container-type: scroll-state` is Chrome-only, and a fix that lands on one engine
-   leaves the estate disagreeing with itself, the same reason `appearance: base-select` was
-   refused.) So the colour is a token the surface sets — netmon had already discovered this and
-   was carrying `.card .tablewrap::after` as a private override.
+   `--card` surface. So the colour is a token the surface sets — netmon had already discovered this
+   and was carrying `.card .tablewrap::after` as a private override.
 
-   It matters more from 0.23.0, because `initTableScroll()` now reaches tables that arrive after
-   load — including the ticker strip's, which is a `--card` box on every page in the estate. */
-.tablewrap::after {
+   WHICH SIDE FADES IS NOW A MEASUREMENT (0.43.0). Until then `::after` painted on every table
+   whether or not one could be scrolled, and there was no `::before` at all — so "there is more
+   over here" was said equally by a table with six hidden columns and by one with none, and never
+   said about anything hidden off the LEFT edge. An indicator that is always on is not an
+   indicator. runtime/tablescroll.js writes `data-scroll` (none | start | middle | end) on the
+   wrapper and keeps it current through scrolls, resizes and re-renders; the four states are the
+   whole reason it is an attribute rather than a boolean class.
+
+   `middle` paints BOTH edges, which is the state that could not be expressed before: halfway
+   through a wide table there is more in both directions and the reader has to know which way they
+   came from. A wrapper with no `data-scroll` at all — nothing has run the runtime — paints
+   nothing, which is the safe way round: silence is better than a false promise.
+
+   The fades sit at `inset-block: 0`, so they span the wrapper's full height and stay in view on a
+   table taller than the window. That is deliberate and it is the answer to where the affordance
+   lives when you are reading the middle of a long table: the scrollbar is at the bottom where a
+   scrollbar belongs, and the thing telling you there is more sideways runs the whole way down. */
+.tablewrap[data-scroll="start"]::after,
+.tablewrap[data-scroll="middle"]::after,
+.tablewrap[data-scroll="middle"]::before,
+.tablewrap[data-scroll="end"]::before {
   content: "";
   position: absolute;
   inset-block: 0;
-  right: 0;
   width: 1.5rem;
   pointer-events: none;
   opacity: 0.9;
+  z-index: 2; /* over the sticky header (z-index 1), or a wide table's fade stops at the first row */
+}
+.tablewrap[data-scroll="start"]::after,
+.tablewrap[data-scroll="middle"]::after {
+  right: 0;
   background: linear-gradient(to right, transparent, var(--tablewrap-fade, var(--background, transparent)));
+}
+.tablewrap[data-scroll="middle"]::before,
+.tablewrap[data-scroll="end"]::before {
+  left: 0;
+  background: linear-gradient(to left, transparent, var(--tablewrap-fade, var(--background, transparent)));
 }
 
 /* The header row stays put while the body scrolls under it. `--background` rather than

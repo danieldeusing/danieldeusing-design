@@ -4,6 +4,49 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.43.0 (2026-08-21)
+
+### A table only says it scrolls when it scrolls
+
+`.tablewrap` painted a right-edge fade on every table, always. Whether six columns were hidden
+past the edge or none were, the page looked identical — so the affordance was a constant, and a
+constant carries no information. Measured on cockpit's `/automation/review`: the 11-column
+activity table overflowed by 41px and the 5-column ticker strip directly above it by zero, and
+nothing on screen told them apart. Daniel had never found that table's `links` column; it is the
+last one.
+
+`initTableScroll()` now measures each wrapper and writes `data-scroll` on it — `none`, `start`,
+`middle` or `end` — kept current through scrolls, resizes and re-renders (a column filter that
+drops rows can take the widest cell with it). chrome.css paints from that: no fade on a table
+that cannot scroll, a right fade when there is more to the right, and a **left** fade when there
+is more to the left, which nothing could express before. `middle` paints both, because halfway
+through a wide table there is more in both directions.
+
+A wrapper with no `data-scroll` at all paints nothing. Silence is the safe way round — a fade is
+a promise, and the old one was being broken on most of the tables in the estate.
+
+### The horizontal scrollbar is visible without touching anything
+
+macOS uses overlay scrollbars: they appear while you scroll and fade out after. So a table with
+hidden columns showed no scrollbar, no gutter and no honest fade — literally nothing on screen
+saying it went further right. `.tablewrap` now styles `::-webkit-scrollbar`, which is what opts
+Chrome and Safari out of overlay behaviour into a permanent slim bar.
+
+**The two scrollbar APIs cancel each other**, which is not obvious and took a measurement to
+find. Setting `scrollbar-width` to anything but `auto` makes Chrome ignore every
+`::-webkit-scrollbar` rule on the element — and `scrollbar-width: thin` is still an overlay
+scrollbar on macOS. Declaring both, the obvious way to cover all three engines, gives back the
+same invisible scrollbar you started with and looks like a fix: webkit rules alone measured an
+8px permanent gutter, both together measured 0. The standard properties are therefore behind
+`@supports not selector(::-webkit-scrollbar)`, which is false in Chrome and Safari and true in
+Firefox.
+
+### Note for reconcilers
+
+`data-scroll` is runtime-owned, like `tabindex`/`aria-hidden` on a wrapped `<select>`. A patcher
+that diffs its own markup against the live DOM will strip it from a hand-written
+`<div class="tablewrap">` unless told not to — cockpit's `dom-patch.js` carries the exemption.
+
 ## 0.42.0 (2026-08-21)
 
 ### A pinned row outranks the sort

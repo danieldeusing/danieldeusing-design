@@ -400,35 +400,44 @@ restores the bug.
 <span data-tip="Explanation shown instantly on hover">metric</span>
 ```
 
-### The marker is an ⓘ, NEVER an underline (0.26.0, Daniel)
+### There is NO marker — discovery is by hover (0.45.0, Daniel)
 
-**Write nothing extra — the ⓘ comes from the stylesheet.** `span`, `th` and `button` carrying
-`data-tip` get it from `::after`, so every existing call site gained one on upgrade.
+**Write the tip and nothing else. A `data-tip` host renders no glyph, no underline, no dotted
+border.** Daniel: *"Remove the info icons everywhere. People will just hover and see if there is
+a tooltip coming or not."*
 
 ```html
-<span data-tip="…">budget</span>          <!-- renders: budget ⓘ -->
-<span data-tip="…">budget ⓘ</span>        <!-- WRONG — two glyphs -->
+<span data-tip="…">budget</span>          <!-- renders: budget -->
+<span data-tip="…">budget ⓘ</span>        <!-- WRONG — a glyph nobody draws for you -->
 ```
 
-Until 0.26.0 this was a dotted `border-bottom`, and an underline is the wrong signal twice over: it
-is the web's mark for a LINK, so a dotted one reads as a link that is broken or disabled, and it
-vanishes in a table header or against a busy row — which is exactly where these sit. Two cockpit
-pages had already hand-rolled the ⓘ, which is the estate telling you the answer; 0.26.0 made it the
-system's, and those local copies were deleted in the same pass.
+**Do not re-add one, and do not write it in markup.** The estate has now tried both alternatives
+and rejected both, so this is settled rather than merely current:
 
-**Never write the glyph in markup.** If you are typing `ⓘ` or `&#9432;` on a danieldeusing surface,
-the stylesheet is already doing it and you are about to ship two.
+- Until 0.26.0 it was a dotted `border-bottom` — the web's mark for a LINK, so it read as a link
+  that was broken or disabled, and it disappeared in a table header or against a busy row.
+- From 0.26.0 to 0.45.0 it was an `::after` ⓘ. The reasoning was sound — a tooltip nobody can see
+  is a tooltip nobody finds — but `span[data-tip]`, `th` and `button` meant **154 call sites**:
+  beside sort arrows, inside buttons that already say what they do, after labels that were never
+  ambiguous. A ten-column table carried ten pieces of furniture explaining controls that explain
+  themselves. Discovery by hover costs the reader nothing; the marker cost every surface.
 
-**An element that is already its own affordance opts out** — a minimap bar jumps to a section, a
-chart segment names a series, and neither is an invitation to hover for prose:
+`initTableTools` also stopped putting `data-tip` on the ↕ sort button and the ⌕ filter summary — a
+bubble reading "sort by repo" anchored under the word *repo* is a tooltip repeating its own
+control. **`aria-label` stays on both.** The glyph was decoration; the accessible name is not, and
+a screen reader still has to be told what an unlabelled ↕ does.
+
+`[data-tip-bare]` and `.minimap-bar` are kept as opt-outs though they now suppress nothing. They
+cost nothing, and a future marker would otherwise have to re-derive which elements are already
+their own affordance:
 
 ```html
-<span data-tip="…" data-tip-bare>2026-08-11</span>   <!-- tip, no glyph -->
+<span data-tip="…" data-tip-bare>2026-08-11</span>
 ```
 
 **A tip never covers an open select (0.41.0, Daniel).** The tip panel is `position: fixed;
 z-index: 9999` so it can never be clipped by an overflow container; `.select-panel` is 60. With a
-listbox open and the pointer near a `[data-tip]` — very often the ⓘ inside the trigger's own label —
+listbox open and the pointer near a `[data-tip]` — very often inside the trigger's own label —
 the tip painted straight over the options. `initTooltips()` now refuses to show while a
 `.select-panel` exists, and a `pointerdown` anywhere hides one already up.
 

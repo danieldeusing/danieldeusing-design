@@ -141,7 +141,7 @@ surfaces had **four** content widths (78rem / 1180px / 72rem / none) and netmon 
 where everything else sat at `0.75rem` — because the system offered no token to inherit.
 
 ```css
---content-w: 78rem;     --content-pad: 1.5rem;
+--content-w: 92rem;     --content-pad: 1.5rem;
 --fs-base: 0.75rem; /* 12px — ALL normal text. The only size you write. */
 --fs-lg: 0.9375rem; /* 15px — h3 / section heads */
 --fs-xl: 1.125rem;  /* 18px — h2 / page title */
@@ -180,10 +180,19 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   three near-identical pixel values inside one card. Write the token, not a ratio.
 
 - **`.wrap` resolves the column** (`max-width: var(--content-w); margin-inline: auto;
-  padding-inline: var(--content-pad)`). Use it, and never restate a bare `78rem` locally. A
+  padding-inline: var(--content-pad)`). Use it, and never restate a bare `92rem` locally. A
   build-free page on an **unpinned** url writes the tokens itself *with literal fallbacks* —
-  `max-width: var(--content-w, 78rem)` — because `.wrap` itself only exists from 0.4.0; see
+  `max-width: var(--content-w, 92rem)` — because `.wrap` itself only exists from 0.4.0; see
   "Pin or unpin".
+- **ONE WIDTH FOR EVERY SECTION, and a surface that wants more raises the token** (0.44.0).
+  A table section must never be wider than the prose sections beside it: blocks that start at
+  different left edges read as broken however well each one is individually sized. So there is
+  no bleed class and none should be invented — cockpit had one for a few hours, for a genuinely
+  too-narrow activity table, and the right fix was `--content-w` going 78rem → 92rem for
+  everybody. The number was measured, not chosen: the widest table in the estate wants 1353px,
+  88rem is the first value that fits it, and 92rem clears it while still leaving an 81px gutter
+  beside the `ls -l` rail at 1920. **The cap only binds above ~1744px**, so widening it is
+  invisible on a laptop and only shows on the monitors it gets raised about.
 - **`.wrap` sets the inline axis ONLY** — vertical rhythm differs legitimately between a doc and a
   dashboard. A consumer adds `padding-block: 2.5rem 5rem`. **Never the `padding` shorthand**: it
   resets `padding-inline` to 0 and silently takes the shared margins back.
@@ -348,6 +357,14 @@ A rail row that is the page you are on takes `aria-current="page"` **on the `<a>
 <li><a class="ls-row ls-row--dir" href="/automation" aria-current="page">
   <span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">automation/</span></a></li>
 ```
+
+A group heading is `<span class="ls-group">`, and it is not decoration — **do not render one
+from a private inline style.** Cockpit did for months, which is how `.ls-group` shipped with
+`padding-inline: 0` against rows that take 14px from `.dropdown-item` and nobody noticed: the
+class was misaligned for every surface using it as intended, and correct on the one surface
+that had opted out of it. Daniel found it on the family site. Fixed in 0.44.1; the lesson is
+that a fork does not just risk drifting from the component, it can hide the component's bugs
+from the person best placed to see them.
 
 **Do not invent a class for this.** The attribute is the standard, it is what a screen reader
 announces, and a page that paints "you are here" without saying it in the accessibility tree has
@@ -800,7 +817,7 @@ The runtime is progressive enhancement: with JS off, content is visible and the 
   that *predates the token it is asking for*: `0.2.0` has no `.wrap` and no `--fs-*` at all, and
   a bare `var(--content-w)` resolves to nothing — full-bleed page, collapsed type. **Give every
   token an unpinned consumer depends on structurally a literal fallback**: `var(--content-w,
-  78rem)`, `var(--fs-2xl, 1.7rem)`. Check what is actually being served before concluding a new
+  92rem)`, `var(--fs-2xl, 1.7rem)`. Check what is actually being served before concluding a new
   token "doesn't work": `curl -sI <url> | grep x-jsd-version`.
 - Consequence for this repo: **a publish is instantly live on every unpinned surface, with no
   staging** (once the edge turns over). So (a) look at them after publishing, and (b) keep new

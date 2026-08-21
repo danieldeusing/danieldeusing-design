@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.43.1 (2026-08-21)
+
+### A table with no layout box records no verdict
+
+`measure()` read a wrapper that had never been laid out — width 0, scrollWidth 0 — as `none`,
+"nothing to scroll". Tables routinely render into a hidden tab panel where every dimension is 0;
+cockpit's activity tables do. So the one verdict 0.43.0 exists to stop a table asserting without
+evidence was exactly the one it asserted, and the fades stayed off until something happened to
+re-measure.
+
+A wrapper with no box now leaves `data-scroll` unset. That paints nothing — chrome.css keys every
+fade off a value — and, unlike `none`, claims nothing; the ResizeObserver fires when the panel is
+shown and the real state lands then.
+
 ## 0.43.0 (2026-08-21)
 
 ### A table only says it scrolls when it scrolls

@@ -102,6 +102,16 @@ function wrap(table) {
  * being removed here.
  */
 function measure(wrapper) {
+  // A wrapper with no layout box has not been measured, it has been GUESSED at. Tables routinely
+  // render into a hidden tab panel — cockpit's do — where every dimension reads 0 and the naive
+  // arithmetic below concludes "nothing to scroll", which is the one verdict this whole change
+  // exists to stop a table from asserting without evidence. Leaving the attribute unset paints
+  // nothing (chrome.css keys every fade off a value) and, unlike "none", records no claim; the
+  // ResizeObserver in watch() fires the moment the panel is shown and the real state lands then.
+  if (!wrapper.clientWidth) {
+    delete wrapper.dataset.scroll;
+    return;
+  }
   const hidden = wrapper.scrollWidth - wrapper.clientWidth;
   if (hidden <= 1) {
     wrapper.dataset.scroll = "none";

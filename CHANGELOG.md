@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.44.0 (2026-08-21)
+
+### The content column is 92rem, not 78rem
+
+Daniel: *"we still go too early into max-width where we increase the paddings to the sides."*
+
+78rem capped every page at 1248px. On a 1920 screen that opened roughly 190px of margin on each
+side while the widest thing in the estate — cockpit's 11-column review activity table — wanted
+1353px and was given 1200, paying the difference in repo paths wrapped onto two lines and
+timestamps split in half. The space to fix it was already on the page; nothing was being bought
+by the cap.
+
+The number comes from that measurement rather than from taste: 88rem is the first value that
+fits 1353px at all, and 92rem clears it by 71px while still leaving an 81px gutter beside the
+`ls -l` rail at 1920. **The cap only binds above roughly 1744px** (92rem + 2×`--content-pad` +
+`--ls-nav-inset`), so every laptop is untouched — the change shows up only on the monitors it
+was raised about.
+
+### One width for every section
+
+A table section must never be wider than the prose sections beside it. Blocks that start at
+different left edges read as broken however well each one is individually sized, so a surface
+that needs more room raises `--content-w` for the whole estate rather than adding a bleed class
+to one section. (Cockpit had exactly such a class for a few hours; it is gone.)
+
+Surfaces that consume only `tokens.css` pick this up with the token. Nothing else changed —
+`--content-pad` is still 1.5rem and `.wrap` is still one rule.
+
 ## 0.43.1 (2026-08-21)
 
 ### A table with no layout box records no verdict

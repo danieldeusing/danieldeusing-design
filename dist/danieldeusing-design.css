@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.43.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.44.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -281,12 +281,30 @@ html[data-theme="paper"] {
  * who raises their browser's base font gets the whole scale with them.
  */
 :root {
-  /* Content column. 78rem is cockpit's — the widest of the four found, the one
-     already tuned against the `ls -l` rail, and the surface with the most page
-     types. Standardising on the narrowest would have reflowed every table.
-     A page whose content genuinely is not a column (a full-bleed dashboard
-     table) sets `max-width: none` deliberately; it does not pick another number. */
-  --content-w: 78rem;
+  /* Content column. Was 78rem — cockpit's, the widest of the four found when the
+     surfaces were unified — and is 92rem since 2026-08-21 (Daniel: "we still go
+     too early into max-width where we increase the paddings to the sides").
+
+     78rem capped the page at 1248px, so on a 1920 screen roughly 190px of margin
+     opened on each side while the widest thing in the estate — /automation/review's
+     11-column activity table — wanted 1353px and had 1200. It paid the difference
+     in wrapped repo paths and timestamps split across two lines. The number is
+     picked FROM that measurement rather than by eye: 88rem is the first that fits
+     1353 at all, and 92rem clears it by 71px while still leaving an 81px gutter
+     beside the `ls -l` rail at 1920.
+
+     THE CAP ONLY BINDS ABOVE ~1744px (with the rail: 92rem + 2×--content-pad +
+     --ls-nav-inset). Below that the page was already fluid and is untouched, which
+     is why this change is invisible on a laptop and only shows on the monitors it
+     was raised about.
+
+     ONE NUMBER FOR EVERY SECTION. A table section must never be wider than the
+     prose sections beside it (Daniel, same day) — a page whose blocks start at
+     different left edges reads as broken, whatever each block individually needs.
+     A surface that wants more width raises THIS, it does not add a bleed class.
+     A page whose content genuinely is not a column (a full-bleed dashboard table)
+     sets `max-width: none` deliberately; it does not pick another number. */
+  --content-w: 92rem;
 
   /* ── SCALE ABOVE THE REFERENCE WIDTH ───────────────────────────────────────
      Everything in this package is stated in rem, so moving the root font size

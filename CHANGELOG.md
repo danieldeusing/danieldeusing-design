@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.45.0 (2026-08-21)
+
+### The ⓘ marker is gone, and header controls carry no tooltip
+
+Daniel: *"Remove the info icons everywhere. People will just hover and see if there is a tooltip
+coming or not."* — and, before that, *"In all tables, remove the info icon and hover from the column
+headers."*
+
+`span[data-tip]::after` / `th[…]` / `button[…]` appended an ⓘ to every tooltip host. The reasoning
+was sound — a tooltip nobody can see is a tooltip nobody finds — but it put a glyph on 154 call
+sites: beside sort arrows, inside buttons that already say what they do, after labels that were
+never ambiguous. On a ten-column table that is ten pieces of furniture explaining controls that
+explain themselves. Discovery by hover costs a reader nothing; the marker cost every surface.
+
+`initTableTools` also stopped setting `data-tip` on the ↕ sort button and the ⌕ filter summary. A
+bubble reading "sort by repo", anchored to a sort arrow sitting under the word *repo*, is a tooltip
+repeating its own control. **`aria-label` stays on both** — the glyph was decoration, but a screen
+reader still has to be told what an unlabelled ↕ does.
+
+The `[data-tip-bare]` and `.minimap-bar` opt-outs are kept though they now suppress nothing: they
+cost nothing, and a future marker would otherwise have to re-derive which elements are already
+their own affordance.
 ## 0.44.1 (2026-08-21)
 
 ### A rail group header lines up with the rows under it

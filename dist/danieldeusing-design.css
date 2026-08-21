@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.44.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.45.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -2491,19 +2491,16 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
  * docs and danieldeusing.de already say `data-tip="…"` and every one of them gets the icon by
  * loading this file.
  */
-span[data-tip]::after,
-th[data-tip]::after,
-button[data-tip]::after {
-  content: "\FE0E\24D8";          /* ⓘ, with VS15 so it stays a glyph and never an emoji */
-  margin-inline-start: 0.35em;
-  color: var(--muted-foreground);
-  font-size: 0.9em;   /* not-text: the ⓘ glyph */
-  font-weight: 400;
-  /* The glyph is decoration: it must not be dragged into a copied selection, and it must not shift
-     the baseline of the label it follows. */
-  user-select: none;
-  vertical-align: baseline;
-}
+/*
+ * NO MARKER (Daniel, 2026-08-21). This used to append an ⓘ to every span/th/button carrying a
+ * [data-tip], on the reasoning that a tooltip nobody can see is a tooltip nobody finds. In
+ * practice it put a glyph on 154 call sites — beside sort arrows, inside buttons that already
+ * say what they do, after labels that were never ambiguous — and the furniture cost more than
+ * the discovery was worth. A reader hovers and either something appears or it does not.
+ *
+ * The opt-outs below are kept: they cost nothing, and re-adding a marker would otherwise have
+ * to re-derive which elements are already their own affordance.
+ */
 
 /* Opt OUT, for a [data-tip] whose element is already its own affordance. */
 .minimap-bar[data-tip]::after,

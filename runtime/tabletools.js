@@ -348,7 +348,12 @@ function buildHeaderControls(inst) {
     const sort = document.createElement("button");
     sort.type = "button";
     sort.className = "tbl-sort";
-    sort.setAttribute("data-tip", "sort by " + col.label);
+    // NO TOOLTIP ON A HEADER CONTROL (Daniel, 2026-08-21). `button[data-tip]::after` renders the ⓘ
+    // marker, so every sortable column grew "↕ⓘ" and every filterable one "⌕ⓘ" — two glyphs of
+    // furniture per column, on tables that can carry ten. The tip said "sort by <label>" beside a
+    // sort arrow already sitting under the label it sorts, which is the definition of a tooltip
+    // that repeats its own control. `aria-label` STAYS: the glyph is decoration, but a screen
+    // reader still has to be told what an unlabelled ↕ button does.
     sort.setAttribute("aria-label", "sort by " + col.label);
     sort.textContent = "↕";
     sort.addEventListener("click", () => {
@@ -374,7 +379,6 @@ function buildHeaderControls(inst) {
     const wrap = document.createElement("details");
     wrap.className = "dropdown tbl-filter";
     const summary = document.createElement("summary");
-    summary.setAttribute("data-tip", "filter " + col.label);
     summary.setAttribute("aria-label", "filter " + col.label);
     summary.textContent = "⌕";
     wrap.appendChild(summary);

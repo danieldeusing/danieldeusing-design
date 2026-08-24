@@ -47,10 +47,15 @@ export function initTooltips() {
   // Checked through the DOM rather than by importing select.js: the panel only exists while open,
   // so its presence IS the state. No shared module variable, no import cycle, and it stays correct
   // for any future component that renders a `.select-panel`.
-  const selectIsOpen = () => Boolean(document.querySelector(".select-panel"));
+  //
+  // `details.dropdown[open]` is the same situation with the other menu component (0.45.1): the
+  // trigger is a summary that very often carries the data-tip itself, so "hover, then click to
+  // open" put the tip straight over the menu it had just explained. While a menu is open the
+  // choices ARE the content; the aside waits.
+  const menuIsOpen = () => Boolean(document.querySelector(".select-panel, details.dropdown[open]"));
 
   function show(el) {
-    if (selectIsOpen()) return;
+    if (menuIsOpen()) return;
     // POINT THE ANCHOR AT THE PANEL. `role="tooltip"` alone describes nothing: without
     // aria-describedby the panel is a div a screen reader never reaches, so `data-tip` was
     // announced to nobody while the native `title` it replaces IS announced. Any estate converting
@@ -129,10 +134,15 @@ export function initTooltips() {
   // the three rules that is ordering-independent, and it is what actually closes the bug.
   new MutationObserver((records) => {
     for (const record of records) {
+      // a dropdown's panel is already in the DOM; what ARRIVES is the `open` attribute
+      if (record.type === "attributes") {
+        if (record.target.matches?.("details.dropdown[open]")) { hide(); return; }
+        continue;
+      }
       for (const node of record.addedNodes) {
         if (node.nodeType !== 1) continue;
         if (node.matches?.(".select-panel") || node.querySelector?.(".select-panel")) { hide(); return; }
       }
     }
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
 }

@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.46.1 (2026-08-24)
+
+### A tip never covers an open dropdown either
+
+0.41.0 taught `initTooltips()` that an open select's listbox outranks a tooltip; the same
+conflict existed with the other menu component and was found in Seedr Studio, where a
+`details.dropdown` summary carrying its own `data-tip` put the tip straight over the menu it
+had just opened. The suppression now covers `details.dropdown[open]` too: `show()` refuses
+while either menu is open, and the runtime's observer — which for selects watches the panel
+*arriving* — additionally watches the `open` attribute, because a dropdown's panel is already
+in the DOM and what arrives is the attribute. Same reasoning as 0.41.0: while a menu is open
+the choices are the content, and the aside waits.
+
 ## 0.46.0 (2026-08-24)
 
 ### The documentation template shipped a merge conflict

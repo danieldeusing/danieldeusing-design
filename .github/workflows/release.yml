@@ -63,6 +63,25 @@ jobs:
         if: steps.decide.outputs.publish == 'true'
         run: git diff --exit-code dist tokens/tokens.json
 
+      # ── THE RELEASE GATE ───────────────────────────────────────────────────────────────────
+      # The push IS the release, so this workflow is the ONLY thing standing between a commit on
+      # main and a published package. Until 2026-08-24 it ran no suite at all: ci.yml ran three
+      # and release.yml ran none, so a red runtime published anyway. (audit design-system #1)
+      #
+      # DD_REQUIRE_BROWSER=1 is load-bearing. Both DOM suites exit 0 with "SKIPPED" when they
+      # cannot find a browser, and on a Linux runner they found none — so simply listing them
+      # here would have re-created the same empty gate one layer down.
+      - name: Runtime suites must pass before publishing
+        if: steps.decide.outputs.publish == 'true'
+        env:
+          DD_REQUIRE_BROWSER: "1"
+        run: |
+          node scripts/check-pagination.mjs
+          node scripts/check-tabletools.mjs
+          node scripts/check-tablescroll.mjs
+          node scripts/check-release-gate.mjs
+          node scripts/check-release.mjs
+
       # No NODE_AUTH_TOKEN and no --provenance: Trusted Publishing authenticates via OIDC
       # and generates provenance automatically.
       - name: Publish to npm (Trusted Publishing)

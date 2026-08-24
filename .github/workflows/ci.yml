@@ -30,15 +30,22 @@ jobs:
       # .value properties and a MutationObserver — it SKIPS loudly where no browser exists rather
       # than going red for its own reasons.
       - name: Check table tools
+        env:
+          DD_REQUIRE_BROWSER: "1"
         run: node scripts/check-tabletools.mjs
 
       # The scroll wrapper reaching tables that did not exist when it was called. Same harness and
       # the same skip. Never wired into CI when it was written, so it had been running nowhere.
       - name: Check table scroll
+        env:
+          DD_REQUIRE_BROWSER: "1"
         run: node scripts/check-tablescroll.mjs
 
       # The dist bundle and tokens.json are committed (jsDelivr serves them). Fail
       # if a source change landed without rebuilding the committed artifacts.
+      - name: Check the release gate still gates
+        run: node scripts/check-release-gate.mjs
+
       - name: Verify committed artifacts are up to date
         run: |
           if ! git diff --exit-code dist tokens/tokens.json; then

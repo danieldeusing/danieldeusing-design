@@ -33,16 +33,31 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CHROME = [
-  `${process.env.HOME}/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
-  `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1234/chrome-mac/Chromium.app/Contents/MacOS/Chromium`,
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-].find((path) => existsSync(path));
+// DD_CHROME, when set, IS the browser — a wrong path there fails loudly rather than
+// falling through to a skip, which is the whole point of the DD_REQUIRE_BROWSER gate below.
+const CHROME = process.env.DD_CHROME
+  ? (existsSync(process.env.DD_CHROME) ? process.env.DD_CHROME : null)
+  : [
+    `${process.env.HOME}/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
+    `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1234/chrome-mac/Chromium.app/Contents/MacOS/Chromium`,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      // Linux, for CI. GitHub's ubuntu runners ship Chrome; without these the suite
+      // skipped on every CI run and the release gate below proved nothing.
+      "/usr/bin/google-chrome",
+      "/usr/bin/google-chrome-stable",
+      "/usr/bin/chromium",
+      "/usr/bin/chromium-browser",
+    ].find((path) => existsSync(path));
 
 if (!CHROME) {
   console.log("check-tablescroll: SKIPPED — no headless chromium on this machine.");
   console.log("  This asserts DOM behaviour (MutationObserver, live child lists), which cannot be");
   console.log("  proven against a stub. Install one with `npx playwright install chromium`.");
+  if (process.env.DD_REQUIRE_BROWSER === "1") {
+    console.log("  DD_REQUIRE_BROWSER=1: a skip counts as a FAILURE here. This suite gates the npm");
+    console.log("  release, and a silent skip would publish a runtime nothing had exercised.");
+    process.exit(1);
+  }
   process.exit(0);
 }
 

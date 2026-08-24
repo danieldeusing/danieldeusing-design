@@ -43,6 +43,16 @@ for (const [file, text] of [["ci.yml", ci], ["release.yml", release]]) {
   }
 }
 
+// A third copy of the same judgement: the node the suites run on. release.yml needs >= 22 for
+// Trusted Publishing and the DOM suites need >= 22 for a global WebSocket, so a ci.yml pinned
+// lower runs a different program than the one that gates the release.
+const nodeOf = (text) => Number((text.match(/node-version:\s*(\d+)/) || [])[1]);
+const ciNode = nodeOf(ci), releaseNode = nodeOf(release);
+if (ciNode && releaseNode && ciNode === releaseNode) pass(`both workflows run node ${ciNode}`);
+else fail(`ci.yml runs node ${ciNode} and release.yml runs node ${releaseNode} — the gate and the check disagree about the runtime`);
+if (releaseNode >= 22) pass("node is new enough for a global WebSocket (the DOM suites need it)");
+else fail(`node ${releaseNode} has no global WebSocket — the DOM suites cannot run at all`);
+
 console.log();
 if (failures) { console.log(`\x1b[31m-- check-release-gate: ${failures} FAILED --\x1b[0m`); process.exit(1); }
 console.log("\x1b[32m-- check-release-gate: all checks passed --\x1b[0m");

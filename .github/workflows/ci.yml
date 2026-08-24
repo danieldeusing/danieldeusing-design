@@ -13,7 +13,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, matching release.yml. NOT cosmetic: the DOM suites talk to Chrome over a
+          # WebSocket, and `WebSocket` only became a Node global in 22 — on 20 they die with
+          # `ReferenceError: WebSocket is not defined`. Nobody could discover that while the
+          # suites were skipping for want of a browser, which is finding #1 in one sentence.
+          node-version: 22
 
       # The package has no dependencies, so there is nothing to install.
       - name: Build dist + tokens

@@ -32,7 +32,7 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f5efe2" />
 
-    <!-- pre-paint: apply the saved theme + resolution zoom before first paint -->
+    <!-- pre-paint: apply the saved theme before first paint. NOTHING ELSE - see below. -->
     <script>
       (() => {
         const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
@@ -41,16 +41,11 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
         document.documentElement.dataset.theme = t;
         document.querySelector('meta[name=theme-color]')?.setAttribute("content", bg[t]);
       })();
-      // resolution-independent zoom: scale the whole layout up past a 1920px reference
-      (() => {
-        const z = () => { document.documentElement.style.zoom = String(Math.max(1, innerWidth / 1920)); };
-        z(); addEventListener("resize", z);
-      })();
     </script>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/dist/danieldeusing-design.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.45.0/dist/danieldeusing-design.min.css" />
     <!-- optional: the real JetBrains Mono webfont (otherwise falls back to Menlo) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/src/fonts.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.45.0/src/fonts.css" />
   </head>
   <body>
     <p class="prompt">cat hello.txt</p>
@@ -59,7 +54,7 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
 
     <script type="module">
       import { initThemeSwitcher, initDropdowns, initTerminal } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.1.2/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.45.0/runtime/index.js";
       initThemeSwitcher();
       initDropdowns();
       initTerminal();
@@ -67,6 +62,21 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
   </body>
 </html>
 ```
+
+> **There is deliberately no `style.zoom` in that block.** Scaling above the 1920px reference
+> has been pure CSS since **0.29.0** - one `font-size: max(...)` declaration in `tokens.css`,
+> applied by loading the stylesheet. A page that ALSO sets `document.documentElement.style.zoom`
+> scales **twice**, and `zoom` additionally scales the coordinate *space*, so anything injected
+> from outside the document (a password manager's dropdown, a translation bar) is measured
+> through one grid and positioned in another - measured on a real login page, the dropdown
+> landed 1.9x down and across from its field. `initResolutionZoom()` still exists and is a
+> no-op; calling it is dead code.
+>
+> The pins above are `0.45.0`, the current release, and
+> `scripts/check-readme-pins.mjs` fails the build if they drift from `package.json`. This quick
+> start shipped pinned to `0.1.2` for many releases - a version from before the zoom was
+> removed - so the two most visible things a new surface copies were both wrong.
+
 
 Need a starting point? Copy [`examples/style-guide.html`](examples/style-guide.html) or the
 documentation template at [`templates/documentation.html`](templates/documentation.html).

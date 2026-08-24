@@ -47,6 +47,9 @@ jobs:
 
       # The dist bundle and tokens.json are committed (jsDelivr serves them). Fail
       # if a source change landed without rebuilding the committed artifacts.
+      - name: Check the README teaches the current release
+        run: node scripts/check-readme-pins.mjs
+
       - name: Check the release gate still gates
         run: node scripts/check-release-gate.mjs
 

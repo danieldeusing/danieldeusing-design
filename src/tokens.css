@@ -189,11 +189,14 @@ html[data-theme="paper"] {
  *   - This scale sets the RATIOS. It is fixed in rem and does not track the
  *     viewport, so a caption is the same amount smaller than body text on every
  *     surface, always.
- *   - runtime/zoom.js `initResolutionZoom()` makes the whole page track the
- *     WINDOW, by laying out at a 1920px reference and zooming above it. Every
- *     surface must call it, pre-paint from <head>, or it will look right on one
- *     monitor and wrong on the next. Scale without zoom = fixed on a 4K screen;
- *     zoom without scale = uniform sizes drifting apart between pages.
+ *   - The fluid root font size below makes the whole page track the WINDOW, by
+ *     laying out at a 1920px reference and growing above it. Since 0.29.0 that
+ *     is THIS FILE's job and a surface gets it by loading the stylesheet - there
+ *     is nothing to call and nothing to forget. This comment used to order every
+ *     surface to call `initResolutionZoom()` pre-paint; that has been a no-op
+ *     since 0.29.0, and a page that still does it scales TWICE. Scale without
+ *     the fluid size = fixed on a 4K screen; the fluid size without the scale =
+ *     uniform sizes drifting apart between pages.
  *
  * WHY THE STEPS ARE 1px APART AT THE BOTTOM. This is a terminal UI: body is
  * 12px and the useful range is 10-15px, so a geometric ratio scale (1.25×,

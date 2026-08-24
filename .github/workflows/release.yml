@@ -79,6 +79,7 @@ jobs:
           node scripts/check-pagination.mjs
           node scripts/check-tabletools.mjs
           node scripts/check-tablescroll.mjs
+          node scripts/check-readme-pins.mjs
           node scripts/check-release-gate.mjs
           node scripts/check-release.mjs
 

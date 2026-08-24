@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.46.0 (2026-08-24)
+
+### The documentation template shipped a merge conflict
+
+`templates/documentation.html` carried six live conflict markers — `<<<<<<< HEAD`, `=======`,
+`>>>>>>> 5e158ad` — around the two CDN `<link>` tags and around the runtime `import`. They were
+committed in 0.45.0 and, because `templates` is in the package's `files`, they were published:
+anyone who took the template from npm or from the repo got them.
+
+Both sides were byte-identical at 0.45.0, so nothing was ever *wrong* about the pins and no
+rendered page was affected. That is exactly why it survived a release — the file reads correctly
+if you skim it, and the markers sit in the one region nobody re-reads once the version is right.
+The damage was downstream: a doc generated from the template without a careful look ships
+`<<<<<<< HEAD` into its own `<head>`, and duplicate `<link>` tags with it.
+
+Resolved by keeping one side verbatim. No CSS, no runtime and no markup semantics changed — this
+release exists so that a template taken from 0.46.0 is a template you can fill without cleaning it
+first.
+
 ## 0.45.0 (2026-08-21)
 
 ### The ⓘ marker is gone, and header controls carry no tooltip

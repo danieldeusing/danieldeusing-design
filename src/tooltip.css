@@ -5,6 +5,12 @@
  */
 [data-tip] { cursor: help; }
 
+/* An ACTION's cursor states what a click does; the tip is an aside (0.46.2,
+   Daniel: "every ACTION should have the intended cursor"). help stays only on
+   non-interactive hosts — labels, badges, cells, plain text. */
+:where(button, a[href], summary, [role="button"], [role="menuitem"], [role="tab"])[data-tip] { cursor: pointer; }
+:where(button, [role="button"])[data-tip]:disabled { cursor: not-allowed; }
+
 /*
  * THE MARKER IS AN ⓘ, NEVER AN UNDERLINE (Daniel, 2026-08-11).
  *

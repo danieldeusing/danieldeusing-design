@@ -435,6 +435,13 @@ their own affordance:
 <span data-tip="…" data-tip-bare>2026-08-11</span>
 ```
 
+**An ACTION always shows its action cursor (0.46.2, Daniel).** `cursor: help` belongs only to
+non-interactive tip hosts — spans, labels, badges, table cells, headings. On anything clickable
+the cursor states what a click does, tooltip or not: `tooltip.css` gives `button`, `a[href]`,
+`summary`, `[role="button"]`, `[role="menuitem"]` and `[role="tab"]` carrying a `data-tip`
+`cursor: pointer` (and `not-allowed` while disabled). A question-mark cursor on a button is bad
+UX; you get the right one for free — do not re-declare it per page.
+
 **A tip never covers an open select (0.41.0, Daniel).** The tip panel is `position: fixed;
 z-index: 9999` so it can never be clipped by an overflow container; `.select-panel` is 60. With a
 listbox open and the pointer near a `[data-tip]` — very often inside the trigger's own label —

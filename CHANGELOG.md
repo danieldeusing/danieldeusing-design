@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.46.2 (2026-08-24)
+
+### An action always shows its action cursor
+
+`[data-tip] { cursor: help; }` applied to every tip host, interactive or not — so in Seedr
+Studio every toolbar button carrying a tooltip greeted the pointer with a question mark, as if
+clicking would open documentation rather than perform the action. Daniel: "every ACTION should
+have the intended cursor."
+
+`tooltip.css` now keeps `help` only for non-interactive hosts — labels, badges, table cells,
+plain text, where hovering genuinely offers information. `button`, `a[href]`, `summary`,
+`[role="button"]`, `[role="menuitem"]` and `[role="tab"]` carrying a `data-tip` get
+`cursor: pointer`, and a disabled button gets `not-allowed`: the cursor states what a click
+does; the tip is an aside. The element list sits in `:where()`, so it adds no specificity —
+a page's own cursor rule of equal or higher specificity still wins.
+
 ## 0.46.1 (2026-08-24)
 
 ### A tip never covers an open dropdown either

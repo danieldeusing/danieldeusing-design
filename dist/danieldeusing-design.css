@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.46.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.46.2 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -2474,6 +2474,12 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
  * clipped by overflow containers and always sits on top.
  */
 [data-tip] { cursor: help; }
+
+/* An ACTION's cursor states what a click does; the tip is an aside (0.46.2,
+   Daniel: "every ACTION should have the intended cursor"). help stays only on
+   non-interactive hosts — labels, badges, cells, plain text. */
+:where(button, a[href], summary, [role="button"], [role="menuitem"], [role="tab"])[data-tip] { cursor: pointer; }
+:where(button, [role="button"])[data-tip]:disabled { cursor: not-allowed; }
 
 /*
  * THE MARKER IS AN ⓘ, NEVER AN UNDERLINE (Daniel, 2026-08-11).

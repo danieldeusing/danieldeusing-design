@@ -285,6 +285,27 @@ the default one.
 
 `.prompt` already prepends `$ ` — never author a literal leading `$ ` inside one (it doubles).
 
+## `.eli5` is opt-in per item, never a field every item fills (0.45.0)
+
+An ELI5 box exists to make one hard thing legible to someone outside the discipline — a product
+owner reading a code review, a family member reading a finance page. It is not a second rendering
+of every item.
+
+**Add one only where a plain-language sentence gives a non-technical reader something they could
+act on.** If the text above it is already clear to anyone, there is nothing to explain, and an
+`.eli5` that restates it in shorter words is noise wearing an accent border — it teaches the reader
+that the box is skippable, which costs you the one place it mattered.
+
+This is why the review reports stopped emitting one per finding: every finding had a box, most
+boxes paraphrased the sentence above them, and the ones that carried real explanation were
+indistinguishable from the filler.
+
+The same rule governs the prose an `.eli5` sits under. A block of eighty correct words with no
+paragraph break is something a reader parses rather than reads: lead with the claim, put the causal
+chain in a list in the order it happens, then say what someone actually observes. Structure is not
+decoration — it is what makes an explanation followable by a reader who does not already know the
+answer.
+
 ## A row action's SHAPE says whether it changes anything (0.13.0)
 
 The one rule that decides what to reach for. It is not a style preference — it is the only thing

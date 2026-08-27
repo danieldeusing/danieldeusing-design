@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.47.0 (2026-08-27)
+
+### A time table opens newest-first, however it was left
+
+Daniel: *"It sorts wrong for me. I should put the newest first. Always as default."*
+
+A saved view is right for a FILTER — a question the reader asked and will ask again. It is wrong
+for the sort on a table whose subject is time. An activity log answers "what happened recently", so
+it opens newest-first or it opens useless; and one click on the ▲ months ago pinned it oldest-first
+for ever, with nothing to undo it since the per-table reset button went in 0.33.0. A table that is
+wrong on every visit, with no way for the reader to say so, is worse than one that remembers
+nothing.
+
+`data-sort-sticky="off"` skips the RESTORE of a remembered sort. Deliberately narrow: sorting still
+works, filters and search still persist, and every table without the attribute behaves exactly as
+before.
+
 ## 0.46.2 (2026-08-24)
 
 ### An action always shows its action cursor

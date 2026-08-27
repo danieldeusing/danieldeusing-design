@@ -155,7 +155,21 @@ function normalize(inst, raw) {
   try { stored = JSON.parse(raw); } catch { return view; }
   if (!stored || typeof stored !== "object" || Array.isArray(stored)) return view;
   const known = new Set(inst.columns.map((c) => c.key));
-  if (known.has(stored.sortKey)) {
+  // `data-sort-sticky="off"` — REMEMBER THE FILTERS, NEVER THE ORDER (Daniel, 2026-08-27:
+  // "I should put the newest first. Always as default").
+  //
+  // A saved view is right for a filter: it is a question the reader asked and will ask again. It
+  // is wrong for the sort on a table whose subject is TIME. An activity log answers "what happened
+  // recently", so it opens newest-first or it opens useless — and one click on the ▲ a month ago
+  // pinned it oldest-first for ever, with no affordance to undo since the per-table reset button
+  // went in 0.33.0. The reader is then left with a table that is wrong every time and no way to
+  // say so, which is worse than not remembering at all.
+  //
+  // Deliberately narrow: sorting still works, and it still persists on every table that does not
+  // set the attribute. Only the RESTORE is skipped, and only where the page says time is the axis.
+  if (!inst.sortSticky) {
+    // fall through to the page's declared default
+  } else if (known.has(stored.sortKey)) {
     view.sortKey = stored.sortKey;
     if (stored.dir === 1 || stored.dir === -1) view.dir = stored.dir;
   }
@@ -178,6 +192,8 @@ function save(inst) {
   try {
     if (isDefault(inst, inst.view)) localStorage.removeItem(STORE_PREFIX + inst.id);
     else localStorage.setItem(STORE_PREFIX + inst.id, JSON.stringify({
+      // Written even when it will not be restored, so a stored view stays a full description of
+      // what was in force — but see normalize(): a non-sticky table ignores these two on load.
       sortKey: inst.view.sortKey, dir: inst.view.dir,
       filters: activeFilters(inst, inst.view), search: inst.view.search || "",
     }));
@@ -543,6 +559,9 @@ function enhance(table) {
     lastWritten: [],
     defaultSortKey: table.getAttribute("data-sort-key") || columns[0].key,
     defaultDir: table.getAttribute("data-sort-dir") === "desc" ? -1 : 1,
+    // Opt OUT of restoring a remembered sort. Default is to remember, so every existing table
+    // behaves exactly as before; a table whose subject is time says so with the attribute.
+    sortSticky: table.getAttribute("data-sort-sticky") !== "off",
   };
   instances.set(table, inst);
   inst.view = restore(inst);

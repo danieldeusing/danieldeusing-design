@@ -12,7 +12,10 @@
 :where(button, [role="button"])[data-tip]:disabled { cursor: not-allowed; }
 
 /*
- * THE MARKER IS AN ⓘ, NEVER AN UNDERLINE (Daniel, 2026-08-11).
+ * SUPERSEDED — kept as the reasoning, not as the rule. The rule is the block below: NO MARKER.
+ * Read this one only to understand what was tried, and do not act on its imperative title.
+ *
+ * THE MARKER IS AN ⓘ, NEVER AN UNDERLINE (Daniel, 2026-08-11) — reversed ten days later.
  *
  * This used to be `border-bottom: 1px dotted`, and an underline is the wrong signal twice over: it
  * is the web's mark for a LINK, so a dotted one reads as "a link that is broken or disabled", and

@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.48.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.49.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -1672,12 +1672,10 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
 }
 .minimap-bar:hover { background: var(--muted-foreground); transform: scaleY(2); }
 
-/* tooltip.css is imported AFTER this file and sets `cursor: help` on every
-   [data-tip]. A bar is clickable — it jumps to its section — so the pointer has
-   to win, and at equal specificity source order would hand it to the later file.
-   The attribute in the selector is what buys the extra specificity, and it is
-   also the honest description: this rule exists because the bar carries a tip. */
-.minimap-bar[data-tip] { cursor: pointer; }
+/* The `.minimap-bar[data-tip] { cursor: pointer }` that used to sit here is gone with the
+   `cursor: help` it existed to out-specify (0.49.0). The base rule above already gives every bar a
+   pointer, tipped or not — which is the point: a tipped element must not wear a cursor an untipped
+   one does not. */
 .minimap-bar:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 .minimap-bar.active { background: var(--primary); transform: scaleY(2); }
 
@@ -2504,13 +2502,22 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
  * The panel is a body-level singleton with position:fixed — it can never be
  * clipped by overflow containers and always sits on top.
  */
-[data-tip] { cursor: help; }
-
-/* An ACTION's cursor states what a click does; the tip is an aside (0.46.2,
-   Daniel: "every ACTION should have the intended cursor"). help stays only on
-   non-interactive hosts — labels, badges, cells, plain text. */
-:where(button, a[href], summary, [role="button"], [role="menuitem"], [role="tab"])[data-tip] { cursor: pointer; }
-:where(button, [role="button"])[data-tip]:disabled { cursor: not-allowed; }
+/* NO CURSOR, AND NO OTHER MARK EITHER (Daniel, 2026-08-28: "No cursor help").
+ *
+ * A tooltip host must look EXACTLY like the same element without a tooltip. That is the whole
+ * rule, and `cursor: help` was the last place this package still broke it — a marker you feel
+ * instead of see. The estate had already dropped the ⓘ glyph (0.45.0) and the dotted underline
+ * before it, and every consuming surface is swept for locally-drawn indicators with `cursor: help`
+ * named among them (bin/cockpit-render-check fails a page that draws one). So the package was
+ * asserting the exact thing its consumers are forbidden to do.
+ *
+ * Nothing replaces these rules and nothing needs to. The two `[data-tip]`-scoped cursor overrides
+ * that used to sit here existed ONLY to undo the `help` above them, so they went with it:
+ * base.css already gives `button:not(:disabled), summary, [role="button"]` a pointer whether or
+ * not the control carries a tip, and `a[href]` gets one from the browser. A tipped element now
+ * inherits the cursor it would have had untipped — including a disabled button, which matches an
+ * untipped disabled button rather than the `not-allowed` only tipped ones used to get.
+ */
 
 /*
  * SUPERSEDED — kept as the reasoning, not as the rule. The rule is the block below: NO MARKER.
@@ -2705,16 +2712,11 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
     padding-right: 0 !important;
   }
 
-  [data-tip] {
-    cursor: auto;
-  }
-  /* The ⓘ is an invitation to hover, and paper cannot be hovered — so the marker goes, exactly as
-     the dotted underline it replaced did. The tip TEXT was never printed either way. */
-  span[data-tip]::after,
-  th[data-tip]::after,
-  button[data-tip]::after {
-    content: none;
-  }
+  /* NOTHING IS NEEDED FOR [data-tip] ON PAPER ANY MORE, and that is worth saying rather than
+     leaving two overrides of rules that no longer exist. Both were undo-rules: `cursor: auto`
+     cancelled the `cursor: help` removed in 0.49.0, and `content: none` removed the ⓘ marker
+     removed in 0.45.0. A tooltip host now renders as the plain element it is, on screen and on
+     paper alike, so print has nothing to correct. The tip TEXT was never printed either way. */
 
   /* ── layout: the page is the column ────────────────────────────────────
      .wrap/.layout/.content are the documentation-template vocabulary shipped

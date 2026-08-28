@@ -3,13 +3,22 @@
  * The panel is a body-level singleton with position:fixed — it can never be
  * clipped by overflow containers and always sits on top.
  */
-[data-tip] { cursor: help; }
-
-/* An ACTION's cursor states what a click does; the tip is an aside (0.46.2,
-   Daniel: "every ACTION should have the intended cursor"). help stays only on
-   non-interactive hosts — labels, badges, cells, plain text. */
-:where(button, a[href], summary, [role="button"], [role="menuitem"], [role="tab"])[data-tip] { cursor: pointer; }
-:where(button, [role="button"])[data-tip]:disabled { cursor: not-allowed; }
+/* NO CURSOR, AND NO OTHER MARK EITHER (Daniel, 2026-08-28: "No cursor help").
+ *
+ * A tooltip host must look EXACTLY like the same element without a tooltip. That is the whole
+ * rule, and `cursor: help` was the last place this package still broke it — a marker you feel
+ * instead of see. The estate had already dropped the ⓘ glyph (0.45.0) and the dotted underline
+ * before it, and every consuming surface is swept for locally-drawn indicators with `cursor: help`
+ * named among them (bin/cockpit-render-check fails a page that draws one). So the package was
+ * asserting the exact thing its consumers are forbidden to do.
+ *
+ * Nothing replaces these rules and nothing needs to. The two `[data-tip]`-scoped cursor overrides
+ * that used to sit here existed ONLY to undo the `help` above them, so they went with it:
+ * base.css already gives `button:not(:disabled), summary, [role="button"]` a pointer whether or
+ * not the control carries a tip, and `a[href]` gets one from the browser. A tipped element now
+ * inherits the cursor it would have had untipped — including a disabled button, which matches an
+ * untipped disabled button rather than the `not-allowed` only tipped ones used to get.
+ */
 
 /*
  * SUPERSEDED — kept as the reasoning, not as the rule. The rule is the block below: NO MARKER.

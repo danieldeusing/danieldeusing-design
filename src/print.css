@@ -144,16 +144,11 @@
     padding-right: 0 !important;
   }
 
-  [data-tip] {
-    cursor: auto;
-  }
-  /* The ⓘ is an invitation to hover, and paper cannot be hovered — so the marker goes, exactly as
-     the dotted underline it replaced did. The tip TEXT was never printed either way. */
-  span[data-tip]::after,
-  th[data-tip]::after,
-  button[data-tip]::after {
-    content: none;
-  }
+  /* NOTHING IS NEEDED FOR [data-tip] ON PAPER ANY MORE, and that is worth saying rather than
+     leaving two overrides of rules that no longer exist. Both were undo-rules: `cursor: auto`
+     cancelled the `cursor: help` removed in 0.49.0, and `content: none` removed the ⓘ marker
+     removed in 0.45.0. A tooltip host now renders as the plain element it is, on screen and on
+     paper alike, so print has nothing to correct. The tip TEXT was never printed either way. */
 
   /* ── layout: the page is the column ────────────────────────────────────
      .wrap/.layout/.content are the documentation-template vocabulary shipped

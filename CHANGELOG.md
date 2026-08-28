@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.49.0 (2026-08-28)
+
+### A tooltip host has no cursor of its own either — `cursor: help` is gone
+
+Daniel: *"No cursor help."*
+
+A `[data-tip]` element must look exactly like the same element without a tooltip. The estate
+settled that twice already — the `ⓘ` glyph went in 0.45.0, the dotted underline before it — and
+consuming surfaces are swept for locally-drawn indicators, with `cursor: help` named among them
+(`bin/cockpit-render-check` fails a page that draws one). This package was still applying the very
+marker its consumers are forbidden to draw: a marker you feel instead of see.
+
+`[data-tip] { cursor: help; }` is removed, and with it the two `[data-tip]`-scoped cursor overrides
+added in 0.46.2 — they existed only to undo the `help`, and keeping them would leave a tipped
+control wearing a cursor an untipped one does not. Nothing replaces them: `base.css` already gives
+`button:not(:disabled)`, `summary` and `[role="button"]` a pointer whether or not a tip is present,
+and `a[href]` gets one from the browser. A tipped element now inherits the cursor it would have had
+untipped — including a disabled button, which matches an untipped disabled button instead of the
+`not-allowed` only tipped ones used to get.
+
+Discovery is by hovering, which costs the reader nothing.
+
 ## 0.48.0 (2026-08-28)
 
 ### An application window can pin the scale — `data-scale="fixed"`

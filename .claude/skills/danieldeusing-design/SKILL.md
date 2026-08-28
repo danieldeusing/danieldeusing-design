@@ -30,8 +30,10 @@ disagrees with four other pages and, for colour, is provably wrong on at least o
 <head>
   <meta name="theme-color" content="#f5efe2" />
 
-  <!-- PRE-PAINT, inline, before any stylesheet. Theme + zoom must be settled before
-       first paint or the page visibly flashes the wrong one. -->
+  <!-- PRE-PAINT, inline, before any stylesheet. The theme must be settled before
+       first paint or the page visibly flashes the wrong one. NOTHING here touches
+       scale: `tokens.css` has done that in CSS since 0.29.0, and a page that also
+       sets `style.zoom` scales TWICE. This template used to carry that script. -->
   <script>
     (() => {
       const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
@@ -42,11 +44,6 @@ disagrees with four other pages and, for colour, is provably wrong on at least o
       let animOff = matchMedia("(prefers-reduced-motion: reduce)").matches;
       try { if (localStorage.getItem("anim") === "off") animOff = true; } catch {}
       if (animOff) document.documentElement.classList.add("anim-off");
-    })();
-    // resolution zoom — lay out at a 1920px reference, scale up past it, never below 1×
-    (() => {
-      const z = () => { document.documentElement.style.zoom = String(Math.max(1, innerWidth / 1920)); };
-      z(); addEventListener("resize", z);
     })();
   </script>
 
@@ -210,6 +207,24 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   A 4K screen gets a bigger page, not a postage stamp of 12px text. It needs no script and
   cannot be forgotten, which is the point: the old `initResolutionZoom()` failed silently when a
   page was written without it.
+- **An APP WINDOW pins the scale; a PAGE tracks it (0.47.0, Daniel).** Set
+  `data-scale="fixed"` on `<html>` and the root font holds at `1rem` at every window size:
+
+  ```html
+  <html data-scale="fixed">
+  ```
+
+  Resizing a window is not the same act as opening a page on a bigger screen. The viewport of a
+  page is the display, so `100vw` is a fair proxy for how much screen there is; an app window is
+  a size the user drags around on a display that never changed, and scaling to it grows the
+  chrome under someone who asked only to see more content. Native apps do not do this, and a
+  HiDPI panel is already handled by the OS. **Every Tauri or Electron surface sets this** —
+  Studio does; configr predates the token and must set it when it upgrades.
+
+  It also breaks mixed units, which is how it was found: Studio's toolbars were `36px` with
+  `1.75rem` icon buttons inside them — identical at 1x, and past a ~2500px-wide window the
+  buttons were taller than the bar. Prefer rem for both, so a deliberate zoom moves them together.
+
 - **Never set `zoom` on a page.** It scales the coordinate *space*, so the page's pixel grid stops
   matching the browser's, and anything injected from outside — a password manager's dropdown, a
   translation bar — is positioned through one grid and written into the other. Measured on the

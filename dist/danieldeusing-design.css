@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.47.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.48.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -340,6 +340,29 @@ html[data-theme="paper"] {
      This lives in tokens.css rather than base.css because netmon loads
      tokens.css + its own frozen chrome.css and never sees base.css. */
   font-size: max(1rem, calc(1rem + (100vw - 1920px) / 120));
+
+  /* AN APPLICATION WINDOW OPTS OUT (0.47.0, Daniel). Everything above is
+     reasoning about a PAGE, where the viewport is the display: you open a
+     browser on a 4K panel, it fills it, and 100vw is a fair proxy for "how much
+     screen is there". Scaling the unit to it is then the difference between a
+     bigger page and a postage stamp.
+
+     An app window is not that. Its width is a thing the user drags, moment to
+     moment, on a display whose size never changed — so the same expression
+     reads a deliberate act of resizing as a change of display, and the chrome
+     grows under the hands of someone who asked only to see more of it. Native
+     apps do not behave this way, and the OS has already applied the scaling
+     that a HiDPI panel actually calls for.
+
+     It also breaks mixed units in a way a page never does. Studio's toolbars
+     are `36px` and the icon buttons inside them `1.75rem`; identical at 1x, and
+     past about a 2500px-wide window the buttons are taller than the bar that
+     contains them. That is what this was found by (Daniel, 2026-08-28).
+
+     `1rem`, not `16px`: on the root, `rem` is the browser's default font size,
+     so a larger default and the webview's own zoom are both still honoured.
+     This fixes the unit to the user's, which is the whole intent — it does not
+     freeze it at ours. */
   /* Horizontal breathing room, i.e. Daniel's "same margins left and right".
      Vertical padding stays a page's own business — a doc and a dashboard do
      not want the same headroom, and pretending otherwise is what produced the
@@ -390,6 +413,14 @@ html[data-theme="paper"] {
      correctly: from the outside, a name the system never declares is indistinguishable from a
      typo. Override it per panel when a panel's labels are genuinely longer. */
   --field-label-w: 8.5rem;
+}
+
+/* See "AN APPLICATION WINDOW OPTS OUT" above. Declared last so it is read next
+   to nothing else, and as an attribute so it can be set pre-paint on <html>
+   without a stylesheet of one's own. The extra attribute out-specifies the
+   `:root` rule it overrides, so load order does not matter. */
+:root[data-scale="fixed"] {
+  font-size: 1rem;
 }
 
 /* ===== base.css ===== */

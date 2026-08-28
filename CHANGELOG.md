@@ -4,6 +4,40 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.48.0 (2026-08-28)
+
+### An application window can pin the scale — `data-scale="fixed"`
+
+Since 0.29.0 the root font size has tracked the viewport
+(`max(1rem, calc(1rem + (100vw - 1920px) / 120))`), so every rem in the package grows past a
+1920px-wide viewport. That is right for a page, where the viewport is the display and the
+alternative is 12px text marooned in the middle of a 4K panel.
+
+It is wrong for an app window. A window's width is something the user drags from moment to
+moment on a display whose size never changed, so the expression reads a deliberate resize as a
+change of screen and grows the chrome under someone who asked only to see more content. Native
+apps do not behave that way, and the scaling a HiDPI panel genuinely needs has already been
+applied by the OS.
+
+Setting `data-scale="fixed"` on `<html>` holds the root at `1rem` at every window size:
+
+```html
+<html data-scale="fixed">
+```
+
+`1rem` rather than `16px`, so the browser's default font size and the webview's own zoom are
+still honoured — this fixes the unit to the *user's*, it does not freeze it at ours.
+
+Nothing changes for a page: the opt-out is an attribute nothing sets by default, and it
+out-specifies the `:root` rule it overrides, so load order does not matter.
+
+Found in Seedr Studio, where it also broke mixed units: toolbars were `36px` tall with
+`1.75rem` icon buttons inside them — identical at 1x, and past a roughly 2500px-wide window the
+buttons were taller than the bar meant to contain them.
+
+The skill's copy-paste `<head>` template went on inlining the pre-0.29.0
+`document.documentElement.style.zoom` script, which the same skill's scale section says scales
+TWICE on top of the CSS. It is gone from the template.
 ## 0.47.0 (2026-08-27)
 
 ### A time table opens newest-first, however it was left

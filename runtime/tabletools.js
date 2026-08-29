@@ -627,16 +627,55 @@ function enhance(table) {
    * delivers asynchronously and the flag is already cleared by then. Measured:
    * the first version hung the page.
    */
-  inst.observer = new MutationObserver(() => {
+  inst.observer = new MutationObserver((records) => {
     const body = table.tBodies[0];
     if (!body) return;
     const now = body.rows;
     const last = inst.lastWritten || [];
-    if (now.length === last.length && last.every((row, i) => now[i] === row)) return;
+    const moved = !(now.length === last.length && last.every((row, i) => now[i] === row));
+
+    /*
+     * A PATCHING RENDERER REWRITES A ROW WITHOUT MOVING IT, and neither the identity
+     * check above nor a childList-only observer can see that.
+     *
+     * cockpit re-renders by patching: it diffs new markup against the live DOM and
+     * writes only the differences, which is what keeps focus, scroll and open panels.
+     * With no key on a row it matches BY POSITION — so on a table the reader has
+     * sorted, a poll rewrites row 1's cells with row 1's data in the RENDERER's
+     * order. Every node is the same node, in the same place, holding somebody else's
+     * values. The rows then sit in the caller's order while paintHeader keeps the
+     * arrow pointing at the reader's column: the table lying about itself rather
+     * than merely resetting.
+     *
+     * MEASURED, because the obvious diagnosis was wrong. Watching a real patch land
+     * on a sorted table: 18 records, every one of them `attributes` on a <td> or
+     * `characterData` on a text node, and NOT ONE childList. A patch never adds or
+     * removes a node when the row count matches — it edits values in place. So the
+     * observer was not returning early on its guard; it was never being called at
+     * all, because it only watched childList.
+     *
+     * Hence characterData and attributes below, and the discriminator here is the
+     * mutation TARGET. Everything this component does to the body is a childList
+     * change on the body ITSELF (appendChild of a fragment, row.remove()), and every
+     * header repaint targets the thead — so a record whose target is inside the body
+     * but is not the body is, by construction, somebody else's write. That is what
+     * keeps this from re-entering on its own output.
+     */
+    const rewritten = !moved && records.some((rec) =>
+      rec.target !== body && body.contains(rec.target));
+
+    if (!moved && !rewritten) return;
     snapshot(inst);
     applyTableView(table);
   });
-  inst.observer.observe(table, { childList: true, subtree: true });
+  /*
+   * characterData and attributes are NOT optional here — see the callback. A patching
+   * renderer emits nothing else when it rewrites a row in place, so a childList-only
+   * observer sleeps through the one event that loses the reader's sort. The extra
+   * volume is header repaints and cell edits, both bounded by the table's own size,
+   * and the callback's work is one `some()` over the batch.
+   */
+  inst.observer.observe(table, { childList: true, subtree: true, characterData: true, attributes: true });
 }
 
 /**

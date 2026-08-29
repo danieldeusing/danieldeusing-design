@@ -4,6 +4,42 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.50.0 (2026-08-29)
+
+### A table keeps the reader's sort through a live refresh
+
+Daniel: *"everytime the page is getting refreshed, it kills my sorting."*
+
+And it was worse than a reset, because the header went on claiming otherwise. The rows returned
+to the renderer's order while `aria-sort` and the arrow stayed on the column the reader had
+chosen — a table lying about itself rather than merely forgetting.
+
+`initTableTools` already re-applies whenever the rows change under it. The bug was in what
+counted as a change. The observer watched `childList` only, and a **patching** renderer never
+adds or removes a node: it diffs new markup against the live DOM and edits values in place,
+which is exactly what keeps focus, scroll position and open panels alive. With no key on a row
+it matches BY POSITION — so on a sorted table, a poll rewrites row 1's cells with row 1's data
+in the renderer's order. Every node is the same node, in the same place, holding somebody
+else's values.
+
+**Measured, because the obvious diagnosis was wrong.** The first fix assumed the observer was
+firing and returning early on its identity guard, and it changed nothing. Watching a real patch
+land on a sorted table: 18 records, every one an `attributes` change on a `<td>` or
+`characterData` on a text node, and **not one `childList`**. The observer was not returning
+early — it was never being called.
+
+So it observes `characterData` and `attributes` too, and tells its own output from somebody
+else's by the mutation TARGET: everything this component does to the body is a `childList`
+change on the body *itself* (`appendChild` of a fragment, `row.remove()`), and every header
+repaint targets the `thead`. A record whose target is inside the body but is not the body is,
+by construction, another writer — which is what keeps it from re-entering on its own work.
+
+Verified in a browser against the real cockpit table engine, not a fixture: reader sorts
+name-descending, one refresh, and the order holds; one apply per refresh; zero applies while
+idle; each row still carries its own values; a column filter survives; and a row set that grows
+or shrinks still lands sorted. `stickySort: false` is untouched — that is about what a table
+opens with, not what a refresh does to it.
+
 ## 0.49.0 (2026-08-28)
 
 ### A tooltip host has no cursor of its own either — `cursor: help` is gone

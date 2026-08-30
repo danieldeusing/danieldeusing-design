@@ -4,6 +4,59 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.51.0 (2026-08-30)
+
+### A tooltipped control gets its clicks back
+
+`show()` measured the panel by parking it at the viewport ORIGIN — `left: 0; top: 0` — and then
+reading `getBoundingClientRect()`. It runs from `mouseover`, so that momentarily dropped a 340px
+panel into the viewport **under the cursor** and forced a synchronous reflow.
+
+The browser's hit-test does not survive that. `pointerdown` and `pointerup` still resolved to the
+control, because they carry the target the pointer was already on; the compatibility MOUSE events
+that follow resolved to an ancestor — `mousedown` and `mouseup` on the `<tbody>` rather than the
+`<button>`. A `click` is only generated when the press and the release agreed on their target, so
+**no click was ever produced and the handler never ran**.
+
+It is the worst shape of bug to look at: the handler is correct, the element is correct, and
+`document.elementFromPoint()` at that exact pixel returns the button. Nothing happens anyway.
+`pointer-events: none` on the panel neither caused it nor prevented it — the panel never receives
+the event, the CONTROL loses it.
+
+The fix is one line: park it **off-screen** (`top: -9999px`) instead of at the origin. `left: 0`
+stays, because that is what makes the measurement honest — a fixed element with only `left` set
+gets `viewport - left` of available width, so measuring the panel where it last sat reports it
+narrower than it is whenever the previous anchor was over on the right. A fixed element above the
+viewport creates no scrollable overflow, so this costs nothing and moves nothing, and `show()`
+stays synchronous — the tooltip is still instant.
+
+Measured on the consuming page, same button and same pixel, one thing changed at a time:
+
+| what | result |
+| --- | --- |
+| park at `top: 0` | `pointerdown:BUTTON`, `mousedown:TBODY`, `mouseup:TBODY`, **no click** |
+| no park at all | all `BUTTON` — but the panel then mis-measures near the right edge |
+| same work deferred to `rAF` | all `BUTTON` — correct, but costs a frame and the tip stops being instant |
+| park at `top: -9999px` | all `BUTTON`, and `width`/`height` identical to the `top: 0` reading |
+
+**What this cost downstream.** cockpit shipped both of its `join →` buttons with their tooltips
+REMOVED, as a workaround, while this was hunted. They can now be restored.
+
+### `scripts/check-tooltip-click.mjs`, and an honest account of what it proves
+
+New suite, wired into `ci.yml`, into `release.yml` before `npm publish`, and into
+`check-release-gate`'s list of suites that may not silently skip.
+
+The **source assertion** is the regression guard for this defect: it passes on the fix, fails on
+the bug, and names the offending line. The **browser assertions** guard the other half — that
+parking off-screen still measures the panel unconstrained and still places it below its anchor,
+which only a real browser can say.
+
+A click assertion on a control *inside* a scrolled wrapper — the configuration this was found in —
+was written first and then removed: in headless such a control is not hit-testable at its own
+centre at all, so the assertion failed identically with the fix and without it. A check that
+reports the same thing in both states is reporting on the harness, not the runtime.
+
 ## 0.50.0 (2026-08-29)
 
 ### A table keeps the reader's sort through a live refresh

@@ -45,6 +45,15 @@ jobs:
           DD_REQUIRE_BROWSER: "1"
         run: node scripts/check-tablescroll.mjs
 
+      # A tooltipped control must still RECEIVE ITS CLICKS. show() used to park the panel at the
+      # viewport origin to measure it, which dropped it under the cursor and cost every tipped
+      # control its clicks — mousedown and mouseup resolved to an ancestor, so no click was ever
+      # generated. Cockpit shipped both its join buttons with the tooltip REMOVED as a workaround.
+      - name: Check tooltip clicks
+        env:
+          DD_REQUIRE_BROWSER: "1"
+        run: node scripts/check-tooltip-click.mjs
+
       # The dist bundle and tokens.json are committed (jsDelivr serves them). Fail
       # if a source change landed without rebuilding the committed artifacts.
       - name: Check the README teaches the current release

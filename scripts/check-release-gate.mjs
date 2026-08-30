@@ -35,7 +35,7 @@ for (const suite of [...required].sort()) {
 // A DOM suite that cannot find a browser exits 0 with "SKIPPED". Listing it above is therefore not
 // enough: without DD_REQUIRE_BROWSER=1 the gate is present and empty, which is worse than absent.
 for (const [file, text] of [["ci.yml", ci], ["release.yml", release]]) {
-  for (const suite of ["check-tabletools", "check-tablescroll"]) {
+  for (const suite of ["check-tabletools", "check-tablescroll", "check-tooltip-click"]) {
     if (!text.includes(suite)) continue;
     const near = text.slice(Math.max(0, text.indexOf(suite) - 900), text.indexOf(suite) + 200);
     if (near.includes("DD_REQUIRE_BROWSER")) pass(`${file}: ${suite} cannot silently skip`);

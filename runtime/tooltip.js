@@ -69,8 +69,39 @@ export function initTooltips() {
     el.setAttribute("aria-describedby", "ddtip");
     tip.textContent = el.getAttribute("data-tip");
     tip.style.display = "block";
+    // PARK IT OFF-SCREEN TO MEASURE IT, NEVER AT THE VIEWPORT ORIGIN.
+    //
+    // This said `top: 0px`, and that one line cost every tooltipped control its CLICKS.
+    //
+    // The panel has to be measured before it can be placed — `t.width` decides the horizontal
+    // clamp and `t.height` decides whether it flips above the anchor — and it has to be measured
+    // UNCONSTRAINED, because a fixed element with only `left` set gets `viewport - left` of
+    // available width. Measuring it where it last sat therefore reports a panel narrower than it
+    // really is whenever the previous anchor was over on the right. Hence the park, and the park
+    // is still here: `left: 0` is what makes the measurement honest.
+    //
+    // What was wrong was parking it at `top: 0` — INSIDE the viewport, i.e. somewhere a pointer
+    // can be. show() runs from `mouseover`, so this momentarily drops a 340px panel into the
+    // viewport under the cursor and then forces a synchronous reflow by reading
+    // getBoundingClientRect(). The browser's hit-test does not survive that: the pointer events
+    // still resolve to the control (they carry the target the pointer was already on), but the
+    // COMPATIBILITY MOUSE EVENTS that follow resolve to an ancestor — mousedown and mouseup land
+    // on the <tbody> rather than the <button> — and a `click` is only generated when both landed
+    // on the same node. So no click is ever produced and the handler never runs.
+    //
+    // MEASURED, on cockpit's execution table, same button and same pixel, toggling one thing at a
+    // time (`pointer-events: none` on the panel does NOT save it — the panel never receives the
+    // event, the CONTROL loses it):
+    //   park at top: 0        -> pointerdown:BUTTON, mousedown:TBODY, mouseup:TBODY, no click
+    //   no park at all        -> pointerdown/mousedown/mouseup/click all BUTTON  (but mis-measures)
+    //   same work in rAF      -> all BUTTON  (correct, but costs a frame and the tip stops being instant)
+    //   park at top: -9999px  -> all BUTTON, and t.width/t.height identical to the top: 0 reading
+    // The last one keeps the measurement, keeps show() synchronous, and is this line.
+    //
+    // A fixed element above the viewport creates no scrollable overflow, so parking it here costs
+    // nothing and moves nothing.
     tip.style.left = "0px";
-    tip.style.top = "0px";
+    tip.style.top = "-9999px";
     const margin = 8;
     const r = el.getBoundingClientRect();
     const t = tip.getBoundingClientRect();

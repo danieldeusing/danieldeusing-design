@@ -4,6 +4,50 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.52.0 (2026-08-30)
+
+### The tooltip click fix, actually found — and 0.51.0's account of it corrected
+
+**0.51.0 claimed to fix this and did not.** It moved the panel's measuring park from the viewport
+origin to off-screen, on evidence from a hand-written mimic of `show()`. Loaded on the real page,
+with 0.51.0 genuinely served and confirmed in `performance.getEntriesByType("resource")`, the click
+was still dead. The mimic had isolated the wrong variable: it ran `show()` **once**, and the real
+runtime runs it repeatedly. Keeping that change (parking a panel under the cursor is still worth
+not doing) but it was never the cause, and the 0.51.0 entry below should be read with this note.
+
+**The cause is mutating `aria-describedby` on the element under the pointer while the browser is
+deciding where a gesture lands.** It is reachable from two directions, and both were reproduced:
+
+- `pointerdown` ran `hide()` in the CAPTURE phase — between `pointerdown` and `mousedown` — and
+  `hide()` removes `aria-describedby` from the element being pressed.
+- `show()` rewrote the same attribute on every `mouseover`, and `mouseover` re-fires whenever the
+  hover target is re-resolved, which that write is itself enough to cause. A feedback loop.
+
+Either way the compatibility mouse events resolve to an ancestor — `mousedown` and `mouseup` on the
+`<tbody>` rather than the `<button>` — and a `click` is only synthesised when the press and the
+release agreed on their target. So no click was produced and the handler never ran.
+
+**The fix is to stop touching the anchor mid-gesture**, in two parts:
+
+- `hidePanel()` is split from `hide()`. A press still makes the tooltip disappear — that rule is
+  untouched — but it no longer edits the element being pressed. The anchor keeps its description
+  until the pointer genuinely leaves it or focus moves away.
+- `describe()` / `removeDescription()` write the attribute only when the value would actually
+  change, which breaks the hover loop. `show()` also returns early for the anchor it is already
+  showing, and the positioning half moved into `place()` so a scroll can still reposition an open
+  tooltip without re-entering `show()`.
+
+Bisected in the real runtime rather than argued: commenting out the single `pointerdown` listener
+restored `mousedown:BUTTON` → `click:BUTTON` on a control that could not be clicked, and the
+mimic ladder (everything except the aria write → works and `mouseover` fires once; add the write
+unconditionally → dies and it fires three times; make it conditional → works again) pins the other
+half.
+
+`check-tooltip-click.mjs` now guards the real thing, in the browser as well as in the source:
+hovering shows and describes, leaving hides and releases, **pressing hides the panel but does not
+strip the anchor's aria**, and the tooltip comes back on a fresh hover. Both halves of the fix are
+mutation-tested — reverting either turns the suite red.
+
 ## 0.51.0 (2026-08-30)
 
 ### A tooltipped control gets its clicks back

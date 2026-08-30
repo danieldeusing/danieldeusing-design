@@ -54,8 +54,33 @@ export function initTooltips() {
   // choices ARE the content; the aside waits.
   const menuIsOpen = () => Boolean(document.querySelector(".select-panel, details.dropdown[open]"));
 
+  // SHOW IS IDEMPOTENT, AND THAT IS WHAT KEEPS A TIPPED CONTROL CLICKABLE.
+  //
+  // `mouseover` does not fire once per hover. It fires again every time the browser re-resolves
+  // what is under the cursor — which, on a live-refreshing table, is constantly, and which happens
+  // DURING a click: the real sequence on cockpit's activity table was mouseover, mouseover,
+  // pointerdown, mousedown, mouseover, pointerup, mouseup, mouseover, all without the mouse
+  // moving. Each of those re-ran the whole of show(): display none -> block, two forced
+  // getBoundingClientRect() reads, four style writes.
+  //
+  // That churn is what broke the hit-test. pointerdown and pointerup resolved to the control,
+  // while the compatibility MOUSE events resolved to an ancestor — mousedown and mouseup on the
+  // <tbody> rather than the <button> — and a `click` is only synthesised when the press and the
+  // release agreed on their target. So no click was ever produced and the handler never ran, on
+  // every tooltipped control in a table. Cockpit shipped both its join buttons with the tooltip
+  // REMOVED as a workaround.
+  //
+  // PROVEN by suppressing re-entry and nothing else: with the panel left SHOWING but show()
+  // prevented from running again, the same click at the same pixel gave mousedown:BUTTON ->
+  // click:BUTTON and the dialog opened.
+  //
+  // ⚠️ The guard is on the ANCHOR, not on visibility, and the scroll handler below calls place()
+  // rather than show() for exactly this reason: a tooltip must still FOLLOW its anchor when the
+  // page scrolls, and a guard that made repositioning a no-op would trade a dead button for a
+  // tooltip stranded where the anchor used to be.
   function show(el) {
     if (menuIsOpen()) return;
+    if (anchor === el) return;
     // POINT THE ANCHOR AT THE PANEL. `role="tooltip"` alone describes nothing: without
     // aria-describedby the panel is a div a screen reader never reaches, so `data-tip` was
     // announced to nobody while the native `title` it replaces IS announced. Any estate converting
@@ -64,11 +89,19 @@ export function initTooltips() {
     //
     // Set per show and REMOVED on hide rather than written once at init: a stale describedby
     // pointing at a hidden panel makes every anchor claim a description it is not showing.
-    if (anchor && anchor !== el) anchor.removeAttribute("aria-describedby");
+    if (anchor && anchor !== el) removeDescription(anchor);
     anchor = el;
-    el.setAttribute("aria-describedby", "ddtip");
+    describe(el);
     tip.textContent = el.getAttribute("data-tip");
     tip.style.display = "block";
+    place();
+  }
+
+  // WHERE THE PANEL GOES. Split out of show() so a scroll can re-place a tooltip that is already
+  // open without going through show()'s anchor guard.
+  function place() {
+    if (!anchor) return;
+    const el = anchor;
     // PARK IT OFF-SCREEN TO MEASURE IT, NEVER AT THE VIEWPORT ORIGIN.
     //
     // This said `top: 0px`, and that one line cost every tooltipped control its CLICKS.
@@ -123,10 +156,44 @@ export function initTooltips() {
     tip.style.left = x / zoom + "px";
     tip.style.top = y / zoom + "px";
   }
-  function hide() {
-    if (anchor) anchor.removeAttribute("aria-describedby");
-    anchor = null;
+  // HIDING THE PANEL AND RELEASING THE ANCHOR ARE TWO DIFFERENT ACTS, and keeping them fused is
+  // what cost every tooltipped control its clicks.
+  //
+  // `hidePanel()` is visual only. `hide()` also releases the anchor, which means touching the
+  // anchor's `aria-describedby`.
+  function hidePanel() {
     tip.style.display = "none";
+  }
+  function hide() {
+    if (anchor) removeDescription(anchor);
+    anchor = null;
+    hidePanel();
+  }
+
+  // WRITE THE ARIA ASSOCIATION ONLY WHEN IT WOULD ACTUALLY CHANGE. This is the click fix, and it
+  // is one comparison.
+  //
+  // `mouseover` does not fire once per hover — it fires again whenever the browser re-resolves
+  // what is under the cursor. Rewriting `aria-describedby` on the hovered element is itself enough
+  // to make it re-resolve, so the old unconditional write was a FEEDBACK LOOP: write -> the hover
+  // target is recomputed -> mouseover -> write. The observed cost was not a busy loop but a broken
+  // control: while that churn was running, `pointerdown` and `pointerup` still resolved to the
+  // button while the compatibility MOUSE events resolved to an ancestor — mousedown and mouseup on
+  // the <tbody> — and a `click` is only synthesised when the press and the release agreed on their
+  // target. So no click was produced and the handler never ran, on every tooltipped control.
+  //
+  // BISECTED, not guessed. Mimicking show() line by line against the real page: everything except
+  // this write, and the click works and `mouseover` fires ONCE. Add this write unconditionally and
+  // the click dies and `mouseover` fires three times. Make the same write conditional and the
+  // click comes back — with the attribute still set, so nothing is traded away for it.
+  //
+  // ⚠️ Do NOT "simplify" these two helpers back into bare setAttribute/removeAttribute calls. The
+  // attribute is not the problem; writing it when it already says that is.
+  function describe(el) {
+    if (el.getAttribute("aria-describedby") !== "ddtip") el.setAttribute("aria-describedby", "ddtip");
+  }
+  function removeDescription(el) {
+    if (el.getAttribute("aria-describedby") === "ddtip") el.removeAttribute("aria-describedby");
   }
 
   document.addEventListener("mouseover", (event) => {
@@ -139,7 +206,9 @@ export function initTooltips() {
     if (el) show(el);
   });
   document.addEventListener("focusout", hide);
-  document.addEventListener("scroll", () => anchor && show(anchor), true);
+  // place(), not show(): show() now returns early for the anchor it is already showing, which is
+  // the whole click fix. Repositioning is the one case that must still recompute.
+  document.addEventListener("scroll", () => anchor && place(), true);
   // The guard in show() stops a tip APPEARING over an open listbox; this is the other half — a tip
   // already on screen when the select opens. The ⓘ frequently sits inside the trigger's own label,
   // so "hovering the tip, then clicking to open" is the ordinary path, not an edge case.
@@ -150,7 +219,30 @@ export function initTooltips() {
   //
   // The scroll handler above re-shows from `anchor`, which would put the tip straight back while
   // the panel scrolled; show()'s own guard refuses that, so the two rules do not fight.
-  document.addEventListener("pointerdown", hide, true);
+  // hidePanel, NOT hide — and this one line is the click fix.
+  //
+  // This runs in the CAPTURE phase of pointerdown, i.e. between `pointerdown` and `mousedown`.
+  // `hide()` removes `aria-describedby` from the element that is being pressed, and mutating that
+  // attribute on the element under the cursor makes the browser re-resolve the pointer target: the
+  // compatibility MOUSE events then land on an ancestor — `mousedown` and `mouseup` on the
+  // <tbody> rather than the <button> — and a `click` is only synthesised when the press and the
+  // release agreed. So no click was ever produced and the handler never ran.
+  //
+  // BISECTED IN THE REAL RUNTIME, not reasoned: commenting out this single listener restores
+  // `mousedown:BUTTON` -> `click:BUTTON` on the page that could not be clicked. It is also
+  // reachable from the other side — writing the attribute unconditionally on every `mouseover`
+  // breaks the same click, because `mouseover` re-fires whenever the hover target is re-resolved
+  // and the write is itself what re-resolves it. Both are the same mistake: MUTATING ARIA ON THE
+  // ELEMENT UNDER THE POINTER WHILE THE BROWSER IS DECIDING WHERE A GESTURE LANDS.
+  //
+  // What this listener is FOR is unaffected: a press means "I am done reading", and the panel
+  // still disappears on press. It simply no longer touches the anchor to do it.
+  //
+  // The anchor keeps its `aria-describedby` until the pointer actually leaves it (the mouseover
+  // handler's else-branch) or focus moves away (focusout), both of which call the full `hide()`.
+  // That is a description the element genuinely still has — it is that element's own data-tip —
+  // rather than the stale cross-anchor one the per-show write was introduced to avoid.
+  document.addEventListener("pointerdown", hidePanel, true);
 
   // AND THE ORDERING CASE, which the two rules above do not cover between them.
   //

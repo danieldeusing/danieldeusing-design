@@ -212,6 +212,47 @@ const outsideTipped = await clickById("outsidetip");
 check("a TOOLTIPPED control outside a scroller clicks",
   saw(outsideTipped.hits, "click:outsidetip"), outsideTipped.hits);
 
+// THE TOOLTIP MUST STILL BE A TOOLTIP. The fix separates hiding the panel from releasing the
+// anchor, and the way to get that wrong is a panel that stops coming back.
+const behaviour = await evaluate(`(async () => {
+  const tip = document.getElementById("ddtip");
+  const el = document.getElementById("outsidetip");
+  const other = document.getElementById("outside");
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const snap = () => ({ disp: getComputedStyle(tip).display, aria: el.getAttribute("aria-describedby") });
+
+  el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  await sleep(30);
+  const hovering = snap();
+
+  other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  await sleep(30);
+  const left = snap();
+
+  // hover again, then PRESS: the panel goes, the anchor keeps its description
+  el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  await sleep(30);
+  el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  await sleep(30);
+  const pressed = snap();
+
+  // and it comes back on a fresh hover
+  other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  await sleep(30);
+  el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  await sleep(30);
+  const again = snap();
+  return { hovering, left, pressed, again, text: tip.textContent.slice(0, 24) };
+})()`);
+check("hovering a [data-tip] shows the panel and describes the anchor",
+  behaviour.hovering.disp === "block" && behaviour.hovering.aria === "ddtip", behaviour);
+check("leaving it hides the panel AND releases the description",
+  behaviour.left.disp === "none" && behaviour.left.aria === null, behaviour);
+check("pressing hides the panel but does NOT strip the anchor's aria mid-gesture",
+  behaviour.pressed.disp === "none" && behaviour.pressed.aria === "ddtip", behaviour);
+check("...and the tooltip comes back on a fresh hover, so the press did not kill it",
+  behaviour.again.disp === "block" && behaviour.again.aria === "ddtip", behaviour);
+
 // The park still has to MEASURE, or the fix trades a dead button for a misplaced panel.
 const placement = await evaluate(`(() => {
   const el = document.getElementById("tipped");
@@ -238,12 +279,17 @@ check("...and is placed below its anchor, inside the viewport",
   placement.tipT >= placement.anchorBottom && placement.tipL >= 0
     && placement.tipL + placement.tipW <= placement.viewportW, placement);
 
-// The specific regression, asserted on the SOURCE as well: a park inside the viewport is the bug.
+// THE SPECIFIC REGRESSION, on the source as well as in the browser. Comments stripped first: this
+// file explains the defect at length and every explanation contains the words being matched.
 const source = readFileSync(join(root, "runtime/tooltip.js"), "utf8")
   .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-check("show() does not park the panel inside the viewport to measure it",
-  !/tip\.style\.top\s*=\s*["']0px["']/.test(source),
-  source.match(/tip\.style\.top[^\n]*/g));
+check("pointerdown hides the PANEL and does not touch the anchor's aria",
+  /addEventListener\("pointerdown",\s*hidePanel\s*,\s*true\)/.test(source),
+  source.match(/addEventListener\("pointerdown"[^\n]*/g));
+check("...and the aria association is written only when it would change",
+  /!== "ddtip"\)\s*el\.setAttribute/.test(source));
+check("...and removed only when it is actually set",
+  /=== "ddtip"\)\s*el\.removeAttribute/.test(source));
 
 console.log(failures
   ? `\n\x1b[31m-- check-tooltip-click: ${failures} FAILED --\x1b[0m`

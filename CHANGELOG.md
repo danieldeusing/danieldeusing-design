@@ -4,6 +4,42 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.56.0 (2026-09-01)
+
+### No wide-screen scaling — a page caps at a reading column instead
+
+Daniel: *"Let us stop doing this zoom thing and make max width to 1280 or the value it is."*
+
+From 0.29.0 to 0.55.0 this package set a fluid root font size above a 1920px viewport, so type, the
+content column and the vertical rhythm grew together on a large display. It replaced an older JS
+`zoom`, and the intent was right — a 4K panel should not show a postage stamp of 12px text in the
+middle of it.
+
+It is removed, and the reasons are worth recording because they are not visible from the idea:
+
+- **Everything authored in px silently opted out.** Icons carry their size as `width`/`height`
+  attributes; controls had px heights; one component wrote an inline px style, which no stylesheet
+  can override. So on a 4K screen the text doubled while all of that stood still. Chasing it took
+  four releases (0.52–0.55) — and each fix revealed another surface that had opted out in a
+  different way.
+- **What did scale, scaled too much.** At 2x the icons read as oversized beside their labels, and a
+  table whose columns were sized for a 1472px reading column had its text overlap once every
+  measurement inside it doubled.
+
+A fixed reading column is the boring answer and the right one. `--content-w` is now **90rem
+(1440px)**; beyond that the viewport is margin. There is nothing to opt out of and nothing to keep
+in step.
+
+The root font size is the browser's own again, which is also the accessible answer: a reader who
+sets a larger default gets it, and text zoom works (WCAG 1.4.4).
+
+Removed with it: the icon-size table (0.53.0–0.55.0), which existed only to make icons grow with
+the root and now converts px to the identical px; `data-scale="fixed"` (0.47.0), an opt-out of a
+behaviour that no longer exists — setting it is harmless and does nothing; and the rem conversions
+of `.dropdown-panel` and `.dd-flag`, which are px again.
+
+Nothing changes at or below 1920px except the content column, which narrows from 1472px to 1440px.
+
 ## 0.55.0 (2026-09-01)
 
 ### The last two px sizes in the package

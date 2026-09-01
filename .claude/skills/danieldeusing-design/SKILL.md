@@ -32,8 +32,9 @@ disagrees with four other pages and, for colour, is provably wrong on at least o
 
   <!-- PRE-PAINT, inline, before any stylesheet. The theme must be settled before
        first paint or the page visibly flashes the wrong one. NOTHING here touches
-       scale: `tokens.css` has done that in CSS since 0.29.0, and a page that also
-       sets `style.zoom` scales TWICE. This template used to carry that script. -->
+       scale, and nothing should: there is no wide-screen scaling since 0.56.0 — a
+       page caps at --content-w and the rest of the viewport is margin. This template
+       used to carry a zoom script; do not bring it back. -->
   <script>
     (() => {
       const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
@@ -186,7 +187,7 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   different left edges read as broken however well each one is individually sized. So there is
   no bleed class and none should be invented — cockpit had one for a few hours, for a genuinely
   too-narrow activity table, and the right fix was `--content-w` going 78rem → 92rem for
-  everybody. The number was measured, not chosen: the widest table in the estate wants 1353px,
+  everybody (and 92rem → **90rem / 1440px** in 0.56.0, when the scaling went). The number was measured, not chosen: the widest table in the estate wants 1353px,
   88rem is the first value that fits it, and 92rem clears it while still leaving an 81px gutter
   beside the `ls -l` rail at 1920. **The cap only binds above ~1744px**, so widening it is
   invisible on a laptop and only shows on the monitors it gets raised about.
@@ -201,35 +202,29 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
 - Tailwind apps get `max-w-content` and `text-fs-base` / `-lg` / `-xl` / `-2xl`. `text-fs-xs`, `-sm`
   and `-md` went with the tokens behind them. Tailwind's own `text-xs/sm/base` are deliberately
   **not** remapped — opt in by name.
-- **The scale fixes the *ratios*; the ROOT FONT SIZE makes them track the window.** Since 0.29.0
-  `tokens.css` sets `font-size: max(1rem, calc(1rem + (100vw - 1920px) / 120))` on the root, so
-  every rem in the package — type, `--content-w`, `--space-section` — grows together above 1920.
-  A 4K screen gets a bigger page, not a postage stamp of 12px text. It needs no script and
-  cannot be forgotten, which is the point: the old `initResolutionZoom()` failed silently when a
-  page was written without it.
-- **An APP WINDOW pins the scale; a PAGE tracks it (0.47.0, Daniel).** Set
-  `data-scale="fixed"` on `<html>` and the root font holds at `1rem` at every window size:
-
-  ```html
-  <html data-scale="fixed">
-  ```
-
-  Resizing a window is not the same act as opening a page on a bigger screen. The viewport of a
-  page is the display, so `100vw` is a fair proxy for how much screen there is; an app window is
-  a size the user drags around on a display that never changed, and scaling to it grows the
-  chrome under someone who asked only to see more content. Native apps do not do this, and a
-  HiDPI panel is already handled by the OS. **Every Tauri or Electron surface sets this** —
-  Studio does; configr predates the token and must set it when it upgrades.
-
-  It also breaks mixed units, which is how it was found: Studio's toolbars were `36px` with
-  `1.75rem` icon buttons inside them — identical at 1x, and past a ~2500px-wide window the
-  buttons were taller than the bar. Prefer rem for both, so a deliberate zoom moves them together.
-
+- **THERE IS NO WIDE-SCREEN SCALING. Removed in 0.56.0 (Daniel).** From 0.29.0 to 0.55.0
+  `tokens.css` set a fluid root font size above 1920px, so every rem — type, `--content-w`,
+  `--space-section` — grew together on a large display. It is gone, and it will read as a
+  regression if you do not know why, so: everything authored in **px silently opted out** (icons
+  are sized by `width`/`height` attributes, controls had px heights, one component wrote an inline
+  px style no stylesheet can override), so a 4K screen doubled the text and left all of that
+  behind. Four releases went into chasing it. And what *did* scale scaled too much — 2x icons read
+  as oversized beside their labels, and a table sized for a 1472px column overlapped once every
+  measurement in it doubled.
+  **A page caps at `--content-w` (90rem / 1440px) and the rest of the viewport is margin.** The
+  root font size is the browser's own, which is also the accessible answer: a larger default is
+  honoured and text zoom works (WCAG 1.4.4).
+  Do not re-add a pre-paint `style.zoom` and do not re-add a fluid root — `bin/design-conformance`
+  check 5 fails a page that assigns a zoom, and it is now the only thing that would be scaling
+  anything.
+  `data-scale="fixed"` (0.47.0) went with it: an opt-out of a behaviour that no longer exists.
+  Setting it is harmless and does nothing.
 - **Never set `zoom` on a page.** It scales the coordinate *space*, so the page's pixel grid stops
   matching the browser's, and anything injected from outside — a password manager's dropdown, a
   translation bar — is positioned through one grid and written into the other. Measured on the
   family login page: 1Password's dropdown landed 1.9x down and across from its field. Scaling the
-  unit has no second grid. A page that sets `style.zoom` on top of 0.29.0 scales TWICE.
+  unit had no second grid — and since 0.56.0 nothing scales the unit either, so a `style.zoom`
+  would be the only thing scaling anything, on one surface, out of step with every other.
 
 ## A card has its own padding (0.38.0, Daniel) — do NOT add your own
 

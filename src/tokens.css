@@ -229,62 +229,37 @@ html[data-theme="paper"] {
      A surface that wants more width raises THIS, it does not add a bleed class.
      A page whose content genuinely is not a column (a full-bleed dashboard table)
      sets `max-width: none` deliberately; it does not pick another number. */
-  --content-w: 92rem;
+  --content-w: 90rem;   /* 1440px — the reading column's cap, see above */
 
-  /* ── SCALE ABOVE THE REFERENCE WIDTH ───────────────────────────────────────
-     Everything in this package is stated in rem, so moving the root font size
-     moves the type, the content column and the vertical rhythm together. That
-     is how a 4K or 8K panel gets a bigger page rather than a postage stamp of
-     12px text in the middle of it.
+  /* ── NO WIDE-SCREEN SCALING ────────────────────────────────────────────────
+     REMOVED 2026-09-01 (Daniel: "let us stop doing this zoom thing"). From 0.29.0
+     to 0.55.0 this set a fluid root font-size above a 1920px viewport, so type,
+     the content column and the vertical rhythm all grew on a large display. It
+     replaced an older JS `zoom`, and the intent was sound — a 4K panel should not
+     show a postage stamp of 12px text.
 
-     WHY NOT `zoom`, WHICH THIS REPLACES. `initResolutionZoom()` did the same
-     arithmetic geometrically, and a geometric scale gives the page a pixel grid
-     that no longer matches the browser's. Anything injected into the document
-     from outside — a password manager's dropdown, a translation bar — reads a
-     field's position through the BROWSER's grid and writes it back into the
-     PAGE's grid, where it is multiplied by the scale factor. Measured on the
-     family login page: 1Password's dropdown landed 1.9x down and across from
-     the field it belonged to, on a window that zoomed 1.89x. Scaling the unit
-     instead of the space has no second grid, so there is nothing to mismatch.
+     In practice it made large displays WORSE, not better, and the reasons are
+     worth keeping because they are not obvious from the idea:
 
-     THE ARITHMETIC IS DELIBERATELY THE OLD ONE. Above 1920 this reduces to
-     100vw/120, i.e. exactly `16px * innerWidth/1920` — the same curve
-     initResolutionZoom drew, so no surface changes size on the day it migrates.
-     Below 1920 the calc goes negative and max() holds it at 1rem, matching the
-     old `Math.max(1, ...)` floor.
+       · everything authored in px silently opted out. Icons carry their size as
+         width/height attributes, controls had px heights, one component wrote an
+         inline px style — so on a 4K screen the text doubled while those stood
+         still. Chasing that took four releases (0.52-0.55) and still left the
+         page looking wrong, because the fix was never one thing.
+       · what did scale, scaled too much. Icons at 2x read as oversized beside
+         their labels, and a table sized for a 1472px column at 1x had its columns
+         overlap once every measurement in it doubled.
 
-     THE `1rem` TERM IS LOAD-BEARING, not decoration. On the root element `rem`
-     resolves against the browser's default font size, so a reader who has set
-     a larger default still gets it honoured and browser text zoom keeps working
-     (WCAG 1.4.4). A bare `100vw/120` would be pixel-exact and quietly override
-     both.
+     A fixed reading column is the boring answer and the right one: the page caps
+     at --content-w and the rest of the viewport is margin. Nothing to opt out of,
+     nothing to keep in step.
 
-     This lives in tokens.css rather than base.css because netmon loads
-     tokens.css + its own frozen chrome.css and never sees base.css. */
-  font-size: max(1rem, calc(1rem + (100vw - 1920px) / 120));
+     The root font-size is therefore the browser's own again, which is also the
+     accessible answer — a reader who has set a larger default gets it, and text
+     zoom works (WCAG 1.4.4). `data-scale="fixed"` (0.47.0) went with it: an
+     opt-out of a behaviour that no longer exists is dead markup that reads as
+     load-bearing. Setting it is harmless and does nothing. */
 
-  /* AN APPLICATION WINDOW OPTS OUT (0.47.0, Daniel). Everything above is
-     reasoning about a PAGE, where the viewport is the display: you open a
-     browser on a 4K panel, it fills it, and 100vw is a fair proxy for "how much
-     screen is there". Scaling the unit to it is then the difference between a
-     bigger page and a postage stamp.
-
-     An app window is not that. Its width is a thing the user drags, moment to
-     moment, on a display whose size never changed — so the same expression
-     reads a deliberate act of resizing as a change of display, and the chrome
-     grows under the hands of someone who asked only to see more of it. Native
-     apps do not behave this way, and the OS has already applied the scaling
-     that a HiDPI panel actually calls for.
-
-     It also breaks mixed units in a way a page never does. Studio's toolbars
-     are `36px` and the icon buttons inside them `1.75rem`; identical at 1x, and
-     past about a 2500px-wide window the buttons are taller than the bar that
-     contains them. That is what this was found by (Daniel, 2026-08-28).
-
-     `1rem`, not `16px`: on the root, `rem` is the browser's default font size,
-     so a larger default and the webview's own zoom are both still honoured.
-     This fixes the unit to the user's, which is the whole intent — it does not
-     freeze it at ours. */
   /* Horizontal breathing room, i.e. Daniel's "same margins left and right".
      Vertical padding stays a page's own business — a doc and a dashboard do
      not want the same headroom, and pretending otherwise is what produced the
@@ -336,65 +311,9 @@ html[data-theme="paper"] {
      typo. Override it per panel when a panel's labels are genuinely longer. */
   --field-label-w: 8.5rem;
 }
-/* ── AN ICON SCALES WITH THE PAGE (Daniel, 2026-09-01) ───────────────────────────────────────
- *
- * Since 0.29.0 the root font-size is fluid above a 1920px viewport and every measurement in this
- * package is in rem, so a page grows as one thing. An inline icon did NOT: it carries its size as
- * `width="16" height="16"` presentation attributes, those are CSS px, and px does not scale. On a
- * 4K display the root reaches 32px and the text doubles while every icon stays exactly as authored.
- *
- * WHY THIS IS A TABLE AND NOT THREE RULES. The first version of this covered 11, 16 and 22 — the
- * only sizes a grep of the estate's SOURCE could find — and it was wrong within the hour. Seedr's
- * icons are rendered by React at RUNTIME: lucide emits `width="24"`, and the agent glyphs are
- * `<img width="16">`, neither of which appears in any markup a scan can read. Enumerating what you
- * can see is not enumerating the alphabet.
- *
- * The alphabet here IS finite, which is what makes a table the right answer rather than a smarter
- * matcher: an icon size is a small integer, and this covers 8-64 including every step any icon set
- * in this estate uses. CSS cannot do the arithmetic itself — `attr()` with a type is too new to
- * rely on — so the conversion is written out. It costs about 2KB and it cannot miss.
- *
- * `img` as well as `svg`, because an icon is not always an SVG: seedr draws its per-agent glyphs
- * as images, and they were frozen for exactly the same reason.
- *
- * Each value is the rem that renders IDENTICALLY at the 1920 baseline where 1rem is 16px, so
- * nothing moves at or below the width most screens are; above it icons grow with everything else.
- *
- * This works because a presentation attribute loses to ANY css declaration — it has no specificity.
- * `:where()` keeps that true in the other direction: the rule adds none either, so a surface that
- * wants a different size still wins with a plain class. Verified in a browser rather than assumed.
- *
- * It lives in tokens.css, not base.css, for the same reason the fluid font-size does: netmon loads
- * tokens.css plus its own frozen chrome.css and never sees base.css.
- */
-:where(svg[width="8"][height="8"], img[width="8"][height="8"]) { inline-size: 0.5rem; block-size: 0.5rem; }
-:where(svg[width="9"][height="9"], img[width="9"][height="9"]) { inline-size: 0.5625rem; block-size: 0.5625rem; }
-:where(svg[width="10"][height="10"], img[width="10"][height="10"]) { inline-size: 0.625rem; block-size: 0.625rem; }
-:where(svg[width="11"][height="11"], img[width="11"][height="11"]) { inline-size: 0.6875rem; block-size: 0.6875rem; }
-:where(svg[width="12"][height="12"], img[width="12"][height="12"]) { inline-size: 0.75rem; block-size: 0.75rem; }
-:where(svg[width="13"][height="13"], img[width="13"][height="13"]) { inline-size: 0.8125rem; block-size: 0.8125rem; }
-:where(svg[width="14"][height="14"], img[width="14"][height="14"]) { inline-size: 0.875rem; block-size: 0.875rem; }
-:where(svg[width="15"][height="15"], img[width="15"][height="15"]) { inline-size: 0.9375rem; block-size: 0.9375rem; }
-:where(svg[width="16"][height="16"], img[width="16"][height="16"]) { inline-size: 1rem; block-size: 1rem; }
-:where(svg[width="18"][height="18"], img[width="18"][height="18"]) { inline-size: 1.125rem; block-size: 1.125rem; }
-:where(svg[width="20"][height="20"], img[width="20"][height="20"]) { inline-size: 1.25rem; block-size: 1.25rem; }
-:where(svg[width="22"][height="22"], img[width="22"][height="22"]) { inline-size: 1.375rem; block-size: 1.375rem; }
-:where(svg[width="24"][height="24"], img[width="24"][height="24"]) { inline-size: 1.5rem; block-size: 1.5rem; }
-:where(svg[width="26"][height="26"], img[width="26"][height="26"]) { inline-size: 1.625rem; block-size: 1.625rem; }
-:where(svg[width="28"][height="28"], img[width="28"][height="28"]) { inline-size: 1.75rem; block-size: 1.75rem; }
-:where(svg[width="32"][height="32"], img[width="32"][height="32"]) { inline-size: 2rem; block-size: 2rem; }
-:where(svg[width="36"][height="36"], img[width="36"][height="36"]) { inline-size: 2.25rem; block-size: 2.25rem; }
-:where(svg[width="40"][height="40"], img[width="40"][height="40"]) { inline-size: 2.5rem; block-size: 2.5rem; }
-:where(svg[width="44"][height="44"], img[width="44"][height="44"]) { inline-size: 2.75rem; block-size: 2.75rem; }
-:where(svg[width="48"][height="48"], img[width="48"][height="48"]) { inline-size: 3rem; block-size: 3rem; }
-:where(svg[width="56"][height="56"], img[width="56"][height="56"]) { inline-size: 3.5rem; block-size: 3.5rem; }
-:where(svg[width="64"][height="64"], img[width="64"][height="64"]) { inline-size: 4rem; block-size: 4rem; }
+/* Icons are sized by their own width/height attributes, as they always were. The rem table that
+ * used to live here existed only to make them grow with the fluid root font-size; with that gone
+ * it converted px to the identical px and was pure indirection. */
 
 
-/* See "AN APPLICATION WINDOW OPTS OUT" above. Declared last so it is read next
-   to nothing else, and as an attribute so it can be set pre-paint on <html>
-   without a stylesheet of one's own. The extra attribute out-specifies the
-   `:root` rule it overrides, so load order does not matter. */
-:root[data-scale="fixed"] {
-  font-size: 1rem;
-}
+

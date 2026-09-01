@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.54.0 (2026-09-01)
+
+### The icon rule covers every icon, including the ones no scan can see
+
+0.53.0 made icons scale by restating their px `width`/`height` attributes as rem — and covered
+exactly three sizes, 11, 16 and 22, because those were the only ones a grep of the estate's source
+markup could find. That was wrong within the hour.
+
+Seedr's icons are rendered by React at RUNTIME. `lucide` emits `width="24"`, and the per-agent
+glyphs are `<img width="16">` — an element type 0.53.0 did not match at all. Neither appears in any
+markup a static scan can read, so the enumeration was complete with respect to the wrong thing:
+what was visible, not what exists. Measured on the live page at 3840px afterwards, 831 elements
+still failed to grow.
+
+This replaces the three rules with a table over 8-64px, for `svg` **and** `img`. The alphabet is
+genuinely finite — an icon size is a small integer — which is what makes a table the right answer
+rather than a cleverer matcher; CSS cannot do the arithmetic itself, since `attr()` with a type is
+too new to depend on. It costs about 2KB and it cannot miss a size.
+
+Every value is the rem that renders identically at the 1920 baseline, so nothing moves at ordinary
+widths.
+
 ## 0.53.0 (2026-09-01)
 
 ### An icon scales with the page

@@ -341,30 +341,54 @@ html[data-theme="paper"] {
  * Since 0.29.0 the root font-size is fluid above a 1920px viewport and every measurement in this
  * package is in rem, so a page grows as one thing. An inline icon did NOT: it carries its size as
  * `width="16" height="16"` presentation attributes, those are CSS px, and px does not scale. On a
- * 4K display the result is measurable and ugly — on danieldeusing.de at 3840px the root reached
- * 32px and paragraphs 24px while the header icons stayed exactly 16x16, so every icon rendered at
- * half its proportional size beside the text it belongs to.
+ * 4K display the root reaches 32px and the text doubles while every icon stays exactly as authored.
  *
- * There was no rule for this anywhere in the package: icons were sized entirely by their markup,
- * on all six surfaces, which is why nothing caught it.
+ * WHY THIS IS A TABLE AND NOT THREE RULES. The first version of this covered 11, 16 and 22 — the
+ * only sizes a grep of the estate's SOURCE could find — and it was wrong within the hour. Seedr's
+ * icons are rendered by React at RUNTIME: lucide emits `width="24"`, and the agent glyphs are
+ * `<img width="16">`, neither of which appears in any markup a scan can read. Enumerating what you
+ * can see is not enumerating the alphabet.
  *
- * MATCHED ON THE ATTRIBUTE, so that not one line of consumer markup has to change. 67 icons across
- * cockpit, netmon, family, pagr, seedr and this package's own templates carry one of three sizes,
- * and each is restated here as the rem that renders IDENTICALLY at the 1920 baseline where 1rem is
- * 16px. Below and at 1920 nothing moves; above it they grow with everything else.
+ * The alphabet here IS finite, which is what makes a table the right answer rather than a smarter
+ * matcher: an icon size is a small integer, and this covers 8-64 including every step any icon set
+ * in this estate uses. CSS cannot do the arithmetic itself — `attr()` with a type is too new to
+ * rely on — so the conversion is written out. It costs about 2KB and it cannot miss.
  *
- * This works because an SVG presentation attribute loses to ANY css declaration — it has no
- * specificity of its own. `:where()` keeps that true in the other direction too: the rule adds no
- * specificity, so a surface that wants a different size can still say so with a plain class.
- * Verified in a browser rather than assumed: with :root at 32px, `svg[width="22"]` under this rule
- * measured 44px (1.375rem x 32) while an unmatched `svg[width="16"]` stayed frozen at 16px.
+ * `img` as well as `svg`, because an icon is not always an SVG: seedr draws its per-agent glyphs
+ * as images, and they were frozen for exactly the same reason.
  *
- * `inline-size`/`block-size` rather than width/height so the rule reads in the same logical axes
- * as the rest of the package.
+ * Each value is the rem that renders IDENTICALLY at the 1920 baseline where 1rem is 16px, so
+ * nothing moves at or below the width most screens are; above it icons grow with everything else.
+ *
+ * This works because a presentation attribute loses to ANY css declaration — it has no specificity.
+ * `:where()` keeps that true in the other direction: the rule adds none either, so a surface that
+ * wants a different size still wins with a plain class. Verified in a browser rather than assumed.
+ *
+ * It lives in tokens.css, not base.css, for the same reason the fluid font-size does: netmon loads
+ * tokens.css plus its own frozen chrome.css and never sees base.css.
  */
-:where(svg[width="11"][height="11"]) { inline-size: 0.6875rem; block-size: 0.6875rem; }
-:where(svg[width="16"][height="16"]) { inline-size: 1rem;      block-size: 1rem; }
-:where(svg[width="22"][height="22"]) { inline-size: 1.375rem;  block-size: 1.375rem; }
+:where(svg[width="8"][height="8"], img[width="8"][height="8"]) { inline-size: 0.5rem; block-size: 0.5rem; }
+:where(svg[width="9"][height="9"], img[width="9"][height="9"]) { inline-size: 0.5625rem; block-size: 0.5625rem; }
+:where(svg[width="10"][height="10"], img[width="10"][height="10"]) { inline-size: 0.625rem; block-size: 0.625rem; }
+:where(svg[width="11"][height="11"], img[width="11"][height="11"]) { inline-size: 0.6875rem; block-size: 0.6875rem; }
+:where(svg[width="12"][height="12"], img[width="12"][height="12"]) { inline-size: 0.75rem; block-size: 0.75rem; }
+:where(svg[width="13"][height="13"], img[width="13"][height="13"]) { inline-size: 0.8125rem; block-size: 0.8125rem; }
+:where(svg[width="14"][height="14"], img[width="14"][height="14"]) { inline-size: 0.875rem; block-size: 0.875rem; }
+:where(svg[width="15"][height="15"], img[width="15"][height="15"]) { inline-size: 0.9375rem; block-size: 0.9375rem; }
+:where(svg[width="16"][height="16"], img[width="16"][height="16"]) { inline-size: 1rem; block-size: 1rem; }
+:where(svg[width="18"][height="18"], img[width="18"][height="18"]) { inline-size: 1.125rem; block-size: 1.125rem; }
+:where(svg[width="20"][height="20"], img[width="20"][height="20"]) { inline-size: 1.25rem; block-size: 1.25rem; }
+:where(svg[width="22"][height="22"], img[width="22"][height="22"]) { inline-size: 1.375rem; block-size: 1.375rem; }
+:where(svg[width="24"][height="24"], img[width="24"][height="24"]) { inline-size: 1.5rem; block-size: 1.5rem; }
+:where(svg[width="26"][height="26"], img[width="26"][height="26"]) { inline-size: 1.625rem; block-size: 1.625rem; }
+:where(svg[width="28"][height="28"], img[width="28"][height="28"]) { inline-size: 1.75rem; block-size: 1.75rem; }
+:where(svg[width="32"][height="32"], img[width="32"][height="32"]) { inline-size: 2rem; block-size: 2rem; }
+:where(svg[width="36"][height="36"], img[width="36"][height="36"]) { inline-size: 2.25rem; block-size: 2.25rem; }
+:where(svg[width="40"][height="40"], img[width="40"][height="40"]) { inline-size: 2.5rem; block-size: 2.5rem; }
+:where(svg[width="44"][height="44"], img[width="44"][height="44"]) { inline-size: 2.75rem; block-size: 2.75rem; }
+:where(svg[width="48"][height="48"], img[width="48"][height="48"]) { inline-size: 3rem; block-size: 3rem; }
+:where(svg[width="56"][height="56"], img[width="56"][height="56"]) { inline-size: 3.5rem; block-size: 3.5rem; }
+:where(svg[width="64"][height="64"], img[width="64"][height="64"]) { inline-size: 4rem; block-size: 4rem; }
 
 
 /* See "AN APPLICATION WINDOW OPTS OUT" above. Declared last so it is read next

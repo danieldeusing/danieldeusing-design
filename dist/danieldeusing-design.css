@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.54.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.55.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -987,8 +987,10 @@ body::after {
 }
 .dd-flag {
   display: inline-block;
-  width: 15px;
-  height: 10px;
+  /* rem, like every other size in the package — a flag sits beside text and should grow with
+     it. 0.9375rem x 16 = 15px, 0.625rem x 16 = 10px: unchanged at the 1920 baseline. */
+  inline-size: 0.9375rem;
+  block-size: 0.625rem;
   flex: none;
   border: 1px solid var(--border);
   background-size: cover;
@@ -1073,7 +1075,11 @@ body::after {
   right: 0;
   bottom: calc(100% + 12px);
   z-index: 50;
-  min-width: 128px;
+  /* rem, so the panel grows with the text in it — a px floor under rem content is the
+     mixed-unit trap 0.48.0 documents, and it left this panel the only element on a 4K page
+     whose width stood still while its own rows doubled. 8rem x 16px = 128px, unchanged at
+     the 1920 baseline. */
+  min-inline-size: 8rem;
   margin: 0;
   padding: 4px 0;
   list-style: none;

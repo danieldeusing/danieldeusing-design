@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.55.0 (2026-09-01)
+
+### The last two px sizes in the package
+
+Found by measuring rather than reading: a script that loads a page at 1920 and at 3840 and reports
+every element whose box failed to grow. After 0.54.0 it was down to one element on seedr's skills
+page — `.dropdown-panel`, whose `min-width: 128px` held the panel at a fixed width while its own
+rows doubled. `.dd-flag` was the same shape, 15x10px beside text that scales.
+
+Both are rem now, at values identical to the old pixels at the 1920 baseline (8rem, 0.9375rem,
+0.625rem).
+
+The two remaining px sizes in the package are deliberate and stay: the `min-height: 44px` touch
+targets in the mobile media queries are a physical accessibility minimum, not a typographic one.
+
 ## 0.54.0 (2026-09-01)
 
 ### The icon rule covers every icon, including the ones no scan can see

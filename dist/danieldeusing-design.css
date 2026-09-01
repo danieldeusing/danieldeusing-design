@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.52.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.53.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -414,6 +414,36 @@ html[data-theme="paper"] {
      typo. Override it per panel when a panel's labels are genuinely longer. */
   --field-label-w: 8.5rem;
 }
+/* ── AN ICON SCALES WITH THE PAGE (Daniel, 2026-09-01) ───────────────────────────────────────
+ *
+ * Since 0.29.0 the root font-size is fluid above a 1920px viewport and every measurement in this
+ * package is in rem, so a page grows as one thing. An inline icon did NOT: it carries its size as
+ * `width="16" height="16"` presentation attributes, those are CSS px, and px does not scale. On a
+ * 4K display the result is measurable and ugly — on danieldeusing.de at 3840px the root reached
+ * 32px and paragraphs 24px while the header icons stayed exactly 16x16, so every icon rendered at
+ * half its proportional size beside the text it belongs to.
+ *
+ * There was no rule for this anywhere in the package: icons were sized entirely by their markup,
+ * on all six surfaces, which is why nothing caught it.
+ *
+ * MATCHED ON THE ATTRIBUTE, so that not one line of consumer markup has to change. 67 icons across
+ * cockpit, netmon, family, pagr, seedr and this package's own templates carry one of three sizes,
+ * and each is restated here as the rem that renders IDENTICALLY at the 1920 baseline where 1rem is
+ * 16px. Below and at 1920 nothing moves; above it they grow with everything else.
+ *
+ * This works because an SVG presentation attribute loses to ANY css declaration — it has no
+ * specificity of its own. `:where()` keeps that true in the other direction too: the rule adds no
+ * specificity, so a surface that wants a different size can still say so with a plain class.
+ * Verified in a browser rather than assumed: with :root at 32px, `svg[width="22"]` under this rule
+ * measured 44px (1.375rem x 32) while an unmatched `svg[width="16"]` stayed frozen at 16px.
+ *
+ * `inline-size`/`block-size` rather than width/height so the rule reads in the same logical axes
+ * as the rest of the package.
+ */
+:where(svg[width="11"][height="11"]) { inline-size: 0.6875rem; block-size: 0.6875rem; }
+:where(svg[width="16"][height="16"]) { inline-size: 1rem;      block-size: 1rem; }
+:where(svg[width="22"][height="22"]) { inline-size: 1.375rem;  block-size: 1.375rem; }
+
 
 /* See "AN APPLICATION WINDOW OPTS OUT" above. Declared last so it is read next
    to nothing else, and as an attribute so it can be set pre-paint on <html>
@@ -542,6 +572,7 @@ summary,
 [role="button"] {
   cursor: pointer;
 }
+
 
 /* CRT scanlines: a fixed, non-interactive overlay above the page. Intensity is
    per-theme via --scanline-opacity. */

@@ -4,6 +4,45 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.53.0 (2026-09-01)
+
+### An icon scales with the page
+
+Daniel, looking at a 4K display: *"should icons not also scale? I see in danieldeusing.de that the
+navigation icons in the header are not scaling."*
+
+They were not. Since 0.29.0 the root font-size is fluid above a 1920px viewport and every
+measurement in this package is in rem, so a page grows as one thing — but an inline icon carries
+its size as `width="16" height="16"` presentation attributes, those are CSS px, and px does not
+scale. Measured on danieldeusing.de at 3840px: the root reached 32px and paragraphs 24px while the
+header icons stayed exactly 16x16, rendering at half their proportional size beside the text they
+belong to.
+
+There was no rule for this anywhere in the package. Icons were sized entirely by consumer markup,
+on all six surfaces, which is why nothing ever caught it.
+
+Matched on the ATTRIBUTE, so not one line of consumer markup changes. The 67 icons across cockpit,
+netmon, family, pagr, seedr and this package's own templates carry one of three sizes, and each is
+restated as the rem that renders identically at the 1920 baseline where 1rem is 16px:
+
+```css
+:where(svg[width="11"][height="11"]) { inline-size: 0.6875rem; block-size: 0.6875rem; }
+:where(svg[width="16"][height="16"]) { inline-size: 1rem;      block-size: 1rem; }
+:where(svg[width="22"][height="22"]) { inline-size: 1.375rem;  block-size: 1.375rem; }
+```
+
+At and below 1920 nothing moves; above it icons grow with everything else.
+
+This works because an SVG presentation attribute loses to any CSS declaration — it has no
+specificity of its own. `:where()` keeps that true in the other direction: the rule adds no
+specificity, so a surface wanting a different size still wins with a plain class. Verified in a
+browser rather than assumed: with `:root` at 32px, a matched `svg[width="22"]` measured 44px
+(1.375rem x 32) while an unmatched `svg[width="16"]` stayed frozen at 16px.
+
+It lives in `tokens.css`, not `base.css`, for the same reason the fluid font-size does: netmon
+loads `tokens.css` + its own frozen `chrome.css` and never sees `base.css`. Put in base.css it
+would have missed netmon entirely — and netmon has two icons.
+
 ## 0.52.0 (2026-08-30)
 
 ### The tooltip click fix, actually found — and 0.51.0's account of it corrected

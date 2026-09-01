@@ -117,6 +117,7 @@ summary,
   cursor: pointer;
 }
 
+
 /* CRT scanlines: a fixed, non-interactive overlay above the page. Intensity is
    per-theme via --scanline-opacity. */
 body::after {

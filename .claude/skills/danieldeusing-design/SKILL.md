@@ -139,7 +139,7 @@ surfaces had **four** content widths (78rem / 1180px / 72rem / none) and netmon 
 where everything else sat at `0.75rem` — because the system offered no token to inherit.
 
 ```css
---content-w: 92rem;     --content-pad: 1.5rem;
+--content-w: 90rem;     --content-pad: 1.5rem;  /* 1440px — 92rem until 0.56.0 */
 --fs-base: 0.75rem; /* 12px — ALL normal text. The only size you write. */
 --fs-lg: 0.9375rem; /* 15px — h3 / section heads */
 --fs-xl: 1.125rem;  /* 18px — h2 / page title */
@@ -178,9 +178,9 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   three near-identical pixel values inside one card. Write the token, not a ratio.
 
 - **`.wrap` resolves the column** (`max-width: var(--content-w); margin-inline: auto;
-  padding-inline: var(--content-pad)`). Use it, and never restate a bare `92rem` locally. A
+  padding-inline: var(--content-pad)`). Use it, and never restate a bare `90rem` locally. A
   build-free page on an **unpinned** url writes the tokens itself *with literal fallbacks* —
-  `max-width: var(--content-w, 92rem)` — because `.wrap` itself only exists from 0.4.0; see
+  `max-width: var(--content-w, 90rem)` — because `.wrap` itself only exists from 0.4.0; see
   "Pin or unpin".
 - **ONE WIDTH FOR EVERY SECTION, and a surface that wants more raises the token** (0.44.0).
   A table section must never be wider than the prose sections beside it: blocks that start at
@@ -864,7 +864,7 @@ The runtime is progressive enhancement: with JS off, content is visible and the 
   that *predates the token it is asking for*: `0.2.0` has no `.wrap` and no `--fs-*` at all, and
   a bare `var(--content-w)` resolves to nothing — full-bleed page, collapsed type. **Give every
   token an unpinned consumer depends on structurally a literal fallback**: `var(--content-w,
-  92rem)`, `var(--fs-2xl, 1.7rem)`. Check what is actually being served before concluding a new
+  90rem)`, `var(--fs-2xl, 1.7rem)`. Check what is actually being served before concluding a new
   token "doesn't work": `curl -sI <url> | grep x-jsd-version`.
 - Consequence for this repo: **a publish is instantly live on every unpinned surface, with no
   staging** (once the edge turns over). So (a) look at them after publishing, and (b) keep new

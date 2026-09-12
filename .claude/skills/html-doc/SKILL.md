@@ -55,9 +55,14 @@ already carries two, and if you cannot write the sentence you do not have an exc
 
    ```html
    <link rel="stylesheet"
-     href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.7.0/dist/danieldeusing-design.min.css"
-     onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.7.0.min.css'" />
+     href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.56.0/dist/danieldeusing-design.min.css"
+     onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.56.0.min.css'" />
    ```
+
+   **Copy the version from `templates/documentation.html`, never from this line.** The example
+   above said `0.7.0` until 2026-09-12 — a version that predates the `ls -l` rail this same
+   paragraph requires — because a version written in prose has nothing keeping it true. The
+   template is the one that ships.
 
    - **Pinned because this page ships the system's MARKUP.** Since 2026-08-06 a doc carries the
      `ls -l` rail and the fixed footer — the design system's own chrome — so it is coupled to the
@@ -155,6 +160,17 @@ already carries two, and if you cannot write the sentence you do not have an exc
      cockpit's pages declare no `.wrap` rule at all. A doc that widens it, or puts the content in
      a grid column beside something, ends up left-aligned against the margin while every sibling
      page is centred, and that difference is visible the moment you have both open.
+   - **THE CHROME IS FULL-BLEED, THE CONTENT IS CAPPED, AND NOTHING SCALES WITH THE WINDOW.**
+     `header.bar` and `footer.status` span the viewport; `main.wrap` is the only capped thing, at
+     `--content-w` (90rem / 1440px since 0.56.0). Three states, one rule — and the reason it is
+     written down rather than left to the template: **a doc must never set `zoom`, and must never
+     restate a width.** Until 2026-09-12 the estate scaled the root font-size above 1920px so every
+     rem grew with the display, and 17 published docs additionally ran a pre-paint
+     `documentElement.style.zoom` of their own. Both are gone. A page that reintroduces either gets
+     a column that is 2944px wide on a 4K monitor with type to match, which is what this rule
+     exists to prevent — measured, not imagined. `bin/design-conformance` check 5 fails a page that
+     applies a zoom.
+
    - **Navigation (top-right) — the `ls -l` RAIL, and MOST DOCS SHOULD NOT HAVE ONE.**
      **The rule: a doc lists only ITSELF, so the rail has one entry, so there is no rail.**
      A navigation whose only destination is the page you are already on is not navigation — it is

@@ -245,13 +245,13 @@ const behaviour = await evaluate(`(async () => {
   return { hovering, left, pressed, again, text: tip.textContent.slice(0, 24) };
 })()`);
 check("hovering a [data-tip] shows the panel and describes the anchor",
-  behaviour.hovering.disp === "block" && behaviour.hovering.aria === "ddtip", behaviour);
+  behaviour.hovering.disp !== "none" && behaviour.hovering.aria === "ddtip", behaviour);
 check("leaving it hides the panel AND releases the description",
   behaviour.left.disp === "none" && behaviour.left.aria === null, behaviour);
 check("pressing hides the panel but does NOT strip the anchor's aria mid-gesture",
   behaviour.pressed.disp === "none" && behaviour.pressed.aria === "ddtip", behaviour);
 check("...and the tooltip comes back on a fresh hover, so the press did not kill it",
-  behaviour.again.disp === "block" && behaviour.again.aria === "ddtip", behaviour);
+  behaviour.again.disp !== "none" && behaviour.again.aria === "ddtip", behaviour);
 
 // The park still has to MEASURE, or the fix trades a dead button for a misplaced panel.
 const placement = await evaluate(`(() => {

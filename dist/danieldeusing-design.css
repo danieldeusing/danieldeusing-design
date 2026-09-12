@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.56.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.57.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -2535,6 +2535,40 @@ footer.status .dropdown summary, footer.status .anim-toggle { padding: 0.55rem 0
   text-align: left; white-space: normal; pointer-events: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
+
+/* ── the tip's own rows (0.57.0) ──
+   tooltip.js splits a tip on `\n` and on the estate's ` · ` separator and emits one element per
+   part, so these three rules are what turn the house convention into a readable panel. Before
+   them a six-part tip was one wrapped paragraph and the reader parsed it by hunting for `·`.
+
+   `max-width` above still holds: a LINE may wrap, and a wrapped line indents under itself rather
+   than back to the margin, so it stays visibly one item rather than looking like the next one. */
+#ddtip .ddtip-line { padding-left: 0.75em; text-indent: -0.75em; }
+/* Row gap rather than margins between siblings: a `display: contents` row has no box to carry a
+   margin, so `+` selectors on the rows would silently apply to nothing. */
+#ddtip { row-gap: 0.2rem; }
+
+/* The FIRST part is the subject — a model name, a container, a repo — and every tip in the estate
+   is written that way already. It carries the weight so the eye lands on it first. */
+#ddtip > :first-child { font-weight: 600; }
+
+/* A parenthetical is provenance or a caveat ("(copilot reported the model)"). It is worth keeping
+   and not worth reading first, which is exactly what --muted-foreground is for. */
+#ddtip .ddtip-aside { color: var(--muted-foreground); font-weight: 400; }
+
+/* `k\tv` — a two-column row for a genuinely tabular tip.
+   THE GRID IS ON THE PANEL AND THE ROWS ARE `display: contents`, which is the whole difference
+   between a table and a set of lines that each happen to have two parts. A grid per ROW sizes its
+   label column to that row's own label, so `effort xhigh` and `premium req 15` put their values at
+   different x — measured, and it reads as ragged rather than tabular. One grid for the panel sizes
+   `auto` against the LONGEST label in the tip, so every value lines up and the labels still cost
+   only what they need. `tabular-nums` then makes the figures themselves line up digit for digit.
+   (`show()` sets `display: grid`, not `block`, for this reason.) */
+#ddtip { grid-template-columns: auto 1fr; gap: 0 0.9rem; align-content: start; }
+#ddtip .ddtip-row { display: contents; }
+#ddtip .ddtip-line { grid-column: 1 / -1; }
+#ddtip .ddtip-k { color: var(--muted-foreground); }
+#ddtip .ddtip-v { font-variant-numeric: tabular-nums; }
 
 /* ===== print.css ===== */
 /*

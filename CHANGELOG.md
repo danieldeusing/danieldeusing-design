@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.57.0 (2026-09-12)
+
+### Changed
+
+- **A tooltip is a LIST, not a paragraph.** `[data-tip]` is split on `\n` and on the estate's own
+  ` · ` separator, and each part is rendered as its own row. The separator was already the house
+  convention everywhere — it just went into `white-space: normal` as one `textContent`, so a
+  six-part tip arrived as prose wrapped at 340px and the reader parsed it by hunting for the `·`s.
+  Daniel, on a model/cost tip: *"the data is good, but the format not … just make it better
+  readable."* Splitting here rather than at the call sites is the whole point: it reaches all 118
+  `[data-tip]`s in cockpit, plus every one on every other surface, without touching any of them —
+  including the tables nobody remembers to update.
+- **Two opt-in shapes on top of that.** A line containing a TAB renders as a key/value row (label
+  left in `--muted-foreground`, value right, `tabular-nums` so figures line up), for a genuinely
+  tabular tip such as a cost breakdown. A line starting with `(` is muted: provenance and caveats
+  are already written that way across the estate, so they de-emphasise themselves with no markup.
+  The first part carries the weight — every tip in the estate opens with its subject.
+- Rows are built with `textContent` per node, never `innerHTML`. A tip routinely carries a model
+  name or a branch an agent chose, and this component must not be the one that renders it as
+  markup. A wrapped line hangs-indents under itself, so it still reads as one item.
+
 ## 0.56.0 (2026-09-01)
 
 ### No wide-screen scaling — a page caps at a reading column instead

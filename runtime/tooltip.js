@@ -92,9 +92,58 @@ export function initTooltips() {
     if (anchor && anchor !== el) removeDescription(anchor);
     anchor = el;
     describe(el);
-    tip.textContent = el.getAttribute("data-tip");
-    tip.style.display = "block";
+    renderTip(el.getAttribute("data-tip"));
+    tip.style.display = "grid";
     place();
+  }
+
+  // A TOOLTIP IS A LIST, NOT A PARAGRAPH.
+  //
+  // Every tip in this estate is already written as `a · b · c` — the separator is the house
+  // convention and predates this function by months. It was then rendered into `white-space:
+  // normal` as one textContent, so a six-part tip arrived as a wall of prose wrapped at 340px and
+  // the reader had to find the `·`s to parse it. Daniel, on a model/cost tip: "the data is good,
+  // but the format not … just make it better readable."
+  //
+  // So the SEPARATOR IS THE FORMAT. Splitting on it here fixes every `[data-tip]` on every surface
+  // at once — 118 of them in cockpit alone — with no call site touched, which is the only version
+  // of this that reaches the tables nobody remembers to update.
+  //
+  // Three shapes, in order of how much the caller has to know:
+  //   "a · b"        → two lines. Free, and what every existing tip already gets.
+  //   "k\tv"         → a key/value ROW: label left in muted, value right. For genuinely tabular
+  //                    tips (a cost breakdown), opt-in per line.
+  //   "(aside)"      → muted. Provenance and caveats are written that way across the estate
+  //                    already, so they de-emphasise themselves without anybody marking them up.
+  //
+  // Built with textContent per node, never innerHTML: a tip routinely carries a model name or a
+  // branch an agent chose, and this component must not be the one that renders it as markup.
+  function renderTip(text) {
+    tip.replaceChildren();
+    const lines = String(text == null ? "" : text)
+      .split("\n")
+      .flatMap((line) => line.split(" · "))
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (const line of lines) {
+      const row = document.createElement("div");
+      const tab = line.indexOf("\t");
+      if (tab !== -1) {
+        row.className = "ddtip-row";
+        const k = document.createElement("span");
+        k.className = "ddtip-k";
+        k.textContent = line.slice(0, tab).trim();
+        const v = document.createElement("span");
+        v.className = "ddtip-v";
+        v.textContent = line.slice(tab + 1).trim();
+        row.append(k, v);
+      } else {
+        row.className = line.startsWith("(") ? "ddtip-line ddtip-aside" : "ddtip-line";
+        row.textContent = line;
+      }
+      tip.appendChild(row);
+    }
   }
 
   // WHERE THE PANEL GOES. Split out of show() so a scroll can re-place a tooltip that is already

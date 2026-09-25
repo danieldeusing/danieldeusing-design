@@ -1,0 +1,25 @@
+# Runtime
+
+Reference for the `danieldeusing-design` skill. Read it before a page calls the runtime.
+
+## Runtime — `runtime/*.js`, dependency-free ESM, tree-shakeable
+
+| Function | What it does |
+| --- | --- |
+| `applyStoredTheme()` / `setTheme()` / `getStoredTheme()` | Apply + persist the theme. **Pre-paint from `<head>`.** |
+| `initThemeSwitcher()` | Wires `[data-theme-value]` buttons and `[data-theme-label]`. |
+| `initResolutionZoom(1920)` | **Deprecated in 0.29.0 — does nothing.** From 0.29.0 wide-screen scaling was the fluid root font size in `tokens.css`, and since 0.56.0 there is no wide-screen scaling at all, so there is no script to call and no pre-paint flash to avoid. Still exported so a pin can be bumped without editing `<head>` in the same commit. Delete the call and any inline zoom IIFE with it. |
+| `initDropdowns()` | `<details class="dropdown">`: one-open, click-away, Escape. |
+| `initSelects()` | Replaces the OS dropdown on every `<select>` with the estate's listbox — the one component CSS alone can never reach, because the option list is painted outside the page. **Markup contract is nothing**; the `<select>` stays authoritative (value, form submission, `input`+`change`). Keeps enhancing: selects rendered later are picked up by a MutationObserver, so a page that rebuilds its tables out of `innerHTML` needs no second call. Keyboard is the ARIA APG select-only combobox and focus never leaves the trigger. |
+| `initTableTools()` | Search box, per-column sort + filter dropdown in the `<th>`, and a filtering column marks its own header with a badge naming the value (`th.is-filtered`, `.tbl-badge`; the `.tbl-view` bar went in 0.33.0). Detaches filtered-out rows so the pager slices the matching set. View remembered per table under `table-view:<id>`. |
+| `initBurgerNav()` | Mobile burger (breakpoint 48rem) with the footer folded in. |
+| `initLsNav()` | The rail's show/hide, and it **measures** the real chrome into `--ls-nav-top` / `--ls-nav-bottom`. The top is the header's **bottom edge** (`getBoundingClientRect().bottom / zoom`), not its height — those agree only while nothing sits above the header, and cockpit's alert banner mounts as the first child of `<body>`. A rect is visual px and a CSS length is re-multiplied by any ancestor `zoom`, so **convert, don't avoid** (0.13.0; before that a 73px banner buried the rail's own toggle). Re-measured on `scroll` too, because a sticky header's bottom edge moves as the banner scrolls away. |
+| `initTerminal()` | The `$ command` typing animation; no-ops under reduced motion / `html.anim-off`. Fires `term:contentdone`. |
+| `initAnimToggle()` | Wires `[data-anim-toggle]`, persists `localStorage["anim"]`. |
+| `initDiagramZoom(".diagram")` | Click / Enter / Space opens a diagram full-screen; wheel-zoom about the pointer, drag-pan, `+ - 0`, Escape closes. Clones the svg — mermaid re-runs against the nodes it rendered, so moving the original is how a diagram silently stops updating. |
+| `initMinimap({sections})` | Builds the left-gutter minimap: one bar per section, scroll-spy included, bar length by heading depth. Markup contract is nothing. Returns `null` for fewer than two sections — a map of one place is not a map. Use it instead of a text "On this page" column: that column repeated headings the reader was about to scroll past and cost the content its width. |
+| `initTableScroll()` | Gives every unwrapped `<table>` a `.tablewrap` parent so a wide table scrolls itself instead of scrolling the whole page sideways. **The markup contract is nothing** — author a plain `<table>`; already-wrapped tables are left alone, so it is never a migration. **Tables rendered later are wrapped too** (0.23.0, MutationObserver), so a page that fetches its rows needs no second call. Colour the right-edge fade with `--tablewrap-fade` when the wrapper does not sit on `--background`. |
+| `initTablePagination()` | Pages every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. **Markup contract is one attribute**, and a table without it is left alone — the id cannot be guessed without silently reassigning readers' settings when a table moves. It has **no sort and no filter**: it hides all but one window of rows a page has *already* filtered and sorted, so the order is filter → sort → slice over the full set by construction. Turning the page writes `hidden` on rows and rebuilds no markup, so it composes with in-place patching. Tables rendered later are picked up by a MutationObserver. |
+| `initTooltips()` | One viewport-clamped panel for every `[data-tip]`, including nodes rendered later. Shows **instantly**, on hover and focus, and sets `aria-describedby` on the anchor while open (0.26.0) so it is announced the way a `title` is. `src/tooltip.css` counterpart. **This replaces the native `title` — see "A hover is `data-tip`" in `components.md`, next to this file.** |
+
+The runtime is progressive enhancement: with JS off, content is visible and the theme is `warm`.

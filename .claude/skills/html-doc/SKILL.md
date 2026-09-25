@@ -50,13 +50,13 @@ already carries two, and if you cannot write the sentence you do not have an exc
    apart the moment the template changed, which is why the skill now ships inside the repo it
    documents.
 
-3. **Keep the CDN urls PINNED, and keep the offline fallback on the SAME version.** The template
+3. **Keep the CDN urls pinned, and keep the offline fallback on the same version.** The template
    already carries both, exactly as the published pages on `docs.danieldeusing.de` do:
 
    ```html
    <link rel="stylesheet"
-     href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.56.0/dist/danieldeusing-design.min.css"
-     onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.56.0.min.css'" />
+     href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.57.0/dist/danieldeusing-design.min.css"
+     onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.57.0.min.css'" />
    ```
 
    **Copy the version from `templates/documentation.html`, never from this line.** The example
@@ -64,7 +64,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
    paragraph requires — because a version written in prose has nothing keeping it true. The
    template is the one that ships.
 
-   - **Pinned because this page ships the system's MARKUP.** Since 2026-08-06 a doc carries the
+   - **Pinned because this page ships the system's markup.** Since 2026-08-06 a doc carries the
      `ls -l` rail and the fixed footer — the design system's own chrome — so it is coupled to the
      release that styles it. That is exactly the case the `danieldeusing-design` skill says must
      pin. Before that, a doc consumed only the *look* and unpinned was right.
@@ -75,7 +75,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
      rail: both nav toggles on screen, a 613px header, the brand floating mid-page. **A release
      cannot fix a poisoned cache** — the url a release publishes to is the one being cached. The
      pinned url is served `immutable`.
-   - **The `onerror` fallback is the SAME release, byte for byte**, served from the docs site — so
+   - **The `onerror` fallback is the same release, byte for byte**, served from the docs site — so
      a reader with no route to the CDN gets an identical page, not an older one. Snapshots live
      **once per version**, not once per doc, in `danieldeusing-docs/site/_design/` and
      `site-internal/_design/`. Verify a fallback that has to render the rail can actually do it:
@@ -87,7 +87,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
      from this repo's committed `dist/` (that is exactly what jsDelivr serves for the tag — prove
      it with `shasum -a 256` against
      `https://cdn.jsdelivr.net/npm/@danieldeusing/design@<v>/dist/danieldeusing-design.min.css`)
-     into BOTH `_design/` dirs as `danieldeusing-design-<v>.min.css` and
+     into both `_design/` dirs as `danieldeusing-design-<v>.min.css` and
      `danieldeusing-design-<v>.fonts.css` (the fonts file is `src/fonts.css` with its two
      `@font-face` urls repointed at the woff2 files sitting beside it — upstream loads those from
      the CDN, which is precisely what is unavailable when the fallback fires). Then update every
@@ -111,39 +111,22 @@ already carries two, and if you cannot write the sentence you do not have an exc
      for lists, `table.kv` (see below) for key/value specs, `pre.block` + `code.inline` for code,
      `.grid` + `.card-terminal` for cards, `.eli5` for callouts/tips, `.ascii-rule` for dividers,
      `.link-quiet` for inline links, and `pre.mermaid` for diagrams (see step 5).
-   - **Tables are styled by the SYSTEM from 0.10.0 — author a plain `<table>` and stop there.**
-     Cell padding, top-aligned cells, the hairline between rows, the stronger header rule and
-     `width: 100%` all ship in `src/base.css`. Do not add any of that to the page: a local
-     `td { padding }` is a forked component and the conformance checker reports it. What a PAGE
-     may still own is **column widths**, because only the page knows which column carries the
-     prose — use a `<colgroup>` and keep the wide one from eating the table:
-     ```html
-     <table>
-       <colgroup><col style="width:4rem" /><col /><col style="width:9rem" /></colgroup>
-     ```
-     Give the sentence column no width and let it take the remainder. Without this a
-     three-sentence cell sizes the column to its longest line and squeezes every other column
-     into a vertical stack of single words.
-   - **Every table must scroll, never the page — and the markup contract for that is NOTHING.**
-     Author a plain `<table>`. `initTableScroll()` (already wired at the bottom of the template)
-     gives every table a `.tablewrap` parent: `overflow-x` plus a right-edge fade, because a
-     scroll container with a hard edge is indistinguishable from a table that simply ends and
-     nobody knows to scroll. Do **not** hand-write a wrapper, and never re-invent
-     `.table-scroll` — that was this repo's private name for the same idea before 0.7.0 shipped
-     `.tablewrap`, and two names for one thing is how the estate drifts.
-     Without it, a long inline-code value or a cell holding more than one item forces the table
-     wider than its column and the browser scrolls the WHOLE PAGE horizontally — the header
-     slides off, the fixed footer stops reaching the edge, and body text needs two axes to read.
-     Never set `white-space: nowrap` on a cell that can hold more than one short token (e.g. a
-     list of file names) — that's what forces the runaway width in the first place; if a cell
-     needs to list several items, join them with `<br />` so they stack instead of running wide.
-   - **Never set a font-size on a table.** 0.7.0 sets `table { font-size: var(--fs-md) }` for the
-     whole estate, which exists because cockpit's doc tables sat at 15px and its dashboard tables
-     at 12px. A local size only reintroduces that.
+   - **Reader first.** Open the page with a TL;DR: three to five bullets in the first section
+     (`#overview`), for a reader who reads it once. Put a diagram before the paragraph it
+     explains. Fold detail into `details.fold`.
+   - **Tables: author a plain `<table>` and stop there.** The system styles it by element (0.10.0), and
+     `initTableScroll()` (already wired at the bottom of the template) wraps every table so the
+     table scrolls, never the page. What the page may still own is column widths, with a
+     `<colgroup>`. The rules and the traps behind them (no local padding or row border, the
+     `<colgroup>` example, never `white-space: nowrap` on a multi-item cell, never a font-size on
+     a table, never a hand-written wrapper or `.table-scroll`) live in the design skill: read
+     `references/tables-and-forms.md` of `danieldeusing-design`
+     (`../danieldeusing-design/references/tables-and-forms.md` from this file) before the page
+     gets a table.
    - `{{FLOW_*}}` — the placeholders of the example diagram in the `#flow` section. Replace the
-     whole diagram with the real one, or delete the section (and its TOC entry) if the page has
-     no flow to draw.
-   - **There is NO table of contents, and the page is ONE CENTRED COLUMN.** Both of those are
+     whole diagram with the real one, or delete the section (its minimap bar goes with it) if the
+     page has no flow to draw.
+   - **There is no table of contents, and the page is one centred column.** Both of those are
      the same decision. A text "On this page" list repeated the headings the reader was about
      to scroll past and charged a 13rem column for it — on a wide display that column was the
      difference between content that fills the page and content stranded beside a strip of
@@ -155,12 +138,12 @@ already carries two, and if you cannot write the sentence you do not have an exc
      per-section entry anywhere: the failure that used to cause (a section added without its TOC
      link, or a stale `data-toc-link` breaking the scroll-spy) no longer has anywhere to happen.
    - **Do not override `.wrap`.** The template declares it once as a token declaration with
-     literal fallbacks, and that IS the layout: `--content-w` wide, `margin-inline: auto`, side
+     literal fallbacks, and that is the layout: `--content-w` wide, `margin-inline: auto`, side
      margins are whatever is left. Every other surface in the estate does exactly this —
      cockpit's pages declare no `.wrap` rule at all. A doc that widens it, or puts the content in
      a grid column beside something, ends up left-aligned against the margin while every sibling
      page is centred, and that difference is visible the moment you have both open.
-   - **THE CHROME IS FULL-BLEED, THE CONTENT IS CAPPED, AND NOTHING SCALES WITH THE WINDOW.**
+   - **The chrome is full-bleed, the content is capped, and nothing scales with the window.**
      `header.bar` and `footer.status` span the viewport; `main.wrap` is the only capped thing, at
      `--content-w` (90rem / 1440px since 0.56.0). Three states, one rule — and the reason it is
      written down rather than left to the template: **a doc must never set `zoom`, and must never
@@ -171,26 +154,27 @@ already carries two, and if you cannot write the sentence you do not have an exc
      exists to prevent — measured, not imagined. `bin/design-conformance` check 5 fails a page that
      applies a zoom.
 
-   - **Navigation (top-right) — the `ls -l` RAIL, and MOST DOCS SHOULD NOT HAVE ONE.**
-     **The rule: a doc lists only ITSELF, so the rail has one entry, so there is no rail.**
+   - **Navigation (top-right) — the `ls -l` rail, and most docs should not have one.**
+     **The rule: a doc lists only itself, so the rail has one entry, so there is no rail.**
      A navigation whose only destination is the page you are already on is not navigation — it is
      a 17rem column of furniture that takes width from the content and states the obvious. Ship
-     the rail only when there is somewhere else to GO: a folder with sibling docs a reader is
+     the rail only when there is somewhere else to go: a folder with sibling docs a reader is
      meant to move between, or a doc with child pages. One entry means delete it.
      **Do not list sibling docs just because they exist in the same folder.** Access on this site
      is per folder, and a rail that enumerates the neighbours tells a scoped reader what else is
      there. It is also how a doc grows a nav it never needed.
-     When you DO ship one: one `<li>` per entry, `ls-row--dir` for a directory (accent + weight),
+     When you do ship one: one `<li>` per entry, `ls-row--dir` for a directory (accent + weight),
      `ls-row--sub` / `ls-row--sub2` for nesting, `aria-current="page"` on the doc itself, and
      **labels under ~18 characters** — the rail is 17rem and `.dropdown-item` sets
      `white-space: nowrap`, so a longer one is clipped with nothing to show for it; put the full
-     filename in `title`.
+     filename in `data-tip`, never `title`
+     (`../danieldeusing-design/references/components.md`).
 
-   - **Deleting the rail — delete the RAIL, not the nav element around it.** Remove exactly two
+   - **Deleting the rail — delete the rail, not the nav element around it.** Remove exactly two
      things: the `<div class="ls-nav-head">` (the `$ ls -l` toggle in the header bar) and the
-     `<div class="ls-nav" id="nav">` that follows it. **KEEP `<nav class="site-nav">`, the
+     `<div class="ls-nav" id="nav">` that follows it. **Keep `<nav class="site-nav">`, the
      `.nav-burger` button, and the `.mobile-footer` inside it.** That last one is not optional:
-     `footer.status` is `display: none` below 48rem, so on a phone the burger menu is the ONLY
+     `footer.status` is `display: none` below 48rem, so on a phone the burger menu is the only
      place the theme picker and the anim toggle exist. Deleting the whole `<nav>` because "there
      is no navigation" silently strips a phone reader of every control on the page.
      Nothing else needs touching — the system keys its own layout off `html:has(.ls-nav)`, so with
@@ -198,7 +182,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
      spans the full width by itself. `initLsNav()` is safe to leave in the runtime call list; with
      no rail in the page it has nothing to wire.
 
-   **Fixed chrome — do NOT change:** the top-left `danieldeusing-docs` wordmark (always); the
+   **Fixed chrome — do not change:** the top-left `danieldeusing-docs` wordmark (always); the
    `ls -l` head in the header bar (it sits there, not in the rail, so the toggle stays put whether
    the rail is open or closed — and the guillemet is generated by CSS from the state, so never
    type one); **every control in the footer** — the `danieldeusing.de` link, the theme picker and
@@ -207,16 +191,17 @@ already carries two, and if you cannot write the sentence you do not have an exc
    is `display:none` below 48rem, so without it a phone reader cannot switch theme); and the
    pre-paint `<head>` scripts — theme, animation gate and **the `ls-nav` read**. Those stay
    inline because a module at the end of `<body>` runs after first paint: a reader who hid the
-   rail would watch it paint and jump away on every load. **There is no zoom script** (0.29.0):
-   wide-screen scaling is the fluid root font size in `tokens.css`, so it is CSS and needs no
-   pre-paint block. Do not copy one in from an older page — it would scale the page twice.
+   rail would watch it paint and jump away on every load. **There is no zoom script**, and
+   since 0.56.0 no wide-screen scaling at all (from 0.29.0 to 0.55.0 it was the fluid root font
+   size in `tokens.css`, which needed no pre-paint block either). Do not copy a zoom script in
+   from an older page — `bin/design-conformance` check 5 fails a page that applies a zoom.
 
    **Every measurement in the page's `<style>` block is a token with a literal fallback.**
    The local CSS is the page's own *layout* only (`.wrap`, `.content`, `ol.steps`, `table.kv`, …) —
-   never a restyle of the system's own classes. `.minimap` is the SYSTEM's, not the page's: do not
+   never a restyle of the system's own classes. `.minimap` is the system's, not the page's: do not
    declare it locally, the same as any other class in the shared vocabulary. Within it:
-   - **No bare numbers.** The column is `max-width: var(--content-w, 78rem)` +
-     `padding-inline: var(--content-pad, 1.5rem)`; sizes are `var(--fs-xs … --fs-2xl, <literal>)`
+   - **No bare numbers.** The column is `max-width: var(--content-w, 90rem)` +
+     `padding-inline: var(--content-pad, 1.5rem)`; sizes are `var(--fs-base|--fs-lg|--fs-xl|--fs-2xl, <literal>)`
      and `var(--lh-tight|--lh-base, <literal>)`; colours are tokens and never a literal hex.
      A hardcoded `max-width: 78rem` is the old way and the reason five surfaces had four widths.
    - **Vertical room is `padding-block`, never the `padding` shorthand** — the shorthand resets
@@ -224,10 +209,10 @@ already carries two, and if you cannot write the sentence you do not have an exc
    - **The `, <literal>` half is not decoration**, even now that the CDN url is pinned. A doc
      opened over `file://` with no route to the CDN gets no stylesheet at all — the site-absolute
      `onerror` path does not resolve there — and a bare `var(--content-w)` resolves to *nothing*:
-     full-bleed page, collapsed type. Use the same literal the published docs use so every page
-     degrades identically — `78rem` / `1.5rem` / `1.7rem` (h1) / `0.86rem` (`pre`) / `1.5`
-     (line-height). Tables get no entry: their size is the system's
-     (`table { font-size: var(--fs-md) }`). Neither does the minimap — it is fixed, sized in the
+     full-bleed page, collapsed type. Use the token's own value as the literal, so an offline
+     reader gets the same column as every live surface — `90rem` / `1.5rem` / `1.7rem` (h1) / `0.75rem` (`pre`, as
+     `var(--fs-base, 0.75rem)`) / `1.5` (line-height). Tables get no entry: their size is the
+     system's (`table { font-size: var(--fs-base) }`). Neither does the minimap — it is fixed, sized in the
      system's own CSS, and a page that never loads that CSS has no minimap to size.
 
 5. **Draw every diagram with Mermaid.** Flows, sequences, state machines, decision trees and
@@ -236,7 +221,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
    switch) and the `pre.mermaid` CSS; keep both when the page has diagrams, delete both when it
    has none. Rules that matter:
 
-   - **Every diagram is ZOOMABLE, and the template already wires it (0.10.0).** A flowchart
+   - **Every diagram is zoomable, and the template already wires it (0.10.0).** A flowchart
      scaled to fit a text column is unreadable at exactly the moment someone needs to read it,
      so `initDiagramZoom("pre.mermaid")` runs after the first render and the system's overlay
      does the rest: click / Enter / Space to open, wheel-zoom about the pointer, drag-pan,
@@ -267,9 +252,12 @@ already carries two, and if you cannot write the sentence you do not have an exc
        --screenshot=/tmp/doc.png "file:///path/to/doc.html"
      ```
      Then look at the screenshot. (`--force-prefers-reduced-motion` skips the typing animation so
-     content is visible immediately.) For a stricter check, load the page in Puppeteer and assert
-     that every `pre.mermaid` contains an `<svg>` and that no label still contains a literal
-     `<br/>`.
+     content is visible immediately.) Before you judge a diagram or a wide table, zoom into its
+     region at full resolution — the browser tool's zoom action, or a crop of the PNG
+     (`sips -c <h> <w> --cropOffset <y> <x> /tmp/doc.png --out /tmp/doc-part.png`): at
+     full-page scale a clipped label or a squeezed column does not show. For a stricter check,
+     load the page in Puppeteer and assert that every `pre.mermaid` contains an `<svg>` and that
+     no label still contains a literal `<br/>`.
    - **Also use this same screenshot to catch table overflow** whenever the page has any table —
      check the image for content running off the right edge or a page-level horizontal scrollbar,
      not just the diagrams. `initTableScroll()` doesn't guarantee every cell was authored safely
@@ -277,16 +265,16 @@ already carries two, and if you cannot write the sentence you do not have an exc
      scrolls now instead of breaking the page). The exact assertion, if you drive a real browser:
      `document.documentElement.scrollWidth <= clientWidth` on the page, and
      `wrap.scrollWidth > wrap.clientWidth` on the `.tablewrap` — the table scrolls, the page does
-     not. Do it at a NARROW viewport (~820px): at 1400px many wide tables still fit.
-   - **Assert the page SHELL too, not just the content.** Mermaid and table checks pass happily on
+     not. Do it at a narrow viewport (~820px): at 1400px many wide tables still fit.
+   - **Assert the page shell too, not just the content.** Mermaid and table checks pass happily on
      a page whose structure is broken, so they are not enough on their own. The classic failure is
      a dropped `</div>` — the page still renders, still passes every content check, and is quietly
-     mis-laid-out. At a WIDE viewport (1920, not 1280 — at 1280 the wrap nearly fills the screen
+     mis-laid-out. At a wide viewport (1920, not 1280 — at 1280 the wrap nearly fills the screen
      and almost any layout looks centred) assert:
      ```js
      const wrap = document.querySelector('main.wrap'), r = wrap.getBoundingClientRect();
      const gapL = r.left, gapR = document.documentElement.clientWidth - r.right;
-     Math.abs(gapL - gapR) <= 2                 // the column is CENTRED, not left-aligned
+     Math.abs(gapL - gapR) <= 2                 // the column is centred, not left-aligned
      r.width <= parseFloat(getComputedStyle(document.documentElement)
                   .getPropertyValue('--content-w')) * 16 + 2   // still capped at --content-w
      document.querySelectorAll('.minimap-bar').length ===
@@ -308,10 +296,17 @@ already carries two, and if you cannot write the sentence you do not have an exc
    `./<slug>-docs.html` next to the subject. Do **not** create any companion `.css`/`.js` files —
    it's single-file by design; styling comes from the CDN.
 
+   Then have the saved page checked for contradictions by a fresh-context subagent that
+   receives only the saved file's path — not this conversation, not your notes. It returns
+   every place where the page's text, tables and diagrams disagree with each other (ticket ids,
+   file and method names, counts, versions and dates), each with both locations. Fix each one
+   before step 8. Where no subagent is available, run the same check yourself. The check is
+   never written into the page.
+
 8. **Offer to publish** to `docs.danieldeusing.de`. Ask first — some docs are local-only. If the
    user declines, stop here and report the local path.
 
-   **a. Ask WHICH SURFACE, then where.** There are **two** trees, and the choice is a security
+   **Ask which surface, then where.** There are **two** trees, and the choice is a security
    decision, not a filing one — ask, never guess:
    - **`site-internal/`** → `docs.internal.danieldeusing.de`, tailnet-only. **This is the
      default and the right answer when in doubt**: client material, private-repo content,
@@ -324,51 +319,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
    (`git mv site-internal/x site/x`) is a one-line decision while demoting is not.
    Full table: `danieldeusing-infra/docs/runbooks/docs-site.md`.
 
-   Within the chosen tree the path is `<context>/<project>/`, mirroring how the estate is
-   organised — e.g. `poi/vu3/`, `danieldeusing/automation/`. Offer the existing folders
-   (`ls ~/Work/danieldeusing/danieldeusing-docs/{site,site-internal}/`) plus a new one. The
-   filename is the kebab-case slug, `.html`.
-
-   **b. Move it in** (`git mv` if it is already tracked, otherwise `mv` — the file lives in the
-   docs repo, not next to the subject, so there is exactly one copy):
-
-   ```bash
-   DOCS=~/Work/danieldeusing/danieldeusing-docs
-   TREE=site            # or site-internal
-   mkdir -p "$DOCS/$TREE/<context>/<project>"
-   mv <written-file> "$DOCS/$TREE/<context>/<project>/<slug>.html"
-   ```
-
-   **c. Check the folder is REACHABLE, and record it in 1Password.**
-
-   > **Access is per-folder scopes in `danieldeusing-docs/docs-access.json`**, enforced by
-   > `deploy/docs/server.py` — the single site-wide password is gone. A scope is a folder, the
-   > users who may open it, and the `surface` it applies to (`public` / `internal` / `both`). It
-   > **fails closed**: a folder no scope covers cannot be opened by anyone, so a doc published
-   > into a brand-new folder is unreachable until a scope covers it. The root scope (`""`) is the
-   > master key and covers everything beneath it, which is why most publishes need no change —
-   > but check rather than assume, and say so in the report if a new scope is needed.
-   > Adding or editing a scope is a repo edit in `docs-access.json`, reviewed like any other.
-
-   Then record it so the doc can be handed to someone: vault `danieldeusing-agents`, item
-   `docs - <context>/<project>/<slug>`, category LOGIN, with the **URL** and a note naming the
-   scope that opens it. Do not invent a password — reference the credential the scope actually
-   lists.
-
-   **d. Pull before you push** — other machines publish to this repo too, so a blind push
-   fails on a non-fast-forward:
-
-   ```bash
-   cd "$DOCS" && git pull --rebase && git add "$TREE/<context>/<project>/<slug>.html" \
-     && git commit -m "docs: <what>" && git push
-   ```
-
-   Stage the **explicit path**, never `git add -A` or `git add site/`: other machines and agents
-   publish into this repo concurrently, and a catch-all sweeps their in-progress work into your
-   commit.
-
-   The push is the deploy: GitHub fires a push webhook, `dd-infra-docs` on ddMini verifies the
-   HMAC and re-syncs. Live in a few seconds — no build, no deploy step.
+   Once the user has chosen, read `references/publish.md` (next to this file) and follow it:
+   where in the tree the file goes, moving it into the docs repo, checking that the folder is
+   reachable and recording it in 1Password, and the pull-before-push that deploys it.
 
 9. **Report.** Give the local path (or the published URL — `https://docs.internal.danieldeusing.de/…`
    for `site-internal/`, `https://docs.danieldeusing.de/…` for `site/` — plus the 1P item name if
@@ -391,3 +344,16 @@ already carries two, and if you cannot write the sentence you do not have an exc
   still running and stacks every diagram into one box.
 - The terminal typing animation runs only when motion is allowed; with reduced motion or JS off,
   all content is shown immediately.
+- **Visual defaults this system rejects.** Each was found in a published doc and removed:
+  - rounded corners: `4px` on inline code chips, badges and verdict tags, `6px` on `pre` blocks,
+    warning boxes and the Mermaid source fallback (twenty declarations, 2026-08-07; Daniel: "We
+    have no rounded corners.");
+  - a second type size for code: `code.inline { font-size: 0.92em }` (2026-09-08), and `pre` at
+    `var(--fs-md, 0.86rem)`, whose fallback kept 13.76px alive after `--fs-md` was deleted
+    (17 pages, 2026-08-11);
+  - a status colour written as a hex outside a Mermaid `classDef`: `#a02c2c` 41 times across
+    four pages, right on warm and wrong on the other three themes (2026-08-06);
+  - the navigation as a dropdown menu instead of the rail (2026-08-06; Daniel: "not a dropdown,
+    but a sidebar").
+
+  After each review, add what the page reached for instead.

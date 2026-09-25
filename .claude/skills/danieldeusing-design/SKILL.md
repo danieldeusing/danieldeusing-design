@@ -30,8 +30,8 @@ disagrees with four other pages and, for colour, is provably wrong on at least o
 <head>
   <meta name="theme-color" content="#f5efe2" />
 
-  <!-- PRE-PAINT, inline, before any stylesheet. The theme must be settled before
-       first paint or the page visibly flashes the wrong one. NOTHING here touches
+  <!-- Pre-paint, inline, before any stylesheet. The theme must be settled before
+       first paint or the page visibly flashes the wrong one. Nothing here touches
        scale, and nothing should: there is no wide-screen scaling since 0.56.0 — a
        page caps at --content-w and the rest of the viewport is margin. This template
        used to carry a zoom script; do not bring it back. -->
@@ -48,7 +48,7 @@ disagrees with four other pages and, for colour, is provably wrong on at least o
     })();
   </script>
 
-  <!-- UNPINNED — correct ONLY if this page consumes the look and none of the system's markup.
+  <!-- Unpinned — correct only if this page consumes the look and none of the system's markup.
        The moment you paste in the `ls -l` rail, header.bar or footer.status from the section
        below, add the `@x.y.z` — see "Pin or unpin". Shipping rail markup against this url is
        the exact bug that took cockpit apart for a week. -->
@@ -77,7 +77,7 @@ reason: a tickstrip is page-level status chrome, and the surfaces that most need
 poller is still running" were the ones that could not load it. It does **not** get `.btn-terminal`,
 `.card-terminal`, `.legend`, `.tabs`, `details.fold`, `.dropdown`, `.field-row` or the diagram
 zoom — those stay in `components.css`. A surface needing that vocabulary must mirror it under its
-OWN class names, never borrow the system's for a stylesheet it does not load; borrowing the name
+own class names, never borrow the system's for a stylesheet it does not load; borrowing the name
 is the silent fork `bin/design-conformance` exists to catch.
 
 ## Themes: four, selected by `html[data-theme]`
@@ -147,7 +147,7 @@ where everything else sat at `0.75rem` — because the system offered no token t
 --lh-tight: 1.3;    --lh-base: 1.5;
 ```
 
-### ONE SIZE FOR TEXT (0.27.0, Daniel) — `--fs-xs`, `--fs-sm` and `--fs-md` are GONE
+### ONE SIZE FOR TEXT (0.27.0, Daniel) — `--fs-xs`, `--fs-sm` and `--fs-md` are gone
 
 Body, tables, labels, badges, notes, buttons, form controls, meta lines: **all `--fs-base`.** If you
 are reaching for a `font-size` on anything a person reads, the answer is already decided. The only
@@ -182,7 +182,7 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   build-free page on an **unpinned** url writes the tokens itself *with literal fallbacks* —
   `max-width: var(--content-w, 90rem)` — because `.wrap` itself only exists from 0.4.0; see
   "Pin or unpin".
-- **ONE WIDTH FOR EVERY SECTION, and a surface that wants more raises the token** (0.44.0).
+- **One width for every section, and a surface that wants more raises the token** (0.44.0).
   A table section must never be wider than the prose sections beside it: blocks that start at
   different left edges read as broken however well each one is individually sized. So there is
   no bleed class and none should be invented — cockpit had one for a few hours, for a genuinely
@@ -191,7 +191,7 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   88rem is the first value that fits it, and 92rem clears it while still leaving an 81px gutter
   beside the `ls -l` rail at 1920. **The cap only binds above ~1744px**, so widening it is
   invisible on a laptop and only shows on the monitors it gets raised about.
-- **`.wrap` sets the inline axis ONLY** — vertical rhythm differs legitimately between a doc and a
+- **`.wrap` sets the inline axis only** — vertical rhythm differs legitimately between a doc and a
   dashboard. A consumer adds `padding-block: 2.5rem 5rem`. **Never the `padding` shorthand**: it
   resets `padding-inline` to 0 and silently takes the shared margins back.
 - A page that genuinely is not a column (a full-bleed dashboard table) sets `max-width: none`
@@ -202,7 +202,7 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
 - Tailwind apps get `max-w-content` and `text-fs-base` / `-lg` / `-xl` / `-2xl`. `text-fs-xs`, `-sm`
   and `-md` went with the tokens behind them. Tailwind's own `text-xs/sm/base` are deliberately
   **not** remapped — opt in by name.
-- **THERE IS NO WIDE-SCREEN SCALING. Removed in 0.56.0 (Daniel).** From 0.29.0 to 0.55.0
+- **There is no wide-screen scaling. Removed in 0.56.0 (Daniel).** From 0.29.0 to 0.55.0
   `tokens.css` set a fluid root font size above 1920px, so every rem — type, `--content-w`,
   `--space-section` — grew together on a large display. It is gone, and it will read as a
   regression if you do not know why, so: everything authored in **px silently opted out** (icons
@@ -226,7 +226,7 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   unit had no second grid — and since 0.56.0 nothing scales the unit either, so a `style.zoom`
   would be the only thing scaling anything, on one surface, out of step with every other.
 
-## A card has its own padding (0.38.0, Daniel) — do NOT add your own
+## A card has its own padding (0.38.0, Daniel) — do not add your own
 
 `.card-terminal` pads itself, `0.85rem 1.1rem`. Before 0.38.0 it had none and every surface
 either added padding or, more often, did not — which is why the family contacts tiles shipped
@@ -237,7 +237,7 @@ content in a padded inner div, and do not redeclare `.card-terminal` to adjust t
 `bin/design-conformance` treats that as the fork it is. A card that genuinely needs to be flush
 (a full-bleed chart, an image) sets `padding: 0` on its own class, deliberately and once.
 
-## The shared component vocabulary — a consumer must NOT redeclare any of it
+## The shared component vocabulary — a consumer must not redeclare any of it
 
 If a class below appears in your page's own `<style>`, that is a bug in waiting: the system's
 rule and your copy will disagree at the next release, and whichever loses is decided by source
@@ -245,37 +245,16 @@ order. Use them as-is; if one is wrong for everybody, fix it *here*. (The one sa
 exception is `.wrap` on an unpinned build-free page — a *token* declaration with literal
 fallbacks, not a copy of the system's rule. See "Measurements" above.)
 
-**Tables are in that set too, by ELEMENT rather than by class (0.10.0).** `table`, `th` and `td`
+**Tables are in that set too, by element rather than by class (0.10.0).** `table`, `th` and `td`
 carry the system's padding, top alignment, hairline row rule, header treatment and `width: 100%`
 — so a consumer authors a plain `<table>` and adds nothing. A local `td { padding }` or a
 hand-rolled row border is a fork exactly like redeclaring `.legend`, and it will disagree with
-the system at the next release. The three things a PAGE legitimately owns are **column widths**
+the system at the next release. The three things a page legitimately owns are **column widths**
 (only the page knows which column holds the prose — use a `<colgroup>`),
 **`--tablewrap-max-h`**, the token that caps a tall table's own scroll area (set it to `none` for
 a full-bleed dashboard table rather than redeclaring `.tablewrap`), and **`--tablewrap-fade`**
 (0.23.0), the colour the right-edge scroll fade blends into — set it whenever the wrapper does
 not sit on `--background`, because on a `--card` surface the default paints a 1.5rem bright band.
-
-**`td` deliberately has NO colour, and on a Tailwind-typography surface that is a trapdoor.** The
-system styles `td`'s padding, alignment and rule but never its ink, because a cell is body copy and
-must inherit `body { color: var(--foreground) }` — correct everywhere the page is plain HTML, which
-is cockpit, docs, netmon, ci-orchestrator and the seedr playgrounds (audited 2026-08-08: not one of
-them colours a `td`, and the three cockpit columns that use `--muted-foreground` are deliberate
-de-emphasis measuring 4.67:1 at worst). But `@tailwindcss/typography` puts a `color` on the `.prose`
-ROOT and gives `td` none of its own, so inside an article the cell inherits the plugin's palette
-instead of the body's. danieldeusing.de shipped that: `--tw-prose-invert-body` unmapped meant every
-table cell in a published article rendered Tailwind gray-300 — **1.29:1 on warm and 1.41:1 on
-paper**, invisible in the default theme, while measuring a healthy 13.84:1 on the two dark themes,
-which is why it survived review. A `td` grep finds nothing, because nothing declares it.
-
-So on a Tailwind surface, **map the plugin's whole palette to tokens — every variable, in one
-block — and never patch the elements.** pagr had mapped four of eighteen and patched `prose-p:` /
-`prose-li:` by hand; the casualties were exactly the elements nobody thought to name (`td`, `dd`,
-`caption`, an `<ol>`'s markers at 2.27:1). An unmapped variable is not "close enough" — it is a
-fixed grey against four themes, the same arithmetic that makes every accent in `tokens.css` a
-per-theme declaration. Drop `prose-invert` while you are there: once every value is a token it is
-an extra hop whose name asserts a dark theme, and a variable missed *behind* it fails invisibly on
-the default one.
 
 | Group | Classes | Source |
 | --- | --- | --- |
@@ -287,484 +266,34 @@ the default one.
 | status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/chrome.css` (moved from components 0.17.0) |
 | diagram zoom | `.dgm-zoomable` `.dgm-overlay` `.dgm-stage` `.dgm-bar` `.dgm-btn` `.dgm-close` `.dgm-art` | `src/components.css` |
 | minimap | `.minimap` `.minimap-bar` (`.active`) | `src/components.css` |
-| dropdown (a MENU) | `.dropdown` `.dropdown-panel` (`--down`) `.dropdown-item` `.anim-toggle` | `src/components.css` |
+| dropdown (a menu) | `.dropdown` `.dropdown-panel` (`--down`) `.dropdown-item` `.anim-toggle` | `src/components.css` |
 | table pager | `.table-pager` `.table-pager-status` `.table-pager-size` `.table-pager-nav` — **all rendered for you** by `initTablePagination()`; the markup contract is `data-table-id` on the `<table>` and nothing else |
-| select (a VALUE) | the `select` ELEMENT, plus `.select-field` `.select-trigger` `.select-value` `.select-panel` `.select-option` (`[aria-selected]`, `[data-active]`, `[aria-disabled]`) `.select-group` — **all rendered for you**, see below | `src/components.css` |
+| select (a value) | the `select` element, plus `.select-field` `.select-trigger` `.select-value` `.select-panel` `.select-option` (`[aria-selected]`, `[data-active]`, `[aria-disabled]`) `.select-group` — **all rendered for you**, see `references/tables-and-forms.md` | `src/components.css` |
 | misc | `.dd-dot` `.dd-flag` (`-de/-en/-es/-pt`) | `src/components.css` |
 | typing animation | the `[data-term]` / `[data-term-out]` contract + the `html.anim-off` kill switch | `src/components.css` |
 
 `.prompt` already prepends `$ ` — never author a literal leading `$ ` inside one (it doubles).
 
-## `.eli5` is opt-in per item, never a field every item fills (0.45.0)
+## Component rules live in `references/`
 
-An ELI5 box exists to make one hard thing legible to someone outside the discipline — a product
-owner reading a code review, a family member reading a finance page. It is not a second rendering
-of every item.
+The table above is the whole vocabulary. How each component behaves, and the traps behind it,
+is in three files next to this one. Read the one for what you are building before you write its
+markup:
 
-**Add one only where a plain-language sentence gives a non-technical reader something they could
-act on.** If the text above it is already clear to anyone, there is nothing to explain, and an
-`.eli5` that restates it in shorter words is noise wearing an accent border — it teaches the reader
-that the box is skippable, which costs you the one place it mattered.
-
-This is why the review reports stopped emitting one per finding: every finding had a box, most
-boxes paraphrased the sentence above them, and the ones that carried real explanation were
-indistinguishable from the filler.
-
-The same rule governs the prose an `.eli5` sits under. A block of eighty correct words with no
-paragraph break is something a reader parses rather than reads: lead with the claim, put the causal
-chain in a list in the order it happens, then say what someone actually observes. Structure is not
-decoration — it is what makes an explanation followable by a reader who does not already know the
-answer.
-
-## A row action's SHAPE says whether it changes anything (0.13.0)
-
-The one rule that decides what to reach for. It is not a style preference — it is the only thing
-that tells a reader, before they click, whether this control will take them somewhere or alter
-something:
-
-> **A row action that NAVIGATES is a link. A row action that MUTATES is a button.**
-> Underlined text that deletes something looks like a footnote.
-
-| the action | what to write |
+| Building … | Read |
 |---|---|
-| `open →` `log →` `detail` `forge →` — goes somewhere, changes nothing | `<a class="doc-link doc-link--forward">` (or a `<button>` carrying the same classes when the destination is an in-page dialog and there is no url) |
-| `add` `update` `save` `apply` `dismiss` `enrol` — writes | `<button class="btn-terminal btn-terminal--ghost btn-terminal--compact">` |
-| `edit` — writes, and is the row's own settings | `<button class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--edit" aria-label="edit <what>">` — see below |
-| `remove` `delete` — **destroys** | `<button class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove <what>">` — see below |
-| the ONE primary action of a view | the same, **filled**: `btn-terminal btn-terminal--compact` |
-| a toggle (`follow`, `live`) | the same button; press = drop `--ghost`, release = add it back. The two states are the two buttons the system already ships, so a toggle never needs a third look. |
-
-Two filled buttons side by side compete, which is the whole reason `--ghost` exists.
-
-**`.btn-terminal--destructive` (0.16.0) is the red bin, and it is the ONLY remove control.** Before
-it, the estate spelled one verb four ways at once: an underlined `remove` text link, a bordered
-ghost button reading `rm`, a muted-grey `remove` on `.doc-link.rowlink`, and the same ghost button
-spelling `remove` out — one page used both `rm` and `remove` for the same operation. It is
-**composed on purpose** rather than split into `--icon` + `--danger`: `--compact` is the size and
-nothing else because size and colour are independent, and these two are not — the split's products
-are a red button with no icon and a bin with no warning. The glyph is a **CSS mask painted in
-`currentColor`**, so no surface writes an SVG and no surface can draw a different bin.
-
-**It takes an `aria-label` — always.** The button has no text, so without one it reads as nothing to
-a screen reader and cannot be identified from the keyboard. Name the target, not the verb:
-`aria-label="remove ddmini"`, not `aria-label="remove"`. `bin/design-conformance` fails a
-`--destructive` button with no accessible name. Under a coarse pointer it grows to 44px via `min-*`,
-so never set a width on it.
-
-**`.btn-terminal--edit` (0.22.0) is the same icon button in the ORDINARY colour.** `edit →` was a
-word and an arrow in a cell beside a bin that is 22px square — two controls doing one job, one four
-times the width of the other, and at 375px the label broke into "edi / t →". Identical mechanism to
-the bin (`currentColor` mask, `::before { content: "" }`, the coarse-pointer `min-*` growth) and one
-deliberate difference: **it carries no colour at all.** Editing is an ordinary action and red is
-reserved for the press that cannot be taken back, so composing it with `--ghost` gives `--primary`
-on a `--border` outline like every other secondary control (5.59:1 at worst — warm over `--muted`).
-Never reach for `--destructive` to get the icon shape. **The `aria-label` is mandatory and names the
-target** (`aria-label="edit poi/vu3"`); without it a column of these announces "button" a dozen
-times over.
-
-**`.doc-link--forward` carries the accent AT REST**, not on hover. `.doc-link` is deliberately
-quiet because it is footer furniture, and row actions inherited that quietness: a column of grey
-`open →` reads as *disabled text* rather than as the way in. Hover cannot advertise itself, and a
-row action is the reason the row is interactive at all. Keep plain `.doc-link` for what it was
-built for — the footer, and links inside running prose. A **value** that happens to be clickable
-(a repo name, a PR ref, a path in the identity column) is not an action either; the forward accent
-belongs to the action column.
-
-**`.btn-terminal--compact` is the SIZE and nothing else.** Colour, square corner, the `> ` prefix
-and the glow still come from `.btn-terminal` / `--ghost`, so a compact button cannot drift into
-being a different button. The system's own button is a landing-page CTA at `12px 24px`; a tool row
-puts six side by side and a table cell is half that height. Cockpit carried this as a local
-`.btn-compact` for months — every surface with a table needs it, so it lives here now. **Never
-declare a local one**, and never a local button class at all: five invented classes (`.cfg-btn`,
-`.copy-btn`, `.tbtn`, `.xbtn`, `.fw-btn`) is how 77 rounded corners accumulated on a system whose
-`--radius` has been `0` since its first release.
-
-## The rail marks the current page on `aria-current="page"` (0.19.0) — an ATTRIBUTE, not a class
-
-A rail row that is the page you are on takes `aria-current="page"` **on the `<a>` that carries
-`.ls-row`**, and the styling follows from that alone:
-
-```html
-<li><a class="ls-row ls-row--dir" href="/automation" aria-current="page">
-  <span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">automation/</span></a></li>
-```
-
-A group heading is `<span class="ls-group">`, and it is not decoration — **do not render one
-from a private inline style.** Cockpit did for months, which is how `.ls-group` shipped with
-`padding-inline: 0` against rows that take 14px from `.dropdown-item` and nobody noticed: the
-class was misaligned for every surface using it as intended, and correct on the one surface
-that had opted out of it. Daniel found it on the family site. Fixed in 0.44.1; the lesson is
-that a fork does not just risk drifting from the component, it can hide the component's bugs
-from the person best placed to see them.
-
-**Do not invent a class for this.** The attribute is the standard, it is what a screen reader
-announces, and a page that paints "you are here" without saying it in the accessibility tree has
-solved the problem only for people who can see the colour. danieldeusing.de had `aria-current`
-*and* a private `.ls-here` rule beside it, cockpit had no notion of a current page in its nav at
-all, and the system styled nothing — one consumer solved it, the others lacked the feature, and
-nobody owned it. `.ls-here` is redundant from 0.19.0; delete it rather than aliasing it.
-
-What it draws, and why it is not just a colour: `--primary` plus bold is **already** what
-`.ls-row--dir` takes, so tinting the name is not enough — a current leaf would look like a
-directory and a current directory would get no marking at all. The current row is instead the
-only row with a **left edge marker** and a **background tint** (position and area, not hue) plus a
-trailing `←`. Scoped to `.ls-row`, so the desktop rail and the mobile burger mark it identically.
-
-**Render it, don't hand-write it.** A static `aria-current` in a shared nav is wrong on every page
-but one — the marker has to be derived per page from the current path by whatever emits the nav.
-
-## `.ls-perm` is deliberately dimmer than muted (0.20.0) — don't "fix" it back
-
-`.ls-perm` is `color-mix(in srgb, var(--muted-foreground) 75%, var(--card))`, not
-`--muted-foreground` flat, and the mix ratio is load-bearing. Before 0.20.0 the permission string
-and `.ls-panel .ls-name` were the **same token**, so on a leaf row `drwxr-xr-x` and the page name
-were the same ink at a contrast ratio of exactly **1.00 on all four themes**; on a directory row
-the warm theme put `#71614e` beside `#8a4516` at **1.2:1**, which reads as one colour. 75% is the
-dimmest mix that still clears **3:1 against the panel** on every theme (warm binds, at 3.02) —
-the string carries meaning (a trailing slash plus `drwxr-xr-x` says the thing has contents), so it
-must stay legible, only not compete. Going dimmer drops warm below 3:1. Going back to a flat token
-restores the bug.
-
-## A hover is `data-tip` — NEVER the native `title` (0.26.0, Daniel)
-
-```html
-<span data-tip="Explanation shown instantly on hover">metric</span>
-```
-
-### There is NO marker — discovery is by hover (0.45.0, Daniel)
-
-**Write the tip and nothing else. A `data-tip` host renders no glyph, no underline, no dotted
-border.** Daniel: *"Remove the info icons everywhere. People will just hover and see if there is
-a tooltip coming or not."*
-
-```html
-<span data-tip="…">budget</span>          <!-- renders: budget -->
-<span data-tip="…">budget ⓘ</span>        <!-- WRONG — a glyph nobody draws for you -->
-```
-
-**Do not re-add one, and do not write it in markup.** The estate has now tried both alternatives
-and rejected both, so this is settled rather than merely current:
-
-- Until 0.26.0 it was a dotted `border-bottom` — the web's mark for a LINK, so it read as a link
-  that was broken or disabled, and it disappeared in a table header or against a busy row.
-- From 0.26.0 to 0.45.0 it was an `::after` ⓘ. The reasoning was sound — a tooltip nobody can see
-  is a tooltip nobody finds — but `span[data-tip]`, `th` and `button` meant **154 call sites**:
-  beside sort arrows, inside buttons that already say what they do, after labels that were never
-  ambiguous. A ten-column table carried ten pieces of furniture explaining controls that explain
-  themselves. Discovery by hover costs the reader nothing; the marker cost every surface.
-
-`initTableTools` also stopped putting `data-tip` on the ↕ sort button and the ⌕ filter summary — a
-bubble reading "sort by repo" anchored under the word *repo* is a tooltip repeating its own
-control. **`aria-label` stays on both.** The glyph was decoration; the accessible name is not, and
-a screen reader still has to be told what an unlabelled ↕ does.
-
-`[data-tip-bare]` and `.minimap-bar` are kept as opt-outs though they now suppress nothing. They
-cost nothing, and a future marker would otherwise have to re-derive which elements are already
-their own affordance:
-
-```html
-<span data-tip="…" data-tip-bare>2026-08-11</span>
-```
-
-**An ACTION always shows its action cursor (0.46.2, Daniel).** `cursor: help` belongs only to
-non-interactive tip hosts — spans, labels, badges, table cells, headings. On anything clickable
-the cursor states what a click does, tooltip or not: `tooltip.css` gives `button`, `a[href]`,
-`summary`, `[role="button"]`, `[role="menuitem"]` and `[role="tab"]` carrying a `data-tip`
-`cursor: pointer` (and `not-allowed` while disabled). A question-mark cursor on a button is bad
-UX; you get the right one for free — do not re-declare it per page.
-
-**A tip never covers an open select (0.41.0, Daniel).** The tip panel is `position: fixed;
-z-index: 9999` so it can never be clipped by an overflow container; `.select-panel` is 60. With a
-listbox open and the pointer near a `[data-tip]` — very often inside the trigger's own label —
-the tip painted straight over the options. `initTooltips()` now refuses to show while a
-`.select-panel` exists, and a `pointerdown` anywhere hides one already up.
-
-**You get this for free; do not re-solve it per page.** In particular do not raise a select's
-z-index above the tip to "win" — the two are not competing for the same moment. While a listbox is
-open the choices ARE the content, and an aside about the control you already opened is not worth one
-covered option. Repositioning was rejected for the same reason: a panel can be full-width and
-viewport-tall, so "flip it to the other side" is not a promise that can be kept.
-
-`initTooltips()` handles every `[data-tip]`, including nodes rendered later. **Never use `title` for
-explanatory text on any danieldeusing surface.** The browser's tooltip waits about a second, is
-unstyled, is unreachable by keyboard on most engines, and **does not exist on a touch screen** —
-cockpit is read from a phone over the tailnet, so there the explanation is simply gone.
-
-**`title` does TWO unrelated jobs and only one of them is a tooltip.** This is the part that makes
-a bulk conversion dangerous, because getting it wrong is an accessibility regression that reads as
-a tidy-up in the diff:
-
-| the element | what `title` was doing | write |
-| --- | --- | --- |
-| has visible text | a description | `data-tip` |
-| an icon button with no text | the accessible **NAME** | `aria-label` |
-| an icon button that also wants a hover | both | `aria-label` **and** `data-tip` |
-| `<iframe>` / `<svg>` | the accessible name | leave `title` — no hover to replace |
-
-Converted estate-wide on 2026-08-10: **108 in cockpit and 3 in netmon**. Two traps found doing it,
-both of which would have shipped silently:
-
-- **`.anim-toggle` had a `title` and no `aria-label` on 35 pages** — its content is an aria-hidden
-  glyph, so `title` WAS the name. A blind rename leaves 35 buttons announced as "button". It now
-  carries both, and so does `templates/page-chrome.html`, which is where all 35 came from.
-- **`role="tooltip"` on the panel described nothing.** Nothing pointed the anchor at it, so
-  `data-tip` was announced to no one while the `title` it replaces IS announced — the swap would
-  have traded a slow tooltip for a silent one. `show()` now sets `aria-describedby` and `hide()`
-  removes it, including when moving between anchors.
-
-**netmon carries its own inline copy** of this component (it loads tokens+chrome, never
-components.css). When `runtime/tooltip.js` changes, `deploy/netmon/index.html` changes with it —
-that duplication is deliberate but it is not automatic. `bin/cockpit-render-check` fails a native
-`title` on any cockpit page or on netmon, and fails an icon toggle that lost its name.
-
-## A `<select>` is enhanced AUTOMATICALLY (0.21.0) — write plain HTML, add nothing
-
-```html
-<select data-k="mode">
-  <option value="public" selected>public — posts on the PR</option>
-  <option value="silent">silent — private report only</option>
-</select>
-```
-
-That is the whole markup contract — the same "nothing" as `<table>` and `initTableScroll()`.
-Call `initSelects()` once and every `<select>` on the page, **and every one rendered
-afterwards**, gets the estate's dropdown. Do not add a class, a wrapper, or a data attribute;
-`.select-trigger` / `.select-panel` / `.select-option` are what the runtime *renders*, and a
-page that writes them by hand has hand-rolled the component it was given.
-
-**Why this exists at all, and why CSS could never have done it:** a `<select>`'s option list is
-painted by the OPERATING SYSTEM, outside the document. Rounded corners, a blue system highlight,
-the system font, in the middle of a terminal UI — and unreachable from any stylesheet. Cockpit
-carried **five copies of a `.cfg-sel` rule**, one per page, every one of them styling the closed
-control, which was never the part that looked wrong. `appearance: base-select` reaches the list
-in Chrome 135+ and nowhere else, so taking it would leave Safari and Firefox on the system menu
-and the estate **disagreeing with itself** — worse than being consistently wrong.
-
-**The `<select>` is still the control.** It holds the value, it is what a form submits, what
-`select.value` reads, and what fires `input` then `change` (both, in that order, bubbling, with
-`event.target` the select). That is why 28 call sites adopted this with **zero page edits** — and
-it is the property to preserve if you ever touch this. It is laid transparently over the trigger
-rather than `display: none`, because Chrome refuses to show a validation bubble on a control it
-cannot focus and then blocks the submit **with no message at all**, which would silently break
-every `required` select.
-
-- **Sizing goes on the wrapper, and a page inline `style` is copied there for you.** A width set
-  in the page's own CSS via a class on the `<select>` (`.cfg-sel { width: 100% }`) acts on an
-  element that is no longer in the flow, so it does nothing. Size `.select-field`.
-- **`title` and `data-tip` are copied to the trigger**, or the tooltip would be anchored to
-  something nobody can hover — and **since 0.26.0 an `<option>`'s pair is copied onto its rendered
-  `.select-option` too**. Before that it was dropped: the panel replaces the native option list, so
-  every per-option explanation ever written was unreachable, in either attribute. Labels are found
-  the way the platform finds them — `aria-label`, then `aria-labelledby`, then a `<label>` by `for=`
-  or by wrapping — and the trigger's name becomes *label + current value*, as a native select
-  announces.
-- **The opt-outs are real ones**: `multiple` and `size > 1` are left alone (the platform renders
-  those inline; there is no popup to replace), and `data-select="off"` skips a select entirely.
-- **Selection is NOT marked by colour, and that is arithmetic.** `--primary` against
-  `--popover-foreground` measures 1.65 / 1.31 / 1.48 / **1.27** on warm/green/mono/paper — two
-  inks a reader cannot tell apart. Same finding as the rail's current row, same answer: a left
-  **edge marker** plus **bold**, with the colour as the third signal. Do not "simplify" it back
-  to a tint.
-- **The control's border is `--foreground` at 60%, not `--border`.** `--border` is a container
-  hairline measuring 1.37 / 2.00 / 1.61 / 1.42 against `--background` — invisible as a control
-  edge, where WCAG 1.4.11 wants 3:1. 60% is the first step that clears it on all four themes
-  against all three surfaces a control can land on (warm binds, at 3.24).
-
-## A WIDE table scrolls itself (0.23.0) — including one you render after the page loads
-
-`initTableScroll()` gives every `<table>` a `.tablewrap` parent, so a table wider than its column
-scrolls **itself** rather than handing the whole PAGE a horizontal scrollbar — the one layout
-failure that reads as broken, because the header slides off and body text needs two axes. Markup
-contract: nothing. Author a plain `<table>`.
-
-**The thing to rely on: it keeps wrapping.** Call it once; a table rendered from a fetch twenty
-minutes later is wrapped too, by a MutationObserver, exactly like `initSelects()` and
-`initTablePagination()`. Until 0.23.0 it was a single walk at call time, which is why it appeared
-to work for sixteen releases and covered only the tables that are never too wide: a static page
-authors its tables in the markup, and **every table that genuinely overflows is on a dashboard,
-where the tables arrive after the walk has finished.** Cockpit's called it from a deferred module
-during load, while every mount still read `loading…`. So do not "help" by re-calling it after each
-render, and above all do not hand-wrap in the markup to work around the old behaviour — a wrapper
-in the markup is a wrapper the system now has to leave alone forever.
-
-**If your page reconciles markup against the live DOM, teach the reconciler about the wrapper.**
-This is the one integration cost, and it is not optional: a wrapper the runtime inserted is in no
-renderer's markup, so a patcher sees `<div>` where its markup says `<table>` and replaces it —
-killing the table, its row listeners and every half-typed filter on every poll, after which the
-runtime wraps the replacement and the next poll does it again. One rule fixes it: **a `.tablewrap`
-holding a single `<table>` stands in for that table** — for its key, its kind, and as the node
-actually patched — and *only* when the incoming node is a `<table>`, so a renderer that writes its
-own wrapper still lines up. Cockpit's `dom-patch.js` is the worked example, filed beside the two
-exemptions it already had (`open` on a `<details>`, `hidden` on a `<tr>`). A page that assigns
-`innerHTML` outright needs none of this.
-
-**The fades are MEASURED, not decorative (0.43.0).** The runtime writes `data-scroll` on the
-wrapper — `none`, `start`, `middle` or `end` — and chrome.css paints from it: nothing on a table
-that cannot scroll, a right fade when there is more to the right, a **left** fade when there is
-more to the left, and both when you are somewhere in the middle. Until 0.43.0 `::after` painted
-always, so "there is more over here" was said equally by a table with six hidden columns and by
-one with none; an indicator that is always on is not an indicator, and cockpit lost a whole column
-behind it. A wrapper with no `data-scroll` — nothing ran the runtime, or the wrapper has no layout
-box yet — paints nothing, because a fade is a promise and silence is the safe way to break none.
-
-**If your page reconciles markup, `data-scroll` is runtime-owned** — the same exemption as
-`tabindex`/`aria-hidden` on a wrapped `<select>`. A patcher that strips it takes the fades off on
-every poll.
-
-**Colour the fade when the wrapper is not on the page background.** The gradient blends to
-`--tablewrap-fade` (default `--background`), which is a visible bright band on a `--card` surface.
-`.tickstrip` sets it upstream; your own card-like container sets it itself.
-
-**The horizontal scrollbar is permanent, and the two APIs cancel each other.** macOS overlay
-scrollbars are invisible until you scroll, so `.tablewrap` styles `::-webkit-scrollbar` to opt
-Chrome and Safari into a persistent slim bar. Do not "complete" this by adding `scrollbar-width`:
-setting it to anything but `auto` makes Chrome ignore every `::-webkit-scrollbar` rule, and
-`scrollbar-width: thin` is still an overlay scrollbar on macOS — so declaring both gives back the
-invisible scrollbar and looks like a fix (measured: webkit alone 8px of gutter, both together 0).
-The standard properties live behind `@supports not selector(::-webkit-scrollbar)` for Firefox.
-
-`--tablewrap-max-h` caps the wrapper's HEIGHT and defaults to `none` on purpose — see the tables
-paragraph under "The shared component vocabulary".
-
-## A long table PAGES to 20 (0.22.0) — one attribute, and it slices LAST
-
-```html
-<table data-table-id="review-activity">
-```
-
-`initTablePagination()` then hides all but 20 rows and puts a bar under the table: `1–20 of 55`,
-a `rows` picker (5/10/20/50/100/200, remembered per table in
-`localStorage["table-rows:<id>"]`), and prev/next. Everything in that bar is already yours — the
-buttons are `.btn-terminal--ghost.btn-terminal--compact` and the picker is a bare `<select>` that
-`initSelects()` enhances — so **there is no new colour and nothing to hand-write.**
-
-**The order is filter → sort → slice, over the FULL dataset, and it is guaranteed by construction.**
-The natural wrong build cuts the data to twenty rows and wires the sort and the filter to the cut:
-page 1 reorders while the actual newest row sits on page 3, and a filter finds nothing because the
-match was never in the slice being searched. It looks right on the first screen, which is why it
-ships. **The component cannot express that mistake — it has no sort and no filter.** It reads a
-`<tbody>` something else already produced and hides all but one window of it. So a page keeps its
-own sort and filter and needs *no edit at all* to gain paging; cockpit's `cockpitTable` still
-filters and sorts `rows`, the full array, and still writes every matching row into the tbody.
-**If you ever make an engine emit only the visible page, you have broken this** — and the guard is
-`bin/cockpit-render-check`'s "the engine hands the pager the WHOLE set".
-
-- **`data-table-id` is REQUIRED and never guessed.** Page path plus table index is the obvious
-  alternative and it is a bug with a delay on it: add a table above another and every reader's
-  "100 per page" silently becomes a different table's setting. A table without an id is left
-  **completely alone** (all rows, no bar) and warns on the console **only if it was long enough to
-  have been paged** — a warning on the forty short tables in the estate teaches people to ignore
-  the console.
-- **Do not paginate a table that cannot outgrow a screen.** Most of the estate's tables are short
-  reference tables — `infra-machines` lists four machines — and controls that can never do
-  anything are noise. Nine tables in cockpit carry an id; the other 36 do not.
-- **The bar appears only when it can act**: more rows than fit, *or* a non-default size in force.
-  That second clause is not decoration — without it, picking 100 on a 30-row table removes the
-  control you just used and there is no way back to 20.
-- **Paging writes `hidden` on rows and rebuilds nothing.** That is what lets it sit under cockpit's
-  in-place patching (`dom-patch.js`), which exists so a refresh cannot destroy half-typed input —
-  a pager that re-rendered the table would hand all of that back. `dom-patch.js` exempts `hidden`
-  on a `<tr>` for the same reason it exempts `open` on a `<details>`: the renderer does not own it.
-- **`tr[hidden] { display: none !important }`** ships in `base.css`, because the UA's
-  one-attribute rule loses to any rule setting `display` on a row — and a `hidden` that loses to a
-  stylesheet is still announced by a screen reader.
-- An engine that renders a "nothing matched" message as a `<tr>` must mark it
-  `data-table-placeholder`, or the pager counts a message as data.
-- **`.table-pager` is NOT for a surface that loads only tokens+chrome.** It is built from
-  `.btn-terminal`, which lives in `components.css`. netmon therefore cannot have this component,
-  and must not borrow its class names — that is the fork `bin/design-conformance` catches.
-
-## A table gets a SEARCH, a FILTER and a SORT — and says which are on (0.29.0, Daniel)
-
-Three rules, in order. The first one is the one people skip.
-
-**1. Use a table when the data is a table, and not otherwise.** Rows that share a set of
-fields, compared down columns — accounts, contacts, containers, transactions. If a reader
-would never compare two rows field by field, it is a list, a definition list or a set of
-cards, and forcing it into a table buys a header row nobody reads. The test is whether
-sorting by a column would mean anything.
-
-**2. Every table that is one gets all three, from the system.** One `data-table-tools`
-attribute and `initTableTools()`:
-
-```html
-<table data-table-id="household-contacts" data-table-tools data-sort-key="name">
-  <thead><tr>
-    <th data-col="name">name</th>
-    <th data-col="rel" data-filter="pick">relationship</th>
-    <th data-col="amount" data-sort-type="num">amount</th>
-  </tr></thead>
-  <tbody>…</tbody>
-</table>
-```
-
-- A search box above the table, matching every column at once.
-- Per column, two controls **in the `<th>`**: sort, and a filter that opens a dropdown.
-  `data-filter="pick"` builds the list from the column's own cells, so it can never offer
-  a value the table does not contain; the default is a contains-box.
-- `data-value` on a `<td>` sorts by something the cell does not print — an ISO date under
-  a friendly one, cents under a formatted amount.
-
-**Do NOT write a row of filter boxes under the header.** That shape is what this replaces.
-It spends a whole row of vertical space advertising a capability idle on most visits, it
-reads as a form to fill in, and the estate grew four incompatible versions of it —
-cockpit's `tr.act-filters`, cockpit's older `tr.filters`, and the family contacts table's
-bare boxes, which is the one that prompted this rule.
-
-**3. What is in force marks its own column.** A filtering column's header takes the
-primary colour and an underline and carries a **badge with the selected value**; the
-badge is a button that clears that filter. Sort direction shows as `▲`/`▼` on the same
-header.
-
-**Not a bar above the table.** 0.30.0 shipped one — a `.tbl-view` strip with a chip per
-filter — and it was removed in 0.33.0. A separate strip is a second place to look, costs
-a line of vertical space on every filtered table, prints `relationship = family` a long
-way from the relationship column, and can be scrolled off a long table. The header
-cannot. Do not reintroduce one.
-
-This is not decoration. The view is remembered per table across a browser restart, so a
-reader can arrive at a table that is already withholding rows for a reason nobody on
-screen gave — and an empty table and a filtered one look nearly identical. The bar says
-which it is. It is derived from the view's *deviation from the table's defaults*, never
-from "was this restored", so it cannot go stale while the filter is still in force.
-
-It composes with the pager (0.22.0): filtered-out rows are detached from the tbody, so
-the pager slices exactly the matching set and needs to know nothing about filtering.
-
-## `.field-row` — a settings panel is a two-column table, so write it as one
-
-```html
-<div class="field-row">
-  <span class="lbl">review type</span>
-  <div class="field-val">…control(s)…</div>
-</div>
-```
-
-Built as flex rows with a label beside a control, every row starts its value wherever *its own*
-label happens to end — the labels are different lengths, so the eye gets no vertical edge to
-follow and the panel reads as noise. Daniel, looking at exactly that: *"make this more a table
-layout and always do it like this. This currently looks chaotic."* `.field-row` decides the value
-edge once, for every row.
-
-- `.field-val` is a flex box, so several controls on one row **wrap together** instead of each
-  finding its own line.
-- Widen the label column with **`--field-label-w`** (default `8.5rem`) when a panel's labels are
-  genuinely longer. Note the checker cannot see this one: upstream only ever *reads* it (with a
-  fallback), so `bin/design-conformance` reports `var(--field-label-w)` as a **phantom token**.
-  Either set it as a real declaration on the panel first, or avoid it.
-- Deliberately **not** `subgrid`: these rows usually render independently — one block per repo, one
-  per source — so they must align without sharing a parent. The failure mode of a fixed column is
-  "the label column is a bit wide", not a broken layout.
-- Below `40rem` it stacks on its own. A form's submit gets a `.field-row` with an **empty** `.lbl`,
-  so it lands on the same value edge as the fields above it and stacks with them for free — rather
-  than a local margin that writes the label width down a second time.
+| any button (never a local button class), a row action (link or button, edit, remove), the rail's current page, `.ls-perm`, a hover explanation (`data-tip`, never `title`), a change to `runtime/tooltip.js` (netmon carries an inline copy), an `.eli5` box | `references/components.md` |
+| a table (plain markup, column widths, horizontal scroll, paging, search / filter / sort), any `@tailwindcss/typography` (`.prose`) surface, a `<select>`, a settings panel (`.field-row`) | `references/tables-and-forms.md` |
+| a call into the runtime: the theme functions and every `init*()` | `references/runtime.md` |
+
+## Chrome templates: start here for any surface
 
 The chrome has a **markup contract**, documented at the top of `src/chrome.css` and shown end to
 end in two templates that ship in the package (`files`), so a consumer reads the canonical markup
 out of its own `node_modules` instead of copying whatever the nearest surface happens to do today
 — which is how the pre-rail dropdown propagated in the first place:
 
-- **`templates/page-chrome.html`** (0.6.0) — the standard chrome ALONE: `header.bar` + the `ls -l`
+- **`templates/page-chrome.html`** (0.6.0) — the standard chrome alone: `header.bar` + the `ls -l`
   rail + `footer.status`, in that order, with the reasoning for each. Start here for any surface.
   **The rail is conditional, and the other two are not.** A nav whose only entry is the current
   page is furniture: it costs 17rem of width to tell the reader where they already are. Ship the
@@ -784,7 +313,7 @@ try { if (localStorage.getItem("ls-nav") === "off") document.documentElement.dat
 
 ## This is machine-checked — `bin/design-conformance` in danieldeusing-infra
 
-The rules above are not advice; a cockpit redeploy runs the checker and **fails on a violation**.
+The rules in this skill and its references are not advice; a cockpit redeploy runs the checker and **fails on a violation**.
 Run it yourself before you get there:
 
 ```bash
@@ -814,39 +343,17 @@ have a fork.
 of the script. `apps/pagr`, the seedr playgrounds and `deploy/ci-orchestrator` are unchecked, and
 every one of them has drifted. Adding a surface is one entry in that array.
 
-## Runtime — `runtime/*.js`, dependency-free ESM, tree-shakeable
+## Pin or unpin the CDN url — decided by whether your markup is coupled to a release
 
-| Function | What it does |
-| --- | --- |
-| `applyStoredTheme()` / `setTheme()` / `getStoredTheme()` | Apply + persist the theme. **Pre-paint from `<head>`.** |
-| `initThemeSwitcher()` | Wires `[data-theme-value]` buttons and `[data-theme-label]`. |
-| `initResolutionZoom(1920)` | **Deprecated in 0.29.0 — does nothing.** Wide-screen scaling is the fluid root font size in `tokens.css`, so there is no script to call and no pre-paint flash to avoid. Still exported so a pin can be bumped without editing `<head>` in the same commit. Delete the call and any inline zoom IIFE with it. |
-| `initDropdowns()` | `<details class="dropdown">`: one-open, click-away, Escape. |
-| `initSelects()` | Replaces the OS dropdown on every `<select>` with the estate's listbox — the one component CSS alone can never reach, because the option list is painted outside the page. **Markup contract is NOTHING**; the `<select>` stays authoritative (value, form submission, `input`+`change`). Keeps enhancing: selects rendered later are picked up by a MutationObserver, so a page that rebuilds its tables out of `innerHTML` needs no second call. Keyboard is the ARIA APG select-only combobox and focus never leaves the trigger. |
-| `initTableTools()` | Search box, per-column sort + filter dropdown in the `<th>`, and the `.tbl-view` bar naming what is in force. Detaches filtered-out rows so the pager slices the matching set. View remembered per table under `table-view:<id>`. |
-| `initBurgerNav()` | Mobile burger (breakpoint 48rem) with the footer folded in. |
-| `initLsNav()` | The rail's show/hide, and it **measures** the real chrome into `--ls-nav-top` / `--ls-nav-bottom`. The top is the header's **bottom edge** (`getBoundingClientRect().bottom / zoom`), not its height — those agree only while nothing sits above the header, and cockpit's alert banner mounts as the first child of `<body>`. A rect is visual px and a CSS length is re-multiplied by any ancestor `zoom`, so **convert, don't avoid** (0.13.0; before that a 73px banner buried the rail's own toggle). Re-measured on `scroll` too, because a sticky header's bottom edge moves as the banner scrolls away. |
-| `initTerminal()` | The `$ command` typing animation; no-ops under reduced motion / `html.anim-off`. Fires `term:contentdone`. |
-| `initAnimToggle()` | Wires `[data-anim-toggle]`, persists `localStorage["anim"]`. |
-| `initDiagramZoom(".diagram")` | Click / Enter / Space opens a diagram full-screen; wheel-zoom about the pointer, drag-pan, `+ - 0`, Escape closes. Clones the svg — mermaid re-runs against the nodes it rendered, so moving the original is how a diagram silently stops updating. |
-| `initMinimap({sections})` | Builds the left-gutter minimap: one bar per section, scroll-spy included, bar length by heading depth. Markup contract is NOTHING. Returns `null` for fewer than two sections — a map of one place is not a map. Use it INSTEAD of a text "On this page" column: that column repeated headings the reader was about to scroll past and cost the content its width. |
-| `initTableScroll()` | Gives every unwrapped `<table>` a `.tablewrap` parent so a wide table scrolls itself instead of scrolling the whole PAGE sideways. **The markup contract is nothing** — author a plain `<table>`; already-wrapped tables are left alone, so it is never a migration. **Tables rendered LATER are wrapped too** (0.23.0, MutationObserver), so a page that fetches its rows needs no second call. Colour the right-edge fade with `--tablewrap-fade` when the wrapper does not sit on `--background`. |
-| `initTablePagination()` | Pages every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. **Markup contract is one attribute**, and a table without it is left alone — the id cannot be guessed without silently reassigning readers' settings when a table moves. It has **no sort and no filter**: it hides all but one window of rows a page has *already* filtered and sorted, so the order is filter → sort → slice over the full set by construction. Turning the page writes `hidden` on rows and rebuilds no markup, so it composes with in-place patching. Tables rendered later are picked up by a MutationObserver. |
-| `initTooltips()` | One viewport-clamped panel for every `[data-tip]`, including nodes rendered later. Shows **instantly**, on hover AND focus, and sets `aria-describedby` on the anchor while open (0.26.0) so it is announced the way a `title` is. `src/tooltip.css` counterpart. **This REPLACES the native `title` — see below.** |
-
-The runtime is progressive enhancement: with JS off, content is visible and the theme is `warm`.
-
-## Pin or unpin the CDN url — decided by whether your MARKUP is coupled to a release
-
-- **Tokens-only / look-only consumer → UNPINNED** (`…/npm/@danieldeusing/design/dist/…`, no
+- **Tokens-only / look-only consumer → unpinned** (`…/npm/@danieldeusing/design/dist/…`, no
   `@x.y.z`). One design system, every surface on the current version — Daniel's call, 2026-08-05.
   A stale cached stylesheet there means slightly older colours, never a broken page. netmon's
   `tokens.css` layer, the seedr playgrounds and pagr-docs are on this side today.
-  **This is where a surface SHOULD sit, not a roster of where they are** — audited 2026-08-06,
+  **This is where a surface should sit, not a roster of where they are** — audited 2026-08-06,
   morning-briefs is hard-pinned at **0.1.3** in four `@import url()` lines in its `lib/tokens.css`
   and `deploy/ci-orchestrator` at **0.1.5**, so neither has had a token since. A pin nobody bumps
   is the failure mode on this side, exactly as a poisoned cache is on the other.
-- **A surface that ships the system's MARKUP → PIN** and bump the pin in the same commit as the
+- **A surface that ships the system's markup → pin** and bump the pin in the same commit as the
   markup that needs it. Cockpit — and **the docs site since 2026-08-06**, when its pages adopted
   the rail and the fixed footer. It sat on the unpinned list above right up until that day, which
   is the shape of this rule: the side a surface belongs on is not a property of the surface, it is
@@ -879,7 +386,7 @@ Trusted Publishing on any push to `main` that bumps `package.json` version; an u
 is skipped, so docs/skills/template pushes are safe. Write the CHANGELOG entry the way the
 existing ones read: what changed, and the measurement or failure that forced it.
 
-**PUSH `main` FIRST, TAG AFTER npm HAS THE VERSION.** The order is load-bearing and neither the
+**Push `main` first, tag after npm has the version.** The order is load-bearing and neither the
 CHANGELOG nor this file used to say so. `prepublishOnly` runs `check-release.mjs` inside the
 publish job, and check #2 refuses a version that is **already tagged on origin** — so tagging
 before the workflow finishes makes the release gate block the very publish it is gating. 0.16.0

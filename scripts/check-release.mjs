@@ -17,7 +17,7 @@
  *   1. the version is not already ON NPM        — an immutable, worldwide fact
  *   2. the version is not already TAGGED on origin
  *   3. the CHANGELOG has a heading for it
- *   4. every pin in templates/ matches it
+ *   4. every pin in templates/ and in the skills' markdown matches it
  *   5. dist/ is what src/ currently builds to
  *
  * Network checks degrade to a WARNING when offline — being on a train is not a
@@ -104,9 +104,15 @@ if (!new RegExp(`^## ${VERSION.replace(/\./g, "\\.")} `, "m").test(changelog)) {
 // A doc ships the system's MARKUP, so it pins the release that styles it. A pin
 // pointing at a version that was never published 404s at the CDN and falls back to
 // a snapshot that is not there either — a blank page, discovered by a reader.
-const tplDir = join(root, "templates");
-for (const file of readdirSync(tplDir).filter((f) => f.endsWith(".html"))) {
-  const text = readFileSync(join(tplDir, file), "utf8");
+// The skills count too: html-doc's example pin sat at 0.56.0 while the template shipped
+// 0.57.0, and an agent copies the example as readily as the template.
+const skillsDir = join(root, ".claude", "skills");
+const pinnedFiles = [
+  ...readdirSync(join(root, "templates")).filter((f) => f.endsWith(".html")).map((f) => join("templates", f)),
+  ...readdirSync(skillsDir, { recursive: true }).filter((f) => f.endsWith(".md")).map((f) => join(".claude", "skills", f)),
+];
+for (const file of pinnedFiles) {
+  const text = readFileSync(join(root, file), "utf8");
   const pins = new Set([
     ...[...text.matchAll(/design@(\d+\.\d+\.\d+)/g)].map((m) => m[1]),
     ...[...text.matchAll(/danieldeusing-design-(\d+\.\d+\.\d+)\./g)].map((m) => m[1]),
@@ -114,7 +120,7 @@ for (const file of readdirSync(tplDir).filter((f) => f.endsWith(".html"))) {
   const wrong = [...pins].filter((p) => p !== VERSION);
   if (wrong.length) {
     problems.push(
-      `templates/${file} pins ${wrong.join(", ")} but this release is ${VERSION}.\n` +
+      `${file} pins ${wrong.join(", ")} but this release is ${VERSION}.\n` +
         `      Bump every CDN url AND every /_design/ fallback path in the same commit.`,
     );
   }

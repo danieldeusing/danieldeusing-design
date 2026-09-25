@@ -98,13 +98,11 @@
       /* Page-only layout. The design system ships the visual identity AND the measurements
          (--content-w / --content-pad / --fs-*), so every value below is a TOKEN.
 
-         Each one carries a literal fallback on purpose. This page loads the design system
-         UNPINNED, and jsDelivr serves that url `max-age=604800` — seven days in the browser,
-         12h at the edge — so a reader can be holding a build that predates these tokens
-         (0.2.0 has neither `.wrap` nor `--fs-*`). A bare `var(--content-w)` would resolve to
-         nothing there and the page would go full-bleed with collapsed type. `var(--token,
-         literal)` takes the published value whenever it arrived and the old one when it did
-         not — the same contract as the offline <link> fallback above.
+         Each one carries a literal fallback on purpose. A doc opened over file:// with no
+         route to the CDN loads no stylesheet at all (the /_design/ fallback is site-absolute),
+         so a bare `var(--content-w)` would resolve to nothing and the page would go full-bleed
+         with collapsed type. The literal is the token's own value, so that reader gets the
+         same column as everyone else.
 
          Note `padding-block` + `padding-inline`, never the `padding` shorthand: the
          shorthand resets padding-inline and silently drops the left/right margins. */
@@ -112,7 +110,7 @@
          system's rule — the sanctioned exception. A doc is meant to open straight off disk
          over file://, where no stylesheet loads at all and a bare var() resolves to nothing.
          The literals are what that reader sees; the tokens win everywhere else. */
-      .wrap { max-width: var(--content-w, 78rem); margin-inline: auto;
+      .wrap { max-width: var(--content-w, 90rem); margin-inline: auto;
               padding-block: 2.5rem 5rem; padding-inline: var(--content-pad, 1.5rem); }
 
       /* header/footer chrome + nav now ship with the design system (src/chrome.css) */
@@ -146,15 +144,15 @@
       .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
       .pad { padding: 1rem; }
       .muted { color: var(--muted-foreground); }
-      code.inline { font-family: inherit; background: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; font-size: 0.92em; }
-      pre.block { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-md, 0.86rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
+      code.inline { font-family: inherit; background: var(--muted); border: 1px solid var(--border); padding: 0.05rem 0.35rem; }
+      pre.block { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-base, 0.75rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); white-space: pre; }
       /* No table CSS for scrolling or size here on purpose. `initTableScroll()` at the
          bottom of this file gives every table a `.tablewrap` parent (overflow-x plus a
          right-edge fade), so a table wider than its column scrolls itself instead of
          handing the WHOLE PAGE a horizontal scrollbar — the failure that makes a site
          read as broken, because the header slides off and body text needs two axes.
          The markup contract is therefore nothing: author a plain <table>.
-         Size is the system's too — 0.7.0 sets `table { font-size: var(--fs-md) }`, so a
+         Size is the system's too — it sets `table { font-size: var(--fs-base) }`, so a
          local font-size here would only reintroduce the 3px disagreement between pages
          it was added to end. Still never `white-space: nowrap` on a cell that can hold
          more than one token (a file list): that is what forces the runaway width. */
@@ -165,7 +163,7 @@
       /* Mermaid diagrams. Before rendering, the <pre> shows the raw diagram source —
          so with JS disabled (or if the CDN is unreachable) the page degrades to a
          readable text diagram instead of an empty box. */
-      pre.mermaid { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-md, 0.86rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); border-radius: 6px; white-space: pre; }
+      pre.mermaid { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-base, 0.75rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); white-space: pre; }
       pre.mermaid[data-processed] { white-space: normal; text-align: center; }
       pre.mermaid svg { max-width: 100%; height: auto; }
     </style>
@@ -211,7 +209,7 @@
            One <li> per entry. `ls-row--dir` marks a directory (accent + weight);
            `ls-row--sub` / `ls-row--sub2` draw the nesting. Keep labels under ~18 characters:
            the rail is 17rem and .dropdown-item sets `white-space: nowrap`, so a longer one is
-           clipped with nothing to show for it — put the full filename in `title`.
+           clipped with nothing to show for it — put the full filename in `data-tip`, never `title`.
            On the docs site, list the doc's OWN subtree and nothing above it: access is per
            folder, so a rail that enumerated the estate would tell a scoped reader what else
            exists. Below 48rem this folds into the burger — one copy, which is why there is no

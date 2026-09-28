@@ -213,7 +213,39 @@ await load();
 await evaluate("document.documentElement.classList.add('anim-off'); null");
 
 const T = (id) => `[data-t="${id}"]`;
-const px = (v) => Math.round(parseFloat(v) * 100) / 100;
+
+/*
+ * THE STAND-IN BLOCK CAN HIDE A MISSING DECLARATION. examples/controls.html carries copies of tokens
+ * and classes other packages own, so this branch renders before they land. Once they have landed, a
+ * stand-in still in the page would keep this suite green over a declaration nobody made, and real
+ * pages would paint a solid square where a glyph should be. So every run reports what the block is
+ * still COVERING FOR: each item is measured with the block on and off, and listed if it changes.
+ * Delete the block at integration; anything missing then fails below, loudly.
+ */
+const covering = await evaluate(`(() => {
+  const block = document.getElementById('stand-ins');
+  if (!block) return null;
+  const read = () => {
+    const root = getComputedStyle(document.documentElement), c = __c;
+    return {
+      '--control-h / --control-edge / --icon-*': ['--control-h', '--control-edge', '--icon-size'].map((p) => root.getPropertyValue(p)).join('|'),
+      '[data-tone] -> --tone': getComputedStyle(c.el('${T("destructive")}')).getPropertyValue('--tone'),
+      '[data-icon] -> --ico': getComputedStyle(c.el('${T("rest")}')).getPropertyValue('--ico'),
+      '.ico / .ico--xl': c.cs('${T("dropzone")} .ico').width,
+      'dd-spin + html.anim-off transitions': [...document.styleSheets].some((s) => { try { return [...s.cssRules].some((r) => r.name === 'dd-spin'); } catch { return false; } }) + '|' + (document.documentElement.classList.add('anim-off'), c.cs('${T("rest")}').transitionDuration),
+      '.btn-terminal--danger': c.cs('${T("confirm-armed")} .btn-terminal--danger').color,
+      '.filter-bar': c.cs('${T("filter-bar")}').display,
+    };
+  };
+  const on = read();
+  block.disabled = true;
+  const off = read();
+  block.disabled = false;
+  return Object.keys(on).filter((k) => on[k] !== off[k]);
+})()`);
+console.log(covering === null
+  ? "NOTE  no stand-in block: every token and class is the real one"
+  : `NOTE  the demo's stand-in block is still covering for: ${covering.length ? covering.join(", ") : "nothing (delete it)"}`);
 
 /* ── .btn-icon ────────────────────────────────────────────────────────────────── */
 

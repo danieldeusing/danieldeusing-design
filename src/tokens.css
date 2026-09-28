@@ -382,7 +382,7 @@ html[data-theme="paper"] {
  * THE CONTROL EDGE. A field's border is a boundary the reader has to find, so WCAG 1.4.11 asks 3:1
  * of it — and --border was never built for that. It is a divider, quiet on purpose so a table does
  * not read as a spreadsheet. The estate had three answers for a field edge (--border, --input,
- * which is the same hex, and configr's --primary at 30%, 1.55-2.67:1) and none cleared 3:1 on
+ * which is the same hex, and configr's --primary at 30%, 1.55-2.65:1) and none cleared 3:1 on
  * every theme. The foreground at 60% does, on every theme and surface:
  *
  *     warm 3.41 / 3.31 / 3.24    green 4.56 / 4.53 / 4.52    mono 5.23 / 5.20 / 5.19    paper 4.29 / 4.20 / 4.18

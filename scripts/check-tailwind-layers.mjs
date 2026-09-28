@@ -110,7 +110,7 @@ const { compile } = await import(pathToFileURL(join(TW_NODE, "dist/index.mjs")).
 const CANDIDATES = [
   "p-6", "px-3", "border", "border-primary", "outline-none", "leading-9", "text-2xl", "flex",
   "rounded-xs", "rounded-2xl", "rounded-full", "text-cat-teal", "border-control-edge",
-  "shadow-float", "shadow-modal", "transition-colors",
+  "shadow-float", "shadow-modal", "transition-colors", "hidden",
 ];
 const compiler = await compile(`@import "tailwindcss";\n@import "${ENTRY}";\n`, {
   base: dirname(dirname(TW_NODE)), onDependency() {},
@@ -119,13 +119,17 @@ const COMPILED = compiler.build(CANDIDATES);
 
 // Tab order is load-bearing: the first control must be the one wearing `outline-none`.
 const HARNESS = `<!doctype html><html><head><meta charset="utf-8">
-<link rel="stylesheet" href="/app.css"></head>
+<link rel="stylesheet" href="/app.css">
+<!-- The consumer's own unlayered CSS, at LOWER specificity than the system class it overrides. -->
+<style>:where(.mine) { padding: 3px; }</style></head>
 <body class="leading-9">
 <button id="bare-ring" class="btn-terminal btn-terminal--ghost outline-none">no ring</button>
 <button id="kept-ring" class="btn-terminal btn-terminal--ghost">ring</button>
 <article id="card-plain" class="card-terminal">card</article>
 <article id="card-p6" class="card-terminal p-6">card</article>
+<article id="card-mine" class="card-terminal mine">card</article>
 <button id="compact-px3" class="btn-terminal btn-terminal--compact px-3">compact</button>
+<button id="hidden-btn" class="btn-terminal hidden">hidden</button>
 <div id="edge-primary" class="border border-primary">edge</div>
 <h1 id="h1">h1</h1><h2 id="h2">h2</h2><h3 id="h3">h3</h3><h4 id="h4">h4</h4>
 <h2 id="h2-util" class="text-2xl">h2 with a utility</h2>
@@ -211,6 +215,10 @@ check("`p-6` on a .card-terminal wins — 24px, not the card's own inset",
   (await style("card-p6", "paddingTop")) === "24px", await style("card-p6", "paddingTop"));
 check("`px-3` on a compact button wins over --compact's padding",
   (await style("compact-px3", "paddingLeft")) === "12px", await style("compact-px3", "paddingLeft"));
+check("the consumer's own unlayered CSS beats a system class even at lower specificity",
+  (await style("card-mine", "paddingTop")) === "3px", await style("card-mine", "paddingTop"));
+check("`hidden` on a .btn-terminal hides it — the class's own display no longer outranks it",
+  (await style("hidden-btn", "display")) === "none", await style("hidden-btn", "display"));
 
 /* ── utilities beat base ────────────────────────────────────────────────── */
 

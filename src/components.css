@@ -288,6 +288,38 @@
   color: var(--primary);
 }
 
+/* ── A FILTER IS NOT AN ACTION (0.58.0, Daniel) ───────────────────────────────────────────────
+   "the filters (hide handled, ...) look exactly like action buttons (refresh, ...). This is not
+   good. They should look different" (2026-09-19), and again on 2026-09-28, about a repository
+   picker built as a row of ghost buttons: "We already said once, that filters and stuff should
+   NOT look like a button."
+
+   An ACTION is a box: `.btn-terminal`, bordered (ghost) or filled. Anything that only changes what
+   is SHOWN — a filter, a toggle such as `follow`, a picker choosing which repository or range a
+   view reads — is TEXT: no border, no fill, muted until pointed at, the page's own colour while it
+   is engaged. The state is `aria-pressed`, which is also what a screen reader announces; there is
+   no second class for "on".
+
+   It lived in cockpit's portal.css until here, with a comment saying the package had no filter
+   vocabulary. That absence is how it came back: this package forbids a local button class, so on
+   a surface without one the only control left to reach for was the action button.
+
+   Vertical padding matches `.btn-terminal--compact` exactly, so a filter in a row of actions does
+   not change the row's height. */
+.filter-ctl {
+  font: inherit;
+  font-size: var(--fs-base);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 0.28rem 0.35rem;
+  color: var(--muted-foreground);
+}
+.filter-ctl:hover { color: var(--primary); }
+.filter-ctl:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.filter-ctl[aria-pressed="true"] { color: var(--foreground); }
+.filter-ctl:disabled { opacity: 0.45; cursor: default; }
+
 /* ─────────────────────────────────────────────────────────────────────────
    Settings-control icons — centralized so every consuming site shares ONE
    source. These were hardcoded per-site (a half-circle glyph, emoji flags),

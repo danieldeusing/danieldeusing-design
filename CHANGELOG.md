@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.58.0 (2026-09-28)
+
+### Added
+
+- **`.filter-ctl` — a filter is not an action.** Anything that only changes what is SHOWN — a
+  filter, a toggle such as `follow`, a picker choosing which repository a view reads — is text: no
+  border, no fill, `--muted-foreground` at rest, `--primary` on hover, `--foreground` while
+  `aria-pressed="true"`. An action stays a `.btn-terminal` box. Daniel ruled this on 2026-09-19
+  (*"the filters … look exactly like action buttons … They should look different"*) and cockpit
+  carried the class in its own `portal.css`; on 2026-09-28 a repository picker shipped as four ghost
+  buttons anyway (*"We already said once, that filters and stuff should NOT look like a button"*).
+
+### Fixed
+
+- **The skill prescribed the wrong control.** `references/components.md` told a toggle to be "the
+  same button; press = drop `--ghost`" — the exact shape the ruling forbids — and the package had no
+  filter class, while forbidding local button classes. Together those left an author exactly one
+  control to reach for. The row now points at `.filter-ctl`, and a new section says when a control
+  is a filter, a tab or an action.
+
 ## 0.57.0 (2026-09-12)
 
 ### Changed

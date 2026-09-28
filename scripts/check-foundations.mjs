@@ -117,11 +117,19 @@ const evaluate = async (expression) => {
 };
 
 let failures = 0;
+let lastPassed = "(before the first check)";
 const check = (label, condition, detail) => {
-  if (condition) { console.log(`PASS  ${label}`); return; }
+  if (condition) { console.log(`PASS  ${label}`); lastPassed = label; return; }
   failures += 1;
   console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${detail}`}`);
 };
+// A throw is a FAIL, never a bare stack: an aborted run must not read as a pass, nor as a
+// mutant the suite detected. Say where it got to.
+process.on("uncaughtException", (error) => {
+  console.log(`FAIL  the suite threw after: ${lastPassed}\n        ${String(error?.message || error).split("\n")[0]}`);
+  console.log(`\ncheck-foundations: ABORTED`);
+  process.exit(1);
+});
 
 await send("Page.enable");
 await send("Runtime.enable");
@@ -342,7 +350,8 @@ check(`all ${ICONS.length} icon tokens are declared, decode as SVG and paint a s
   icons.every((i) => i.ok), icons.filter((i) => !i.ok).map((i) => `--ico-${i.name}: ${i.why}`).join("; "));
 const [plain, filled] = await evaluate(`Promise.all(["star", "star-filled"].map(async (n) => {
   const img = new Image(); img.src = getComputedStyle(document.documentElement).getPropertyValue("--ico-" + n).trim().slice(5, -2);
-  await img.decode(); const c = document.createElement("canvas"); c.width = c.height = 24; const x = c.getContext("2d");
+  try { await img.decode(); } catch { return -1; }
+  const c = document.createElement("canvas"); c.width = c.height = 24; const x = c.getContext("2d");
   x.drawImage(img, 0, 0, 24, 24); let n2 = 0; const d = x.getImageData(0, 0, 24, 24).data;
   for (let i = 3; i < d.length; i += 4) if (d[i] > 128) n2 += 1; return n2; }))`);
 check(`--ico-star-filled is the star with its fill closed (${filled} solid pixels vs ${plain})`, filled > plain * 1.5);

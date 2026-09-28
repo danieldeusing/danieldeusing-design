@@ -43,11 +43,19 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ENTRY = join(root, "src/tailwind.css");
 
 let failures = 0;
+let lastPassed = "(before the first check)";
 const check = (label, condition, detail) => {
-  if (condition) { console.log(`PASS  ${label}`); return; }
+  if (condition) { console.log(`PASS  ${label}`); lastPassed = label; return; }
   failures += 1;
   console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${detail}`}`);
 };
+// A throw is a FAIL, never a bare stack: an aborted run must not read as a pass, nor as a
+// mutant the suite detected. Say where it got to.
+process.on("uncaughtException", (error) => {
+  console.log(`FAIL  the suite threw after: ${lastPassed}\n        ${String(error?.message || error).split("\n")[0]}`);
+  console.log(`\ncheck-tailwind-layers: ABORTED`);
+  process.exit(1);
+});
 const finish = () => {
   console.log(failures ? `\ncheck-tailwind-layers: ${failures} FAILED` : "\ncheck-tailwind-layers: all checks passed");
   process.exit(failures ? 1 : 0);

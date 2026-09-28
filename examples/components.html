@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>danieldeusing-design — components (0.60.0 revisions)</title>
+    <meta name="theme-color" content="#f5efe2" />
+
+    <!-- Pre-paint: the stored theme, so a reload does not flash warm. -->
+    <script>
+      (() => {
+        const backgrounds = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
+        let theme = "warm";
+        try {
+          const stored = localStorage.getItem("theme");
+          if (stored && stored in backgrounds) theme = stored;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+
+    <!-- The package's own order, deliberately WITHOUT reset.css: every interactive class on this
+         page has to render right without one (house rule 4), and a missing `font: inherit` shows
+         up here as a 13px system font. chrome.css is here for header.bar and .visually-hidden. -->
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" />
+    <link rel="stylesheet" href="../src/components.css" />
+    <link rel="stylesheet" href="../src/chrome.css" />
+
+    <style id="stand-in">
+      /* ⚠ STAND-IN — NOT PART OF THE PACKAGE, AND NOT A PATTERN TO COPY.
+         Every declaration in this block belongs to ANOTHER work package of 0.60.0 that is not on
+         this branch yet. It is here so this page can show the revised components as they will
+         render once those land, and it goes when they do. Values are SPEC.md's, verbatim.
+
+         WP1 (src/tokens.css): F1 size tokens, F3 elevation, F6 motion, F7 tones, I1 icon masks.
+         WP4 (I1's table): --ico-maximize-2, which WP1 does not ship. */
+      :root {
+        --control-h: 1.75rem;
+        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
+        --card-pad: 0.75rem;
+        --icon-sm: 0.75rem;
+        --icon-size: 0.875rem;
+        --icon-lg: 1rem;
+        --icon-xl: 1.5rem;
+        --elev-float: 0 0 20px var(--glow-soft);
+        --ico-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+        --ico-trash-2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3C/svg%3E");
+        --ico-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
+        --ico-loader-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-6.219-8.56'/%3E%3C/svg%3E");
+        --ico-refresh-cw: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/%3E%3Cpath d='M8 16H3v5'/%3E%3C/svg%3E");
+        --ico-package: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/%3E%3Cpath d='M12 22V12'/%3E%3Cpolyline points='3.29 7 12 12 20.71 7'/%3E%3Cpath d='m7.5 4.27 9 5.15'/%3E%3C/svg%3E");
+        --ico-triangle-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+        --ico-maximize-2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='m21 3-7 7'/%3E%3Cpath d='m3 21 7-7'/%3E%3Cpath d='M9 21H3v-6'/%3E%3C/svg%3E");
+        --ico-history: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3Cpath d='M12 7v5l4 2'/%3E%3C/svg%3E");
+      }
+      [data-tone="destructive"] { --tone: var(--destructive); }
+      @keyframes dd-spin { to { transform: rotate(1turn); } }
+      html.anim-off *, html.anim-off *::before, html.anim-off *::after { animation: none !important; transition: none !important; }
+      html.anim-off .cursor-block { display: none; }
+      /* I1 (`.ico`, owned elsewhere): a mask in currentColor, named by data-icon. */
+      .ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+      .ico[data-icon="refresh-cw"] { --ico: var(--ico-refresh-cw); }
+      .ico[data-icon="history"] { --ico: var(--ico-history); }
+      .ico[data-icon="package"] { --ico: var(--ico-package); }
+      .ico[data-icon="triangle-alert"] { --ico: var(--ico-triangle-alert); }
+      /* WP6 (runtime/select.js): writes `position: fixed` inline on the panel it appends. */
+      body > .select-panel { position: fixed; }
+    </style>
+
+    <style>
+      /* Page layout only — nothing here styles a component. */
+      body { margin: 0; }
+      header.bar nav { display: flex; align-items: center; gap: 1rem; }
+      .demo-wrap { max-width: 64rem; margin-inline: auto; padding: 1.5rem 1.5rem 6rem; }
+      .demo-wrap h1 { font-size: var(--fs-xl); margin: 0.4rem 0; }
+      .demo-wrap h2 { font-size: var(--fs-lg); margin: 0 0 0.25rem; }
+      .demo-wrap section { margin-top: 2.5rem; }
+      /* Zero specificity, so a component that is a <p> (.legend-label, .fold-empty) keeps its own margins. */
+      :where(.demo-wrap p) { margin: 0 0 0.75rem; }
+      .demo-lede { color: var(--muted-foreground); max-width: 70ch; }
+      .demo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.6rem 0; }
+      .demo-note { color: var(--muted-foreground); margin-top: 0.75rem; }
+      .demo-surfaces { display: grid; gap: 0.5rem; }
+      .demo-surface { padding: 0.75rem; border: 1px solid var(--border); }
+      .demo-surface[data-s="background"] { background: var(--background); }
+      .demo-surface[data-s="card"] { background: var(--card); }
+      .demo-surface[data-s="muted"] { background: var(--muted); }
+      .demo-cols { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); align-items: start; }
+      .demo-label { color: var(--muted-foreground); display: block; margin-bottom: 0.35rem; }
+      /* The showcase panels are shown OPEN and in the flow; a live panel is placed by its runtime. */
+      .demo-static .dropdown-panel { position: static; }
+      .demo-menus { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; min-height: 15rem; }
+      .demo-statusbar { position: relative; display: flex; justify-content: flex-end; gap: 1rem; margin-top: 12rem; padding: 0.4rem 0.75rem; background: var(--card); border-top: 1px solid var(--border); }
+      .demo-cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+      .demo-cards .card-terminal { display: block; }
+      .demo-region { padding: 0.5rem 0 0.5rem 1.4rem; color: var(--muted-foreground); }
+      .demo-diagram { display: grid; place-items: center; block-size: 7rem; max-inline-size: 22rem; border: 1px solid var(--border); background: var(--card); }
+      /* The page loads no reset, so a bare prose link would be the browser's blue. */
+      .demo-wrap a:not([class]) { color: var(--primary); }
+    </style>
+  </head>
+
+  <body>
+    <header class="bar">
+      <span class="brand glow">components.css — 0.60.0 revisions<span class="cursor-block" aria-hidden="true"></span></span>
+      <nav aria-label="page settings">
+        <!-- N5, the theme switcher, is a live M1 menu: initThemeSwitcher() marks the items
+             menuitemradio + aria-checked, initDropdowns() makes the panel an APG menu. The summary
+             reads "theme warm"; the dot is the one indicator (no per-theme swatch). -->
+        <details class="dropdown" id="theme-menu">
+          <summary><span class="visually-hidden">theme </span><span class="dd-dot" aria-hidden="true"></span><span data-theme-label>warm</span><span aria-hidden="true">▾</span></summary>
+          <ul class="dropdown-panel dropdown-panel--end" role="list">
+            <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+          </ul>
+        </details>
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
+          <span data-anim-box aria-hidden="true">[x]</span><span>anim</span>
+        </button>
+      </nav>
+    </header>
+
+    <main class="demo-wrap">
+      <p class="prompt">cat components.css | diff 0.59.0</p>
+      <h1>Buttons, fields, the one popup look, menus, cards</h1>
+      <p class="demo-lede">
+        Every element WP2 revised, in every state. Switch the theme top right — the switcher is itself a
+        revised menu (arrow keys, Home/End, typeahead, Escape back to the summary).
+      </p>
+
+      <!-- ── C1 ─────────────────────────────────────────────────────────── -->
+      <section id="buttons">
+        <h2>.btn-terminal</h2>
+        <div class="demo-row">
+          <button type="button" class="btn-terminal" id="btn-cta">deploy</button>
+          <button type="button" class="btn-terminal btn-terminal--compact" id="btn-primary-compact">save</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ghost">cancel</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ico"><span class="ico" data-icon="refresh-cw"></span>refresh</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-svg"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>history</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success" id="btn-success">approve</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger" id="btn-danger">deny</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--edit" id="btn-edit" aria-label="edit poi/vu3"></button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" id="btn-bin" aria-label="remove poi/vu3"></button>
+        </div>
+        <div class="demo-row">
+          <button type="button" class="btn-terminal btn-terminal--compact" disabled>save</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ghost-disabled" disabled>cancel</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success" disabled>approve</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger" disabled>deny</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--edit" aria-label="edit poi/vu3" disabled></button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove poi/vu3" disabled></button>
+          <span class="demo-note">disabled</span>
+        </div>
+        <div class="demo-row">
+          <button type="button" class="btn-terminal btn-terminal--compact" id="btn-busy" aria-busy="true" disabled>saving</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ghost-busy" aria-busy="true" disabled>refreshing</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" id="btn-bin-busy" aria-label="removing poi/vu3" aria-busy="true" disabled></button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-toggle-busy">press to go busy for 2s</button>
+          <span class="demo-note">busy: <code>aria-busy="true"</code> + <code>disabled</code></span>
+        </div>
+        <p class="demo-note">One toolbar row on each surface — every control is <code>--control-h</code> tall:</p>
+        <!-- Computed by the page from its own controls, on load and on every theme change. -->
+        <p class="demo-note" id="height-check" role="status">height check: not run</p>
+        <div class="demo-surfaces">
+          <div class="demo-surface" data-s="background"><div class="demo-row" style="margin:0">
+            <input type="search" aria-label="search skills" placeholder="search…" />
+            <select aria-label="type"><option>all types</option><option>skill</option><option>agent</option></select>
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">refresh</button>
+            <button type="button" class="btn-terminal btn-terminal--compact">publish</button>
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove selection"></button>
+          </div></div>
+          <div class="demo-surface" data-s="card"><div class="demo-row" style="margin:0">
+            <input type="search" aria-label="search skills" placeholder="search…" />
+            <select aria-label="type"><option>all types</option><option>skill</option></select>
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success">approve</button>
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger">deny</button>
+          </div></div>
+          <div class="demo-surface" data-s="muted"><div class="demo-row" style="margin:0">
+            <input type="text" aria-label="name" value="poi/vu3" />
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">rename</button>
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--edit" aria-label="edit poi/vu3"></button>
+          </div></div>
+        </div>
+      </section>
+
+      <!-- ── C7 ─────────────────────────────────────────────────────────── -->
+      <section id="inputs">
+        <h2>text fields</h2>
+        <div class="demo-cols">
+          <label><span class="demo-label">text</span><input type="text" id="in-text" value="poi/vu3" /></label>
+          <label><span class="demo-label">placeholder</span><input type="text" id="in-placeholder" placeholder="owner/repo" /></label>
+          <label><span class="demo-label">search</span><input type="search" id="in-search" value="review" /></label>
+          <label><span class="demo-label">number (no spinners)</span><input type="number" id="in-number" value="42" /></label>
+          <label><span class="demo-label">email</span><input type="email" value="me@example.test" /></label>
+          <label><span class="demo-label">date</span><input type="date" value="2026-09-28" /></label>
+          <label><span class="demo-label">no type attribute</span><input id="in-notype" value="plain" /></label>
+          <label><span class="demo-label">invalid</span><input type="text" id="in-invalid" aria-invalid="true" value="not a repo" /></label>
+          <label><span class="demo-label">disabled</span><input type="text" id="in-disabled" disabled value="read only" /></label>
+        </div>
+        <div class="demo-cols" style="margin-top:1rem">
+          <label><span class="demo-label">textarea</span><textarea id="in-textarea" rows="3">A reviewer note that wraps onto a second line.</textarea></label>
+          <label><span class="demo-label">textarea, invalid</span><textarea aria-invalid="true" rows="3" placeholder="required"></textarea></label>
+          <label><span class="demo-label">textarea, disabled</span><textarea disabled rows="3">frozen</textarea></label>
+        </div>
+      </section>
+
+      <!-- ── C8 + M0 ────────────────────────────────────────────────────── -->
+      <section id="select">
+        <h2>select — trigger and the one popup look</h2>
+        <div class="demo-row">
+          <label>model <select id="sel-model"><option>claude-fable-5</option><option selected>gpt-5.9</option><option disabled>gpt-4 (retired)</option><optgroup label="local"><option>qwen</option></optgroup></select></label>
+          <label>disabled <select disabled><option>locked</option></select></label>
+          <!-- aria-invalid mirrored onto the trigger is WP6's select.js; the trigger here is the rendered markup. -->
+          <span class="select-field"><button type="button" class="select-trigger" id="trigger-invalid" aria-invalid="true" aria-haspopup="listbox" aria-expanded="false"><span class="select-value">pick a model</span></button></span>
+          <span class="demo-note">← invalid trigger (rendered markup)</span>
+        </div>
+        <div class="demo-cols demo-static">
+          <div>
+            <span class="demo-label">.select-panel (listbox) — shown open</span>
+            <ul class="select-panel" role="listbox" aria-label="model" id="static-listbox">
+              <li class="select-group" role="presentation">hosted</li>
+              <li class="select-option" role="option" aria-selected="false">claude-fable-5</li>
+              <li class="select-option" role="option" aria-selected="true" id="opt-chosen">gpt-5.9</li>
+              <li class="select-option" role="option" aria-selected="false" data-active="true" id="opt-active">gpt-5.10</li>
+              <li class="select-option" role="option" aria-selected="false" aria-disabled="true" id="opt-disabled">gpt-4 (retired)</li>
+              <li class="select-group" role="presentation">local</li>
+              <li class="select-option" role="option" aria-selected="false"><span class="ico" data-icon="history"></span>qwen (last used)</li>
+            </ul>
+          </div>
+          <div>
+            <span class="demo-label">.dropdown-panel (menu) — shown open</span>
+            <ul class="dropdown-panel" role="menu" aria-label="sort" id="static-menu">
+              <li role="none"><span class="dropdown-label">sort by</span></li>
+              <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true" tabindex="-1" id="static-checked">name</button></li>
+              <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" tabindex="-1">updated</button></li>
+              <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" tabindex="-1" data-active="true">stars</button></li>
+              <li class="dropdown-sep" role="separator"></li>
+              <li role="none"><button type="button" class="dropdown-item" role="menuitem" tabindex="-1" id="static-plain">reset sort</button></li>
+              <li role="none"><button type="button" class="dropdown-item" role="menuitem" tabindex="-1" aria-current="true" id="static-current">history: current</button></li>
+              <li role="none"><button type="button" class="dropdown-item" role="menuitem" tabindex="-1" aria-disabled="true" id="static-disabled">export (no rows)</button></li>
+              <li role="none"><button type="button" class="dropdown-item dropdown-item--danger" role="menuitem" tabindex="-1" id="static-danger">delete view</button></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── M1 ─────────────────────────────────────────────────────────── -->
+      <section id="menus">
+        <h2>details.dropdown — live menus</h2>
+        <p class="demo-note">Tab to a summary, then ArrowDown / ArrowUp / Enter / Space. Inside: arrows wrap, Home/End, type a letter, Escape, Tab.</p>
+        <div class="demo-menus" id="menu-row">
+          <details class="dropdown" id="dd-actions">
+            <summary>actions ▾</summary>
+            <ul class="dropdown-panel dropdown-panel--down">
+              <li><span class="dropdown-label">file</span></li>
+              <li><button type="button" class="dropdown-item">rename</button></li>
+              <li><button type="button" class="dropdown-item">duplicate</button></li>
+              <li><a class="dropdown-item" href="#menus">open in new view</a></li>
+              <li class="dropdown-sep"></li>
+              <li><button type="button" class="dropdown-item" aria-disabled="true">archive (nothing to archive)</button></li>
+              <li><button type="button" class="dropdown-item dropdown-item--danger">delete</button></li>
+            </ul>
+          </details>
+          <details class="dropdown" id="dd-sort">
+            <summary>sort: name ▾</summary>
+            <ul class="dropdown-panel dropdown-panel--down">
+              <li><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true">name</button></li>
+              <li><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false">updated</button></li>
+              <li><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false">stars</button></li>
+              <li class="dropdown-sep"></li>
+              <li><button type="button" class="dropdown-item">reset</button></li>
+            </ul>
+          </details>
+          <details class="dropdown" id="dd-history">
+            <summary aria-label="history"><span class="ico" data-icon="history"></span></summary>
+            <ul class="dropdown-panel dropdown-panel--down">
+              <li><a class="dropdown-item" href="#menus">/skills/review</a></li>
+              <li><a class="dropdown-item" href="#menus" aria-current="true">/skills/deploy</a></li>
+              <li><a class="dropdown-item" href="#menus">/agents/poi</a></li>
+            </ul>
+          </details>
+          <details class="dropdown" id="dd-disclosure">
+            <summary>filter ⌕</summary>
+            <div class="dropdown-panel dropdown-panel--down" style="padding: 0.5rem">
+              <input type="search" aria-label="filter names" placeholder="name contains…" />
+            </div>
+          </details>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="page-menu-opener" aria-haspopup="menu" aria-expanded="false">page-built menu ▾</button>
+          <span id="late-slot"></span>
+        </div>
+        <div class="demo-statusbar">
+          <details class="dropdown" id="dd-up">
+            <summary>opens upward ▴</summary>
+            <ul class="dropdown-panel">
+              <li><button type="button" class="dropdown-item">copy link</button></li>
+              <li><button type="button" class="dropdown-item">print</button></li>
+            </ul>
+          </details>
+        </div>
+      </section>
+
+      <!-- ── C9 ─────────────────────────────────────────────────────────── -->
+      <section id="field-rows">
+        <h2>.field-row</h2>
+        <div class="card-terminal">
+          <div class="field-row" id="row-default">
+            <label class="lbl" for="f-model">model</label>
+            <div class="field-val">
+              <select id="f-model" aria-describedby="f-model-desc f-model-err" aria-invalid="true"><option>gpt-5.9</option><option>claude-fable-5</option></select>
+              <p class="field-desc" id="f-model-desc">used for every review on this repository</p>
+              <p class="field-error" id="f-model-err" role="alert">pick a model the agent supports</p>
+            </div>
+          </div>
+          <div class="field-row field-row--top" id="row-top">
+            <label class="lbl" for="f-note">reviewer note</label>
+            <textarea id="f-note" rows="3">Keep it short.</textarea>
+          </div>
+          <div class="field-row" id="row-button-label">
+            <button type="button" class="lbl" id="f-hint">max per hour</button>
+            <div class="field-val"><input type="number" aria-label="max per hour" value="6" style="max-width: 6rem" /><span class="field-desc">the label is a button: on a phone it opens its explanation</span></div>
+          </div>
+          <div class="field-row field-row--stacked" id="row-stacked">
+            <span class="lbl">agents</span>
+            <table id="f-table">
+              <thead><tr><th>agent</th><th>model</th><th>state</th></tr></thead>
+              <tbody><tr><td>claude</td><td>claude-fable-5</td><td>on</td></tr><tr><td>codex</td><td>gpt-5.9</td><td>off</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── C16 + C17 ──────────────────────────────────────────────────── -->
+      <section id="text-actions">
+        <h2>.link-quiet and .disclosure-btn</h2>
+        <div class="demo-row">
+          <a class="link-quiet" href="#text-actions" id="lq-a">cd ~</a>
+          <button type="button" class="link-quiet" id="lq-button">show all 55</button>
+          <button type="button" class="link-quiet" disabled>undo (nothing to undo)</button>
+        </div>
+        <div>
+          <div class="demo-row">
+            <button type="button" class="disclosure-btn" id="disc-1" aria-expanded="false" aria-controls="disc-1-body" aria-label="expand poi/vu3"></button>
+            <span>poi/vu3</span>
+          </div>
+          <div class="demo-region" id="disc-1-body" hidden>reviews on · 5 agents · base main</div>
+          <div class="demo-row">
+            <button type="button" class="disclosure-btn" id="disc-2" aria-expanded="true" aria-controls="disc-2-body" aria-label="collapse danieldeusing/infra"></button>
+            <span>danieldeusing/infra</span>
+          </div>
+          <div class="demo-region" id="disc-2-body">reviews on · 3 agents · base main</div>
+        </div>
+      </section>
+
+      <!-- ── K1 ─────────────────────────────────────────────────────────── -->
+      <section id="cards">
+        <h2>.card-terminal</h2>
+        <div class="demo-cards">
+          <div class="card-terminal" id="card-static"><strong>static</strong><p style="margin:0.4rem 0 0; color: var(--muted-foreground)">No hover: nothing happens on a click.</p></div>
+          <a class="card-terminal" href="#cards" id="card-link"><strong>a.card-terminal</strong><p style="margin:0.4rem 0 0; color: var(--muted-foreground)">The whole card is the link.</p></a>
+          <button type="button" class="card-terminal" id="card-button"><strong>button.card-terminal</strong><p style="margin:0.4rem 0 0; color: var(--muted-foreground)">Picks this option.</p></button>
+          <article class="card-terminal card-terminal--link" id="card-modlink"><strong><a href="#cards">.card-terminal--link</a></strong><p style="margin:0.4rem 0 0; color: var(--muted-foreground)">Its title link is the target.</p></article>
+          <div class="card-terminal card-terminal--flush" id="card-flush">
+            <table><thead><tr><th>host</th><th>state</th></tr></thead><tbody><tr><td>ddmini</td><td>up</td></tr><tr><td>ddstudio</td><td>up</td></tr></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── K13 ────────────────────────────────────────────────────────── -->
+      <section id="folds">
+        <h2>details.fold</h2>
+        <p class="demo-note">Print this page (or preview it): <code>initFolds()</code> opens every closed fold for the paper and closes them again after.</p>
+        <details class="fold" id="fold-plain">
+          <summary>what a review costs</summary>
+          <div class="fold-body"><p>One invocation per configured agent, against the ticket's ceiling.</p></div>
+        </details>
+        <details class="fold" id="fold-count" open>
+          <summary><span class="ico" data-icon="package" aria-hidden="true"></span>skills/ <span class="fold-count" id="fold-count-n">12</span></summary>
+          <div class="fold-body"><p>deploy · review · release · …</p></div>
+        </details>
+        <details class="fold" id="fold-search">
+          <summary>agents/ <span class="fold-count">(3/17)</span></summary>
+          <div class="fold-body"><p>claude · codex · copilot</p></div>
+        </details>
+        <details class="fold" data-tone="destructive" id="fold-tone">
+          <summary><span class="ico" data-icon="triangle-alert" aria-hidden="true"></span>2 commands failed</summary>
+          <div class="fold-body"><p><code>npm run check:release</code> exited 1</p></div>
+        </details>
+        <p class="fold-empty" id="fold-empty" data-tip="no hooks in this registry yet">hooks/ <span class="fold-count">0</span></p>
+
+        <span class="demo-label" style="margin-top:1.25rem">--compact (a log)</span>
+        <details class="fold fold--compact" id="fold-compact">
+          <summary>ran 3 commands</summary>
+          <div class="fold-body"><p><code>git status</code></p><p><code>npm test</code></p><p><code>npm run build</code></p></div>
+        </details>
+        <details class="fold fold--compact" data-tone="destructive">
+          <summary>1 command failed</summary>
+          <div class="fold-body"><p><code>npm run lint</code> — 2 errors</p></div>
+        </details>
+
+        <span class="demo-label" style="margin-top:1.25rem">--boxed (a case)</span>
+        <details class="fold fold--boxed" id="fold-boxed" open>
+          <summary>case 1 · the queue has no consumer</summary>
+          <div class="fold-body"><p>queued ✓ was reported while nothing drained the queue.</p></div>
+        </details>
+        <details class="fold fold--boxed">
+          <summary>case 2 · a stale address in a monitor</summary>
+          <div class="fold-body"><p>100% loss is what a dead host and an unowned address both look like.</p></div>
+        </details>
+      </section>
+
+      <!-- ── K14 ────────────────────────────────────────────────────────── -->
+      <section id="legends">
+        <h2>.legend-label</h2>
+        <!-- .doc-link--forward is WP3's; unstyled on this branch. -->
+        <p class="legend-label" id="legend-label"><span id="lg-src">what a source reports</span>
+          <a class="doc-link doc-link--forward" href="#legends">where they are configured →</a></p>
+        <ul class="legend" aria-labelledby="lg-src" id="legend-list">
+          <li><strong>ok</strong> the last run passed</li>
+          <li><strong>stale</strong> no run for three intervals</li>
+          <li><strong>failed</strong> the last run exited non-zero</li>
+          <li><strong>off</strong> not scheduled</li>
+        </ul>
+      </section>
+
+      <!-- ── O4, the opener's half ──────────────────────────────────────── -->
+      <section id="zoom">
+        <h2>.dgm-zoomable — the opener's corner hint</h2>
+        <p class="demo-note">The view it opens is WP9's <code>&lt;dialog&gt;</code> (overlays.css); this page shows the opener only, as <code>initDiagramZoom()</code> marks it.</p>
+        <div class="diagram demo-diagram dgm-zoomable" id="dgm" role="button" tabindex="0" aria-label="zoom diagram">
+          <svg viewBox="0 0 200 60" width="200" height="60" aria-hidden="true"><rect x="5" y="15" width="60" height="30" fill="none" stroke="currentColor" /><rect x="135" y="15" width="60" height="30" fill="none" stroke="currentColor" /><path d="M65 30h70" stroke="currentColor" /></svg>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { initDropdowns, attachMenuKeys } from "../runtime/dropdown.js";
+      import { initThemeSwitcher } from "../runtime/theme.js";
+      import { initSelects } from "../runtime/select.js";
+      import { initAnimToggle } from "../runtime/anim.js";
+      import { initFolds } from "../runtime/fold.js";
+      import { initMinimap } from "../runtime/minimap.js";
+
+      initThemeSwitcher();
+      initDropdowns();
+      initSelects();
+      initAnimToggle();
+      initFolds();
+      // N9: this page has no TOC, so it gets a minimap (from 64rem, in the left gutter).
+      initMinimap({ sections: "main > section" });
+
+      // HEIGHT CHECK — every single-line control on this page must measure --control-h, both as
+      // rendered and from its own padding and line height with the min-block-size floor removed:
+      // a field that only reaches 28px because the floor lifts it is one inherited line height away
+      // from 29.6px. Rendered into #height-check, and onto its data-* for scripts/check-control-height.mjs.
+      const SINGLE_LINE = 'input:is([type="text"], [type="search"], [type="url"], [type="email"], [type="password"], ' +
+        '[type="number"], [type="tel"], [type="date"], :not([type])), .select-trigger, select:not(.select-field > select), ' +
+        ".btn-terminal--compact, .btn-terminal--destructive, .btn-terminal--edit";
+      const runHeightCheck = () => {
+        const probe = document.createElement("div");
+        probe.style.blockSize = "var(--control-h)";
+        document.body.appendChild(probe);
+        const want = probe.getBoundingClientRect().height;
+        probe.remove();
+        const off = [];
+        const controls = [...document.querySelectorAll(SINGLE_LINE)].filter((el) => el.getClientRects().length);
+        for (const el of controls) {
+          const rendered = el.getBoundingClientRect().height;
+          const keep = el.style.minBlockSize;
+          el.style.minBlockSize = "0px";
+          const natural = el.getBoundingClientRect().height;
+          el.style.minBlockSize = keep;
+          // 1/32px: Chrome lays out in 1/64px units, so 5.2px of padding lands as 5.1875.
+          if (Math.abs(rendered - want) > 1 / 32 || Math.abs(natural - want) > 1 / 32) {
+            off.push(`${el.id || el.getAttribute("aria-label") || el.className || el.tagName}: ${rendered}/${natural}`);
+          }
+        }
+        const out = document.getElementById("height-check");
+        out.dataset.result = off.length ? "fail" : "pass";
+        out.dataset.count = String(controls.length);
+        out.dataset.want = String(want);
+        out.dataset.offenders = JSON.stringify(off);
+        out.textContent = off.length
+          ? `height check: ${off.length} of ${controls.length} single-line controls are not ${want}px (rendered/natural): ${off.join(", ")}`
+          : `height check: all ${controls.length} single-line controls measure ${want}px, rendered and natural`;
+      };
+      requestAnimationFrame(runHeightCheck);
+      new MutationObserver(runHeightCheck).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+      // C17: the page owns the state; the button's glyph follows aria-expanded.
+      for (const button of document.querySelectorAll(".disclosure-btn")) {
+        button.addEventListener("click", () => {
+          const open = button.getAttribute("aria-expanded") !== "true";
+          button.setAttribute("aria-expanded", String(open));
+          document.getElementById(button.getAttribute("aria-controls")).hidden = !open;
+        });
+      }
+
+      // C1 busy: the page sets aria-busy AND disabled, and clears both.
+      document.getElementById("btn-toggle-busy").addEventListener("click", (event) => {
+        const button = event.currentTarget;
+        button.setAttribute("aria-busy", "true");
+        button.disabled = true;
+        setTimeout(() => { button.removeAttribute("aria-busy"); button.disabled = false; }, 2000);
+      });
+
+      // M1, delegated: a dropdown rendered AFTER initDropdowns() gets the same menu.
+      setTimeout(() => {
+        document.getElementById("late-slot").innerHTML =
+          '<details class="dropdown" id="dd-late"><summary>rendered later ▾</summary>' +
+          '<ul class="dropdown-panel dropdown-panel--down"><li><button type="button" class="dropdown-item">alpha</button></li>' +
+          '<li><button type="button" class="dropdown-item">beta</button></li></ul></details>';
+      }, 300);
+
+      // attachMenuKeys(): a menu the page builds and places itself (the context-menu shape).
+      const opener = document.getElementById("page-menu-opener");
+      let pageMenu = null;
+      let detach = null;
+      const closePageMenu = () => {
+        if (!pageMenu) return;
+        detach();
+        pageMenu.remove();
+        pageMenu = null;
+        opener.setAttribute("aria-expanded", "false");
+      };
+      opener.addEventListener("click", () => {
+        if (pageMenu) return closePageMenu();
+        pageMenu = document.createElement("ul");
+        pageMenu.className = "select-panel";
+        pageMenu.id = "page-menu";
+        pageMenu.setAttribute("role", "menu");
+        pageMenu.setAttribute("aria-label", "page-built menu");
+        pageMenu.innerHTML = ["open in editor", "copy path", "reveal"].map((label) =>
+          `<li role="none"><button type="button" class="dropdown-item" role="menuitem">${label}</button></li>`).join("");
+        const rect = opener.getBoundingClientRect();
+        Object.assign(pageMenu.style, { position: "fixed", left: `${rect.left}px`, top: `${rect.bottom + 4}px`, minWidth: `${rect.width}px` });
+        document.body.appendChild(pageMenu);
+        opener.setAttribute("aria-expanded", "true");
+        detach = attachMenuKeys(pageMenu, { onClose: closePageMenu, returnFocusTo: opener });
+        pageMenu.querySelector('[role="menuitem"]').focus();
+      });
+      document.addEventListener("pointerdown", (event) => {
+        if (pageMenu && !pageMenu.contains(event.target) && event.target !== opener) closePageMenu();
+      });
+    </script>
+  </body>
+</html>

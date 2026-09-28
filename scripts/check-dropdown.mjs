@@ -1,0 +1,458 @@
+#!/usr/bin/env node
+/*
+ * check-dropdown.mjs — a `details.dropdown` is a MENU, and it stays one on markup rendered later.
+ *
+ * WHAT IS AT RISK. Until 0.60.0 runtime/dropdown.js was the "one open, close on a click away or
+ * Escape" layer and nothing else, and it bound only the dropdowns that existed when it was called.
+ * Two failures followed from that and neither was visible on a static page:
+ *   · every dropdown runtime/tabletools.js builds in a table header — rendered AFTER the call —
+ *     had no click-away and no Escape at all;
+ *   · a keyboard reader who opened any dropdown got no arrow keys, and Escape dropped focus on
+ *     <body> instead of handing it back to the summary.
+ * 0.60.0 makes a panel of rows an ARIA APG menu, delegates every listener to the document and
+ * marks later markup with a MutationObserver. Each of those is asserted here, including the
+ * disclosure case — a panel holding a text field must NOT be announced as a menu.
+ *
+ * A REAL BROWSER AND REAL KEYS. The subject is default actions: a summary toggles itself on Enter
+ * and Space, Tab moves focus, a button activates on Space's keyup. A dispatched KeyboardEvent skips
+ * every one of those, so it would pass a build whose Space opens the menu and closes it again. Keys
+ * go through the DevTools protocol's Input domain, exactly as a reader's would. The SHIPPED modules
+ * are served off the working tree and imported as they are — nothing is inlined or rewritten.
+ *
+ * No dependency: headless chromium from the Playwright cache, Node's own fetch and WebSocket. The
+ * debugging port is 0 and read back from DevToolsActivePort, so two suites running at once on one
+ * machine cannot talk to each other's browser. No browser: it SKIPS loudly (and fails under
+ * DD_REQUIRE_BROWSER=1), as the other browser checks do.
+ *
+ *   node scripts/check-dropdown.mjs
+ */
+import { spawn } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const CHROME = process.env.DD_CHROME
+  ? (existsSync(process.env.DD_CHROME) ? process.env.DD_CHROME : null)
+  : [
+    `${process.env.HOME}/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
+    `${process.env.HOME}/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
+    `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1234/chrome-mac/Chromium.app/Contents/MacOS/Chromium`,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ].find((path) => existsSync(path));
+
+if (!CHROME) {
+  console.log("check-dropdown: SKIPPED — no headless chromium on this machine.");
+  console.log("  This asserts real key presses, focus movement and a MutationObserver, none of which");
+  console.log("  a stub can prove. Install one with `npx playwright install chromium`.");
+  if (process.env.DD_REQUIRE_BROWSER === "1") {
+    console.log("  DD_REQUIRE_BROWSER=1: a skip counts as a FAILURE here.");
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ── the page under test ──────────────────────────────────────────────────── */
+
+const HARNESS = `<!doctype html><html><head><meta charset="utf-8"><style>
+  body { font: 14px system-ui; margin: 20px; }
+  details.dropdown { display: inline-block; margin: 0 1rem 1rem 0; vertical-align: top; }
+</style></head><body>
+<button id="before">before</button>
+<details class="dropdown" id="dd1"><summary id="s1">actions</summary>
+  <ul class="dropdown-panel" role="list">
+    <li><span class="dropdown-label">file</span></li>
+    <li><button type="button" class="dropdown-item" id="i-rename">rename</button></li>
+    <li><button type="button" class="dropdown-item" id="i-dup">duplicate</button></li>
+    <li><button type="button" class="dropdown-item" id="i-del">delete</button></li>
+    <li class="dropdown-sep" id="sep"></li>
+    <li><button type="button" class="dropdown-item" id="i-dis" aria-disabled="true">disabled one</button></li>
+    <li><button type="button" class="dropdown-item" id="i-focus">focus the field</button></li>
+  </ul></details>
+<button id="after">after</button>
+<details class="dropdown" id="dd2"><summary id="s2">second</summary>
+  <ul class="dropdown-panel"><li><button type="button" class="dropdown-item" id="i2">only</button></li></ul></details>
+<details class="dropdown" id="ddx"><summary id="sx">filter</summary>
+  <div class="dropdown-panel"><input type="search" id="fx" aria-label="filter"></div></details>
+<details class="dropdown" id="dth"><summary id="sth">theme <span data-theme-label></span></summary>
+  <ul class="dropdown-panel" role="list">
+    <li><button type="button" class="dropdown-item" data-theme-value="warm" id="t-warm">warm</button></li>
+    <li><button type="button" class="dropdown-item" data-theme-value="green" id="t-green">green</button></li>
+  </ul></details>
+<div id="flat"><button type="button" class="dropdown-item" data-theme-value="green" id="flat-green">green</button></div>
+<span id="late-theme-slot"></span>
+<input id="field" aria-label="field">
+<span id="late-slot"></span>
+<dialog id="dlg"><details class="dropdown" id="ddd"><summary id="sd">in a dialog</summary>
+  <ul class="dropdown-panel"><li><button type="button" class="dropdown-item" id="id1">one</button></li></ul></details></dialog>
+<button id="pm-opener">opener</button>
+<ul id="pm" role="menu" aria-label="page menu" hidden>
+  <li role="none"><button type="button" role="menuitem" id="pm1">open</button></li>
+  <li role="none"><button type="button" role="menuitem" id="pm2">copy</button></li>
+</ul>
+<script type="module">
+  // Namespace imports: a module missing one export (an older build) still loads, and the cases
+  // that need the export fail by name instead of the page never running at all.
+  import * as dropdown from "/runtime/dropdown.js";
+  import * as theme from "/runtime/theme.js";
+  window.acts = [];
+  for (const b of document.querySelectorAll("#dd1 .dropdown-item")) b.addEventListener("click", () => acts.push(b.id));
+  document.getElementById("i-focus").addEventListener("click", () => document.getElementById("field").focus());
+  // Theme first, exactly as cockpit, family and the template call them.
+  theme.initThemeSwitcher();
+  window.closeAll = dropdown.initDropdowns();
+  window.setTheme = theme.setTheme;
+  window.THEMES = theme.THEMES;
+  window.attachMenuKeys = dropdown.attachMenuKeys;
+  window.ready = true;
+</script></body></html>`;
+
+const server = createServer((req, res) => {
+  if (req.url === "/") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(HARNESS);
+    return;
+  }
+  const file = { "/runtime/dropdown.js": "runtime/dropdown.js", "/runtime/theme.js": "runtime/theme.js" }[req.url];
+  if (!file) { res.writeHead(404); res.end(); return; }
+  res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+  res.end(readFileSync(join(root, file), "utf8"));
+}).listen(0, "127.0.0.1");
+await new Promise((ok) => server.on("listening", ok));
+
+/* ── the browser ──────────────────────────────────────────────────────────── */
+
+const profile = mkdtempSync(join(tmpdir(), "dd-dropdown-"));
+const chrome = spawn(CHROME, [
+  "--remote-debugging-port=0", "--remote-allow-origins=*", "--headless=new",
+  "--no-first-run", "--no-default-browser-check", "--disable-gpu", `--user-data-dir=${profile}`, "about:blank",
+], { stdio: "ignore" });
+let socket;
+const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+process.on("exit", shutdown);
+
+let port;
+for (let i = 0; i < 100 && !port; i += 1) {
+  try { port = readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]; } catch {}
+  if (!port) await sleep(100);
+}
+if (!port) { shutdown(); throw new Error("headless chromium did not come up"); }
+
+const target = await (await fetch(`http://127.0.0.1:${port}/json/new`, { method: "PUT" })).json();
+socket = new WebSocket(target.webSocketDebuggerUrl);
+await new Promise((ok, bad) => { socket.onopen = ok; socket.onerror = bad; });
+
+let messageId = 0;
+const pending = new Map();
+socket.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  const slot = pending.get(message.id);
+  if (!slot) return;
+  pending.delete(message.id);
+  message.error ? slot.bad(new Error(JSON.stringify(message.error))) : slot.ok(message.result);
+};
+const send = (method, params = {}) => new Promise((ok, bad) => {
+  messageId += 1;
+  pending.set(messageId, { ok, bad });
+  socket.send(JSON.stringify({ id: messageId, method, params }));
+});
+const evaluate = async (expression) => {
+  const { result, exceptionDetails } = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+  if (exceptionDetails) throw new Error(exceptionDetails.exception?.description || exceptionDetails.text);
+  return result.value;
+};
+
+await send("Runtime.enable");
+await send("Page.enable");
+await send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/` });
+for (let i = 0; i < 50 && !(await evaluate("window.ready === true").catch(() => false)); i += 1) await sleep(100);
+
+const KEYS = {
+  Enter: { code: "Enter", keyCode: 13, text: "\r" }, " ": { code: "Space", keyCode: 32, text: " " },
+  Tab: { code: "Tab", keyCode: 9 }, Escape: { code: "Escape", keyCode: 27 },
+  ArrowDown: { code: "ArrowDown", keyCode: 40 }, ArrowUp: { code: "ArrowUp", keyCode: 38 },
+  Home: { code: "Home", keyCode: 36 }, End: { code: "End", keyCode: 35 },
+};
+const press = async (key, { shift = false } = {}) => {
+  const def = KEYS[key] || { code: `Key${key.toUpperCase()}`, keyCode: key.toUpperCase().charCodeAt(0), text: key };
+  const modifiers = shift ? 8 : 0;
+  await send("Input.dispatchKeyEvent", { type: def.text ? "keyDown" : "rawKeyDown", key, code: def.code,
+    windowsVirtualKeyCode: def.keyCode, text: def.text, unmodifiedText: def.text, modifiers });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key, code: def.code, windowsVirtualKeyCode: def.keyCode, modifiers });
+  await sleep(40); // `toggle` is dispatched asynchronously
+};
+const click = async (id) => {
+  const box = await evaluate(`(() => { const r = document.getElementById(${JSON.stringify(id)}).getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x, y: box.y });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: box.x, y: box.y, button: "left", clickCount: 1 });
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: box.x, y: box.y, button: "left", clickCount: 1 });
+  await sleep(40);
+};
+const focused = () => evaluate("document.activeElement?.id || document.activeElement?.tagName");
+const isOpen = (id) => evaluate(`document.getElementById(${JSON.stringify(id)}).open`);
+const attr = (id, name) => evaluate(`document.getElementById(${JSON.stringify(id)}).getAttribute(${JSON.stringify(name)})`);
+const reset = () => evaluate("closeAll(); document.getElementById('before').focus(); acts.length = 0; null");
+const focusOn = (id) => evaluate(`document.getElementById(${JSON.stringify(id)}).focus(); null`);
+
+let failures = 0;
+let last = "(none yet)";
+const check = (label, condition, detail) => {
+  last = label;
+  if (condition) { console.log(`PASS  ${label}`); return; }
+  failures += 1;
+  console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${JSON.stringify(detail)}`}`);
+};
+/*
+ * A THROW IS A FAIL, NOT A STACK. Each group runs inside section(): an exception — an older build
+ * without attachMenuKeys, a node a re-render detached — is reported as a FAIL naming the group and
+ * the last check that completed, and the next group still runs. A suite one throw can abort says
+ * nothing about everything after the throw, and to a grep for FAIL that reads like a pass.
+ */
+const section = async (name, body) => {
+  try {
+    await body();
+  } catch (error) {
+    failures += 1;
+    console.log(`FAIL  ${name}: aborted after "${last}"\n        ${String(error.message).split("\n")[0]}`);
+  }
+};
+
+/* ── a panel of rows is a menu; a panel holding a field is not ───────────── */
+await section("a panel of rows is a menu; a panel holding a field is not", async () => {
+  const roles = await evaluate(`(() => {
+    const p = document.querySelector("#dd1 .dropdown-panel");
+    return { panel: p.getAttribute("role"), labelledby: p.getAttribute("aria-labelledby"),
+      lis: [...p.children].map((li) => li.getAttribute("role")),
+      items: [...p.querySelectorAll(".dropdown-item")].map((b) => b.getAttribute("role") + "/" + b.getAttribute("tabindex")),
+      haspopup: document.getElementById("s1").getAttribute("aria-haspopup"),
+      expanded: document.getElementById("s1").getAttribute("aria-expanded") };
+  })()`);
+  check("a panel of rows becomes role=menu, labelled by its summary", roles.panel === "menu" && roles.labelledby === "s1", roles);
+  check("...its <li>s are role=none and its separator role=separator",
+    roles.lis.join() === "none,none,none,none,separator,none,none", roles.lis);
+  check("...its items are menuitems out of the tab order (tabindex -1)",
+    roles.items.every((r) => r === "menuitem/-1"), roles.items);
+  check("...and the summary says it opens a menu, and that it is shut", roles.haspopup === "menu" && roles.expanded === "false", roles);
+
+  const disclosure = await evaluate(`({ role: document.querySelector("#ddx .dropdown-panel").getAttribute("role"),
+    haspopup: document.getElementById("sx").getAttribute("aria-haspopup"),
+    tabindex: document.getElementById("fx").getAttribute("tabindex") })`);
+  check("a panel holding a text field stays a DISCLOSURE: no menu role, no aria-haspopup, field still tabbable",
+    disclosure.role === null && disclosure.haspopup === null && disclosure.tabindex === null, disclosure);
+
+  const theme = await evaluate(`[...document.querySelectorAll("#dth .dropdown-item")].map((b) => b.getAttribute("role") + "/" + b.getAttribute("aria-checked"))`);
+  check("theme items in a menu are menuitemradio with aria-checked, and marking kept the role",
+    theme.join() === "menuitemradio/true,menuitemradio/false", theme);
+  check("...a theme item OUTSIDE a menu is a toggle button (aria-pressed), never a stray menuitem",
+    (await attr("flat-green", "role")) === null && (await attr("flat-green", "aria-pressed")) === "false");
+});
+
+/* ── the summary opens the menu from the keyboard ────────────────────────── */
+await section("the summary opens the menu from the keyboard", async () => {
+  await reset(); await focusOn("s1"); await press("ArrowDown");
+  check("ArrowDown on the summary opens the menu onto the FIRST item",
+    (await isOpen("dd1")) && (await focused()) === "i-rename", await focused());
+  check("...and aria-expanded follows", (await attr("s1", "aria-expanded")) === "true");
+  await press("ArrowDown");
+  check("ArrowDown moves to the next item", (await focused()) === "i-dup", await focused());
+  await press("End");
+  check("End jumps to the last item", (await focused()) === "i-focus", await focused());
+  await press("ArrowDown");
+  check("ArrowDown on the last item WRAPS to the first", (await focused()) === "i-rename", await focused());
+  await press("ArrowUp");
+  check("ArrowUp on the first item wraps to the last", (await focused()) === "i-focus", await focused());
+  await press("Home");
+  check("Home jumps to the first item", (await focused()) === "i-rename", await focused());
+  await press("d");
+  check("typeahead: 'd' goes to the first item starting with d", (await focused()) === "i-dup", await focused());
+  await press("d");
+  check("...'d' again CYCLES to the next d-item", (await focused()) === "i-del", await focused());
+  await press("d");
+  check("...and reaches an aria-disabled item, which APG keeps focusable", (await focused()) === "i-dis", await focused());
+  // The precondition is part of the claim: a menu that never opened would "close to the summary"
+  // trivially, and pass on a build with no keys at all.
+  const beforeEscape = { open: await isOpen("dd1"), focus: await focused() };
+  await press("Escape");
+  check("Escape closes the OPEN menu and hands focus from the item back to the summary",
+    beforeEscape.open && beforeEscape.focus === "i-dis" && !(await isOpen("dd1")) && (await focused()) === "s1",
+    { beforeEscape, focus: await focused() });
+  check("...and aria-expanded follows", (await attr("s1", "aria-expanded")) === "false");
+
+  await reset(); await focusOn("s1"); await press("ArrowUp");
+  check("ArrowUp on the summary opens the menu onto the LAST item",
+    (await isOpen("dd1")) && (await focused()) === "i-focus", await focused());
+
+  await reset(); await focusOn("s1"); await press("Enter");
+  check("Enter on the summary opens the menu onto the first item — and it STAYS open",
+    (await isOpen("dd1")) && (await focused()) === "i-rename", { open: await isOpen("dd1"), focus: await focused() });
+
+  await reset(); await focusOn("s1"); await press(" ");
+  check("Space on the summary opens the menu onto the first item — and it STAYS open",
+    (await isOpen("dd1")) && (await focused()) === "i-rename", { open: await isOpen("dd1"), focus: await focused() });
+  await press(" ");
+  check("...Space then activates the focused item, and does not reopen anything",
+    (await evaluate("acts.join()")) === "i-rename" && !(await isOpen("dd1")), await evaluate("acts"));
+});
+
+/* ── leaving and activating ──────────────────────────────────────────────── */
+await section("leaving and activating", async () => {
+  await reset(); await focusOn("s1"); await press("ArrowDown");
+  const beforeTab = await focused();
+  await press("Tab");
+  check("Tab from an ITEM closes the menu and moves on, past the dropdown",
+    beforeTab === "i-rename" && !(await isOpen("dd1")) && (await focused()) === "after", { beforeTab, focus: await focused() });
+
+  await reset(); await focusOn("s1"); await press("ArrowDown"); await press("Tab", { shift: true });
+  check("Shift+Tab from an item closes the menu and lands on its summary",
+    !(await isOpen("dd1")) && (await focused()) === "s1", await focused());
+
+  await reset(); await focusOn("s1"); await press("ArrowDown"); await press("ArrowDown"); await press("Enter");
+  check("Enter on an item runs it, closes the menu and hands focus back to the summary",
+    (await evaluate("acts.join()")) === "i-dup" && !(await isOpen("dd1")) && (await focused()) === "s1",
+    { acts: await evaluate("acts"), focus: await focused() });
+
+  await reset(); await click("s1"); await click("i-del");
+  check("a mouse click on an item runs it and closes the menu",
+    (await evaluate("acts.join()")) === "i-del" && !(await isOpen("dd1")), await evaluate("acts"));
+
+  await reset(); await click("s1"); await click("i-dis");
+  check("an aria-disabled item does NOT close the menu when pressed", await isOpen("dd1"));
+
+  await reset(); await click("s1"); await click("i-focus");
+  check("an action that moves focus on purpose keeps it — the summary does not steal it back",
+    !(await isOpen("dd1")) && (await focused()) === "field", await focused());
+});
+
+/* ── one open, click-away, Escape from anywhere ──────────────────────────── */
+await section("one open, click-away, Escape from anywhere", async () => {
+  await reset(); await click("s1"); await click("s2");
+  check("opening one dropdown closes the other", (await isOpen("dd2")) && !(await isOpen("dd1")));
+  await click("before");
+  check("a click outside closes it", !(await isOpen("dd2")));
+
+  await reset(); await click("s1"); await focusOn("before"); await press("Escape");
+  check("Escape with focus OUTSIDE closes an open menu", !(await isOpen("dd1")));
+
+  await reset(); await click("sx"); await focusOn("fx"); await press("Tab", { shift: true }); await press("Tab");
+  check("a disclosure's field is reachable with Tab (it is not a menu)", (await focused()) === "fx", await focused());
+  await press("Escape");
+  check("Escape inside a disclosure closes it and returns focus to its summary",
+    !(await isOpen("ddx")) && (await focused()) === "sx", await focused());
+
+  await reset();
+  await evaluate("document.getElementById('dlg').showModal(); document.getElementById('sd').focus(); null");
+  await press("ArrowDown"); await press("Escape");
+  check("Escape in a menu inside a modal <dialog> closes the MENU, not the dialog",
+    !(await isOpen("ddd")) && (await evaluate("document.getElementById('dlg').open")) && (await focused()) === "sd",
+    { dialog: await evaluate("document.getElementById('dlg').open"), focus: await focused() });
+  await click("sd"); await focusOn("sd"); await press("Escape");
+  check("...and so does Escape on the SUMMARY of a menu opened by mouse",
+    !(await isOpen("ddd")) && (await evaluate("document.getElementById('dlg').open")),
+    { menu: await isOpen("ddd"), dialog: await evaluate("document.getElementById('dlg').open") });
+  await evaluate("document.getElementById('dlg').close(); null");
+
+  await reset(); await click("s1");
+  await evaluate(`(() => { const p = document.createElement("ul"); p.className = "select-panel"; p.id = "sp";
+    p.innerHTML = '<li class="select-option" id="spo">x</li>'; document.body.appendChild(p); })()`);
+  await click("spo");
+  check("a pick in a select's list on <body> does not close the dropdown holding the select", await isOpen("dd1"));
+  await evaluate("document.getElementById('sp').remove(); null");
+});
+
+/* ── markup rendered later ───────────────────────────────────────────────── */
+await section("markup rendered later", async () => {
+  await reset();
+  await evaluate(`document.getElementById("late-slot").innerHTML =
+    '<details class="dropdown" id="ddl"><summary id="sl">late</summary><ul class="dropdown-panel">' +
+    '<li><button type="button" class="dropdown-item" id="l1">alpha</button></li>' +
+    '<li><button type="button" class="dropdown-item" id="l2">beta</button></li></ul></details>'; null`);
+  await sleep(40);
+  check("a dropdown rendered AFTER initDropdowns() is marked as a menu",
+    (await evaluate("document.querySelector('#ddl .dropdown-panel').getAttribute('role')")) === "menu");
+  await focusOn("sl"); await press("ArrowDown"); await press("ArrowDown");
+  check("...and its keys work", (await focused()) === "l2", await focused());
+  await click("before"); await click("sl");
+  const lateOpened = await isOpen("ddl");
+  await click("before");
+  check("...and a click away closes it (opened by a click first)", lateOpened && !(await isOpen("ddl")), { lateOpened });
+  await evaluate(`document.querySelector("#ddl .dropdown-panel").insertAdjacentHTML("beforeend",
+    '<li><button type="button" class="dropdown-item" id="l3">gamma</button></li>'); null`);
+  await sleep(40);
+  check("a row ADDED to an existing menu is marked too (a pick list rebuilt from new values)",
+    (await attr("l3", "role")) === "menuitem" && (await attr("l3", "tabindex")) === "-1",
+    { role: await attr("l3", "role"), tabindex: await attr("l3", "tabindex") });
+});
+
+/* ── attachMenuKeys: a menu the page builds itself ───────────────────────── */
+await section("attachMenuKeys: a menu the page builds itself", async () => {
+  await reset();
+  await evaluate(`(() => {
+    const menu = document.getElementById("pm"); menu.hidden = false; window.closeCount = 0;
+    window.detach = attachMenuKeys(menu, { onClose: () => { closeCount += 1; menu.hidden = true; },
+                                           returnFocusTo: document.getElementById("pm-opener") });
+    document.getElementById("pm1").focus();
+  })()`);
+  check("attachMenuKeys takes the items out of the tab order", (await attr("pm2", "tabindex")) === "-1");
+  await press("ArrowDown");
+  check("...ArrowDown moves through the page's menu", (await focused()) === "pm2", await focused());
+  await press("Escape");
+  check("...Escape calls onClose and returns focus to the opener",
+    (await evaluate("closeCount")) === 1 && (await focused()) === "pm-opener", { closed: await evaluate("closeCount"), focus: await focused() });
+  await evaluate("document.getElementById('pm').hidden = false; document.getElementById('pm2').focus(); null");
+  await press("Enter");
+  check("...activating an item calls onClose and returns focus to the opener",
+    (await evaluate("closeCount")) === 2 && (await focused()) === "pm-opener", { closed: await evaluate("closeCount"), focus: await focused() });
+  await evaluate("document.getElementById('pm').hidden = false; detach(); document.getElementById('pm1').focus(); null");
+  await press("ArrowDown");
+  check("...and detach() removes the keys", (await focused()) === "pm1", await focused());
+});
+
+/* ── the theme items follow the theme, whoever changes it ────────────────── */
+await section("the theme items follow the theme, whoever changes it", async () => {
+  await reset(); await click("sth"); await click("t-green");
+  check("picking a theme sets html[data-theme] and moves the ✓ (aria-checked) to it",
+    (await evaluate("document.documentElement.dataset.theme")) === "green" &&
+    (await attr("t-green", "aria-checked")) === "true" && (await attr("t-warm", "aria-checked")) === "false");
+  check("...the label follows and the menu closes",
+    (await evaluate("document.querySelector('[data-theme-label]').textContent")) === "green" && !(await isOpen("dth")));
+  await evaluate("setTheme('warm'); null");
+  await sleep(40);
+  check("a theme set from PAGE CODE re-syncs the items too (the observer, not the click)",
+    (await attr("t-warm", "aria-checked")) === "true" && (await attr("flat-green", "aria-pressed")) === "false");
+
+  await reset(); await evaluate("document.getElementById('sth').focus(); null");
+  await press("ArrowDown"); await press("ArrowDown"); await press("Enter");
+  check("a keyboard pick (ArrowDown, ArrowDown, Enter) sets the theme, closes the menu and hands focus back to the summary",
+    (await evaluate("document.documentElement.dataset.theme")) === "green" && !(await isOpen("dth")) && (await focused()) === "sth",
+    { theme: await evaluate("document.documentElement.dataset.theme"), open: await isOpen("dth"), focus: await focused() });
+
+  // Delegated: a switcher rendered after initThemeSwitcher() works without another call.
+  await evaluate(`document.getElementById("late-theme-slot").innerHTML =
+    '<details class="dropdown" id="dth2"><summary id="sth2">theme later</summary><ul class="dropdown-panel">' +
+    '<li><button type="button" class="dropdown-item" data-theme-value="mono" id="t2-mono">mono</button></li>' +
+    '<li><button type="button" class="dropdown-item" data-theme-value="paper" id="t2-paper">paper</button></li></ul></details>'; null`);
+  await sleep(40);
+  check("a theme menu rendered LATER is marked (menuitemradio, aria-checked) with no second call",
+    (await attr("t2-mono", "role")) === "menuitemradio" && (await attr("t2-paper", "aria-checked")) === "false",
+    { role: await attr("t2-mono", "role"), checked: await attr("t2-paper", "aria-checked") });
+  await reset(); await click("sth2"); await click("t2-paper");
+  check("...and picking from it sets the theme and moves the ✓ in EVERY switcher on the page",
+    (await evaluate("document.documentElement.dataset.theme")) === "paper" && (await attr("t2-paper", "aria-checked")) === "true" &&
+    (await attr("t-green", "aria-checked")) === "false" && !(await isOpen("dth2")));
+  check("one theme order everywhere: THEMES is warm, green, mono, paper",
+    (await evaluate("(window.THEMES || []).join()")) === "warm,green,mono,paper", await evaluate("window.THEMES"));
+  await evaluate("setTheme('warm'); null");
+});
+
+console.log(failures ? `\ncheck-dropdown: ${failures} FAILED` : "\ncheck-dropdown: all checks passed");
+shutdown();
+process.exit(failures ? 1 : 0);

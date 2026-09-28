@@ -55,6 +55,60 @@
   .field-row { grid-template-columns: 1fr; gap: 0.2rem; }
 }
 
+/* THE SHAPES A SETTINGS PANEL ACTUALLY HAS (0.60.0). Cockpit wrote every one of these locally,
+   which is how a settings row came to exist in three spellings:
+
+   `--top` — the row centres its label against ONE line, which is right for a select and wrong for
+   a textarea or a stack of radios: centred against two stacked options the label reads as though
+   it belongs to neither. Top-aligned it heads the value.
+
+   `--stacked` — the label over the value at EVERY width, for a value too wide to share a row with
+   an 8.5rem label column (a table, a long textarea). It is what the row already becomes below
+   40rem, made available above it. */
+.field-row--top { align-items: start; }
+.field-row--stacked { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 0.2rem; }
+
+/* A DESCRIPTION AND AN ERROR BELONG TO THE VALUE, not to a third column: both span the value
+   cell's whole width (the cell is a wrapping flex row, `flex-basis: 100%` takes a line of its own)
+   and sit under the control they explain. The error is the one line in the panel in
+   --destructive, and it is linked to the control by `aria-describedby` so a reader tabbing
+   through hears it on the field, not only when it appears (`role="alert"`). */
+.field-desc,
+.field-error { flex-basis: 100%; margin: 0; }
+.field-desc { color: var(--muted-foreground); }
+.field-error { color: var(--destructive); }
+
+/* A LABEL THAT EXPLAINS ITSELF ON TOUCH. Cockpit's config panel carries a paragraph behind each
+   label, and on a phone there is no hover to read it by — so the label is a <button> that opens
+   the explanation in a dialog. It is still the label: same ink, same place, no box. Only the
+   pointer and the focus ring say it can be pressed, and the 44px floor under a thumb grows the
+   row rather than overlapping the controls beside it. */
+.field-row > button.lbl {
+  box-sizing: border-box;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-base);
+  color: var(--muted-foreground);
+  text-align: start;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.field-row > button.lbl:hover { color: var(--primary); }
+.field-row > button.lbl:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; color: var(--primary); }
+@media (pointer: coarse) {
+  .field-row > button.lbl { min-block-size: 44px; }
+}
+
+/* A TABLE USED AS A VALUE STARTS AT ITS LABEL (cockpit, Daniel 2026-08-11: "It seems they have
+   margin to top"). It was never a margin: the header CELL's own top padding put the header text
+   7px below the label beside it. This is the block-axis twin of `tr > *:first-child
+   { padding-inline-start: 0 }` in base.css, and it is scoped to a field row on purpose — a table
+   standing on its own wants that padding as air under its heading. Only the first row loses it. */
+.field-row table > thead > tr:first-child > *,
+.field-row table > tbody:first-child > tr:first-child > * { padding-block-start: 0; }
+
 /* ─────────────────────────────────────────────────────────────────────────
    Shell affordances — `$ command` section headers and `# comment` lines.
    ───────────────────────────────────────────────────────────────────────── */
@@ -89,17 +143,45 @@
     opacity: 0;
   }
 }
+/* A blink is motion. `html.anim-off` (tokens.css) hides the cursor outright; a reader who asked the
+   OS for less motion keeps the block and loses only the blinking. */
+@media (prefers-reduced-motion: reduce) {
+  .cursor-block { animation: none; }
+}
 
 /* ─────────────────────────────────────────────────────────────────────────
    Primary CTA — `> label` with a phosphor glow that lifts on hover.
    ───────────────────────────────────────────────────────────────────────── */
+/* AN ICON SLOT, AND THE SAME BOX ON EVERY SURFACE (0.60.0). The button was `inline-block`, so an
+   icon beside its label sat on the text baseline at whatever size the SVG happened to carry —
+   seedr's Button needs a glyph before the word, and every surface that put one there wrote its own
+   alignment. A flex row centres the glyph on the label and spaces it with one gap; a child `svg`
+   or `.ico` is sized by --icon-size, never by its own width attribute.
+
+   `font: inherit` and `box-sizing` are here, not left to the reset: a <button> outside the
+   build-free bundle (a Tailwind app, a tokens-only page) otherwise renders in the browser's 13px
+   system font, and a class that looks right only after a reset is a class that looks right on one
+   surface. The weight comes AFTER the shorthand, which would reset it.
+
+   THE FILLED BUTTON DECLARES ITS BORDER TOO, and it is a transparent 1px. It declared none, so on
+   every surface without Tailwind's Preflight a <button class="btn-terminal"> wore the browser's
+   2px outset border (painted --border by base.css) — measured: the filled compact button 30px tall
+   beside a 28px ghost. A transparent 1px is the ghost's box with the fill showing through it, so a
+   filled and an outlined button with the same label are the same size, on every surface. */
 .btn-terminal {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  box-sizing: border-box;
+  font: inherit;
+  font-weight: 700;
   background: var(--primary);
   color: var(--primary-foreground);
-  font-weight: 700;
+  border: 1px solid transparent;
   padding: 12px 24px;
   box-shadow: 0 0 16px var(--glow);
+  cursor: pointer;
   transition:
     box-shadow 0.15s ease,
     transform 0.15s ease;
@@ -107,6 +189,12 @@
 .btn-terminal::before {
   content: "> ";
 }
+.btn-terminal > :is(svg, .ico) {
+  flex: none;
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+}
+.btn-terminal:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 /* THE SECONDARY BUTTON. `.btn-terminal` is the loud one — filled --primary, one per view. Every
    surface that needed a quieter button (refresh, dry run, cancel) invented its own instead, and
    every one of those invented a border-radius with it. This is that button, square like
@@ -121,7 +209,9 @@
   box-shadow: none;
   font-weight: 400;
 }
-.btn-terminal--ghost::before { content: ""; }
+/* `none`, not `""`, since the button is a flex row: an empty string still generates a zero-width
+   box, the gap is laid out beside it, and every ghost label sat 0.4rem right of centre. */
+.btn-terminal--ghost::before { content: none; }
 .btn-terminal--ghost:hover {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, transparent);
@@ -165,8 +255,41 @@
    they have EQUAL specificity and the later one wins — declared above the CTA, this rule's padding
    lost to `padding: 12px 24px` and every compact button in the estate rendered at CTA size. Only
    the font-size appeared to work, because `.btn-terminal` happens not to set one, which is what
-   made it look like a class that was working. Position is load-bearing here, not tidiness. */
-.btn-terminal--compact { padding: 0.28rem 0.7rem; font-size: var(--fs-base); }
+   made it look like a class that was working. Position is load-bearing here, not tidiness.
+
+   AT THE FIELD'S HEIGHT (0.60.0). A compact ghost button measured 27.4px beside a 25.2px select
+   and a 25.2px text field — two heights on one toolbar row. Every single-line control now shares
+   --control-h (28px, seedr's and configr's `h-7`), and it is the field's box exactly: one
+   --lh-tight line, the two 1px edges (the filled button's are transparent), and a block padding
+   that is whatever the token leaves — so it is 28px at a 16px root and --control-h at every other,
+   where a fixed .25rem under the inherited 1.5 line was 34.5px against a 35px field at 20px.
+   `min-block-size` is the floor, and it agrees. */
+.btn-terminal--compact {
+  padding: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2) 0.7rem;
+  min-block-size: var(--control-h);
+  font-size: var(--fs-base);
+  line-height: var(--lh-tight);
+}
+
+/* TWO TEXT ACTIONS THAT ARE NOT ORDINARY (0.60.0). Both compose with `--ghost` — they are outlined
+   secondary buttons whose words carry a verdict, never a second filled button competing with the
+   primary. `--success` is approve / merge / accept; `--danger` is the destructive action that has a
+   WORD (deny, discard, reset to defaults): the red bin below stays the icon-only removal, and a
+   word never borrows it. The edge is the token mixed toward --border so it reads as a coloured
+   control at rest, and it takes the text's full colour under the pointer. */
+.btn-terminal--success {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 60%, var(--border));
+}
+.btn-terminal--danger {
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 60%, var(--border));
+}
+.btn-terminal--success:hover,
+.btn-terminal--danger:hover {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
 
 /* THE DESTRUCTIVE ROW ACTION — square, red, a bin, and nothing else.
 
@@ -185,32 +308,34 @@
    THE GLYPH IS A MASK, NOT MARKUP. Three surfaces adopt this (cockpit, netmon, docs) and an SVG
    pasted into three templates is three bins that drift. As a mask it is `currentColor`, so it
    takes --destructive from this rule and re-takes it on all four themes for free — a fill= would
-   have to be declared four times or be wrong on two of them. */
+   have to be declared four times or be wrong on two of them.
+
+   THE BIN IS LUCIDE'S `trash-2` (0.60.0), from the one icon set every surface already draws with
+   (--ico-trash-2 in tokens.css), where it was a hand-drawn path nobody else used. And it is a
+   28px square — --control-h on both axes — so it lines up with the compact buttons and the fields
+   in the row it sits in; configr's bin shipped at 28px in a 28px toolbar and this one at 25.6. The
+   padding is what the square leaves around the glyph and the two edges, so the box is the token. */
 .btn-terminal--destructive {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 0.3rem;
+  padding: calc((var(--control-h) - var(--icon-size) - 2px) / 2);
+  min-inline-size: var(--control-h);
+  min-block-size: var(--control-h);
   color: var(--destructive);
   border-color: color-mix(in srgb, var(--destructive) 45%, var(--border));
 }
 /* An icon button has no text, so the `> ` prefix would be the entire content of the button.
-   --ghost already blanks it; this repeats it so the class is correct on a filled button too. */
-.btn-terminal--destructive::before { content: ""; }
+   --ghost already blanks it; this repeats it so the class is correct on a filled button too —
+   `none` rather than `""`, which in a flex row would still be a box the gap is laid out beside. */
+.btn-terminal--destructive::before { content: none; }
 .btn-terminal--destructive::after {
-  content: ""; display: block; width: 0.875rem; height: 0.875rem;
+  content: ""; display: block; inline-size: var(--icon-size); block-size: var(--icon-size);
   background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 3h6v3H9zM4 6h16v2H4zM6 9h12l-1 12H7z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 3h6v3H9zM4 6h16v2H4zM6 9h12l-1 12H7z'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: var(--ico-trash-2) center / contain no-repeat;
+  mask: var(--ico-trash-2) center / contain no-repeat;
 }
 .btn-terminal--destructive:hover {
   border-color: var(--destructive);
   background: color-mix(in srgb, var(--destructive) 12%, transparent);
   box-shadow: none;
-}
-/* 44px on a touch screen. The control is 22px of bin at desktop density, and it DELETES things —
-   the last control in the estate that should be a coin toss under a thumb. Not `width/height`:
-   `min-*` grows the tap target without moving the glyph, which stays centred by the flexbox. */
-@media (pointer: coarse) {
-  .btn-terminal--destructive { min-width: 44px; min-height: 44px; }
 }
 
 /* THE EDIT ROW ACTION — the same icon button as the bin, in the ordinary colour.
@@ -236,24 +361,55 @@
    entire content is a mask, and a mask has no text: a screen reader announces "button", and a
    column of them announces "button" a dozen times. `aria-label` must name the TARGET
    ("edit poi/vu3"), not repeat the verb, or the column is a dozen identical announcements
-   instead. `bin/design-conformance` fails an icon button with no accessible name. */
+   instead. `bin/design-conformance` fails an icon button with no accessible name.
+
+   Lucide's `pencil` since 0.60.0 (--ico-pencil), and the bin's 28px square, for the bin's reasons. */
 .btn-terminal--edit {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 0.3rem;
+  padding: calc((var(--control-h) - var(--icon-size) - 2px) / 2);
+  min-inline-size: var(--control-h);
+  min-block-size: var(--control-h);
 }
 /* Kills the `> ` prefix, which would otherwise be the entire text content of an icon button.
    --ghost already blanks it; repeated here so the class is correct on a filled button too. */
-.btn-terminal--edit::before { content: ""; }
+.btn-terminal--edit::before { content: none; }
 .btn-terminal--edit::after {
-  content: ""; display: block; width: 0.875rem; height: 0.875rem;
+  content: ""; display: block; inline-size: var(--icon-size); block-size: var(--icon-size);
   background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04l-3.75-3.75-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04l-3.75-3.75-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: var(--ico-pencil) center / contain no-repeat;
+  mask: var(--ico-pencil) center / contain no-repeat;
 }
-/* 44px under a thumb, same as the bin: `min-*` grows the tap target without moving the glyph,
-   which the flexbox keeps centred. Never set a width on it. */
+
+/* BUSY: THE BUTTON SAYS IT IS WORKING (0.60.0). configr and seedr studio spin a loader in the
+   button that started a slow action, and a surface without one gets pressed twice. The page sets
+   `aria-busy="true"` AND `disabled` — busy is the reason, disabled is what stops the second press —
+   and the `> ` prefix (or the empty slot on a ghost) becomes lucide's loader-circle, turning. On
+   the bin and the pencil the spinner REPLACES the glyph: two glyphs in a 28px square is neither.
+   dd-spin is declared in tokens.css; `html.anim-off` stops it there, and reduced motion here. */
+.btn-terminal[aria-busy="true"]::before {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  background: currentColor;
+  -webkit-mask: var(--ico-loader-circle) center / contain no-repeat;
+  mask: var(--ico-loader-circle) center / contain no-repeat;
+  animation: dd-spin 1s linear infinite;
+}
+.btn-terminal--destructive[aria-busy="true"]::after,
+.btn-terminal--edit[aria-busy="true"]::after { content: none; }
+@media (prefers-reduced-motion: reduce) {
+  .btn-terminal[aria-busy="true"]::before { animation: none; }
+}
+
+/* 44px on a touch screen, for every variant — the compact button is a 28px target at desktop
+   density. The bin and the pencil grow on both axes: they DELETE and edit things, the last controls
+   that should be a coin toss under a thumb. `min-*`, never width/height, so the glyph stays centred
+   by the flexbox. Last in the family on purpose: it has to outrank `--compact`'s 28px floor, and
+   the two are equal in specificity. */
 @media (pointer: coarse) {
-  .btn-terminal--edit { min-width: 44px; min-height: 44px; }
+  .btn-terminal { min-block-size: 44px; }
+  .btn-terminal--destructive,
+  .btn-terminal--edit { min-inline-size: 44px; }
 }
 
 /* Quiet, underlined link that warms to the primary colour on hover. */
@@ -265,6 +421,59 @@
 }
 .link-quiet:hover {
   color: var(--primary);
+}
+.link-quiet:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* ON A <button> TOO (0.60.0). A quiet inline action that changes nothing about where you are —
+   "show all", "undo" — is a button, and a button carries the browser's box, padding and 13px system
+   font. The class used to assume an <a>, so every surface that put it on a button re-typed this
+   reset beside it. Only the box is reset; the colour and the underline above still apply. */
+button.link-quiet {
+  padding: 0;
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: inherit;
+}
+button.link-quiet:disabled { opacity: 0.45; cursor: default; color: var(--muted-foreground); }
+
+/* ── DISCLOSURE BUTTON — the ▸ that opens a row or a card in place (0.60.0) ─────────────────────
+   Cockpit's config page and the family contacts book both drew their own: a caret button beside a
+   name that expands the body under it. `details.fold` cannot do this — its summary is the whole
+   row, and these rows already have a name link, badges and actions on that line — so the toggle is
+   a separate <button> with `aria-expanded`, and the page shows or hides the region it
+   `aria-controls`.
+
+   The glyph is generated from the state, so it cannot disagree with it, and it carries empty alt
+   text (`/ ""`): the reader hears the button's name and "collapsed" / "expanded", not a triangle.
+   Declared twice because an engine without the alt syntax drops the whole declaration. It sits at
+   60% until it is the thing being aimed at, so a column of them does not out-shout the names they
+   sit beside; it inherits its colour for the same reason. */
+.disclosure-btn {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 0.15rem;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.disclosure-btn::before { content: "\25B8"; content: "\25B8" / ""; }
+.disclosure-btn[aria-expanded="true"]::before { content: "\25BE"; content: "\25BE" / ""; }
+.disclosure-btn:hover,
+.disclosure-btn:focus-visible { opacity: 1; }
+.disclosure-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.disclosure-btn:disabled { opacity: 0.45; cursor: default; }
+@media (pointer: coarse) {
+  .disclosure-btn { min-inline-size: 44px; min-block-size: 44px; }
+}
+@media print {
+  /* A control on paper is a glyph that does nothing; the page opens what it hides before printing. */
+  .disclosure-btn { display: none !important; }
 }
 
 /* Animations on/off toggle — a chrome control (footer/status bar). Pairs with
@@ -288,55 +497,10 @@
   color: var(--primary);
 }
 
-/* ── A FILTER IS NOT AN ACTION, AND IT SAYS WHAT IT IS (0.58.0, 0.59.0, Daniel) ────────────────
-   "the filters (hide handled, ...) look exactly like action buttons (refresh, ...). This is not
-   good. They should look different" (2026-09-19), and again on 2026-09-28, about a repository
-   picker built as a row of ghost buttons: "We already said once, that filters and stuff should
-   NOT look like a button." 0.58.0 answered that with bare text — and the same day: "Now it does
-   not look like a button, but I as a user does not know if this is some filter possibility, I
-   barely even see if something is active or not."
-
-   So a filter is not a box, and it is not bare text either: it carries the MARK of a choice, the
-   one every reader already knows and the one this estate's own chrome already wears (the footer's
-   `[x] anim`). Drawn here from `aria-pressed`, so a page cannot forget it and cannot disagree with
-   its own state:
-
-     a toggle              [ ] follow            [x] follow
-     one of several        ( ) columbus          (•) columbus      — inside .filter-set
-
-   The chosen one is also the only thing on the row in the foreground colour and in bold, with its
-   mark in --primary; the rest recede. The marks are `content: … / ""`, so a screen reader hears
-   the label and the pressed state once, not "left bracket x right bracket". The font is mono, so
-   a mark never shifts the row when it flips.
-
-   A control with no `aria-pressed` gets no mark — it is not a filter, whatever its class.
-
-   Vertical padding matches `.btn-terminal--compact` exactly, so a filter in a row of actions does
-   not change the row's height. */
-.filter-ctl {
-  font: inherit;
-  font-size: var(--fs-base);
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  padding: 0.28rem 0.35rem;
-  color: var(--muted-foreground);
-}
-.filter-ctl:hover { color: var(--primary); }
-.filter-ctl:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.filter-ctl[aria-pressed="true"] { color: var(--foreground); font-weight: 700; }
-.filter-ctl:disabled { opacity: 0.45; cursor: default; }
-.filter-ctl[aria-pressed]::before { content: "[ ] "; content: "[ ] " / ""; white-space: pre; }
-.filter-ctl[aria-pressed="true"]::before { content: "[x] "; content: "[x] " / ""; color: var(--primary); }
-
-/* ONE OF SEVERAL — a picker choosing which repository, range or view a panel reads. The set says
-   what is being chosen (`repo:`), and its options wear the radio mark instead of the checkbox. */
-.filter-set { display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.75rem; row-gap: 0.1rem; }
-.filter-set-label { font-size: var(--fs-base); color: var(--muted-foreground); }
-.filter-set-label::after { content: ":"; }
-.filter-set > .filter-ctl[aria-pressed]::before { content: "( ) "; content: "( ) " / ""; }
-/* \2022 is the bullet, escaped so the file stays ASCII whatever charset it is served with. */
-.filter-set > .filter-ctl[aria-pressed="true"]::before { content: "(\2022) "; content: "(\2022) " / ""; }
+/* `.filter-ctl`, `.filter-set` and `.filter-set-label` (0.58.0-0.59.0) are gone in 0.60.0. A
+   filter is not a text toggle wearing `[x]`: a single choice is `<select data-filter>`, a boolean is
+   `.switch`, a multi-select is `.chip-set` of `button.chip[aria-pressed]`. See references/filters.md
+   and references/controls.md. */
 
 /* ─────────────────────────────────────────────────────────────────────────
    Settings-control icons — centralized so every consuming site shares ONE
@@ -386,9 +550,12 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Card — bordered surface that warms its border and glows softly on hover.
+   Card — a bordered surface. Only a card you can PRESS answers the pointer.
    ───────────────────────────────────────────────────────────────────────── */
 .card-terminal {
+  /* A table inside a card fades into the card, not into the page behind it — the default fade is
+     --background, which paints a bright band across a --card surface. */
+  --tablewrap-fade: var(--card);
   background: var(--card);
   border: 1px solid var(--border);
   /* PADDING BELONGS TO THE CARD (Daniel, 2026-08-19). It had none, so every card in the
@@ -400,31 +567,65 @@
      one-size type scale was introduced to end. A card is a box with something in it; the
      gap between the box and the something is the card's business, not the caller's.
 
-     Stated in rem so it tracks the root font size with everything else — on a 4K screen the
-     breathing room grows with the text it is holding away from the edge. */
-  padding: 0.85rem 1.1rem;
+     --card-pad (0.75rem) since 0.60.0, down from `.85rem 1.1rem`: it is what seedr's and configr's
+     cards both use (12px), and those are the surfaces with grids of cards. One value on every side,
+     so a card no longer has a wider gutter than it has headroom. */
+  padding: var(--card-pad);
   transition:
     border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    background-color 0.15s ease;
 }
-.card-terminal:hover {
+/* HOVER ONLY ON A CARD THAT DOES SOMETHING (0.60.0). Every card used to warm its border and glow
+   under the pointer — static ones, settings panels, photo figures — so the one card that WAS a
+   link looked exactly like the forty that were not, and a reader learned that hovering a card
+   means nothing. Now the pointer is answered only where a click lands: a card that is an <a> or a
+   <button>, or `.card-terminal--link` (a card whose title link is stretched over it).
+
+   And the answer is a fill, not a glow: the edge takes --primary and the surface steps to
+   --secondary, which is what seedr's and configr's cards do. --secondary keeps --primary text at
+   5.59:1 and muted text at 4.67:1 on warm, so nothing inside the card gets harder to read. */
+a.card-terminal:hover,
+button.card-terminal:hover,
+.card-terminal--link:hover {
   border-color: var(--primary);
-  box-shadow: 0 0 20px var(--glow-soft);
+  background: var(--secondary);
 }
+/* A card that IS the control needs the reset its element needs — a link's underline and blue, a
+   button's system font and centred text — and the ring any control needs. */
+a.card-terminal {
+  color: inherit;
+  text-decoration: none;
+}
+button.card-terminal {
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+a.card-terminal:focus-visible,
+button.card-terminal:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* A card that frames a table or a `.row-list` flush to its edge: the rows carry their own inset. */
+.card-terminal--flush { padding: 0; }
 
 /* ─────────────────────────────────────────────────────────────────────────
    Dropdown — a <details class="dropdown"> with a <summary> trigger and a
-   floating panel. Pairs with runtime/dropdown.js (close-others, click-away,
-   Escape). The panel opens UPWARD by default (for status-bar / footer menus);
-   add .dropdown-panel--down to open below the trigger.
+   floating panel. Pairs with runtime/dropdown.js, which makes a panel of
+   rows an APG menu (arrow keys, Home/End, typeahead, Escape back to the
+   summary) and keeps one open at a time. The panel opens UPWARD by default
+   (for status-bar / footer menus); `--down` opens below the trigger and
+   `--end` below it, right-aligned.
    ───────────────────────────────────────────────────────────────────────── */
 .dropdown {
   position: relative;
 }
-.dropdown > summary {
+/* ZERO SPECIFICITY, so the summary can be something else as well (0.60.0). A summary may be a
+   `.btn-icon` — a history clock, a kebab — and at `.dropdown > summary` (0,1,1) this rule outranked
+   the icon button's own class (0,1,0): the square turned into a left-aligned muted flex row. Inside
+   :where() it is the look of a summary that has no look of its own, and any class on it wins. */
+:where(.dropdown > summary) {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
   cursor: pointer;
   user-select: none;
   list-style: none;
@@ -434,59 +635,179 @@
 .dropdown > summary::-webkit-details-marker {
   display: none;
 }
-.dropdown > summary:hover,
-.dropdown[open] > summary {
+:where(.dropdown > summary:hover, .dropdown[open] > summary) {
   color: var(--primary);
 }
+.dropdown > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .dropdown-panel {
   position: absolute;
   right: 0;
   bottom: calc(100% + 12px);
   z-index: 50;
-  min-width: 128px;
-  margin: 0;
-  padding: 4px 0;
-  list-style: none;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 0 20px var(--glow-soft);
+  min-inline-size: 8rem;
 }
 /* open below the trigger instead of above */
 .dropdown-panel--down {
-  top: calc(100% + 8px);
+  top: calc(100% + 4px);
   bottom: auto;
   left: 0;
   right: auto;
 }
+/* open below, flush with the trigger's END: a menu at the right edge of a toolbar or a card, which
+   opening rightward would push past the viewport. */
+.dropdown-panel--end {
+  top: calc(100% + 4px);
+  bottom: auto;
+  left: auto;
+  right: 0;
+}
+
+/* ── ONE POPUP LOOK — every list that drops down is the system's list (0.60.0, Daniel) ──────────
+   "A dropdown should ALWAYS have the custom layout for the list, not the system one." And the
+   system had two looks for the one idea: `.dropdown-panel` (--card on a --border hairline, rows
+   resting muted and turning --primary under the pointer) and `.select-panel` (--popover on the 60%
+   control edge, a left bar plus bold on the chosen row). seedr's filter and sort panels, configr's
+   Select and studio's Select agreed on a third — every row reserves a ✓ column and the chosen one
+   fills it — and that is the look now, for every list that drops down: a menu, a listbox, the
+   context menu (`.select-panel.context-menu`), and a framework app's own panel wearing these
+   classes.
+
+   THE PANEL sits on --control-edge, not --border. On green and mono no shadow can separate a
+   near-black panel from a near-black page (--popover against --background: 1.06 and 1.05:1), and
+   --border reaches only 1.49-2.00:1 there, so the edge is what does the separating: --control-edge
+   measures >= 3.26:1 against every surface on every theme. The glow is --elev-float, the one popup
+   elevation.
+
+   A PANEL DOES NOT PLACE ITSELF HERE. `.dropdown-panel` is absolute inside its <details> (above);
+   a `.select-panel` is placed by whoever opens it — select.js and positionPopup() write
+   `position: fixed` inline, and a framework app positions its own — so the class can be put on a
+   panel React owns without a fixed box fighting its layout. */
+.dropdown-panel,
+.select-panel {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  font-size: var(--fs-base);
+  line-height: var(--lh-tight);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 1px solid var(--control-edge);
+  box-shadow: var(--elev-float);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* 60 clears the scanline overlay (40), .dropdown-panel (50) and footer.status (50). */
+.select-panel { z-index: 60; }
+
+/* THE ROW — one box for a menu item and an option, so a menu and a listbox side by side cannot
+   drift apart. It rests in the panel's own ink: a menu item used to rest muted, so a menu of
+   ACTIONS read as a list of disabled ones. It starts .5rem in because the ✓ column below takes the
+   rest of the gutter. A row may be an <a> (a history entry, "open in new view"), so it resets a
+   link's underline as well as a button's box: the two kinds of row must read as one list. */
+.select-option,
 .dropdown-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 5px 14px;
-  text-align: left;
+  gap: 0.5rem;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: 0.3rem 0.9rem 0.3rem 0.5rem;
   font: inherit;
-  line-height: 1.5;
+  text-align: start;
+  text-decoration: none;
+  color: var(--popover-foreground);
   background: none;
   border: 0;
-  color: var(--muted-foreground);
-  cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s ease;
+  cursor: pointer;
 }
-.dropdown-item:hover {
-  color: var(--primary);
+/* THE RAIL BORROWS THE ROW, NOT THE POPUP. `a.dropdown-item.ls-row` is how cockpit, pagr and the
+   documentation template render the `ls -l` rail, and chrome.css lines `.ls-group` up with those
+   rows at 0.875rem (0.44.1). The rail is navigation, not a list that drops down: it keeps its gutter. */
+.dropdown-item.ls-row { padding-inline: 0.875rem; }
+
+/* ONE POINTER OF ATTENTION. Hover, a listbox's keyboard-active option (`data-active`) and Radix's
+   `data-highlighted` are one state, as they have been for the select since 0.21.0 — two highlights
+   would ask the reader which one Enter takes. A menu item holding real focus adds the ring, inset
+   so the panel's overflow cannot clip it. */
+.select-option:hover,
+.select-option[data-active="true"],
+.select-option[data-highlighted],
+.dropdown-item:hover,
+.dropdown-item:focus-visible,
+.dropdown-item[data-active="true"],
+.dropdown-item[data-highlighted] {
   background: var(--muted);
 }
-.dropdown-item[aria-current="true"],
-html:not([data-theme]) .dropdown-item[data-theme-value="warm"],
-html[data-theme="green"] .dropdown-item[data-theme-value="green"],
-html[data-theme="mono"] .dropdown-item[data-theme-value="mono"],
-html[data-theme="paper"] .dropdown-item[data-theme-value="paper"],
-html[data-theme="warm"] .dropdown-item[data-theme-value="warm"] {
+.dropdown-item:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+
+/* THE CHOICE COLUMN: a ✓ says which, in a column every row keeps free. Selection CANNOT be a colour
+   here, and that is measured — --primary against --popover-foreground, the chosen row's ink against
+   its neighbours', is 1.65 / 1.31 / 1.48 / 1.27:1 on warm / green / mono / paper, two inks nobody
+   can tell apart. 0.21.0 answered with a left bar plus bold, which moved the chosen label and
+   changed its width; the ✓ is shape and position, and no label moves when the choice does. The
+   label keeps its weight and its colour; the ✓ carries the state.
+
+   Reserved on every row of a `.select-panel`, on every choice row of a menu (`aria-checked`,
+   `aria-pressed`, `menuitemradio`, `menuitemcheckbox`), and on every row of a menu that holds one,
+   so a "reset" under the choices lines up with them. That last selector needs :has() and is a rule
+   of its own on purpose: in one list with the others, an engine without :has() drops the whole
+   list — the always-safe selectors with it. */
+.select-panel :is(.select-option, .dropdown-item)::before,
+.dropdown-item:is([aria-checked], [aria-pressed], [role="menuitemradio"], [role="menuitemcheckbox"])::before {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+}
+.dropdown-panel:has(:is([aria-checked], [aria-pressed], [role="menuitemradio"], [role="menuitemcheckbox"])) .dropdown-item::before {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+}
+.select-option[aria-selected="true"]::before,
+.dropdown-item:is([aria-checked="true"], [aria-pressed="true"])::before {
+  background: var(--primary);
+  -webkit-mask: var(--ico-check) center / contain no-repeat;
+  mask: var(--ico-check) center / contain no-repeat;
+}
+
+/* A navigation list in a popup (history, language) marks where you ARE, not what you chose: the
+   accent and the glow, as since the first release. */
+.dropdown-item[aria-current="true"] {
   color: var(--primary);
   text-shadow: 0 0 8px var(--glow);
+}
+
+/* 65% of the ink, not 45%: below that warm lands at 2.94:1 and the row stops being readable at all,
+   and "unavailable" still has to be legible to be understood as a choice that exists. 65% measures
+   3.75 at worst (warm). No highlight: there is nothing for the pointer to take. */
+:is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled) {
+  color: color-mix(in srgb, var(--popover-foreground) 65%, var(--popover));
+  cursor: default;
+}
+:is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled):hover { background: none; }
+
+.dropdown-item--danger { color: var(--destructive); }
+
+.dropdown-sep {
+  block-size: 1px;
+  margin: 0.25rem 0;
+  padding: 0;
+  background: var(--border);
+}
+
+/* A group heading inside a popup: an <optgroup>'s label in a listbox, `.dropdown-label` in a menu. */
+.dropdown-label,
+.select-group {
+  padding: 0.35rem 0.9rem 0.15rem 0.5rem;
+  color: var(--muted-foreground);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -515,16 +836,19 @@ html[data-theme="warm"] .dropdown-item[data-theme-value="warm"] {
    ELEMENT and by class together. Five copies of `.cfg-sel` in cockpit are what
    this replaces; none of them agreed about `:disabled`.
 
-   THE BORDER IS 60% OF --foreground, MEASURED, NOT --border. A control's edge
-   is the thing that says "this is a control" and WCAG 1.4.11 wants 3:1 for
-   that; `--border` is a CONTAINER hairline and measures 1.37 / 2.00 / 1.61 /
-   1.42 against `--background` on the four themes — invisible as a control
-   edge, and correct for the cards it was made for. The estate's hand-rolled
-   selects used `currentColor 30%`, which is 1.70 at worst. 60% is the first
-   step that clears 3:1 on all four themes against ALL THREE surfaces a control
-   can land on (worst: warm 3.24 over --background, 3.24 over --muted). Mixed
-   with `transparent` rather than with a surface so it composites correctly
-   wherever it is dropped, and derived from a token so it stays per-theme.
+   THE BORDER IS --control-edge: 60% OF --foreground, MEASURED, NOT --border.
+   A control's edge is the thing that says "this is a control" and WCAG 1.4.11
+   wants 3:1 for that; `--border` is a CONTAINER hairline and measures 1.37 /
+   2.00 / 1.61 / 1.42 against `--background` on the four themes — invisible as
+   a control edge, and correct for the cards it was made for. The estate's
+   hand-rolled selects used `currentColor 30%`, which is 1.70 at worst. 60% is
+   the first step that clears 3:1 on all four themes against ALL THREE surfaces
+   a control can land on (worst: warm 3.40 / 3.30 / 3.26 over --background /
+   --card / --muted). Mixed with `transparent` rather than with a surface so it
+   composites correctly wherever it is dropped, and derived from a token so it
+   stays per-theme. Since 0.60.0 the mix is ONE token in tokens.css, so the
+   field, the trigger, the search box and every popup edge are one declaration
+   rather than five copies of the same color-mix.
 
    THE CARET IS TWO GRADIENT HALVES, not an SVG. It has to be `currentColor` —
    a data-URI with a baked fill would need declaring four times or be wrong on
@@ -556,7 +880,32 @@ html[data-theme="warm"] .dropdown-item[data-theme-value="warm"] {
    are listed, plus `:not([type])`, which is a valid text input.
 
    `textarea` takes the box but NOT the tight line-height: --lh-tight is for
-   single-line chrome, and multi-line prose set at 1.3 is unreadable. */
+   single-line chrome, and multi-line prose set at 1.3 is unreadable.
+
+   ONE HEIGHT, AND IT IS A TOKEN (0.60.0). "The button's height" was a number
+   nobody could name: 25.2px from padding and line-height, 27.44px for the
+   compact button. seedr and configr both build every single-line control at
+   28px (`h-7`), so --control-h is that, and every field, trigger and compact
+   button takes it as `min-block-size`.
+
+   AND THE BOX IS THE TOKEN, NOT A NUMBER UNDER IT. The block padding is what
+   --control-h leaves after one --lh-tight line and the two 1px edges, so the
+   field is 28px from its own metrics, at any root font size, and the floor
+   only agrees with it. A padding picked by eye is how this went wrong the last
+   time: `.3rem` with the line height the field INHERITS (1.5) measures 29.6px,
+   and a padding that only sits under the line by luck is one inherited
+   line-height away from that. The line height is declared here for the same
+   reason, never left to inheritance. `box-sizing` is declared here, not left to
+   a reset a Tailwind app or a tokens-only page may not have.
+
+   FOCUS IS THE RING AND THE EDGE. The ring alone sits 2px outside the box, and
+   on a dense settings panel it reads as belonging to the row; configr's fields
+   turn their own edge --primary on focus, so the field itself says it has the
+   caret. An invalid field keeps its --destructive edge through hover and focus
+   — the error is what the reader is fixing, and hiding it while they fix it is
+   backwards. Placeholder text is --muted-foreground, at full opacity because
+   Firefox dims a placeholder with `opacity` on top of whatever colour it is
+   given, and it is never the only label. */
 input[type="text"],
 input[type="search"],
 input[type="url"],
@@ -567,20 +916,22 @@ input[type="tel"],
 input[type="date"],
 input:not([type]),
 textarea {
+  box-sizing: border-box;
   max-width: 100%;
-  padding: 0.35rem 0.5rem;
+  min-block-size: var(--control-h);
+  padding: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2) 0.5rem;
   font: inherit;
   font-size: var(--fs-base);
   line-height: var(--lh-tight);
   color: var(--foreground);
   background-color: transparent;
-  /* The same 60%-of-foreground edge as the select below, for the same measured
-     reason: --border is a container hairline and misses WCAG 1.4.11's 3:1 for a
-     control edge on all four themes. A control is a control. */
-  border: 1px solid color-mix(in srgb, var(--foreground) 60%, transparent);
+  /* The same edge as the select below, for the same measured reason: --border is a
+     container hairline and misses WCAG 1.4.11's 3:1 for a control edge on all four
+     themes. A control is a control. */
+  border: 1px solid var(--control-edge);
   transition: border-color 0.15s ease;
 }
-textarea { line-height: var(--lh-base); }
+textarea { min-block-size: 4rem; line-height: var(--lh-base); resize: vertical; }
 input[type="text"]:hover,
 input[type="search"]:hover,
 input[type="url"]:hover,
@@ -591,19 +942,62 @@ input[type="tel"]:hover,
 input[type="date"]:hover,
 input:not([type]):hover,
 textarea:hover { border-color: var(--primary); }
+input[type="text"]:focus-visible,
+input[type="search"]:focus-visible,
+input[type="url"]:focus-visible,
+input[type="email"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="tel"]:focus-visible,
+input[type="date"]:focus-visible,
+input:not([type]):focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-color: var(--primary);
+}
+/* After hover and focus, and as specific as either, so it outranks both. */
+input[aria-invalid="true"],
+input[aria-invalid="true"]:hover,
+input[aria-invalid="true"]:focus-visible,
+textarea[aria-invalid="true"],
+textarea[aria-invalid="true"]:hover,
+textarea[aria-invalid="true"]:focus-visible { border-color: var(--destructive); }
+input::placeholder,
+textarea::placeholder { color: var(--muted-foreground); opacity: 1; }
 input:disabled,
-textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+textarea:disabled { opacity: 0.45; cursor: default; }
+input:is([type="text"], [type="search"], [type="url"], [type="email"], [type="password"], [type="number"], [type="tel"], [type="date"], :not([type])):disabled:hover,
+textarea:disabled:hover { border-color: var(--control-edge); }
+/* The browser's own furniture inside a field: number spinners are a second, 8px-tall control glued
+   to the first, and WebKit's search decoration is a magnifier and a rounded field on Safari. The
+   textfield appearance keeps the search box square and keeps its native clear button, which a bare
+   search field has no replacement for (`.search-field` draws its own). */
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="search"] { -webkit-appearance: textfield; appearance: textfield; }
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-results-decoration { -webkit-appearance: none; }
+/* Chrome's date field pads its own editor (1px) and its calendar button (2px) inside the box, which
+   put it at 29.97px beside 28px fields — measured by examples/components.html's height check. */
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-calendar-picker-indicator { padding-block: 0; }
 
 select,
 .select-trigger {
   appearance: none;
   -webkit-appearance: none;
+  box-sizing: border-box;
   max-width: 100%;
-  /* 0.35rem, not 0.28rem, since 0.26.0 — this is what lifts the closed control
-     onto the button's height so a filter box, a dropdown and a button line up.
-     It changes BOTH renderings at once, which is exactly why they are declared
-     together. */
-  padding: 0.35rem 1.45rem 0.35rem 0.5rem;
+  /* --control-h puts the closed control on the field's and the compact button's line, so a filter
+     box, a dropdown and a button line up (0.26.0 did it with padding alone, and landed at 25.2px
+     beside a 27.4px button). The block padding is the field's — what the token leaves after one
+     tight line and two edges — so the box IS 28px, and the floor only agrees. It changes BOTH
+     renderings at once, which is exactly why they are declared together. */
+  min-block-size: var(--control-h);
+  padding: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2) 1.45rem
+    calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2) 0.5rem;
   font: inherit;
   font-size: var(--fs-base);
   line-height: var(--lh-tight);
@@ -618,7 +1012,7 @@ select,
     right 0.5rem center;
   background-size: 0.28rem 0.28rem;
   background-repeat: no-repeat;
-  border: 1px solid color-mix(in srgb, var(--foreground) 60%, transparent);
+  border: 1px solid var(--control-edge);
   cursor: pointer;
   transition: border-color 0.15s ease;
 }
@@ -627,11 +1021,31 @@ select:hover,
 .select-trigger[aria-expanded="true"] {
   border-color: var(--primary);
 }
+/* Focus is the ring AND the edge, as on a text field: the two sit side by side in every form. */
+select:focus-visible,
+.select-trigger:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-color: var(--primary);
+}
+/* An invalid choice keeps its --destructive edge through hover, focus and an open list. select.js
+   mirrors `aria-invalid` from the <select> onto the trigger, so the page marks the select it owns. */
+select[aria-invalid="true"],
+select[aria-invalid="true"]:hover,
+select[aria-invalid="true"]:focus-visible,
+.select-trigger[aria-invalid="true"],
+.select-trigger[aria-invalid="true"]:hover,
+.select-trigger[aria-invalid="true"]:focus-visible,
+.select-trigger[aria-invalid="true"][aria-expanded="true"] {
+  border-color: var(--destructive);
+}
 select:disabled,
 .select-trigger:disabled {
   opacity: 0.45;
   cursor: default;
 }
+select:disabled:hover,
+.select-trigger:disabled:hover { border-color: var(--control-edge); }
 /* Open: the caret turns over, so the control says "the list is out" without
    relying on the panel being in view — it may have flipped above the trigger. */
 .select-trigger[aria-expanded="true"] {
@@ -682,79 +1096,17 @@ select:disabled,
   content: "\200b";
 }
 
-/* THE PANEL IS position: fixed AND APPENDED OUT OF THE FLOW, for two reasons
-   this estate hits constantly: selects live inside `.tablewrap` (which scrolls,
-   so it clips) and inside modal `<dialog>`s (a top layer, which nothing outside
-   can paint above). An absolutely-positioned panel would be cut off in the
-   first and hidden behind the second. runtime/select.js appends it to the
-   nearest open <dialog> when there is one and to <body> otherwise.
-   z-index 60 clears the scanline overlay (40), .dropdown-panel (50) and
-   footer.status (50). */
-.select-panel {
-  position: fixed;
-  z-index: 60;
-  margin: 0;
-  padding: 0.15rem 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  list-style: none;
-  font-size: var(--fs-base);
-  line-height: var(--lh-tight);
-  color: var(--popover-foreground);
-  background: var(--popover);
-  border: 1px solid color-mix(in srgb, var(--foreground) 60%, transparent);
-  box-shadow: 0 0 20px var(--glow-soft);
-}
+/* THE LIST — `.select-panel`, `.select-option`, `.select-group` — is the ONE POPUP LOOK above,
+   shared with every menu: a ✓ column instead of the left bar plus bold, one edge, one elevation.
 
-/* SELECTION CANNOT BE A COLOUR HERE, and that is measured, not felt. `--primary`
-   against `--popover-foreground` — the selected option's ink against its
-   neighbours' — is 1.65:1 on warm, 1.31 on green, 1.48 on mono, 1.27 on paper.
-   Two inks a reader cannot tell apart is not a marking. Same finding as the
-   rail's current row (0.19.0), same answer: POSITION AND AREA. The selected
-   option is the only one with a left edge marker, and it is bold; the colour is
-   the third signal, not the only one.
-
-   The keyboard's active option and the mouse's hover are the SAME state on
-   purpose — there is one pointer of attention, and showing two would ask the
-   reader which one Enter is going to take. */
-.select-option {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.28rem 0.9rem 0.28rem 0.55rem;
-  border-inline-start: 2px solid transparent;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.select-option:hover,
-.select-option[data-active="true"] {
-  background: var(--muted);
-}
-.select-option[aria-selected="true"] {
-  color: var(--primary);
-  font-weight: 700;
-  border-inline-start-color: var(--primary);
-}
-/* 65% of the ink, not 45%: below that warm lands at 2.94:1 and the option stops
-   being readable at all, and "unavailable" still has to be legible to be
-   understood as a choice that exists. 65% measures 3.75 at worst (warm). */
-.select-option[aria-disabled="true"] {
-  color: color-mix(in srgb, var(--popover-foreground) 65%, var(--popover));
-  cursor: default;
-}
-.select-option[aria-disabled="true"]:hover {
-  background: none;
-}
-/* <optgroup> label. Nothing in the estate uses one today; it is here because a
-   listbox that silently drops the grouping a consumer wrote is worse than one
-   that never supported it. */
-.select-group {
-  padding: 0.35rem 0.9rem 0.15rem;
-  color: var(--muted-foreground);
-  font-size: var(--fs-base);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
+   THE PANEL IS STILL position: fixed AND APPENDED OUT OF THE FLOW, for two reasons this estate hits
+   constantly: selects live inside `.tablewrap` (which scrolls, so it clips) and inside modal
+   `<dialog>`s (a top layer, which nothing outside can paint above). An absolutely-positioned panel
+   would be cut off in the first and hidden behind the second. runtime/select.js appends it to the
+   nearest open <dialog> when there is one and to <body> otherwise — and since 0.60.0 it writes the
+   `position: fixed` inline, beside the left/top it already wrote, rather than this class declaring
+   it: a framework app puts `.select-panel` on a panel it positions itself, and a fixed box declared
+   by the class fought that layout. */
 
 /* ─────────────────────────────────────────────────────────────────────────
    TABLE PAGER — twenty rows at a time, and the reader can say otherwise.
@@ -835,21 +1187,6 @@ select:disabled,
 .eli5-term {
   font-weight: 700;
   color: var(--primary);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Animation kill-switch — add html.anim-off (e.g. from a footer "animations
-   off" toggle) to stop ALL motion regardless of the OS reduced-motion setting.
-   runtime/terminal.js also bails when this class is present, so content stays
-   visible. Complements the prefers-reduced-motion handling below.
-   ───────────────────────────────────────────────────────────────────────── */
-html.anim-off *,
-html.anim-off *::before,
-html.anim-off *::after {
-  animation: none !important;
-}
-html.anim-off .cursor-block {
-  display: none;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -968,22 +1305,55 @@ section.doc.tab-panel { margin-top: 1.35rem; }
    text that was deleted. Hence a permanent ▸ marker and a full-width summary row rather than
    anything that appears on hover.
 
-   Pair with a `beforeprint` handler that opens every <details>, or a printout silently loses
-   whatever the closed ones were holding. */
+   A SUMMARY IS ONE CONTROL. Nothing interactive goes inside it: a button in a summary is a second
+   control inside the first, and a click on it toggles the fold as well. A section whose head
+   carries actions is a `.panel` with a `.disclosure-btn`. What a summary holds, after the ▸: an
+   optional `.ico`, the label, and a `.fold-count` — "skills/ 12", "(3/17)" while a search narrows.
+
+   initFolds() (runtime/fold.js) opens every closed <details> for a print and closes them again
+   afterwards; without it a printout silently loses whatever the closed ones were holding. */
 details.fold { border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
 details.fold > summary {
   display: flex; align-items: center; gap: 0.5rem; cursor: pointer; list-style: none;
   padding: 0.55rem 0; font-size: var(--fs-base); color: var(--muted-foreground);
 }
 details.fold > summary::-webkit-details-marker { display: none; }
-details.fold > summary::before { content: "\25B8"; flex: none; opacity: 0.6; }
-details.fold[open] > summary::before { content: "\25BE"; }
+/* The triangle pictures the state; <details> already exposes it, so the glyph has empty alt text.
+   The first `content` is the fallback for an engine without the alt-text form. */
+details.fold > summary::before { content: "\25B8"; content: "\25B8" / ""; flex: none; opacity: 0.6; }
+details.fold[open] > summary::before { content: "\25BE"; content: "\25BE" / ""; }
 details.fold > summary:hover { color: var(--primary); }
-details.fold > summary:focus-visible {
-  outline: 2px solid color-mix(in srgb, currentColor 45%, transparent); outline-offset: 2px;
+details.fold > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+details.fold > summary .ico {
+  inline-size: var(--icon-size); block-size: var(--icon-size); color: var(--tone, currentColor);
 }
+.fold-count { color: var(--muted-foreground); font-weight: 400; font-variant-numeric: tabular-nums; }
+/* A tone colours the whole summary, so an error group reads as one before it is opened — and keeps
+   its colour under the pointer, where the meaning matters more than the hover. */
+details.fold[data-tone] > summary { color: var(--tone); }
 .fold-body { font-size: var(--fs-base); padding: 0 0 0.7rem 1.1rem; }
 .fold-body > * + * { margin-top: 0.6rem; }
+
+/* --compact: a log's folds ("▸ ran 3 commands"), stacked tight with no rule between them. */
+details.fold--compact { border-top: 0; }
+details.fold--compact > summary { padding-block: 0.125rem; }
+details.fold--compact > .fold-body { padding: 0.125rem 0 0.25rem 1rem; }
+
+/* --boxed: a fold that is a case of its own, in a frame. */
+details.fold--boxed { border: 1px solid var(--border); padding-inline: 0.75rem; margin-block-end: 0.5rem; }
+details.fold--boxed > summary { padding-block: 0.5rem; }
+
+/* An EMPTY group is not a disclosure — there is nothing to open — so it is a line of text with its
+   count, set in line with the labels of the folds around it and under the same rule, or it reads
+   as the body of the fold above it. Why it is empty goes in a data-tip. */
+.fold-empty {
+  margin: 0; padding: 0.55rem 0 0.55rem 1.1rem; color: var(--muted-foreground);
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 15%, transparent);   /* its own colour is muted */
+}
+
+@media (pointer: coarse) {
+  details.fold > summary { min-block-size: 44px; }
+}
 
 /* ── legend: one rendering of each state, beside the thing it keys ─────────────────────────────
    An item is `display: block`, NOT flex: a gloss contains <strong>/<code>/<em>, and every one of
@@ -996,54 +1366,39 @@ details.fold > summary:focus-visible {
 @media (min-width: 52rem) { .legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .legend > li { line-height: 1.6; }
 .legend > li > :first-child { margin-right: 0.45rem; }
+/* A legend's caption: what the keyed states belong to, with an optional forward link to where they
+   are set. The list is named by the caption's words (`aria-labelledby` on the span), so the link's
+   text is not part of that name. */
+.legend-label {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem;
+  margin: 1.1rem 0 0; font-size: var(--fs-base); font-weight: 600;
+}
+.legend-label + .legend { margin-block-start: 0.35rem; }
 
 /* ── zoomable diagrams ────────────────────────────────────────────────────────────────────────
    An architecture diagram authored for a text column is unreadable at exactly the moment someone
    needs it. Pair with `initDiagramZoom()`: every `.diagram` becomes a real button that opens
-   full-screen, fitted to the viewport, then zoomable and pannable.
+   full-screen, fitted to the viewport, then zoomable and pannable. The view it opens is a
+   `<dialog class="dgm-overlay">`, and its rules live in overlays.css with the other dialogs.
 
    The affordance has to be visible without hovering — this portal is read from a phone — so the
-   corner hint is always drawn, not revealed on :hover. */
+   corner hint is always drawn, not revealed on :hover. It is the maximize-2 glyph, a mask in
+   currentColor at the small icon size, so it has no text to announce. */
 .dgm-zoomable { position: relative; cursor: zoom-in; }
 .dgm-zoomable::after {
-  content: "⤢"; position: absolute; top: 0.4rem; right: 0.5rem;
-  font-size: 0.85rem; line-height: 1; opacity: 0.45; pointer-events: none;   /* not-text: the ⤢ corner hint */
-  color: var(--muted-foreground);
+  content: ""; position: absolute; top: 0.4rem; right: 0.5rem;
+  inline-size: var(--icon-sm); block-size: var(--icon-sm); opacity: 0.45; pointer-events: none;
+  background: var(--muted-foreground);
+  -webkit-mask: var(--ico-maximize-2) center / contain no-repeat; mask: var(--ico-maximize-2) center / contain no-repeat;
 }
-.dgm-zoomable:hover::after, .dgm-zoomable:focus-visible::after { opacity: 1; color: var(--primary); }
-.dgm-zoomable:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
-
-html.dgm-locked, html.dgm-locked body { overflow: hidden; }
-
-.dgm-overlay {
-  display: none; position: fixed; inset: 0; z-index: 90;
-  background: color-mix(in srgb, var(--background) 96%, transparent);
-  flex-direction: column;
-}
-.dgm-overlay.open { display: flex; }
-.dgm-bar {
-  flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem;
-  padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); background: var(--card);
-}
-.dgm-btn {
-  font: inherit; font-size: var(--fs-base); cursor: pointer; padding: 0.3rem 0.7rem; min-height: 32px;
-  background: transparent; border: 1px solid var(--border); color: var(--foreground);
-}
-.dgm-btn:hover { border-color: var(--primary); color: var(--primary); }
-.dgm-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.dgm-close { border-color: color-mix(in srgb, var(--destructive) 55%, transparent); color: var(--destructive); }
-.dgm-close:hover { border-color: var(--destructive); color: var(--destructive); }
-/* The stage clips; the artwork inside it is what moves. Transforming a wrapper rather than the
-   svg keeps mermaid's own geometry untouched. */
-.dgm-stage { flex: 1; overflow: hidden; display: grid; place-items: center; cursor: grab; touch-action: none; }
-.dgm-stage.is-grabbing { cursor: grabbing; }
-.dgm-art { transform-origin: center center; will-change: transform; }
-.dgm-art > svg, .dgm-art > img { display: block; max-width: none; max-height: none; }
+.dgm-zoomable:hover::after, .dgm-zoomable:focus-visible::after { opacity: 1; background: var(--primary); }
+.dgm-zoomable:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 @media print { .dgm-overlay, .dgm-zoomable::after { display: none !important; } }
 
 /* ── document minimap ──
-   One bar per section, down the LEFT gutter, replacing the "On this page" list.
+   One bar per section, down the LEFT gutter: a full-width document's "On this page". A page shows
+   a TOC or a minimap, never both — initMinimap() returns null where a TOC is present.
 
    A text table of contents costs a whole column to repeat headings the reader is
    about to scroll past anyway, and on a wide screen that column is the difference
@@ -1052,8 +1407,8 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
    where am I — in 2rem, and gives the width back.
 
    Wordless on screen, never wordless underneath: every bar is a real <button>
-   carrying the heading as its accessible name and its native tooltip, so the
-   strip is tabbable and hoverable. Bar LENGTH encodes heading depth, which is the
+   carrying the heading as its accessible name and its data-tip, so the strip is
+   tabbable and hoverable. Bar LENGTH encodes heading depth, which is the
    only structure a wordless strip can still carry.
 
    Placed between the chrome, like the rail on the other side: initLsNav()
@@ -1089,7 +1444,6 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
   height: 2px;
   padding: 0;
   border: 0;
-  border-radius: 1px;
   background: var(--border);
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease;
@@ -1102,7 +1456,7 @@ html.dgm-locked, html.dgm-locked body { overflow: hidden; }
    pointer, tipped or not — which is the point: a tipped element must not wear a cursor an untipped
    one does not. */
 .minimap-bar:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-.minimap-bar.active { background: var(--primary); transform: scaleY(2); }
+.minimap-bar[aria-current="true"] { background: var(--primary); transform: scaleY(2); }
 
 /* The strip is navigation for a screen. On paper the page IS the map. */
 @media print { .minimap { display: none !important; } }

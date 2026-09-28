@@ -76,6 +76,11 @@
   --glow-soft: rgba(160, 82, 45, 0.05);
   --scanline-opacity: 0.15;
 
+  /* The per-theme inputs of the derived colours below (DERIVED COLOURS). */
+  --cat-l: 0.45;           /* categorical text, worst over the whole hue circle: 5.57:1 */
+  --cat-c: 0.075;
+  --backdrop: rgb(0 0 0 / 0.5);
+
   --radius: 0rem;
 
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "Menlo", monospace;
@@ -108,6 +113,9 @@ html[data-theme="green"] {
   --glow: rgba(51, 255, 102, 0.35);
   --glow-soft: rgba(51, 255, 102, 0.12);
   --scanline-opacity: 0.5;
+  --cat-l: 0.74;           /* 7.65:1 worst */
+  --cat-c: 0.12;
+  --backdrop: rgb(0 0 0 / 0.6);
 }
 
 /* white-phosphor terminal */
@@ -137,6 +145,9 @@ html[data-theme="mono"] {
   --glow: rgba(255, 255, 255, 0.25);
   --glow-soft: rgba(255, 255, 255, 0.08);
   --scanline-opacity: 0.45;
+  --cat-l: 0.74;           /* 7.71:1 worst */
+  --cat-c: 0.12;
+  --backdrop: rgb(0 0 0 / 0.6);
 }
 
 /* black-on-white terminal (e-ink / printout) */
@@ -166,6 +177,9 @@ html[data-theme="paper"] {
   --glow: rgba(0, 0, 0, 0.06);
   --glow-soft: rgba(0, 0, 0, 0.04);
   --scanline-opacity: 0.12;
+  --cat-l: 0.45;           /* 6.18:1 worst */
+  --cat-c: 0.075;
+  --backdrop: rgb(0 0 0 / 0.5);
 }
 
 /*
@@ -311,9 +325,264 @@ html[data-theme="paper"] {
      typo. Override it per panel when a panel's labels are genuinely longer. */
   --field-label-w: 8.5rem;
 }
-/* Icons are sized by their own width/height attributes, as they always were. The rem table that
- * used to live here existed only to make them grow with the fluid root font-size; with that gone
- * it converted px to the identical px and was pure indirection. */
 
+/*
+ * ── CONTROLS, CARDS AND GLYPHS — one number each (0.60.0) ──────────────────────
+ *
+ * The drift the content width had in 2026-08, one level down. seedr and configr each settled on a
+ * 28px single-line control (Tailwind `h-7`) for their inputs, filter and sort triggers and icon
+ * buttons — independently, which is the best evidence a number is right — while the system
+ * offered no height at all, so a compact button sat a few pixels short of the field beside it and
+ * every surface squared the row up by hand. `--control-h` is that 28px. A control takes it as
+ * `min-block-size`, never `height`: a coarse pointer's 44px and a wrapped label still grow it.
+ *
+ * `--card-pad` is the 12px card inset seedr and configr both use; `.card-terminal` takes it. The
+ * system's own .85rem 1.1rem was the one card inset in the estate nobody else had.
+ *
+ * THE GLYPH SIZES ARE NOT THE TABLE THAT WAS REMOVED. Until 0.56.0 a rem table here existed only
+ * to make icons grow with the fluid root font size; once that went, it converted px into the
+ * identical px and was deleted as indirection. These answer a different question. A glyph drawn
+ * as a CSS mask (the icon tokens at the end of this file) has no intrinsic size, so something has
+ * to give it a box — and ONE TEXT SIZE forbids that something from being `font-size`. Four steps,
+ * each a visible jump: 12px beside a label, 14px the default inside a control, 16px for a larger
+ * control, 24px for an empty state or a page-level load. An inline <svg> inside a system control
+ * takes the same token, so a lucide component and a mask sit at one size in one row.
+ *
+ * `--dot-size` is the 8px status dot netmon and cockpit already drew. `--status-h` is
+ * footer.status's height, declared so a page can reserve exactly that much room above it.
+ */
+:root {
+  --control-h: 1.75rem;   /* 28px — every single-line control */
+  --card-pad: 0.75rem;    /* 12px */
+  --icon-sm: 0.75rem;     /* 12px — beside a label, in a tag, a clear button */
+  --icon-size: 0.875rem;  /* 14px — the default glyph */
+  --icon-lg: 1rem;        /* 16px */
+  --icon-xl: 1.5rem;      /* 24px — empty state, page-level load */
+  --dot-size: 0.5rem;     /* 8px */
+  --status-h: 2rem;       /* 32px — footer.status */
+}
 
+/* THE PHONE GUTTER. 1.5rem a side is 48px of a 375px screen: an eighth of every line spent on
+   margin on the device where lines are shortest. danieldeusing.de had already answered it
+   privately, 1.25rem below 40rem in its own layout, and a private answer is exactly how the
+   estate once ended up with four content widths. The token carries it now, so everything that
+   reads the gutter gets the phone value without a breakpoint of its own. */
+@media (max-width: 40rem) {
+  :root { --content-pad: 1.25rem; }
+}
 
+/*
+ * ── DERIVED COLOURS — declared once, resolved per theme (0.60.0) ────────────────
+ *
+ * Each of these is computed from a per-theme input, so it is right on all four themes without
+ * being declared four times: the arithmetic lives in the input, and the numbers below measure
+ * what the four themes actually produce (sRGB compositing of the token hexes, 8-bit, WCAG relative
+ * luminance) against --background / --card / --muted.
+ *
+ * THE CONTROL EDGE. A field's border is a boundary the reader has to find, so WCAG 1.4.11 asks 3:1
+ * of it — and --border was never built for that. It is a divider, quiet on purpose so a table does
+ * not read as a spreadsheet. The estate had three answers for a field edge (--border, --input,
+ * which is the same hex, and configr's --primary at 30%, 1.55-2.67:1) and none cleared 3:1 on
+ * every theme. The foreground at 60% does, on every theme and surface:
+ *
+ *     warm 3.41 / 3.31 / 3.24    green 4.56 / 4.53 / 4.52    mono 5.23 / 5.20 / 5.19    paper 4.29 / 4.20 / 4.18
+ *
+ * Every FIELD takes it: input, textarea, select and filter triggers, the search field, a bordered
+ * icon button, a popup panel. A CONTAINER keeps --border — a card is not a control and must not
+ * outline itself like one.
+ *
+ * CATEGORICAL HUES. Twelve named hues on one lightness/chroma pair per theme (--cat-l and --cat-c,
+ * in the theme blocks above): cockpit's identity-tag mechanism, with names instead of free angles.
+ * Measured over the WHOLE hue circle, not only the twelve — worst text contrast warm 5.57, paper
+ * 6.18, green 7.65, mono 7.71 — and every hue lies inside sRGB at these L/C, so no browser has to
+ * gamut-map one into a different colour. --background on a categorical fill (a solid tag) is at
+ * least 6.20:1. The skill's rule that a colour naming a THING belongs to the surface still holds
+ * for the ASSIGNMENT: which vendor, agent or series gets which hue is the surface's call. The
+ * palette is shared. A surface that derives a hue from a name (a hash) picks one of these twelve
+ * names, never an angle of its own — the measurement covers the names, not whatever a hash
+ * produces.
+ *
+ * ELEVATION. A popup and a dialog glow; they do not cast a shadow. A black drop shadow is the one
+ * non-token colour a component can smuggle in, it vanishes on the two near-black themes, and on
+ * the light ones it is another design language. The phosphor glow is the one the system already
+ * spoke: the dropdown and select panels drew 20px of --glow-soft before these tokens existed.
+ * Named --elev-* on purpose, because Tailwind owns the shadow namespace and a token there would
+ * reskin its utilities.
+ * The modal scrim (--backdrop, per theme above) DIMS the page; it cannot SEPARATE a dialog on the
+ * dark themes, where a near-black card over a scrimmed near-black page is 1.04-1.08:1 whatever the
+ * alpha. On warm and paper the dialog's own fill separates it (--card against the scrimmed page:
+ * 3.58 and 3.64:1 at worst); on green and mono its edge does (--control-edge against the scrimmed
+ * page: 4.75 and 5.39:1). That is why every popup and dialog is edged with --control-edge.
+ */
+:root {
+  --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
+
+  --cat-red: oklch(var(--cat-l) var(--cat-c) 25);
+  --cat-orange: oklch(var(--cat-l) var(--cat-c) 50);
+  --cat-amber: oklch(var(--cat-l) var(--cat-c) 80);
+  --cat-lime: oklch(var(--cat-l) var(--cat-c) 125);
+  --cat-green: oklch(var(--cat-l) var(--cat-c) 150);
+  --cat-teal: oklch(var(--cat-l) var(--cat-c) 185);
+  --cat-cyan: oklch(var(--cat-l) var(--cat-c) 210);
+  --cat-blue: oklch(var(--cat-l) var(--cat-c) 255);
+  --cat-indigo: oklch(var(--cat-l) var(--cat-c) 275);
+  --cat-violet: oklch(var(--cat-l) var(--cat-c) 295);
+  --cat-purple: oklch(var(--cat-l) var(--cat-c) 315);
+  --cat-pink: oklch(var(--cat-l) var(--cat-c) 350);
+
+  --elev-float: 0 0 20px var(--glow-soft);   /* popups: dropdown, select, context menu, tooltip */
+  --elev-modal: 0 0 40px var(--glow-soft);   /* dialogs */
+}
+
+/* PAPER IS A LIGHT THEME, whatever the screen was showing: print.css repaints every surface
+   white. The dark themes' categorical pair is light text (L 0.74), 2.19:1 on white paper at
+   worst, so on paper every theme takes the light pair (7.10:1). It lives here, not in print.css,
+   because the tokens-only apps load this file and never that one. */
+@media print {
+  :root,
+  html[data-theme] {
+    --cat-l: 0.45;
+    --cat-c: 0.075;
+  }
+}
+
+/*
+ * ── TONE — one attribute drives every component's state colour (0.60.0) ────────
+ *
+ * `data-tone="warning"` on a notice, a callout, a banner, a tag, an icon button or a dot, and the
+ * component reads `var(--tone, <its own default>)`. Before this every family spelled state its
+ * own way — cockpit by attribute through a JS vocabulary, configr by a tone prop mapped to class
+ * strings, seedr by a switch per component — so one state was three sets of rules that could
+ * disagree. The attribute is the whole contract: seven values, the five status accents plus
+ * primary and muted, each resolving to a token already measured on every theme. An unknown value
+ * sets nothing, so the component falls back to its own default instead of to no colour at all.
+ *
+ * IT INHERITS, deliberately: a component draws its glyph on a pseudo-element, and a pseudo-element
+ * only sees the tone by inheriting it. The price is that a component nested in a toned container
+ * takes the container's tone unless it sets a data-tone of its own.
+ *
+ * The tone is a TEXT, EDGE and GLYPH colour. Under text it is at most a 6% tint: tone text on a 6%
+ * tone tint measures 4.53:1 or better on every theme and surface, and at 8% paper's warning falls
+ * to 4.41.
+ */
+[data-tone="primary"] { --tone: var(--primary); }
+[data-tone="success"] { --tone: var(--success); }
+[data-tone="warning"] { --tone: var(--warning); }
+[data-tone="destructive"] { --tone: var(--destructive); }
+[data-tone="info"] { --tone: var(--info); }
+[data-tone="pending"] { --tone: var(--pending); }
+[data-tone="muted"] { --tone: var(--muted-foreground); }
+
+/*
+ * ── MOTION — the kill switch lives in the one file every surface loads (0.60.0) ──
+ *
+ * `html.anim-off` is a promise that nothing on the page moves. The pre-paint script sets it from
+ * `prefers-reduced-motion`, the footer's `[x] anim` toggle sets it by hand. Until 0.60.0 it lived
+ * in components.css and stopped KEYFRAMES only, which broke the promise twice over:
+ *
+ *   · a hover fade, a sliding panel and a colour change are motion too. seedr had to add its own
+ *     `transition: none` under the same class to keep the switch honest;
+ *   · a surface loading tokens.css without components.css (netmon, configr, seedr's studio) had no
+ *     switch at all.
+ *
+ * So it stops both, from here. `!important` because it overrides every rule that animates,
+ * whatever that rule's specificity: the one place in the system where that is the whole point.
+ * The block cursor is hidden rather than frozen — it exists to blink, and a still block after a
+ * wordmark reads as a rendering fault.
+ *
+ * The keyframes the components share are declared here as well, named `dd-*` so a consumer's own
+ * `spin` (Tailwind ships one) can never shadow them. A file that RUNS an animation also stops it
+ * under `prefers-reduced-motion: reduce` itself: this switch only covers a page whose pre-paint
+ * script maps the preference onto the class, and not every page has one.
+ */
+@keyframes dd-spin {
+  to { transform: rotate(1turn); }
+}
+@keyframes dd-pulse {
+  50% { opacity: 0.25; }
+}
+html.anim-off *,
+html.anim-off *::before,
+html.anim-off *::after {
+  animation: none !important;
+  transition: none !important;
+}
+html.anim-off .cursor-block {
+  display: none;
+}
+
+/*
+ * ── ICON MASKS — the token half of the icon system (0.60.0) ─────────────────────
+ *
+ * One lucide icon per token, as an SVG data url for a CSS MASK — never for an <img> or a
+ * background image:
+ *
+ *     inline-size: var(--icon-size); block-size: var(--icon-size);
+ *     background: currentColor;
+ *     mask: var(--ico-check) center / contain no-repeat;
+ *
+ * A mask keeps only the shape and paints it in currentColor, so one token is right on all four
+ * themes and in every state colour with no fill declared per theme — the reason the bin and the
+ * pencil were masks before any of this existed. The stroke is black because a mask reads only its
+ * alpha; the stroke width is lucide's 2 on a 24-unit box, the glyph seedr and configr already ship
+ * through lucide-react, so a mask here and a lucide component there are the same drawing.
+ *
+ * Source: lucide 0.575.0, the version seedr's lucide-react resolves. Token names are the estate's
+ * `data-icon` words, which are not always lucide's current file names: `filter` is lucide's
+ * `funnel` and `home` is its `house` (lucide renamed both; markup keeps the word a reader expects).
+ * `star-filled` is `star` with its fill closed, the pressed state of a favourite toggle.
+ *
+ * EXTENDING IT. One declaration per icon, in this block, generated from lucide rather than drawn
+ * by hand, named after its `data-icon` word. Two characters must never appear inside the url:
+ * a semicolon, because scripts/build.mjs splits a declaration there, and a raw hash, which starts
+ * a fragment in a data url (write %23). `<` and `>` are percent-encoded, attributes single-quoted,
+ * and no attribute may repeat — a duplicate makes the SVG invalid and the mask paints nothing.
+ *
+ * Lucide — ISC License. Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2026 as
+ * part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2026.
+ * Permission to use, copy, modify, and/or distribute this software for any purpose with or
+ * without fee is hereby granted, provided that the above copyright notice and this permission
+ * notice appear in all copies. THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+ * FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
+ * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+ * WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Feather (the portions of Lucide derived from it) — The MIT License (MIT). Copyright (c)
+ * 2013-2026 Cole Bemis. Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"), to deal in the
+ * Software without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the following conditions: The
+ * above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+ * KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+:root {
+  --ico-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  --ico-minus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+  --ico-x: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E");
+  --ico-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21 21-4.34-4.34'/%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3C/svg%3E");
+  --ico-filter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z'/%3E%3C/svg%3E");
+  --ico-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 7-7 7 7'/%3E%3Cpath d='M12 19V5'/%3E%3C/svg%3E");
+  --ico-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14'/%3E%3Cpath d='m19 12-7 7-7-7'/%3E%3C/svg%3E");
+  --ico-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --ico-chevron-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E");
+  --ico-trash-2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3C/svg%3E");
+  --ico-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
+  --ico-loader-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-6.219-8.56'/%3E%3C/svg%3E");
+  --ico-refresh-cw: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/%3E%3Cpath d='M8 16H3v5'/%3E%3C/svg%3E");
+  --ico-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z'/%3E%3C/svg%3E");
+  --ico-star-filled: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z'/%3E%3C/svg%3E");
+  --ico-history: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3Cpath d='M12 7v5l4 2'/%3E%3C/svg%3E");
+  --ico-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8'/%3E%3Cpath d='M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3C/svg%3E");
+  --ico-image-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 5h6'/%3E%3Cpath d='M19 2v6'/%3E%3Cpath d='M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3C/svg%3E");
+  --ico-triangle-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+  --ico-package: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/%3E%3Cpath d='M12 22V12'/%3E%3Cpolyline points='3.29 7 12 12 20.71 7'/%3E%3Cpath d='m7.5 4.27 9 5.15'/%3E%3C/svg%3E");
+  --ico-download: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V3'/%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+}

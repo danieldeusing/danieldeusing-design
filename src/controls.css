@@ -1,0 +1,681 @@
+/*
+ * danieldeusing-design — controls.
+ *
+ * The control set: the icon-only button, joined groups, the form footer, the switch, checkboxes
+ * and radios, the segmented choice, choice cards, the file drop zone, revealed actions and the two
+ * confirmations (arm-then-confirm, and type-it-back).
+ *
+ * SELF-SUFFICIENT ON PURPOSE. Every class here works on a page that loads tokens.css and this file
+ * and nothing else: netmon loads tokens + chrome only, and a Tauri app may load tokens alone. So
+ * nothing below leans on base.css or components.css. Each interactive class states its own
+ * box-sizing, font, padding, border, background, focus ring and disabled state, even where base.css
+ * would have supplied one. A control that only looks right beside base.css looks wrong on the first
+ * surface that does not load it, and that surface is never the one it was tested on.
+ *
+ * WHAT IT READS FROM tokens.css, and nothing else:
+ *   --control-h       the one height of every single-line control (1.75rem, 28px)
+ *   --control-edge    60% of --foreground: the measured control edge, >= 3:1 on every theme and
+ *                     surface (warm 3.26 at worst). --border is a container hairline and is not one.
+ *   --icon-sm / --icon-size / --icon-xl    glyph sizes; a glyph is never sized by font-size
+ *   --ico-* and the [data-icon] -> --ico mapping    the glyph masks
+ *   --tone            set by [data-tone] (primary, success, warning, destructive, info, pending, muted)
+ *   dd-spin           the busy keyframes; html.anim-off stops them and every transition below
+ *
+ * NO RUNTIME. Every state here is an attribute the page already owns (aria-pressed, aria-checked,
+ * aria-busy, data-dragging, disabled). Framework apps render the same markup from their own
+ * components and keep their own handlers; build-free pages flip the attribute in a click handler.
+ */
+
+/* ── .btn-icon — THE ICON-ONLY BUTTON ─────────────────────────────────────────────────────────────
+   configr's IconButton is the most-used control in the estate (81 call sites) and the system had no
+   answer for it: its only icon buttons were the bin and the pencil, each a .btn-terminal variant with
+   one glyph baked in. So every surface drew its own square, configr at 18, 24, 28, 32 and 36px and
+   seedr at 20, 24 and 28, and one toolbar could hold three sizes of the same button.
+
+   ONE BOX, AT THE CONTROL HEIGHT. 28px square is --control-h, the height of the field and of the
+   compact button beside it, so a refresh button in a filter bar lines up with the search box without
+   anybody measuring. --sm (24px) is the one smaller step, for a button that sits INSIDE something: a
+   notice's dismiss, a thumbnail's remove. The other sizes are gone. A size nobody can tell from its
+   neighbour is the one-pixel type scale again.
+
+   THE EDGE IS --control-edge, NOT --border. A bordered icon button is a control, and WCAG 1.4.11
+   wants its edge at 3:1; --border measures 1.23:1 on warm over --muted. --bare drops the edge for
+   chrome that sits in a bar of its own (pagr's header arrows, seedr's history), where the bar is the
+   container and a box around every glyph is noise.
+
+   THE GLYPH IS A MASK. data-icon names it, the icon set maps the name onto --ico, and ::before paints
+   currentColor through it, so one colour rule recolours the glyph on all four themes and in every
+   state. An inline <svg> child is accepted for a glyph the set does not have.
+
+   THE STATE RULES SHARE ONE SPECIFICITY, so source order is the precedence and the order below is
+   the whole story: rest, then hover / open / pressed, then --bare and its states, then a tone, then
+   disabled. :where() is what holds them level. Without it `:hover` (three classes' worth) outranks
+   `--bare` (one), and a bare button grows an edge under the pointer.
+
+   NAME THE TARGET. aria-label is mandatory: a mask is not text, so without one a column of these
+   announces "button" a dozen times. It names what the press acts on ("refresh catalog"), never the
+   glyph ("refresh icon"). A data-tip may repeat it for a sighted reader. */
+.btn-icon {
+  position: relative;   /* a .count--overlay sits on the corner */
+  display: inline-grid;
+  place-items: center;
+  place-content: center;
+  box-sizing: border-box;
+  inline-size: var(--control-h);
+  block-size: var(--control-h);
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  vertical-align: middle;
+  color: var(--btn-icon-color, var(--primary));
+  background: transparent;
+  border: 1px solid var(--control-edge);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.btn-icon:is([data-icon], [aria-busy="true"])::before {
+  content: "";
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+.btn-icon > svg { inline-size: var(--icon-size); block-size: var(--icon-size); }
+
+/* Hover, open and pressed are one look: the edge takes the glyph's colour and a 12% wash of it
+   fills the box. Pressed KEEPS it, so a toggle that is on looks like a toggle under the pointer
+   whether or not the pointer is there. */
+.btn-icon:where(:not(:disabled, [aria-disabled="true"]):hover, [aria-expanded="true"], [aria-pressed="true"]) {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.btn-icon--sm { inline-size: 1.5rem; block-size: 1.5rem; }
+.btn-icon--sm:is([data-icon], [aria-busy="true"])::before,
+.btn-icon--sm > svg { inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+
+.btn-icon--bare {
+  --btn-icon-color: var(--muted-foreground);
+  border-color: transparent;
+}
+.btn-icon--bare:where(:not(:disabled, [aria-disabled="true"]):hover, [aria-expanded="true"], [aria-pressed="true"]) {
+  --btn-icon-color: var(--primary);
+  border-color: transparent;
+  background: var(--muted);
+}
+
+/* A tone is set on the BUTTON, never inherited. --tone itself does inherit, so reading it straight
+   from `color` would turn a notice's dismiss the notice's colour; the attribute on the button is
+   what opts in. A class and an attribute, so it outranks every :where()-levelled state above: a
+   destructive remove stays destructive under the pointer. */
+.btn-icon[data-tone] { --btn-icon-color: var(--tone); }
+
+/* A favourite that is on is a FILLED star: the glyph carries the state as well as the box. */
+.btn-icon[data-icon="star"][aria-pressed="true"]:not([aria-busy="true"]) { --ico: var(--ico-star-filled); }
+
+/* BUSY: the glyph becomes the spinner, whatever it was. The page also sets `disabled`, so the press
+   cannot be repeated while it runs. An <svg> child steps aside for the spinner. */
+.btn-icon[aria-busy="true"] { --ico: var(--ico-loader-circle); }
+.btn-icon[aria-busy="true"]::before { animation: dd-spin 1s linear infinite; }
+.btn-icon[aria-busy="true"] > svg { display: none; }
+
+.btn-icon:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* aria-disabled keeps the button focusable, so a tip explaining WHY it is off can still be reached
+   from the keyboard. The page must then ignore its clicks; CSS cannot. */
+.btn-icon:is(:disabled, [aria-disabled="true"]) { opacity: 0.45; cursor: default; }
+
+/* ── .btn-group — CONTROLS THAT SHARE AN EDGE ──────────────────────────────────────────────────────
+   A filter trigger and its clear, a sort direction and its field, a row of icon toggles: two or more
+   controls that read as one. seedr and configr both join them by overlapping the borders; this is
+   that, once. Each child keeps its own tab stop, name and focus ring. The group only overlaps them by
+   the width of an edge, so neighbours draw one line between them instead of two.
+
+   The overlap means a neighbour paints over half of an edge, so the child that is hovered, pressed or
+   open is lifted above its siblings, and the focused one above that: its ring must not be cut by the
+   control beside it.
+
+   ONE HEIGHT FOR THE GROUP. The children stretch to the tallest, with --control-h as the floor. A
+   .btn-icon is fixed at 28px everywhere else, so that some tall flex row cannot pull it into a tall
+   rectangle; inside a group it gives the fixed height up. Measured: beside 0.59.0's select trigger
+   (28.8px) a fixed icon button left a step at the bottom edge where the two should read as one. */
+.btn-group {
+  display: inline-flex;
+  align-items: stretch;
+  min-block-size: var(--control-h);
+  vertical-align: middle;
+}
+.btn-group > .btn-icon { block-size: auto; }
+.btn-group > * + * { margin-inline-start: -1px; }
+.btn-group > :is(:hover, [aria-pressed="true"], [aria-expanded="true"]) { position: relative; z-index: 1; }
+.btn-group > :focus-within { position: relative; z-index: 2; }
+
+/* ── .form-actions — THE FOOTER THAT COMMITS ───────────────────────────────────────────────────────
+   configr's FormActions, seedr's, cockpit's .dlg-actions: every form and dialog ends in the same row
+   and each surface built it, so the order of cancel and save and the place of the status line
+   differed by surface. One row now: the status at the start (muted, one line, truncated), then
+   cancel, then the one primary action LAST.
+
+   The status takes the free space rather than being pushed by an auto margin. flex: 1 with
+   min-inline-size: 0 is what lets text-overflow fire at all: an auto margin leaves the item at its
+   content width, and a long status then wraps the buttons onto a line of their own instead of
+   truncating.
+
+   A dialog's dismiss is the X in its header, so its footer only commits, except in a confirmation,
+   whose footer IS the answer pair. --ruled draws the rule above the row for a footer that closes a
+   long form.
+
+   .btn-row is the same row without the footer's alignment and margin, for buttons that are not the
+   end of a form: cockpit's .cfg-actions, configr's inline add row. */
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.form-actions--ruled { padding-top: 0.75rem; border-top: 1px solid var(--border); }
+.form-status {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  margin: 0;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── .switch — ON OR OFF, AND IT SAYS WHICH ────────────────────────────────────────────────────────
+   Replaces every boolean .filter-ctl (`follow` in the log drawer, `hide handled`, `hide review/`) and
+   netmon's hidden-checkbox `label.chk`. 0.59.0 drew those as `[ ] follow` / `[x] follow`, which
+   answered "is this a choice?" but still sat in a row of words. A switch is the control every reader
+   already knows means "this stays on until I turn it off", and its state is a POSITION as well as a
+   fill (knob at the start or the end), so it never rests on colour alone.
+
+   A BUTTON WITH role="switch", not a checkbox in disguise. The page flips aria-checked in its click
+   handler exactly as it flipped aria-pressed before. Space and Enter come from the button for free,
+   the accessible name is the visible text, and there is no hidden input for a label to point at or
+   for a re-render to orphan.
+
+   SQUARE, ON TOKENS. configr's Toggle is where the shape comes from, adopted with correction: its
+   pill track, round knob and literal rgba colours become a square track in --control-edge and a
+   square knob in --muted-foreground (off) or --primary-foreground on a --primary track (on). The knob
+   is painted by the track's own gradient, so the whole switch is one pseudo-element and the knob's
+   slide is a background-position transition, stopped with every other one by html.anim-off.
+   Measured: the off knob 4.67:1 against the page at worst (warm), the on knob 6.45:1 on its track. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  min-block-size: var(--control-h);
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--foreground);
+  text-align: start;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.switch::after {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  inline-size: 2rem;
+  block-size: 1.125rem;
+  border: 1px solid var(--control-edge);
+  background: linear-gradient(var(--muted-foreground), var(--muted-foreground)) 2px 50% / 0.75rem 0.75rem no-repeat;
+  transition: background-position 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.switch[aria-checked="true"]::after {
+  background-color: var(--primary);
+  background-image: linear-gradient(var(--primary-foreground), var(--primary-foreground));
+  background-position: calc(100% - 2px) 50%;
+  border-color: var(--primary);
+}
+.switch:not(:disabled):hover::after { border-color: var(--primary); }
+.switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.switch:disabled { opacity: 0.45; cursor: default; }
+
+/* ── CHECKBOX AND RADIO — drawn, because the native ones belong to the operating system ────────────
+   37 places in cockpit's source render a native checkbox or radio, and on macOS every one of them was
+   a rounded, system-blue control in the middle of a square terminal page; cockpit never set even
+   accent-color (seedr studio did, which recolours the fill and keeps the rounded box). A native box
+   cannot be restyled into this look, only replaced, so it is
+   `appearance: none` and drawn here: square, a --control-edge outline, and when checked a --primary
+   fill with the check cut out of it in --primary-foreground (6.45:1 at worst, warm).
+
+   ELEMENT-LEVEL, and that is a breaking change on purpose. Every checkbox and radio changes with this
+   file, because a box that is native on one page and drawn on the next is exactly the inconsistency
+   this system exists to end. The radio keeps border-radius: 50%. It is a circle, the one exception the
+   no-radius rule has always made, and a square radio would read as a checkbox.
+
+   :indeterminate IS SCOPED TO THE CHECKBOX. A radio group with nothing selected also matches
+   :indeterminate, and would otherwise draw a minus in every radio of an unanswered question.
+
+   A FILTER IS NEVER A CHECKBOX. A box that changes what a list shows is a filter dropdown, a chip set
+   or a switch; a checkbox is a value that a form submits. */
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: none;
+  box-sizing: border-box;
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+  background: transparent;
+  border: 1px solid var(--control-edge);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+input[type="radio"] { border-radius: 50%; }
+input[type="checkbox"]::before {
+  content: "";
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+}
+input[type="checkbox"]:is(:checked, :indeterminate) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+input[type="checkbox"]:checked::before {
+  background: var(--primary-foreground);
+  -webkit-mask: var(--ico-check) center / contain no-repeat;
+  mask: var(--ico-check) center / contain no-repeat;
+}
+input[type="checkbox"]:indeterminate::before {
+  background: var(--primary-foreground);
+  -webkit-mask: var(--ico-minus) center / contain no-repeat;
+  mask: var(--ico-minus) center / contain no-repeat;
+}
+input[type="radio"]:checked { border-color: var(--primary); }
+input[type="radio"]:checked::before {
+  content: "";
+  inline-size: 0.375rem;
+  block-size: 0.375rem;
+  border-radius: 50%;
+  background: var(--primary);
+}
+input:is([type="checkbox"], [type="radio"]):not(:disabled):hover,
+.check:hover > input:is([type="checkbox"], [type="radio"]):not(:disabled) { border-color: var(--primary); }
+input:is([type="checkbox"], [type="radio"]):focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: default; }
+
+/* The label wraps the box, so the words are part of the target. A disabled one dims AS A WHOLE: a
+   faded box beside full-strength words reads as an enabled option with a rendering fault. The box
+   inside goes back to full opacity so the two do not multiply to .2. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.check-meta { color: var(--muted-foreground); }
+.check:has(> input:disabled) { opacity: 0.45; cursor: default; }
+.check > input:is([type="checkbox"], [type="radio"]):disabled { opacity: 1; }
+
+/* ── .segmented — ONE VALUE OF A FEW, CHOSEN IN PLACE ──────────────────────────────────────────────
+   A preview's formatted / raw, a chart's 1h / 24h / 7d. seedr and configr both built this (the
+   preview-mode group, SegmentedToggle) and cockpit's overlay has a mode switch of its own, while the
+   system offered only the (•) picker, which reads as a sentence rather than a control you flip.
+
+   Joined like .btn-group, so the set reads as one control. The chosen segment is the only one in
+   --primary, bold, on a 12% --primary fill, and its own --primary edge is lifted above its
+   neighbours' so all four of its sides show. 12% and no more: --primary on its own 12% tint measures
+   4.72:1 on warm over --muted, and at 18% it drops below 4.5. configr's 5px outer radius is dropped.
+   Bold costs no width: every weight of the face has the same advance, so the row never shifts.
+
+   NOT a tab bar and NOT a filter. Switching whole panels of a page is .tabs; narrowing a list is a
+   filter dropdown. A segmented control chooses a value inside a view that stays where it is.
+
+   An unavailable segment is :disabled and KEEPS its data-tip, which is where the reader learns why
+   ("no preview for binary files"). An icon-only segment has no content at all, not even a space, and
+   an aria-label; :empty is what makes it square. */
+.segmented {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+}
+.segmented > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  box-sizing: border-box;
+  min-block-size: var(--control-h);
+  margin: 0;
+  padding: 0 0.7rem;
+  font: inherit;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 1px solid var(--control-edge);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.segmented > button + button { margin-inline-start: -1px; }
+.segmented > button:not(:disabled):hover { color: var(--primary); }
+.segmented > button[aria-pressed="true"] {
+  position: relative;
+  z-index: 1;
+  color: var(--primary);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: var(--primary);
+}
+.segmented > button:focus-visible { position: relative; z-index: 2; outline: 2px solid var(--ring); outline-offset: 2px; }
+.segmented > button:disabled { opacity: 0.45; cursor: default; }
+.segmented > button[data-icon]::before {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+.segmented > button[data-icon]:empty { inline-size: var(--control-h); padding: 0; }
+
+/* ── .choice-card — AN OPTION WITH A SENTENCE UNDER IT ─────────────────────────────────────────────
+   configr's install-scope and add-capability dialogs ask a question whose options need explaining:
+   "user: ~/.claude, every project" is a different decision from "project". A radio list puts the
+   explanation in small print beside a dot. A card gives each option a glyph, a title and room for the
+   sentence, and the whole card is the target.
+
+   A BUTTON WITH aria-pressed inside a labelled group, exactly one pressed: the same state model as
+   .segmented, so the file has one way to say "chosen".
+
+   PRESSED is the tone's edge and a 12% tone fill over --card, and the description turns from
+   --muted-foreground to --foreground. That last part is measured, not styled: --muted-foreground on a
+   12% fill over --card is 4.03:1 at worst (warm, destructive) and never clears 4.5 on warm or mono,
+   whatever the tone, while --foreground on it is 7.96 or better. The chosen card reads louder for it,
+   which is the point of choosing it.
+
+   The edge at rest is --border. A card is a container and is identified by its title, not by its
+   outline; the chosen edge is the tone at full strength. */
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
+  gap: 0.5rem;
+}
+.choice-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 0.25rem 0.75rem;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  color: var(--foreground);
+  text-align: start;
+  background: var(--card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.choice-card[data-icon] { grid-template-columns: auto minmax(0, 1fr); }
+.choice-card[data-icon] > * { grid-column: 2; }
+.choice-card[data-icon]::before {
+  content: "";
+  grid-row: 1 / span 2;
+  inline-size: var(--icon-xl);
+  block-size: var(--icon-xl);
+  background: var(--tone, var(--primary));
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+.choice-title { font-weight: 700; }
+.choice-desc { color: var(--muted-foreground); }
+.choice-card:not(:disabled):hover { border-color: var(--tone, var(--primary)); }
+.choice-card[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--tone, var(--primary)) 12%, var(--card));
+  border-color: var(--tone, var(--primary));
+}
+.choice-card[aria-pressed="true"] .choice-desc { color: var(--foreground); }
+.choice-card:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.choice-card:disabled { opacity: 0.45; cursor: default; }
+
+/* ── .dropzone — A FILE INPUT THE KEYBOARD CAN REACH ───────────────────────────────────────────────
+   configr's screenshot uploader was a div with an onClick: a mouse could open the file picker and a
+   keyboard could not reach it at all. Adopted with correction: the zone is a <label> around a real
+   <input type="file">, so Tab lands on the input, Space opens the picker, and a click anywhere on the
+   zone is a click on the label. The input is hidden HERE rather than by a utility class, so the zone
+   works on a page that never loaded chrome.css.
+
+   The ring is drawn on the ZONE while the hidden input has keyboard focus, :has(:focus-visible), not
+   on :focus-within. A mouse click on the label focuses the input too, and a ring after every click is
+   the thing :focus-visible exists to prevent.
+
+   HOVER AND DRAG LIGHT THE WHOLE ZONE: --primary edge, --primary text and glyph, an 8% --primary fill.
+   The text changes colour with the fill because it has to: --muted-foreground on that fill measures
+   4.18:1 on warm and 4.49 on mono, under AA, while --primary on it is 5.00 at worst. The page sets
+   data-dragging on dragenter and removes it on dragleave and drop; there is no runtime.
+
+   A dashed edge is the mark of a drop target, and nothing else in the control set uses one. */
+.dropzone {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  padding: 1rem;
+  text-align: center;
+  color: var(--muted-foreground);
+  border: 1px dashed var(--control-edge);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.dropzone > input[type="file"] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.dropzone:not(:has(> input:disabled)):hover,
+.dropzone[data-dragging] {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-color: var(--primary);
+}
+.dropzone:has(> input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
+.dropzone:has(> input:disabled) { opacity: 0.45; cursor: default; }
+
+/* THUMBNAILS: three to a row, 16:9, each with its remove button in the corner. The button carries an
+   OPAQUE --background plate, because it sits on a picture: a transparent button over a screenshot has
+   a glyph whose contrast nobody can promise. */
+.thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.thumb {
+  position: relative;
+  box-sizing: border-box;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border);
+}
+.thumb > img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+.thumb > .btn-icon {
+  position: absolute;
+  inset-block-start: 0.25rem;
+  inset-inline-end: 0.25rem;
+  background: var(--background);
+}
+.thumb > .btn-icon:not(:disabled):hover { background: color-mix(in srgb, currentColor 12%, var(--background)); }
+
+/* ── .reveal — ACTIONS THAT APPEAR ON HOVER, ON FOCUS, AND ALWAYS ON TOUCH ─────────────────────────
+   A card's star, a row's remove: shown only while the reader is on that item, so a list of forty does
+   not carry forty sets of buttons. configr does this with opacity on hover and focus-within, and in
+   one place (ListCard) with display: none, which takes the actions out of the tab order: until the
+   pointer arrives, a keyboard cannot reach them at all.
+
+   So this is OPACITY, never display or visibility. An invisible action is still a tab stop, and the
+   moment focus lands on it :focus-within shows it. Under (hover: none), a phone, where no pointer
+   ever arrives, it is simply always visible.
+
+   A thumbnail's remove button follows the same rule without the classes: .thumb is its host. The
+   transition names the colour properties too, so a revealed .btn-icon keeps its own hover fade. */
+.reveal-host .reveal,
+.thumb > .btn-icon {
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.reveal-host:is(:hover, :focus-within) .reveal,
+.thumb:is(:hover, :focus-within) > .btn-icon { opacity: 1; }
+@media (hover: none) {
+  .reveal-host .reveal,
+  .thumb > .btn-icon { opacity: 1; }
+}
+
+/* ── .confirm-inline — THE SECOND PRESS, IN PLACE ──────────────────────────────────────────────────
+   seedr studio's remove and publish ask twice without a dialog: the first press ARMS the action and
+   swaps the button for a named pair (remove / keep), and the second press is the decision. It fits an
+   action that is one row's business, where a modal would be heavier than the question.
+
+   The pair says the verb in words, never a check and a cross: two glyphs are a guess, and this is the
+   one press that cannot be taken back. An optional note says what the press does that the verb does
+   not ("commits on main"), in --warning. The page owns the swap and the focus: arming moves focus to
+   the confirming button, disarming returns it to the original action, and the pair disarms when the
+   row it belongs to changes. */
+.confirm-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.confirm-inline-note { color: var(--warning); }
+
+/* ── .confirm-code — TYPE IT BACK ──────────────────────────────────────────────────────────────────
+   Cockpit's approval dialog: an action that spends money is confirmed by typing back a code shown
+   beside it, so the decision cannot be a reflex. Cockpit-only, so cockpit's version is taken, with one
+   correction: its input was --fs-xl, and the one text size applies to what a reader types as much as
+   to what they read. The code itself stays --fs-xl, because it is the thing being read.
+
+   MONO AND TRACKED, because a code is read one character at a time: in a proportional face 1, l and I
+   are one shape, and the tracking keeps a run of digits from reading as a number. The input is scoped
+   under .confirm-code so it outranks the element-level text-input rule of components.css, whose
+   `max-width: 100%` would otherwise win over the 14rem cap.
+
+   The page keeps the confirming button disabled until the typed value matches, and sets the status
+   line's tone: data-tone="warning" on a mismatch, nothing while it works. */
+.confirm-code {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}
+.confirm-code label { display: grid; gap: 0.25rem; }
+.confirm-code-value {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+}
+.confirm-code .confirm-code-input {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 14rem;
+  min-block-size: var(--control-h);
+  margin: 0;
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  /* --lh-tight, as for every single-line control: the body's 1.5 would make this 29.6px, not 28. */
+  line-height: var(--lh-tight);
+  letter-spacing: 0.14em;
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--control-edge);
+  transition: border-color 0.15s ease;
+}
+.confirm-code .confirm-code-input:hover { border-color: var(--primary); }
+.confirm-code .confirm-code-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-color: var(--primary);
+}
+.confirm-code-status {
+  min-block-size: 1lh;
+  margin: 0;
+  color: var(--tone, var(--muted-foreground));
+}
+
+/* ── 44px UNDER A THUMB ────────────────────────────────────────────────────────────────────────────
+   Every control above is sized for a pointer. On a touch screen each grows to WCAG's 44px target,
+   and it grows by min-*, never by width or height, so the glyph or the label stays centred where it
+   was drawn. A checkbox grows through its .check label, which is the target a thumb actually hits. */
+@media (pointer: coarse) {
+  .btn-icon { min-inline-size: 44px; min-block-size: 44px; }
+  .switch,
+  .check,
+  .choice-card,
+  .segmented > button,
+  .confirm-code .confirm-code-input { min-block-size: 44px; }
+  .segmented > button[data-icon]:empty { min-inline-size: 44px; }
+}
+
+/* A busy spinner is motion the reader did not ask for. Stopped, the glyph still says "working". */
+@media (prefers-reduced-motion: reduce) {
+  .btn-icon[aria-busy="true"]::before { animation: none; }
+}
+
+/* ── PRINT ─────────────────────────────────────────────────────────────────────────────────────────
+   Paper cannot be pressed. The controls that only ACT (icon buttons, groups, form footers, drop
+   zones, revealed actions, the confirmations) are removed. The ones that carry a VALUE stay, and keep
+   it: a checkbox's fill, a radio's dot and a switch's knob are backgrounds, which a browser drops on
+   paper by default, so a checked box would print as an empty one. print-color-adjust keeps them,
+   against print.css's black-on-white palette. */
+@media print {
+  .btn-icon,
+  .btn-group,
+  .segmented,
+  .form-actions,
+  .btn-row,
+  .dropzone,
+  .reveal,
+  .confirm-inline,
+  .confirm-code {
+    display: none !important;
+  }
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="checkbox"]::before,
+  input[type="radio"]::before,
+  .switch::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -111,15 +111,16 @@ const send = (method, params = {}) => new Promise((ok, bad) => {
 await send("Runtime.enable");
 
 /*
- * The SHIPPED module, read off the filesystem and inlined, so the fixture cannot drift from the
- * thing being asserted. A `data:` URL has an opaque origin and no localStorage, so this is served
- * over a loopback HTTP server instead — the store is the subject here, not incidental to it.
+ * The SHIPPED modules, served straight off the filesystem, so the fixture cannot drift from the
+ * thing being asserted. Served rather than inlined since 0.60.0: tabletools.js imports search.js
+ * (its search boxes are `.search-field`s), and an inlined copy with its `export`s stripped cannot
+ * import anything. A `data:` URL has an opaque origin and no localStorage, so this is a loopback
+ * HTTP server either way — the store is the subject here, not incidental to it.
  */
-const RUNTIME = readFileSync(join(root, "runtime/tabletools.js"), "utf8").replace(/^export /gm, "");
 const HARNESS = `<!doctype html><html><head><meta charset="utf-8"></head><body>
 <div id="mount"></div>
 <script type="module">
-${RUNTIME}
+import { initTableTools, applyTableView, resetTableView } from "/runtime/tabletools.js";
 window.initTableTools = initTableTools;
 window.applyTableView = applyTableView;
 window.resetTableView = resetTableView;
@@ -147,11 +148,13 @@ window.build = (opts = {}) => {
 window.order = () => [...document.querySelectorAll("#mount tbody tr")]
   .filter((tr) => !tr.hidden).map((tr) => tr.cells[0].textContent);
 window.stored = (id) => localStorage.getItem("table-view:" + (id || "probe"));
-// A "text" column filters through an <input class="tbl-filter-input"> inside its header dropdown;
+// A "text" column filters through the search box (a \`.search-field\`) inside its header dropdown;
 // a "pick" column has no input at all, only a list of buttons built from the column's own cells.
 // Driving the real controls is the point — a test that set inst.view directly would prove the
 // component can filter and say nothing about whether a reader can reach it.
-window.colInput = (key) => document.querySelector('#mount th[data-col="' + key + '"] .tbl-filter-input');
+window.colInput = (key) =>
+  document.querySelector('#mount th[data-col="' + key + '"] .search-field > input[type="search"]');
+window.searchBox = () => document.querySelector("#mount search.filter-bar > .search-field > input[type='search']");
 window.setFilter = (key, text) => {
   const input = window.colInput(key);
   input.value = text;
@@ -164,16 +167,22 @@ window.pick = (key, label) => {
   hit.click();
 };
 window.setSearch = (text) => {
-  const box = document.querySelector("#mount .tbl-search");
+  const box = window.searchBox();
   box.value = text;
   box.dispatchEvent(new Event("input", { bubbles: true }));
 };
 window.sortBy = (key) => document.querySelector('#mount th[data-col="' + key + '"] .tbl-sort').click();
+window.ready = true;
 <\/script></body></html>`;
 
 // A real origin, because localStorage is the subject.
 const { createServer } = await import("node:http");
-const server = createServer((_req, res) => {
+const server = createServer((req, res) => {
+  if (/^\/runtime\/[a-z]+\.js$/.test(req.url || "")) {
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+    res.end(readFileSync(join(root, req.url), "utf8"));
+    return;
+  }
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
   res.end(HARNESS);
 }).listen(0);
@@ -183,7 +192,12 @@ process.on("exit", () => server.close());
 
 await send("Page.enable");
 await send("Page.navigate", { url: pageUrl });
-await sleep(500);
+for (let i = 0; ; i += 1) {
+  const { result } = await send("Runtime.evaluate", { expression: "window.ready === true", returnByValue: true });
+  if (result.value) break;
+  if (i > 40) throw new Error("the harness module never finished loading");
+  await sleep(100);
+}
 
 const evaluate = async (expression) => {
   const { result, exceptionDetails } = await send("Runtime.evaluate", {
@@ -250,7 +264,7 @@ await evaluate(`
     { sortKey: "name", dir: 1, filters: {}, search: "gra" }));
   window.build(); null`);
 check("a restored SEARCH is visible in the box that is doing it",
-  (await evaluate("document.querySelector('#mount .tbl-search').value")) === "gra");
+  (await evaluate("window.searchBox().value")) === "gra");
 check("...and it is actually in force", (await evaluate("window.order()")).join(",") === "grace");
 
 /* ── a stored view cannot outlive its columns ─────────────────────────────── */
@@ -310,7 +324,7 @@ check("reset brings every row back, in the table's own order",
 check("...and the control that was SET is cleared by its PROPERTY, which the attribute cannot do",
   (await evaluate('window.colInput("name").value')) === "");
 check("...and the search box with it",
-  (await evaluate("document.querySelector('#mount .tbl-search').value")) === "");
+  (await evaluate("window.searchBox().value")) === "");
 check("...and the memory of the view is gone, not merely emptied",
   (await evaluate("window.stored()")) === null);
 check("...and no column still claims to be filtering",
@@ -348,6 +362,44 @@ check("...and when they reverse it, which luck cannot survive",
   "score descending puts ada (30) first unless the pin outranks the comparator");
 check("...while the rows that are NOT pinned are still ordered by the column",
   (await evaluate("window.order()")).slice(1).join(",") === "ada,grace");
+
+/* ── the search boxes are the system's `.search-field` (0.60.0) ───────────── */
+// The bespoke `.tbl-search` / `.tbl-filter-input` boxes are gone: the table's search sits in a
+// `<search class="filter-bar">` as a `.search-field`, and so does each text column's filter. The
+// clear buttons and Escape come from search.js, which initTableTools() installs itself.
+
+await evaluate("localStorage.clear(); window.build(); null");
+check("the search above the table is a .search-field in a <search class=\"filter-bar\">",
+  await evaluate("!!document.querySelector('#mount search.filter-bar > .search-field > input[type=search] + button.search-clear')"));
+check("...and nothing still renders the removed classes",
+  await evaluate("!document.querySelector('#mount .tbl-toolbar, #mount .tbl-search, #mount .tbl-filter-input')"));
+check("a text column's filter box is a .search-field too, its clear named after the column",
+  (await evaluate('window.colInput("name").nextElementSibling.getAttribute("aria-label")')) === "clear the name filter");
+check("an empty box offers no clear", await evaluate("window.searchBox().nextElementSibling.hidden === true"));
+
+await evaluate(`
+  localStorage.clear();
+  localStorage.setItem("table-view:probe", JSON.stringify(
+    { sortKey: "name", dir: 1, filters: { name: "a" }, search: "gra" }));
+  window.build(); null`);
+check("a RESTORED search shows its clear — a value set from code fires no input for search.js",
+  await evaluate("window.searchBox().nextElementSibling.hidden === false"));
+check("...and so does a restored column filter",
+  await evaluate('window.colInput("name").nextElementSibling.hidden === false'));
+await evaluate("window.searchBox().nextElementSibling.click(); null");
+check("the clear empties the box", (await evaluate("window.searchBox().value")) === "");
+check("...and takes the search OUT OF FORCE, leaving the column filter that is still set",
+  (await evaluate("window.order()")).join(",") === "ada,grace", JSON.stringify(await evaluate("window.order()")));
+check("...and the stored view forgets the search",
+  !(JSON.parse((await evaluate("window.stored()")) || "{}").search));
+await evaluate(`window.setSearch("ada");
+  window.searchBox().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  null`);
+check("Escape in the filled table search clears it too",
+  (await evaluate("window.searchBox().value")) === "" && (await evaluate("window.order()")).join(",") === "ada,grace");
+await evaluate("window.resetTableView(document.querySelector('#mount table')); null");
+check("reset hides every clear button it emptied",
+  await evaluate("[...document.querySelectorAll('#mount .search-clear')].every((b) => b.hidden)"));
 
 console.log(failures
   ? `\ncheck-tabletools: ${failures} FAILED`

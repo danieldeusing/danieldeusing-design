@@ -33,11 +33,28 @@
  * without changing anything, Tab moves on. Focus never leaves the trigger —
  * the active option is pointed at with `aria-activedescendant` — so there is
  * nowhere for it to get stuck.
+ *
+ * THERE IS NO OPT-OUT (0.60.0, Daniel: "A dropdown should ALWAYS have the custom
+ * layout for the list, not the system one"). `data-select="off"` used to skip a
+ * select; no surface used it, and an escape hatch nobody needs is the one the
+ * next page reaches for when the enhanced list is inconvenient — which puts the
+ * OS list back in front of the reader. `multiple` and `size > 1` stay native
+ * because they are not dropdowns at all.
+ *
+ * Two opt-INs, each one attribute on the <select> (M5, references/filters.md):
+ *   data-filter  a FILTER: the trigger names the facet while nothing is chosen
+ *                and the value once something is, wears --primary while it
+ *                filters, and a clear button is joined to it. The empty option
+ *                is the "all" row at the top of the list.
+ *   data-search  a search box at the top of the list. A list longer than twenty
+ *                options gets one without asking — past that a list is searched,
+ *                not scanned (configr's FilterDropdown threshold).
  */
 
+import { positionPopup } from "./popup.js";
+
 const TYPEAHEAD_MS = 700;
-const GAP = 4; // visual px between the trigger and the panel
-const EDGE = 8; // keep the panel this far off the viewport edge
+const SEARCH_THRESHOLD = 20;
 
 const enhanced = new WeakMap();
 let counter = 0;
@@ -45,41 +62,122 @@ let openInstance = null;
 let documentObserver = null;
 let globalsInstalled = false;
 
-/*
- * Consumers set `zoom` on <html> (initResolutionZoom lays every page out
- * against a 1920px reference), and that puts the two halves of any positioning
- * sum in different coordinate spaces: getBoundingClientRect() and
- * innerWidth/innerHeight are VISUAL px, already multiplied, while style.left is
- * a CSS length the browser multiplies AGAIN on the way out. Writing a rect
- * straight into a length therefore applies the zoom twice — an error that grows
- * with distance from the origin, which is how it survives review (it looks fine
- * near the top left). Fixed twice before in this runtime: tooltip.js and
- * lsnav.js. Divide on the WRITE; never "fix" a comparison whose operands are
- * both already visual.
- */
-const zoomOf = () => Number(getComputedStyle(document.documentElement).zoom) || 1;
-
 const optionsOf = (instance) => instance.select.options;
 const label = (element) => (element.textContent || "").trim();
+const indexOf = (item) => Number(item.dataset.index);
+
+/*
+ * THE ROWS A READER CAN REACH, IN THE ORDER THEY SEE THEM. Not `select.options`
+ * order: a filter moves its "all" row to the top, and a panel search hides the
+ * rows that do not match. The arrows, Home/End and typeahead all walk what is on
+ * screen — walking the underlying options would move the highlight onto a row
+ * the reader cannot see.
+ */
+const reachable = (instance) =>
+  instance.panel
+    ? [...instance.panel.querySelectorAll('.select-option:not([hidden]):not([aria-disabled="true"])')]
+    : [];
 
 const firstEnabled = (instance) => {
-  const options = optionsOf(instance);
-  for (let i = 0; i < options.length; i += 1) if (!options[i].disabled) return i;
-  return -1;
+  const rows = reachable(instance);
+  return rows.length ? indexOf(rows[0]) : -1;
 };
 const lastEnabled = (instance) => {
-  const options = optionsOf(instance);
-  for (let i = options.length - 1; i >= 0; i -= 1) if (!options[i].disabled) return i;
-  return -1;
+  const rows = reachable(instance);
+  return rows.length ? indexOf(rows[rows.length - 1]) : -1;
 };
 
+/* A label's own words, without the control it wraps — a wrapping <label>'s
+   textContent would otherwise read "source all seedr skills.sh". */
+function ownText(element) {
+  let text = "";
+  for (const node of element.childNodes) {
+    if (node.nodeType === 3) text += node.textContent;
+    else if (node.nodeType === 1 && !node.matches("select, .select-field, .filter-dd")) text += node.textContent;
+  }
+  return text.trim();
+}
+
+/*
+ * What a filter is ABOUT — "source", "type" — found the three ways nameTrigger()
+ * finds a label, in the platform's order, so a select the page already labels
+ * correctly needs nothing more.
+ */
+function facetOf(select) {
+  const explicit = select.getAttribute("aria-label");
+  if (explicit) return explicit.trim();
+  const ids = select.getAttribute("aria-labelledby");
+  if (ids) {
+    return ids.split(/\s+/).map((id) => document.getElementById(id)).filter(Boolean).map(ownText).join(" ").trim();
+  }
+  const element =
+    (select.id && document.querySelector(`label[for="${CSS.escape(select.id)}"]`)) || select.closest("label");
+  return element ? ownText(element) : "";
+}
+
 /* ── the closed control ─────────────────────────────────────────────────── */
+
+/*
+ * An <option data-icon="…"> shows its glyph wherever its label is shown: in its
+ * row and, while it is the value, in the trigger (configr's option icons). The
+ * glyph is the system's `.ico` mask, so it takes the row's colour on every theme.
+ */
+function syncIcon(instance, option) {
+  const name = option ? option.dataset.icon : "";
+  if (!name) {
+    instance.icon?.remove();
+    instance.icon = null;
+    return;
+  }
+  if (!instance.icon) {
+    instance.icon = document.createElement("span");
+    instance.icon.className = "ico";
+    instance.trigger.insertBefore(instance.icon, instance.value);
+  }
+  instance.icon.dataset.icon = name;
+}
 
 function syncTrigger(instance) {
   const { select, trigger, value } = instance;
   const option = select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
-  value.textContent = option ? label(option) : "";
   trigger.disabled = select.disabled;
+  // An invalid select must SAY so where the reader is looking. The select itself
+  // is transparent and aria-hidden, so a red edge or an announcement pinned to it
+  // reaches nobody; the trigger is the control now.
+  const invalid = select.getAttribute("aria-invalid");
+  if (invalid === null) trigger.removeAttribute("aria-invalid");
+  else trigger.setAttribute("aria-invalid", invalid);
+  syncIcon(instance, option);
+  if (!instance.filter) {
+    value.textContent = option ? label(option) : "";
+    return;
+  }
+
+  /*
+   * A FILTER NAMES ITS FACET UNTIL IT FILTERS, THEN ITS VALUE (seedr and configr,
+   * both): "source" at rest, "seedr" once a source is chosen. The trigger is the
+   * place a reader looks to see what is in force, so it says the one thing that is.
+   *
+   * Only a select WITH an empty option can be "not filtering". A required picker —
+   * cockpit's repository chart, configr's worktree — always has a value, so it
+   * always shows it, never wears the active edge and never offers a clear: there is
+   * nothing to go back to (configr conflict 20, corrected).
+   */
+  const facet = facetOf(select);
+  const optional = [...select.options].some((o) => o.value === "");
+  const active = optional && select.value !== "";
+  const choice = option ? label(option) || (option.value === "" ? "all" : "") : "";
+  value.textContent = active || !optional ? choice : facet;
+
+  // State is never colour alone: the NAME carries the facet AND the value, so
+  // "source filter: seedr" is what a screen reader hears, active or not.
+  const name = facet ? `${facet} filter` : "filter";
+  trigger.setAttribute("aria-label", `${name}: ${choice}`);
+  instance.group.setAttribute("aria-label", name);
+  instance.clear.setAttribute("aria-label", `clear ${name}`);
+  if (active) trigger.setAttribute("data-active", "true");
+  else trigger.removeAttribute("data-active");
+  instance.clear.hidden = !active;
 }
 
 /*
@@ -92,6 +190,8 @@ function syncTrigger(instance) {
  * order, so a page that already labels its select correctly needs no change:
  * an explicit aria-label, an explicit aria-labelledby, then a <label> — whether
  * associated by `for=` or by wrapping.
+ *
+ * A filter is named in syncTrigger() instead: its name changes with its value.
  */
 function nameTrigger(instance) {
   const { select, trigger } = instance;
@@ -116,14 +216,14 @@ function nameTrigger(instance) {
 function enhance(select) {
   if (enhanced.has(select)) return;
   // `multiple` and `size > 1` are not popups — the platform renders them inline
-  // and there is no OS menu to replace. `data-select="off"` is the opt-out.
+  // and there is no OS menu to replace. Nothing else is skipped (see the header).
   if (select.multiple || select.size > 1) return;
-  if (select.dataset.select === "off") return;
   if (select.parentElement?.classList.contains("select-field")) return;
   if (!select.parentNode) return;
 
   counter += 1;
   const id = `dd-select-${counter}`;
+  const isFilter = select.hasAttribute("data-filter");
 
   const field = document.createElement("span");
   field.className = "select-field";
@@ -136,7 +236,7 @@ function enhance(select) {
 
   const trigger = document.createElement("button");
   trigger.type = "button";
-  trigger.className = "select-trigger";
+  trigger.className = isFilter ? "select-trigger select-trigger--filter" : "select-trigger";
   trigger.id = `${id}-trigger`;
   trigger.setAttribute("role", "combobox");
   trigger.setAttribute("aria-haspopup", "listbox");
@@ -155,19 +255,56 @@ function enhance(select) {
     if (text !== null) trigger.setAttribute(attribute, text);
   }
 
-  select.parentNode.insertBefore(field, select);
+  /*
+   * A FILTER IS TWO CONTROLS IN ONE EDGE: the trigger and, while it filters, a
+   * clear button joined to it (seedr's `-ml-px`, configr's `border-l-0`). Each
+   * keeps its own tab stop and its own name; the group is what says they belong
+   * together. The clear is always built and simply `hidden` while there is
+   * nothing to clear, so a picker whose options change under it never has to
+   * grow or lose a node.
+   */
+  let group = null;
+  let clear = null;
+  if (isFilter) {
+    group = document.createElement("span");
+    group.className = "filter-dd btn-group";
+    group.setAttribute("role", "group");
+    clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "filter-clear";
+    clear.hidden = true;
+    select.parentNode.insertBefore(group, select);
+    group.append(field, clear);
+  } else {
+    select.parentNode.insertBefore(field, select);
+  }
   field.appendChild(select);
   field.appendChild(trigger);
   select.setAttribute("tabindex", "-1");
   select.setAttribute("aria-hidden", "true");
 
-  const instance = { select, field, trigger, value, id, panel: null, items: [], active: -1, typed: "", typedAt: 0 };
+  const instance = {
+    select, field, trigger, value, id, group, clear, filter: isFilter,
+    icon: null, panel: null, search: null, empty: null, side: undefined,
+    items: [], active: -1, typed: "", typedAt: 0,
+  };
   enhanced.set(select, instance);
-  nameTrigger(instance);
+  if (!isFilter) nameTrigger(instance);
   syncTrigger(instance);
 
   trigger.addEventListener("click", () => (instance.panel ? close(instance, true) : open(instance)));
   trigger.addEventListener("keydown", (event) => onKeydown(instance, event));
+  clear?.addEventListener("click", () => {
+    if (select.value === "") return;
+    select.value = "";
+    syncTrigger(instance);
+    // The button just pressed is hidden now, and focus on a hidden button is
+    // focus on nothing. Moved BEFORE the events go out, for commit()'s reason: a
+    // `change` handler may re-render and detach all of this.
+    trigger.focus();
+    select.dispatchEvent(new Event("input", { bubbles: true }));
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   // Focus aimed at the hidden control — a <label> click, or page code calling
   // select.focus() — belongs to the one the reader can see.
   select.addEventListener("focus", () => trigger.focus());
@@ -183,9 +320,15 @@ function enhance(select) {
     syncTrigger(instance);
     if (instance.panel) {
       // The list changed under an open panel. Rebuild it rather than show a stale
-      // one; focus is on the trigger throughout, so nothing is disturbed.
+      // one — and keep what the reader had typed into its search, which a poll
+      // landing mid-word would otherwise throw away.
+      const query = instance.search ? instance.search.value : "";
       close(instance, false);
       open(instance);
+      if (query && instance.search) {
+        instance.search.value = query;
+        filterRows(instance);
+      }
     }
   });
   instance.observer.observe(select, {
@@ -193,18 +336,56 @@ function enhance(select) {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ["disabled", "selected", "value", "label"],
+    attributeFilter: ["disabled", "selected", "value", "label", "aria-invalid", "aria-label", "data-icon"],
   });
 }
 
 /* ── the panel ──────────────────────────────────────────────────────────── */
 
 function buildPanel(instance) {
+  const { select } = instance;
   const panel = document.createElement("ul");
   panel.className = "select-panel";
   panel.id = `${instance.id}-panel`;
   panel.setAttribute("role", "listbox");
   panel.tabIndex = -1;
+
+  /*
+   * THE SEARCH ROW (M5). Focus moves INTO it on open — it has to hold focus to be
+   * typed into — so it, not the trigger, carries `aria-activedescendant` while the
+   * list is out; `aria-controls` repairs the fact that the panel is appended to
+   * <body> and is no descendant of either.
+   */
+  instance.search = null;
+  instance.empty = null;
+  if (select.options.length > SEARCH_THRESHOLD || select.hasAttribute("data-search")) {
+    const row = document.createElement("li");
+    row.className = "select-search";
+    row.setAttribute("role", "presentation");
+    const field = document.createElement("div");
+    field.className = "search-field";
+    const input = document.createElement("input");
+    input.type = "search";
+    input.setAttribute("aria-label", `search ${facetOf(select) || "options"}`);
+    input.setAttribute("aria-controls", panel.id);
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("spellcheck", "false");
+    input.setAttribute("data-1p-ignore", "");
+    // THE BOX IS THE LIST'S OWN MACHINERY, and its events are not the page's. Left to bubble, a
+    // page listening for `input`/`change` on the document would hear every keystroke of the query —
+    // and a `change` the browser fires as the edited box leaves focus when the list closes, carrying
+    // the query as if it were a value. The <select> announces the pick; nothing else should.
+    input.addEventListener("input", (event) => {
+      event.stopPropagation();
+      filterRows(instance);
+    });
+    input.addEventListener("change", (event) => event.stopPropagation());
+    input.addEventListener("keydown", (event) => onSearchKeydown(instance, event));
+    field.appendChild(input);
+    row.appendChild(field);
+    panel.appendChild(row);
+    instance.search = input;
+  }
 
   instance.items = [];
   let index = 0;
@@ -213,7 +394,7 @@ function buildPanel(instance) {
     item.className = "select-option";
     item.id = `${instance.id}-o${index}`;
     item.setAttribute("role", "option");
-    item.setAttribute("aria-selected", String(index === instance.select.selectedIndex));
+    item.setAttribute("aria-selected", String(index === select.selectedIndex));
     if (option.disabled) item.setAttribute("aria-disabled", "true");
     // PER-OPTION TOOLTIPS, for the reason the trigger's own copy above states: a tooltip anchored
     // to a control nobody can hover never shows. The native option list is replaced by this panel,
@@ -223,7 +404,13 @@ function buildPanel(instance) {
       const text = option.getAttribute(attribute);
       if (text !== null) item.setAttribute(attribute, text);
     }
-    item.textContent = label(option);
+    if (option.dataset.icon) {
+      const icon = document.createElement("span");
+      icon.className = "ico";
+      icon.dataset.icon = option.dataset.icon;
+      item.appendChild(icon);
+    }
+    item.append(label(option));
     item.dataset.index = String(index);
     instance.items[index] = item;
     index += 1;
@@ -234,7 +421,7 @@ function buildPanel(instance) {
   // keeps its heading. The walk order is document order, which is exactly the
   // order `select.options` flattens to — that is what keeps `data-index` a valid
   // index into the real control.
-  for (const child of instance.select.children) {
+  for (const child of select.children) {
     if (child.tagName === "OPTGROUP") {
       const heading = document.createElement("li");
       heading.className = "select-group";
@@ -247,6 +434,31 @@ function buildPanel(instance) {
     } else if (child.tagName === "OPTION") {
       panel.appendChild(addOption(child));
     }
+  }
+
+  /*
+   * A FILTER'S "ALL" ROW COMES FIRST, whatever order the page wrote its options in
+   * (seedr and configr both). It is the empty option, labelled "all" when the page
+   * gave it no words, and it carries the ✓ exactly when nothing is filtered — the
+   * reader can always see the way back to the whole list, and see that they are
+   * on it.
+   */
+  if (instance.filter) {
+    const all = instance.items.find((item) => select.options[indexOf(item)].value === "");
+    if (all) {
+      if (!label(all)) all.append("all");
+      panel.insertBefore(all, panel.querySelector(".select-option, .select-group"));
+    }
+  }
+
+  if (instance.search) {
+    const empty = document.createElement("li");
+    empty.className = "select-empty";
+    empty.setAttribute("role", "presentation");
+    empty.textContent = "no matches";
+    empty.hidden = true;
+    panel.appendChild(empty);
+    instance.empty = empty;
   }
   return panel;
 }
@@ -276,16 +488,24 @@ function open(instance) {
 
   // Options are never focusable; the panel is pointed at with
   // aria-activedescendant instead. preventDefault on mousedown is what keeps
-  // focus on the trigger when an option is clicked.
-  panel.addEventListener("mousedown", (event) => event.preventDefault());
+  // focus where it is when an option is clicked. The search row is the one
+  // exception — it is typed into, so a press there must be able to place the caret.
+  panel.addEventListener("mousedown", (event) => {
+    if (!event.target.closest(".select-search")) event.preventDefault();
+  });
   panel.addEventListener("click", (event) => {
     const item = event.target.closest(".select-option");
-    if (item) commit(instance, Number(item.dataset.index));
+    if (item) commit(instance, indexOf(item));
   });
 
+  // PLACED BEFORE ANYTHING SCROLLS. setActive() calls scrollIntoView(), and since
+  // 0.60.0 `.select-panel` has no `position` in CSS (M0) — until positionPopup()
+  // makes it fixed it is an ordinary block at the end of <body>, and scrolling a
+  // row of it into view would scroll the whole PAGE to the bottom.
+  instance.side = positionPopup(panel, instance.trigger).side;
   const selected = instance.select.selectedIndex;
   setActive(instance, selected >= 0 && !instance.select.options[selected].disabled ? selected : firstEnabled(instance));
-  position(instance);
+  instance.search?.focus({ preventScroll: true });
 }
 
 function close(instance, focusTrigger) {
@@ -294,6 +514,8 @@ function close(instance, focusTrigger) {
     instance.panel = null;
   }
   instance.items = [];
+  instance.search = null;
+  instance.empty = null;
   instance.active = -1;
   instance.typed = "";
   instance.trigger.setAttribute("aria-expanded", "false");
@@ -307,12 +529,14 @@ function setActive(instance, index) {
   if (previous) previous.removeAttribute("data-active");
   instance.active = index;
   const item = instance.items[index];
+  // Whichever of the two holds focus carries the pointer, so both are given it.
+  const pointers = instance.search ? [instance.trigger, instance.search] : [instance.trigger];
   if (!item) {
-    instance.trigger.removeAttribute("aria-activedescendant");
+    for (const element of pointers) element.removeAttribute("aria-activedescendant");
     return;
   }
   item.setAttribute("data-active", "true");
-  instance.trigger.setAttribute("aria-activedescendant", item.id);
+  for (const element of pointers) element.setAttribute("aria-activedescendant", item.id);
   item.scrollIntoView({ block: "nearest" });
 }
 
@@ -337,32 +561,41 @@ function commit(instance, index) {
   }
 }
 
-function position(instance) {
-  const { trigger, panel } = instance;
-  const zoom = zoomOf();
-  const rect = trigger.getBoundingClientRect(); // visual px
-
-  // offsetWidth is a LAYOUT length, already in the same space as the panel's own
-  // min-width, so this one must NOT be divided. Mixing the two is the trap.
-  panel.style.minWidth = `${trigger.offsetWidth}px`;
-  panel.style.maxWidth = `${(window.innerWidth - EDGE * 2) / zoom}px`;
-  panel.style.maxHeight = "";
-
-  const spaceBelow = window.innerHeight - rect.bottom - EDGE - GAP;
-  const spaceAbove = rect.top - EDGE - GAP;
-  const wanted = panel.getBoundingClientRect().height;
-  // Flip only when flipping actually helps. A long list near the bottom of a tall
-  // page has room in neither direction, and flipping it there just moves the
-  // clipping to the other end.
-  const flip = wanted > spaceBelow && spaceAbove > spaceBelow;
-  const room = Math.max(flip ? spaceAbove : spaceBelow, 72);
-  if (wanted > room) panel.style.maxHeight = `${room / zoom}px`;
-
-  const box = panel.getBoundingClientRect(); // visual px, after the clamp
-  const x = Math.min(Math.max(rect.left, EDGE), Math.max(EDGE, window.innerWidth - box.width - EDGE));
-  const y = flip ? rect.top - GAP - box.height : rect.bottom + GAP;
-  panel.style.left = `${x / zoom}px`;
-  panel.style.top = `${y / zoom}px`;
+/*
+ * Typing in the search row narrows the list to the options whose label contains
+ * the text, case-insensitively. The "all" row answers no query — a reader typing
+ * "sk" is looking for skills, not for the way out — so it steps aside while
+ * anything is typed, as configr's does.
+ *
+ * The side the panel opened on is KEPT: re-choosing it as the list shrinks would
+ * jump the box being typed into from one side of the trigger to the other.
+ */
+function filterRows(instance) {
+  const { panel, select } = instance;
+  const query = instance.search.value.trim().toLowerCase();
+  let shown = 0;
+  for (const item of instance.items) {
+    const isAll = instance.filter && select.options[indexOf(item)].value === "";
+    const hit = !query || (!isAll && label(item).toLowerCase().includes(query));
+    item.hidden = !hit;
+    if (hit) shown += 1;
+  }
+  for (const heading of panel.querySelectorAll(".select-group")) {
+    let next = heading.nextElementSibling;
+    let any = false;
+    while (next && next.classList.contains("select-option")) {
+      if (!next.hidden) any = true;
+      next = next.nextElementSibling;
+    }
+    heading.hidden = !any;
+  }
+  instance.empty.hidden = shown > 0;
+  // The value in force stays the highlight while it is on screen; otherwise the
+  // first match is, so "type, Enter" picks what the reader just narrowed to.
+  const selected = instance.items[select.selectedIndex];
+  const keep = selected && !selected.hidden && selected.getAttribute("aria-disabled") !== "true";
+  setActive(instance, keep ? select.selectedIndex : firstEnabled(instance));
+  positionPopup(panel, instance.trigger, { side: instance.side });
 }
 
 /* ── keyboard ───────────────────────────────────────────────────────────── */
@@ -371,13 +604,11 @@ const isPrintable = (event) =>
   event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
 
 function step(instance, direction) {
-  const options = optionsOf(instance);
-  for (let i = instance.active + direction; i >= 0 && i < options.length; i += direction) {
-    if (!options[i].disabled) {
-      setActive(instance, i);
-      return;
-    }
-  }
+  const rows = reachable(instance);
+  if (!rows.length) return;
+  const at = rows.findIndex((row) => indexOf(row) === instance.active);
+  const next = at === -1 ? rows[direction > 0 ? 0 : rows.length - 1] : rows[at + direction];
+  if (next) setActive(instance, indexOf(next));
 }
 
 function typeahead(instance, character) {
@@ -392,13 +623,13 @@ function typeahead(instance, character) {
   const repeated = instance.typed.length > 1 && new Set(instance.typed).size === 1;
   const needle = repeated ? instance.typed[0] : instance.typed;
   const advance = repeated || instance.typed.length === 1;
-  const options = optionsOf(instance);
-  const from = advance ? instance.active + 1 : Math.max(instance.active, 0);
-  for (let i = 0; i < options.length; i += 1) {
-    const index = (from + i + options.length) % options.length;
-    if (options[index].disabled) continue;
-    if (label(options[index]).toLowerCase().startsWith(needle)) {
-      setActive(instance, index);
+  const rows = reachable(instance);
+  const at = rows.findIndex((row) => indexOf(row) === instance.active);
+  const from = advance ? at + 1 : Math.max(at, 0);
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[(from + i) % rows.length];
+    if (label(row).toLowerCase().startsWith(needle)) {
+      setActive(instance, indexOf(row));
       return;
     }
   }
@@ -434,7 +665,14 @@ function onKeydown(instance, event) {
     if (isPrintable(event)) {
       event.preventDefault();
       open(instance);
-      typeahead(instance, key);
+      // A list with a search row takes the keystroke AS the search: it is the
+      // first letter of what the reader is looking for, not a lost key.
+      if (instance.search) {
+        instance.search.value = key;
+        filterRows(instance);
+      } else {
+        typeahead(instance, key);
+      }
     }
     return;
   }
@@ -477,6 +715,40 @@ function onKeydown(instance, event) {
   }
 }
 
+/*
+ * The search row's keys. Home and End are left to the text box — they move the
+ * caret there, and a reader editing a query expects exactly that.
+ */
+function onSearchKeydown(instance, event) {
+  switch (event.key) {
+    case "ArrowDown":
+      event.preventDefault();
+      step(instance, 1);
+      return;
+    case "ArrowUp":
+      event.preventDefault();
+      step(instance, -1);
+      return;
+    case "Enter":
+      event.preventDefault();
+      if (instance.active >= 0) commit(instance, instance.active);
+      return;
+    case "Escape":
+      // Same pair as the trigger's, for the same reason: inside a <dialog> the
+      // Escape that closes this list must not close the dialog too.
+      event.preventDefault();
+      event.stopPropagation();
+      close(instance, true);
+      return;
+    case "Tab":
+      // Focus goes back to the trigger and the Tab itself then moves on FROM there.
+      // Left alone it would move on from the search box — which sits at the end of
+      // <body> — and throw the reader to the bottom of the page.
+      close(instance, true);
+      return;
+  }
+}
+
 /* ── document-level wiring, installed once ──────────────────────────────── */
 
 function installGlobals() {
@@ -500,9 +772,15 @@ function installGlobals() {
   });
   // The trigger moves when the page or a scroll container moves under it. Capture,
   // because most of these selects sit in a `.tablewrap` that scrolls on its own and
-  // a scroll event there does not bubble.
-  addEventListener("resize", () => openInstance && position(openInstance));
-  addEventListener("scroll", () => openInstance && position(openInstance), true);
+  // a scroll event there does not bubble. A list scrolling ITSELF moves nothing,
+  // and re-placing it would re-measure it mid-scroll, so its own scrolls are skipped.
+  const reposition = (event) => {
+    if (!openInstance) return;
+    if (event.type === "scroll" && openInstance.panel.contains(event.target)) return;
+    openInstance.side = positionPopup(openInstance.panel, openInstance.trigger).side;
+  };
+  addEventListener("resize", reposition);
+  addEventListener("scroll", reposition, true);
   // form.reset() rewinds selectedIndex without firing an event or touching the DOM,
   // so nothing else here would notice. One delegated listener rather than one per
   // select: these selects are re-created on every render and the <form> is not, so

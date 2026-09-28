@@ -1,0 +1,596 @@
+/*
+ * danieldeusing-design — filters: search, filter dropdowns, sort, chips, and the bar they sit in.
+ *
+ * Daniel, 2026-09-28: "we have filter functionality already in seedr and configr. Look at how we
+ * did the filters there (dropdown) and also search input field and sorting." Both apps had built
+ * the same four controls, independently and nearly identically — a search box with a magnifier
+ * and a clear button, a filter dropdown that names its facet until it filters and then its value,
+ * a sort that is a direction arrow joined to a field picker, a row of chips saying what is in
+ * force — while the design system offered `.filter-ctl`, a text toggle nobody could recognise as
+ * a filter. This file is those controls, taken from seedr web and configr and drawn on tokens.
+ *
+ * Pairs with runtime/search.js (`.search-field`), runtime/select.js (`select[data-filter]`),
+ * runtime/sort.js (`.sort-ctl`) and runtime/popup.js (where every popup list goes). The reference
+ * an author reads is `.claude/skills/danieldeusing-design/references/filters.md`.
+ *
+ * SELF-SUFFICIENT ON PURPOSE. Every control here declares its own box — sizing, font, padding,
+ * edge, background, focus ring, disabled state, the 44px touch target — and reads nothing but
+ * tokens, so a surface that loads tokens.css and this file (netmon loads tokens + chrome) gets
+ * working controls rather than half-styled ones. The one exception is the filter DROPDOWN: it is
+ * an enhanced `<select>`, and the select — its wrapper, its panel, its rows — lives in
+ * components.css. A surface without components.css cannot have it, and must not borrow its class
+ * names for a look it does not load.
+ *
+ * ONE HEIGHT. Every single-line control here is `min-block-size: var(--control-h)` — 28px, the
+ * `h-7` both seedr and configr settled on independently — so a search box, a filter, a sort and a
+ * button share a row without one of them standing proud.
+ *
+ * ONE EDGE. A field's edge is `--control-edge` (60% of --foreground), measured: `--border` is a
+ * container hairline at 1.37–2.00:1 and cannot say "this is a control" at WCAG 1.4.11's 3:1.
+ * The edge turns --primary on hover and focus, and a filter that is FILTERING keeps it.
+ */
+
+/* ── M4 · .search-field ─────────────────────────────────────────────────────────────────────────
+   seedr's Input (web/components/ui/Input.tsx): a magnifier inside the start of the box, the
+   clear button inside its end, 32px of padding on each side so text never runs under either.
+
+   The magnifier is painted by the FIELD, not the input — an <input> cannot have generated content
+   — and it is `pointer-events: none` so a click on it lands in the box. It is drawn in
+   --muted-foreground: it says what the box is, it is not a control.
+
+   The input is `type="search"`, so it is a searchbox to assistive technology and the phone
+   keyboard offers "search"; the browser's own cancel glyph is hidden because the field draws its
+   own, and two × in one box is one too many. */
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+.search-field::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.625rem;
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  background: var(--muted-foreground);
+  -webkit-mask: var(--ico-search) center / contain no-repeat;
+  mask: var(--ico-search) center / contain no-repeat;
+  pointer-events: none;
+}
+.search-field > input[type="search"] {
+  flex: 1;
+  min-inline-size: 0;
+  box-sizing: border-box;
+  min-block-size: var(--control-h);
+  margin: 0;
+  padding: 0.3rem 2rem;
+  font: inherit;
+  font-size: var(--fs-base);
+  line-height: var(--lh-tight);
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--control-edge);
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 0.15s ease;
+}
+.search-field > input[type="search"]::-webkit-search-cancel-button,
+.search-field > input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+.search-field > input[type="search"]::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+/* ONE BOX, NEVER TWO. Focus turns the edge --primary AND draws the ring, both on the input.
+   cockpit's `.grepline` put a border on a wrapper and `outline: none` on the input, so focus was
+   a colour change on a box around a box; pagr's `grep` ended up with the cascade's box inside its
+   own. Nothing here draws on the wrapper. */
+.search-field > input[type="search"]:hover:not(:disabled),
+.search-field > input[type="search"]:focus-visible {
+  border-color: var(--primary);
+}
+.search-field > input[type="search"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.search-field > input[type="search"]:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* THE CLEAR IS A NAMED BUTTON, not a glyph. seedr's and configr's both said "Clear search", and
+   that is kept: `aria-label` names what it clears. It is `hidden` while the box is empty — the
+   runtime (or a framework) keeps that in step with the value — and the `[hidden]` rule below is
+   not decoration: an author `display` beats the user agent's `[hidden] { display: none }`
+   whatever the specificity, so without it a hidden clear would be drawn anyway. */
+.search-clear {
+  position: absolute;
+  inset-inline-end: 0.5rem;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--muted-foreground);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.search-clear[hidden] { display: none; }
+.search-clear::before {
+  content: "";
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+  background: currentColor;
+  -webkit-mask: var(--ico-x) center / contain no-repeat;
+  mask: var(--ico-x) center / contain no-repeat;
+}
+.search-clear:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+.search-clear:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* A QUERY TYPED BUT NOT YET APPLIED (configr's DebounceRing, corrected). configr drew a rounded
+   SVG rect whose stroke drained around the box — a radius on a system that has none, and a whole
+   SVG for one line. This is the same message as one square 1px --primary line along the inside
+   bottom edge, draining left to right over the debounce: markPending(field, ms) sets
+   `data-pending` and `--pending-ms`, restarts it on every keystroke, and removes it `ms` after the
+   last one. With motion off the line simply stands while the query is pending. */
+.search-field[data-pending]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 1px;
+  inset-block-end: 1px;
+  block-size: 1px;
+  background: var(--primary);
+  transform-origin: left;
+  animation: dd-drain var(--pending-ms, 1s) linear forwards;
+  pointer-events: none;
+}
+@keyframes dd-drain {
+  to { transform: scaleX(0); }
+}
+
+/* "3/17" beside a search that steps through matches (cockpit's log search). Tabular figures, and
+   a floor under its width, so the row does not twitch as the count goes from 9 to 10. */
+.match-count {
+  min-inline-size: 3.5em;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── M5 · filter dropdown — `<select data-filter>` ──────────────────────────────────────────────
+   Rendered by initSelects(): the select, its trigger and a joined clear button in one
+   `.filter-dd` group. seedr's FilterDropdown and configr's, both:
+
+     at rest     [⏷ source ▾]              the trigger names the FACET
+     filtering   [⏷ seedr ▾][×]            the trigger names the VALUE, the edge and ink are
+                                            --primary, and the clear is joined to it
+
+   The funnel says "this is a filter" before anything is chosen — the thing 0.58.0's bare text
+   and 0.59.0's `[x]` mark were both trying to say — and the value in the trigger says what is in
+   force without opening anything.
+
+   `background-color`, NOT the `background` shorthand: the caret is the trigger's background
+   IMAGE (two gradient halves, components.css), and the shorthand would reset it to none. */
+/* 0.3rem of block padding, not the 0.35rem a plain trigger carried until 0.60.0: at 12px on a
+   1.3 line the text is 15.6px, so 0.3rem + two 1px edges is 27.2px and min-block-size lifts it to
+   exactly --control-h, where 0.35rem overshoots to 28.8 and stands proud of the search box. */
+.select-trigger--filter {
+  box-sizing: border-box;
+  min-block-size: var(--control-h);
+  padding-block: 0.3rem;
+  gap: 0.375rem;
+  color: var(--foreground);
+  background-color: transparent;
+}
+.select-trigger--filter::before {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+  background: var(--muted-foreground);
+  -webkit-mask: var(--ico-filter) center / contain no-repeat;
+  mask: var(--ico-filter) center / contain no-repeat;
+}
+/* FILTERING. Colour is the third signal here, not the only one: the trigger's words change from
+   the facet to the value, the clear button appears, and the accessible name says
+   "source filter: seedr". seedr intended exactly this edge and never rendered it — its
+   `border-primary` lost to the Button's own outline variant. */
+.select-trigger--filter[data-active="true"] {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.select-trigger--filter[data-active="true"]::before { background: var(--primary); }
+.select-trigger--filter:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.select-trigger--filter:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The group: two controls, one edge. Each child after the first steps back 1px so neighbours
+   share a line instead of drawing two, and whichever is hovered or focused is lifted so its edge
+   and its ring are the ones on top. Declared here as well as by `.btn-group` (controls.css), so
+   the filter dropdown does not depend on a stylesheet a surface may not load. */
+.filter-dd {
+  display: inline-flex;
+  align-items: stretch;
+  max-inline-size: 100%;
+  vertical-align: middle;
+}
+.filter-dd > :is(:hover, :focus-within, :focus-visible) {
+  position: relative;
+  z-index: 1;
+}
+
+/* THE CLEAR IS JOINED TO THE TRIGGER, and it names its facet. seedr and configr both labelled it
+   "Clear filter" — seven of them on one bar, all announced identically. `aria-label` says which:
+   "clear source filter". It exists only while the filter filters, so it is --primary like the
+   edge it shares. */
+.filter-clear {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.5rem;
+  min-block-size: var(--control-h);
+  margin: 0;
+  margin-inline-start: -1px;
+  padding: 0;
+  font: inherit;
+  color: var(--primary);
+  background: transparent;
+  border: 1px solid var(--primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.filter-clear[hidden] { display: none; }
+.filter-clear::before {
+  content: "";
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+  background: currentColor;
+  -webkit-mask: var(--ico-x) center / contain no-repeat;
+  mask: var(--ico-x) center / contain no-repeat;
+}
+.filter-clear:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.filter-clear:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* THE SEARCH ROW IN A LONG LIST (configr, past twenty options). Sticky at the top of the panel
+   and opaque, so rows scroll UNDER it rather than through it; the panel's scroll padding is set
+   to the row's height so a row brought into view by the arrow keys lands below it, not behind. */
+.select-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.25rem 0.5rem;
+  background: var(--popover);
+  border-bottom: 1px solid var(--border);
+}
+/* The box follows the panel's width instead of setting it: an <input> asks for about twenty
+   characters of its own, which would widen a list of three-letter options to fit the search. */
+.select-search .search-field > input[type="search"] { inline-size: 0; }
+.select-panel:has(> .select-search) {
+  scroll-padding-block-start: calc(var(--control-h) + 0.5rem + 1px);
+}
+/* Indented to line up with the option labels, past the check column (M0: .5rem, the column,
+   .5rem of gap). */
+.select-empty {
+  padding: 0.3rem 0.9rem 0.3rem calc(1rem + var(--icon-sm));
+  color: var(--muted-foreground);
+}
+
+/* ── M6 · .sort-ctl ─────────────────────────────────────────────────────────────────────────────
+   seedr's SortDropdown, which configr's matches: an arrow that flips the direction, joined to the
+   field picker. The arrow is the one control that is --primary at rest — it is the action; the
+   field beside it is a value. The picker is an ordinary `<select data-sort>`: no funnel, no clear.
+   Tables keep their own column sort (`.tbl-sort` in the header); this is for lists and cards. */
+.sort-ctl {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+}
+.sort-ctl > * + * { margin-inline-start: -1px; }
+.sort-ctl > :is(:hover, :focus-within, :focus-visible) {
+  position: relative;
+  z-index: 1;
+}
+.sort-dir {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.5rem;
+  min-block-size: var(--control-h);
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--primary);
+  background: transparent;
+  border: 1px solid var(--control-edge);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.sort-dir::before {
+  content: "";
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+  background: currentColor;
+  -webkit-mask: var(--ico-arrow-up) center / contain no-repeat;
+  mask: var(--ico-arrow-up) center / contain no-repeat;
+}
+.sort-dir[data-dir="desc"]::before {
+  -webkit-mask-image: var(--ico-arrow-down);
+  mask-image: var(--ico-arrow-down);
+}
+.sort-dir:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.sort-dir:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.sort-dir:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── M7 · .filter-bar ───────────────────────────────────────────────────────────────────────────
+   configr's RegistryBrowser and seedr's Browse arrived at the same order without comparing notes,
+   and the order is the rule: search → spacer → filters → sort → separator → actions. The search
+   is where the eye starts, the spacer pushes everything that narrows the list to the far edge,
+   and actions — refresh, add — come last and apart, because they do something rather than choose
+   something.
+
+   `--sticky` pins the bar under a page's header (`--sticky-top`) and is OPAQUE: configr blurred
+   what scrolled under it, which is a translucent surface text has to be read through. */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-end: 1rem;
+}
+.filter-bar > .search-field {
+  flex: 1 1 14rem;
+  max-inline-size: 24rem;
+}
+.filter-bar-spacer { flex: 1; }
+.filter-bar > .sep { block-size: 1.5rem; }
+.filter-bar--sticky {
+  position: sticky;
+  top: var(--sticky-top, 0);
+  z-index: 10;
+  padding-block: 0.5rem;
+  background: var(--background);
+}
+/* A phone has no room for a spacer: the search takes the whole first row and the filters wrap
+   under it, left-aligned where a thumb can reach them. */
+@media (max-width: 40rem) {
+  .filter-bar > .search-field {
+    flex-basis: 100%;
+    max-inline-size: none;
+  }
+  .filter-bar-spacer { display: none; }
+}
+
+/* ── M8 · .chip / .chip-set — a multi-select filter ─────────────────────────────────────────────
+   pagr's tag bar and cockpit's tag and host pills: several values, any number of them on at once
+   (OR within one set, AND across sets). Replaces `.filter-ctl` for that job. pagr's chips and
+   cockpit's pills said "on" by colour alone and carried no `aria-pressed`; here the state is
+   `aria-pressed`, and fill and weight repeat it, so it survives a colour-blind reader and a
+   screen reader alike.
+
+   An IDENTITY chip — a host, a tag, a person, a netmon series — sets `--chip-accent` to one of
+   the categorical `--cat-*` colours, and its hover and pressed states take that hue instead of
+   --primary. A chip that is a link (pagr's static tag pages) wears the pressed look on
+   `aria-current="page"`, and still navigates with no JS at all. */
+.chip-set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  box-sizing: border-box;
+  min-block-size: 1.5rem;
+  margin: 0;
+  padding: 0 0.5rem;
+  font: inherit;
+  font-size: var(--fs-base);
+  line-height: var(--lh-tight);
+  color: var(--muted-foreground);
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.chip:hover:not(:disabled) {
+  color: var(--chip-accent, var(--primary));
+  border-color: var(--chip-accent, var(--primary));
+}
+.chip:is([aria-pressed="true"], [aria-current="page"]) {
+  color: var(--chip-accent, var(--primary));
+  border-color: var(--chip-accent, var(--primary));
+  background: color-mix(in srgb, var(--chip-accent, var(--primary)) 12%, transparent);
+  font-weight: 700;
+}
+.chip-count {
+  color: var(--muted-foreground);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── M9 · .filter-chips — what is in force ──────────────────────────────────────────────────────
+   seedr's Browse: under the bar, one chip per filter in force, and "reset filters" after them.
+   The WHOLE chip is the remove button — cockpit's put an unlabelled × inside a chip, a 9px target
+   with no name. Its `aria-label` says what it removes ("remove filter source: seedr"). The row is
+   absent when nothing is in force; a page does not render an empty one.
+
+   Tables do not get this row. A table marks a filter on its own column header (`th.is-filtered`),
+   because a strip above a table is a second place to look and scrolls away with a long table. */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-end: 1rem;
+}
+.chip--remove {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.chip--remove::after {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+  background: currentColor;
+  -webkit-mask: var(--ico-x) center / contain no-repeat;
+  mask: var(--ico-x) center / contain no-repeat;
+}
+.chip--remove:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.chip-key { color: var(--muted-foreground); }
+
+/* ── M10 · .value-filter — a value that filters by itself ───────────────────────────────────────
+   A tag on a card that narrows the list to that tag (seedr's source badge, pagr's in-card #tags).
+   A real <button>: configr's was a `span role="button"` no keyboard could reach. It is raised
+   above a stretched card link (`.card-link::after`) so the press lands on the filter, not the card.
+
+   Hover draws a full edge on an inner `.tag`, and underlines bare text — never `brightness()`,
+   which lightens --primary on the dark themes and darkens nothing on the light ones. */
+.value-filter {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.value-filter:hover .tag { border-color: currentColor; }
+.value-filter:not(:has(.tag)):hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.value-filter:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.value-filter:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── M11 · .result-count ── M12 · .load-more ─────────────────────────────────────────────────────
+   "7 of 55 skills" under the bar: a measurement of the list, so muted, and tabular so the figures
+   do not dance while they change. It is the live region (`role="status"`), not the search box, and
+   a page updates it once the input settles — a count announced on every keystroke is noise.
+
+   A long list shows a window and grows it: "showing 48 of 312 · show more". The button is always
+   there for the keyboard even where an IntersectionObserver also extends the window near the end. */
+.result-count {
+  margin: 0.5rem 0 0;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.load-more {
+  padding-block: 2rem;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
+/* ── M13 · an autocomplete list ─────────────────────────────────────────────────────────────────
+   A text field whose suggestions drop down (seedr studio's slash commands) is the system's list
+   too: `ul.select-panel[role=listbox]` of `li.select-option` rows, placed by positionPopup(). A
+   row may explain itself after its label; the explanation takes the room that is left and is cut
+   with an ellipsis rather than wrapping the row. */
+.option-desc {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted-foreground);
+}
+
+/* ── touch ──────────────────────────────────────────────────────────────────────────────────────
+   44px under a thumb, as everywhere in the estate. `min-*`, never a width or a height: the target
+   grows and the glyph stays centred. The search box keeps its text clear of a clear button that
+   is now 2.75rem wide. */
+@media (pointer: coarse) {
+  .search-field > input[type="search"] {
+    min-block-size: 44px;
+    padding-inline-end: 2.75rem;
+  }
+  .search-clear {
+    inset-inline-end: 0;
+    inline-size: 2.75rem;
+    block-size: 2.75rem;
+  }
+  .select-trigger--filter,
+  .chip,
+  .value-filter { min-block-size: 44px; }
+  .filter-clear,
+  .sort-dir {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+  }
+  .value-filter {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-field[data-pending]::after { animation: none; }
+}
+
+/* ── print ──────────────────────────────────────────────────────────────────────────────────────
+   The controls that only DO something go; the ones that SAY something stay. A printed list that is
+   silently filtered is the failure the table badge exists for, on paper, where nobody can ask —
+   so a filtering trigger still prints its value on its --primary edge, the chips in force still
+   print, and the count still prints. The clear buttons, the direction arrow, the pending line and
+   "show more" have nothing to do on paper. */
+@media print {
+  .search-clear,
+  .filter-clear,
+  .sort-dir,
+  .load-more > button,
+  .search-field[data-pending]::after,
+  .chip--remove::after {
+    display: none !important;
+  }
+  .filter-bar--sticky { position: static; }
+}

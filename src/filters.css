@@ -268,10 +268,14 @@
   -webkit-mask: var(--ico-x) center / contain no-repeat;
   mask: var(--ico-x) center / contain no-repeat;
 }
-.filter-clear:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.filter-clear:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 12%, transparent); }
 .filter-clear:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+.filter-clear:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* THE SEARCH ROW IN A LONG LIST (configr, past twenty options). Sticky at the top of the panel
@@ -288,6 +292,11 @@
 /* The box follows the panel's width instead of setting it: an <input> asks for about twenty
    characters of its own, which would widen a list of three-letter options to fit the search. */
 .select-search .search-field > input[type="search"] { inline-size: 0; }
+/* A row the search has ruled out is `hidden` — and `.select-option` sets `display: flex`, which
+   outranks the user agent's `[hidden]` rule, so without this every row stayed on screen while the
+   runtime believed it had filtered them. Measured on the demo page before this line existed: the
+   query "1" left all 25 rows drawn, "all" included. */
+.select-panel > [hidden] { display: none; }
 .select-panel:has(> .select-search) {
   scroll-padding-block-start: calc(var(--control-h) + 0.5rem + 1px);
 }
@@ -441,6 +450,11 @@
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
+/* ON THE 12% FILL, MUTED INK FAILS — measured, not guessed: --muted-foreground on the tint is
+   3.91:1 on warm and 3.99 on mono over --muted, under AA, where the chip's own ink measures 4.68 at
+   worst. So a count inside a pressed chip, and the key inside a hovered remove chip, take the chip's
+   colour; weight still tells a count from its label (the label is bold, the count is not). */
+.chip:is([aria-pressed="true"], [aria-current="page"]) .chip-count { color: inherit; }
 .chip:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -480,6 +494,8 @@
 }
 .chip--remove:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 12%, transparent); }
 .chip-key { color: var(--muted-foreground); }
+/* the same measurement as .chip-count above: on the hover fill the key takes the chip's ink */
+.chip--remove:hover:not(:disabled) .chip-key { color: inherit; }
 
 /* ── M10 · .value-filter — a value that filters by itself ───────────────────────────────────────
    A tag on a card that narrows the list to that tag (seedr's source badge, pagr's in-card #tags).
@@ -544,6 +560,19 @@
   text-overflow: ellipsis;
   color: var(--muted-foreground);
 }
+
+/* `hidden` MEANS HIDDEN. Every class above that sets a `display` outranks the user agent's
+   `[hidden] { display: none }` — author CSS beats the UA whatever the specificity — so a page that
+   hides a chip row, a bar or a control with the attribute would still see it drawn. The two clear
+   buttons carry their own rule above because the runtime toggles them; this covers the rest. */
+.search-field[hidden],
+.filter-dd[hidden],
+.sort-ctl[hidden],
+.filter-bar[hidden],
+.chip-set[hidden],
+.chip[hidden],
+.filter-chips[hidden],
+.value-filter[hidden] { display: none; }
 
 /* ── touch ──────────────────────────────────────────────────────────────────────────────────────
    44px under a thumb, as everywhere in the estate. `min-*`, never a width or a height: the target

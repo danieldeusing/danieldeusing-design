@@ -178,6 +178,9 @@ function syncTrigger(instance) {
   if (active) trigger.setAttribute("data-active", "true");
   else trigger.removeAttribute("data-active");
   instance.clear.hidden = !active;
+  // A disabled filter can still be filtering — and its clear would then change the value of a
+  // control the page has switched off. It is shown (the state is still worth seeing), not usable.
+  instance.clear.disabled = select.disabled;
 }
 
 /*

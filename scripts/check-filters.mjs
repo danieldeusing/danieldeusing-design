@@ -149,7 +149,11 @@ ${HELPERS}
 window.triggerOf = (id) => document.getElementById(id).parentElement.querySelector(".select-trigger");
 window.clearOf = (id) => document.getElementById(id).closest(".filter-dd")?.querySelector(".filter-clear") || null;
 window.panel = () => document.querySelector(".select-panel");
-window.rows = () => [...(panel()?.querySelectorAll(".select-option:not([hidden])") || [])].map((r) => r.textContent);
+// The rows a reader SEES — rendered boxes, not the \`hidden\` attribute. The attribute is the
+// runtime's intent; \`.select-option { display: flex }\` once overrode it and every "filtered" row
+// stayed on screen while an attribute-reading check reported the filter working.
+window.rows = () => [...(panel()?.querySelectorAll(".select-option") || [])]
+  .filter((r) => r.getClientRects().length > 0).map((r) => r.textContent);
 window.activeRow = (el = document.activeElement) => {
   const id = el && el.getAttribute("aria-activedescendant");
   return id ? document.getElementById(id).textContent : null;
@@ -382,6 +386,7 @@ await evaluate(`mount(\`
   <select id="req" data-filter aria-label="repository"><option value="vu3">poi/vu3</option><option value="infra">dd/infra</option></select>
   <select id="order" data-filter aria-label="kind"><option value="a">agent</option><option value="">all</option><option value="s">skill</option></select>
   <select id="bad" aria-label="model" aria-invalid="true"><option data-icon="star">claude</option><option>codex</option></select>
+  <select id="dis" data-filter aria-label="host" disabled><option value="">all</option><option value="m" selected>ddmini</option></select>
 \`); initSelects(); null`);
 
 check("never the OS list: every <select> is wrapped, including one still carrying data-select=\"off\"",
@@ -535,6 +540,11 @@ check("filter: ...and after a pick it still offers no clear — there is nothing
   !(await evaluate(`triggerOf("req").hasAttribute("data-active")`)) &&
   (await evaluate(`clearOf("req").hidden`)) === true);
 
+check("filter: a DISABLED filter still shows that it filters, but its clear cannot be pressed",
+  (await evaluate(`clearOf("dis").hidden`)) === false && (await evaluate(`clearOf("dis").disabled`)) === true);
+await click(`clearOf("dis")`);
+check("filter: ...and a press on it changes nothing", (await evaluate(`document.getElementById("dis").value`)) === "m");
+
 /* ── aria-invalid and option icons (C8) ── */
 
 check("select: aria-invalid on the <select> is mirrored onto the trigger the reader sees",
@@ -585,7 +595,8 @@ check("search row: the side it opened on is kept while the list shrinks under th
 await press("ArrowDown");
 check("search row: ArrowDown moves through the matches", (await evaluate("activeRow()")) === "label 10");
 await typeText("zz");
-check("search row: nothing matching says so", await evaluate(`!panel().querySelector(".select-empty").hidden`) &&
+check("search row: nothing matching says so", (await evaluate("rows().length")) === 0 &&
+  (await evaluate(`panel().querySelector(".select-empty").getClientRects().length`)) === 1 &&
   (await evaluate(`panel().querySelector(".select-empty").textContent`)) === "no matches" &&
   (await evaluate("activeRow()")) === null);
 await evaluate(`(() => { const i = panel().querySelector(".select-search input"); i.value = "label 2";
@@ -769,6 +780,7 @@ await evaluate(`mount(\`
     <button type="button" class="chip" id="c-off" aria-pressed="false">#agents <span class="chip-count">12</span></button>
     <button type="button" class="chip" id="c-id" aria-pressed="true" style="--chip-accent: rgb(0, 128, 0)">ddmini</button>
     <button type="button" class="chip" id="c-dis" aria-pressed="false" disabled>disabled</button>
+    <button type="button" class="chip" id="c-pc" aria-pressed="true">#infra <span class="chip-count">31</span></button>
   </div>
   <div class="filter-chips"><button type="button" class="chip chip--remove" id="c-rm" aria-label="remove filter source: seedr"><span class="chip-key">source:</span> seedr</button></div>
   <button type="button" class="value-filter" id="vf" aria-label="filter by source: official">official</button>
@@ -831,6 +843,20 @@ check("css: an unpressed chip is muted, regular weight, on the --border hairline
   (await evaluate(`cs("#c-off", "color")`)) === (await evaluate(`probe("var(--muted-foreground)")`)) &&
   (await evaluate(`cs("#c-off", "font-weight")`)) === "400" &&
   (await evaluate(`cs("#c-off", "border-top-color")`)) === (await evaluate(`probe("var(--border)")`)));
+check("css: a count inside a PRESSED chip takes the chip's ink — muted on the 12% fill fails AA",
+  (await evaluate(`cs("#c-pc .chip-count", "color")`)) === primary &&
+  (await evaluate(`cs("#c-off .chip-count", "color")`)) === (await evaluate(`probe("var(--muted-foreground)")`)));
+// Rest BEFORE the forced hover: clearing a FORCED pseudo-state does not restyle descendants keyed
+// on it (measured — `.chip--remove:hover .chip-key` kept its hover ink with :hover false), which is
+// a DevTools artifact, not the page's behaviour.
+check("css: the key of a remove chip at rest is muted", (await evaluate(`cs("#c-rm .chip-key", "color")`)) ===
+  (await evaluate(`probe("var(--muted-foreground)")`)));
+await force("#c-rm", ["hover"]);
+check("css: ...and on the hovered remove chip's fill it takes the chip's ink",
+  (await evaluate(`cs("#c-rm .chip-key", "color")`)) === primary);
+await force("#c-rm", []);
+check("css: a row of in-force chips hidden with the attribute is really hidden",
+  (await evaluate(`($(".filter-chips").hidden = true, cs(".filter-chips", "display"))`)) === "none");
 check("css: an identity chip takes its --chip-accent instead of --primary",
   (await evaluate(`cs("#c-id", "color")`)) === "rgb(0, 128, 0)" && (await evaluate(`cs("#c-id", "border-top-color")`)) === "rgb(0, 128, 0)");
 await evaluate(`$("#bsrc").disabled = true; tick()`);

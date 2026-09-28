@@ -876,6 +876,13 @@ check("css: under a coarse pointer every control is at least 44px",
   [await h(`"#bq"`), await h(`clearOf("bsrc")`), await h(`".sort-dir"`), await h(`"#c-off"`)].join("/"));
 await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 
+await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 700, deviceScaleFactor: 1, mobile: false });
+check("css: on a phone the search takes the bar's whole first row and the spacer is gone",
+  near(await evaluate(`box("#bsf").width`), await evaluate(`box("#bar").width`)) &&
+  (await evaluate(`cs(".filter-bar-spacer", "display")`)) === "none",
+  `${await evaluate(`box("#bsf").width`)} of ${await evaluate(`box("#bar").width`)}`);
+await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
+
 /* ── self-sufficient: tokens.css + filters.css and nothing else ── */
 
 await open("/bare");

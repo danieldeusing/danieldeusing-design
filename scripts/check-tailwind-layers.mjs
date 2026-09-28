@@ -110,7 +110,7 @@ const { compile } = await import(pathToFileURL(join(TW_NODE, "dist/index.mjs")).
 const CANDIDATES = [
   "p-6", "px-3", "border", "border-primary", "outline-none", "leading-9", "text-2xl", "flex",
   "rounded-xs", "rounded-2xl", "rounded-full", "text-cat-teal", "border-control-edge",
-  "shadow-float", "shadow-modal", "transition-colors", "hidden",
+  "shadow-float", "shadow-modal", "transition-colors", "hidden", "text-fs-display",
 ];
 const compiler = await compile(`@import "tailwindcss";\n@import "${ENTRY}";\n`, {
   base: dirname(dirname(TW_NODE)), onDependency() {},
@@ -133,6 +133,7 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8">
 <div id="edge-primary" class="border border-primary">edge</div>
 <h1 id="h1">h1</h1><h2 id="h2">h2</h2><h3 id="h3">h3</h3><h4 id="h4">h4</h4>
 <h2 id="h2-util" class="text-2xl">h2 with a utility</h2>
+<h1 id="display" class="text-fs-display">display step</h1>
 <h2><code id="code-in-h2">code</code></h2>
 <p><code id="code">code</code></p>
 <pre id="pre"><code>pre</code></pre>
@@ -272,6 +273,12 @@ check("`text-cat-teal` resolves to --cat-teal, a colour of its own",
 check("`border-control-edge` resolves to --control-edge",
   (await style("ctl-edge", "borderTopColor")) === (await token("--control-edge")),
   `${await style("ctl-edge", "borderTopColor")} vs ${await token("--control-edge")}`);
+const displaySize = await evaluate(`(() => { const p = document.getElementById("probe");
+  p.style.cssText = "position:absolute;inline-size:var(--fs-display)"; const w = p.getBoundingClientRect().width;
+  p.style.cssText = ""; return w; })()`);
+check("`text-fs-display` is --fs-display (30px, 36px from 48rem) and beats the h1 default",
+  (await style("display", "fontSize")) === `${displaySize}px` && (displaySize === 30 || displaySize === 36),
+  `${await style("display", "fontSize")} vs --fs-display ${displaySize}px`);
 check("`shadow-float` is the 20px glow", String(await style("float", "boxShadow")).includes("20px"), await style("float", "boxShadow"));
 check("`shadow-modal` is the 40px glow", String(await style("modal", "boxShadow")).includes("40px"), await style("modal", "boxShadow"));
 

@@ -102,6 +102,7 @@
       .demo-dots { padding: 1rem; border: 1px solid var(--border); }
       .demo-dots .demo-card { min-block-size: 3.5rem; }
       .demo-values { color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+      .demo-display { font-size: var(--fs-display); font-weight: 700; line-height: var(--lh-tight); color: var(--primary); }
       section { scroll-margin-top: 4rem; }
     </style>
   </head>
@@ -156,6 +157,20 @@
         <div id="status-bar" class="demo-status" style="margin-top: 0.75rem">--status-h: the footer.status height</div>
         <div class="demo-gutter" id="gutter" style="margin-top: 0.75rem"><div>--content-pad: <span id="gutter-value"></span> (1.25rem below 40rem)</div></div>
         <p class="demo-values" id="f1-values" style="margin-top: 0.5rem"></p>
+      </section>
+
+      <!-- ── display step ───────────────────────────────────────────────── -->
+      <section id="display">
+        <h2>The display step · --fs-display</h2>
+        <p class="demo-lede">One size above the heading scale, for a public-site page title and an error page's status code only:
+          30px, 36px from 48rem. An app's title stays --fs-2xl. Resize the window across 48rem to see it step.</p>
+        <p class="demo-label">a public page title (what .page-title--display will wear)</p>
+        <h1 class="demo-display" id="display-title">Articles<span class="cursor-block demo-cursor" aria-hidden="true"></span></h1>
+        <p class="demo-label" style="margin-top: 0.75rem">an error page's status code</p>
+        <p class="demo-display" id="display-code">404</p>
+        <p class="demo-label" style="margin-top: 0.75rem">for contrast, an app title at --fs-2xl</p>
+        <h1 id="display-app-title">Automation · review</h1>
+        <p class="demo-values" id="display-value" style="margin-top: 0.5rem"></p>
       </section>
 
       <!-- ── F2 ─────────────────────────────────────────────────────────── -->
@@ -311,6 +326,8 @@
         document.body.append(p); const w = p.getBoundingClientRect().width; p.remove(); return `${w}px`; };
       const readout = () => {
         document.getElementById("gutter-value").textContent = px("--content-pad");
+        document.getElementById("display-value").textContent =
+          `--fs-display ${px("--fs-display")} at ${innerWidth}px wide · --fs-2xl ${px("--fs-2xl")}`;
         document.getElementById("f1-values").textContent =
           ["--control-h", "--card-pad", "--icon-sm", "--icon-size", "--icon-lg", "--icon-xl", "--dot-size", "--status-h"]
             .map((t) => `${t} ${px(t)}`).join(" · ");

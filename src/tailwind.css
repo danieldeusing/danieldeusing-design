@@ -128,4 +128,10 @@
   --text-fs-lg: var(--fs-lg);
   --text-fs-xl: var(--fs-xl);
   --text-fs-2xl: var(--fs-2xl);
+  /* The one display step (0.60.0): `text-fs-display`, 30px and 36px from 48rem — the token carries
+     the breakpoint, so it replaces `text-3xl md:text-4xl` with one class. For a public-site page
+     title and an error page's status code ONLY; an app's title stays `text-fs-2xl`, and nothing a
+     person reads as text takes it. It sets the size alone: the line height stays the heading's
+     (--lh-tight), where `text-3xl` brought its own 1.2. */
+  --text-fs-display: var(--fs-display);
 }

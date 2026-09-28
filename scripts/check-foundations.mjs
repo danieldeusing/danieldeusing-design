@@ -182,6 +182,23 @@ check("...and 1.25rem (20px) on a 375px phone", (await evaluate('M.len("--conten
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 await sleep(150);
 
+/* ── the display step (the lead's ruling, 0.60.0) ───────────────────────── */
+
+// 30px below 48rem and 36px from it, the step danieldeusing.de's titles already take. 767 and 768
+// pin the breakpoint itself, so a media query written against another width cannot pass.
+for (const [width, px] of [[375, 30], [767, 30], [768, 36], [1440, 36]]) {
+  await send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: false });
+  await sleep(150);
+  const [size, title, code, app] = await evaluate(`[M.len("--fs-display"),
+    ...["display-title", "display-code", "display-app-title"].map((id) =>
+      parseFloat(getComputedStyle(document.getElementById(id)).fontSize))]`);
+  check(`--fs-display is ${px}px at ${width}px wide on a public title and an error code; an app title stays 24px`,
+    size === px && title === px && code === px && app === 24,
+    `token ${size}px, title ${title}px, code ${code}px, app title ${app}px`);
+}
+await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+await sleep(150);
+
 for (const theme of THEMES) {
   const edge = await evaluate(`(M.theme(${JSON.stringify(theme)}),
     ${JSON.stringify(SURFACES)}.map((s) => M.contrast("--control-edge", s)))`);

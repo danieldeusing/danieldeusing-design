@@ -9,6 +9,7 @@ of it, are in `SKILL.md`.
 Contents:
 
 - One height, one field edge, one card inset, four glyph sizes (0.60.0)
+- One display step, for a public page's title (0.60.0)
 - Categorical colours: twelve names, one lightness per theme (0.60.0)
 - Depth is a glow, and a dialog is edged (0.60.0)
 - In a Tailwind app, a utility beats the system (0.60.0)
@@ -65,6 +66,40 @@ beside it and every surface squared the row up by hand.
   40rem, so that becomes `px-[var(--content-pad)]` and every `.wrap` gets it for free.
 - Tailwind: `border-control-edge`. The sizes are read with `var()`: `min-h-(--control-h)`,
   `size-(--icon-sm)`.
+
+## One display step, for a public page's title (0.60.0)
+
+> **`--fs-display` is 30px, and 36px from 48rem wide. It titles a public-site page and sets an
+> error page's status code — nothing else. An app's title stays `--fs-2xl`. It is not a text
+> size.**
+
+The type scale, whole, as the skill states it plus the one step this release adds:
+
+| token | size | for |
+|---|---|---|
+| `--fs-base` | 12px | ALL text a person reads: body, tables, labels, controls, code |
+| `--fs-lg` | 15px | h3, a section head |
+| `--fs-xl` | 18px | h2 |
+| `--fs-2xl` | 24px | h1 — an app page's title |
+| `--fs-display` | **30px, 36px from 48rem** | a public-site page title (`.page-title--display`, content.css) and an error page's status code — only |
+
+**Why it exists (the lead, 2026-09-28).** danieldeusing.de is a source of truth, and it titles its
+pages at 30px, 36px from 48rem (Tailwind `text-3xl md:text-4xl`). The scale topped out at 24px, so
+either the public site shrank to fit the system or the system gained one step. It gained one step,
+and only that: a presented page's title is a different thing from an app's, whose title is read at a
+glance among controls and stays `--fs-2xl`.
+
+- **The token carries the breakpoint.** It is 30px below 48rem and 36px from it — the site's own
+  `md:` width — so a title written with it needs no media query, and `text-3xl md:text-4xl` becomes
+  one class.
+- **Write the class, never the token on an element of your own.** A public page title is
+  `.page-title--display`; an error page's code is the error-page template's. A bare `<h1>` stays
+  `--fs-2xl` — the element default does not change, so no app title grows by accident.
+- **Not a text size.** No paragraph, label, heading inside a page, button or stat takes it. A figure
+  that must stand out is a stat tile's value at `--fs-xl`, not a display number.
+- **Tailwind:** `text-fs-display`. It sets the SIZE only: the line height stays the heading's
+  (`--lh-tight`, 1.3), where `text-3xl` brought its own 1.2. Measured by
+  `scripts/check-foundations.mjs` at 375, 767, 768 and 1440px wide.
 
 ## Categorical colours: twelve names, one lightness per theme (0.60.0)
 
@@ -142,7 +177,8 @@ it must cascade the same way through the entry; the second because on paper it m
 everything, a utility included.
 
 What changed on the element, measured by `scripts/check-tailwind-layers.mjs` against both entries
-(23 of its 38 assertions fail on the 0.59.0 entry):
+(each changed row fails against the 0.59.0 entry and passes against this one; the last row is what
+did not change):
 
 | on the same element | 0.59.0 | 0.60.0 |
 |---|---|---|

@@ -327,6 +327,26 @@ html[data-theme="paper"] {
 }
 
 /*
+ * ── ONE DISPLAY STEP, for a public page's title (0.60.0) ────────────────────────
+ *
+ * danieldeusing.de titles its pages at 30px, and at 36px from 48rem wide (Tailwind `text-3xl
+ * md:text-4xl`), while the scale above tops out at --fs-2xl, 24px. The public site is a source of
+ * truth, so the ruling (the lead, 2026-09-28) was to give the system ONE display step rather than
+ * shrink the site's titles to fit the scale. The step carries the site's own breakpoint, so a
+ * title that uses it needs no media query of its own.
+ *
+ * WHO MAY USE IT: a public-site page title (`.page-title--display`, in content.css) and an error
+ * page's status code. Nothing else. An app surface's title stays --fs-2xl, and this is not a text
+ * size: nothing a person reads as body copy, a label or a heading inside a page takes it.
+ */
+:root {
+  --fs-display: 1.875rem;   /* 30px, below 48rem */
+}
+@media (min-width: 48rem) {
+  :root { --fs-display: 2.25rem; }   /* 36px */
+}
+
+/*
  * ── CONTROLS, CARDS AND GLYPHS — one number each (0.60.0) ──────────────────────
  *
  * The drift the content width had in 2026-08, one level down. seedr and configr each settled on a

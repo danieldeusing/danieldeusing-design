@@ -288,21 +288,28 @@
   color: var(--primary);
 }
 
-/* ── A FILTER IS NOT AN ACTION (0.58.0, Daniel) ───────────────────────────────────────────────
+/* ── A FILTER IS NOT AN ACTION, AND IT SAYS WHAT IT IS (0.58.0, 0.59.0, Daniel) ────────────────
    "the filters (hide handled, ...) look exactly like action buttons (refresh, ...). This is not
    good. They should look different" (2026-09-19), and again on 2026-09-28, about a repository
    picker built as a row of ghost buttons: "We already said once, that filters and stuff should
-   NOT look like a button."
+   NOT look like a button." 0.58.0 answered that with bare text — and the same day: "Now it does
+   not look like a button, but I as a user does not know if this is some filter possibility, I
+   barely even see if something is active or not."
 
-   An ACTION is a box: `.btn-terminal`, bordered (ghost) or filled. Anything that only changes what
-   is SHOWN — a filter, a toggle such as `follow`, a picker choosing which repository or range a
-   view reads — is TEXT: no border, no fill, muted until pointed at, the page's own colour while it
-   is engaged. The state is `aria-pressed`, which is also what a screen reader announces; there is
-   no second class for "on".
+   So a filter is not a box, and it is not bare text either: it carries the MARK of a choice, the
+   one every reader already knows and the one this estate's own chrome already wears (the footer's
+   `[x] anim`). Drawn here from `aria-pressed`, so a page cannot forget it and cannot disagree with
+   its own state:
 
-   It lived in cockpit's portal.css until here, with a comment saying the package had no filter
-   vocabulary. That absence is how it came back: this package forbids a local button class, so on
-   a surface without one the only control left to reach for was the action button.
+     a toggle              [ ] follow            [x] follow
+     one of several        ( ) columbus          (•) columbus      — inside .filter-set
+
+   The chosen one is also the only thing on the row in the foreground colour and in bold, with its
+   mark in --primary; the rest recede. The marks are `content: … / ""`, so a screen reader hears
+   the label and the pressed state once, not "left bracket x right bracket". The font is mono, so
+   a mark never shifts the row when it flips.
+
+   A control with no `aria-pressed` gets no mark — it is not a filter, whatever its class.
 
    Vertical padding matches `.btn-terminal--compact` exactly, so a filter in a row of actions does
    not change the row's height. */
@@ -317,8 +324,19 @@
 }
 .filter-ctl:hover { color: var(--primary); }
 .filter-ctl:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.filter-ctl[aria-pressed="true"] { color: var(--foreground); }
+.filter-ctl[aria-pressed="true"] { color: var(--foreground); font-weight: 700; }
 .filter-ctl:disabled { opacity: 0.45; cursor: default; }
+.filter-ctl[aria-pressed]::before { content: "[ ] "; content: "[ ] " / ""; white-space: pre; }
+.filter-ctl[aria-pressed="true"]::before { content: "[x] "; content: "[x] " / ""; color: var(--primary); }
+
+/* ONE OF SEVERAL — a picker choosing which repository, range or view a panel reads. The set says
+   what is being chosen (`repo:`), and its options wear the radio mark instead of the checkbox. */
+.filter-set { display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.75rem; row-gap: 0.1rem; }
+.filter-set-label { font-size: var(--fs-base); color: var(--muted-foreground); }
+.filter-set-label::after { content: ":"; }
+.filter-set > .filter-ctl[aria-pressed]::before { content: "( ) "; content: "( ) " / ""; }
+/* \2022 is the bullet, escaped so the file stays ASCII whatever charset it is served with. */
+.filter-set > .filter-ctl[aria-pressed="true"]::before { content: "(\2022) "; content: "(\2022) " / ""; }
 
 /* ─────────────────────────────────────────────────────────────────────────
    Settings-control icons — centralized so every consuming site shares ONE

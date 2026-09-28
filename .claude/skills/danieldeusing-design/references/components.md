@@ -8,7 +8,7 @@ Contents:
 
 - `.eli5` is opt-in per item (0.45.0)
 - A row action's shape says whether it changes anything (0.13.0)
-- A filter is not an action — `.filter-ctl` (0.58.0)
+- A filter is not an action, and it says what it is — `.filter-ctl`, `.filter-set` (0.58.0, 0.59.0)
 - The rail marks the current page on `aria-current="page"` (0.19.0)
 - `.ls-perm` is deliberately dimmer than muted (0.20.0)
 - A hover is `data-tip`, never the native `title` (0.26.0)
@@ -50,7 +50,7 @@ something:
 | `edit` — writes, and is the row's own settings | `<button class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--edit" aria-label="edit <what>">` — see below |
 | `remove` `delete` — **destroys** | `<button class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove <what>">` — see below |
 | the one primary action of a view | the same, **filled**: `btn-terminal btn-terminal--compact` |
-| a filter, a toggle (`follow`, `hide handled`), a picker — changes what is **shown**, nothing else | **not a button**: `<button class="filter-ctl" aria-pressed="…">` — see the next section |
+| a filter, a toggle (`follow`, `hide handled`), a picker — changes what is **shown**, nothing else | **not a button**: `<button class="filter-ctl" aria-pressed="…">`, marked `[x]` by the stylesheet; a picker is a labelled `.filter-set` marked `(•)` — see the next section |
 
 Two filled buttons side by side compete, which is the whole reason `--ghost` exists.
 
@@ -97,37 +97,41 @@ declare a local one**, and never a local button class at all: five invented clas
 `.copy-btn`, `.tbtn`, `.xbtn`, `.fw-btn`) is how 77 rounded corners accumulated on a system whose
 `--radius` has been `0` since its first release.
 
-## A filter is not an action — `.filter-ctl` (0.58.0, Daniel)
+## A filter is not an action, and it says what it is — `.filter-ctl`, `.filter-set` (0.58.0, 0.59.0, Daniel)
 
-> **An action is a box. A filter is text.**
+> **An action is a box. A filter carries the mark of a choice: `[x]` or `(•)`.**
 
 Daniel, 2026-09-19: *"the filters (hide handled, ...) look exactly like action buttons (refresh,
-...). This is not good. They should look different."* And on 2026-09-28, about a row of ghost
-buttons picking which repository a chart shows: *"We already said once, that filters and stuff
-should NOT look like a button."*
+...). This is not good. They should look different."* On 2026-09-28, about a row of ghost buttons
+picking which repository a chart shows: *"We already said once, that filters and stuff should NOT
+look like a button."* And the same day, about 0.58.0's answer — bare muted text, the chosen one in
+the foreground colour: *"Now it does not look like a button, but I as a user does not know if this
+is some filter possibility, I barely even see if something is active or not."*
 
-| the control | what to write |
-|---|---|
-| does something — refresh, run, save, approve, copy | `.btn-terminal` (+ `--ghost` / `--compact`), per the table above |
-| changes what is **shown** — a filter, a toggle (`follow`, `hide handled`, `live`), a picker choosing a repository, a range, a view | `<button type="button" class="filter-ctl" aria-pressed="true\|false">label</button>` |
-| switches between whole panels of one page | `.tab` — it is a tab, not a filter |
+Both failures are the same failure from opposite sides. A box says "this does something"; plain
+text says nothing at all. A filter has to say **"this is a choice, and this one is chosen"**, and
+the mark every reader already knows for that is the checkbox and the radio button — in this
+estate's terminal idiom, the one the footer's `[x] anim` already wears.
 
-- **The state is `aria-pressed`, and nothing else.** An engaged filter reads in `--foreground`, a
-  released one recedes to `--muted-foreground`; no second class, no border to add or remove.
-  `aria-pressed` is also what a screen reader announces, so the look and the accessible state
-  cannot disagree.
-- **A picker is a row of filters, one pressed.** Choosing one repository out of four is a filter on
-  what the view shows — `.filter-ctl` each, the chosen one `aria-pressed="true"`. Not a row of
-  ghost buttons, however much a set of choices looks like a set of buttons.
-- **No marker glyph.** A `[x] ` / `[ ] ` prefix is fine where it is the label's own text (cockpit's
-  `hide handled`), but never add a glyph to make a filter look clickable: discovery is by hover,
-  as for tips.
-- **Never re-draw it locally.** It lived in cockpit's `portal.css` until 0.58.0, and the reason it
-  was needed there is the reason it had to move: this package forbids a local button class, so a
-  surface without a filter class had exactly one control left to reach for — the action button.
-  That is how the stats page's repository picker shipped as four ghost buttons, eight days after
-  the rule was written. Cockpit's `bin/cockpit-render-check` now fails a `.btn-terminal` carrying
-  `aria-pressed`.
+| the control | what to write | reads as |
+|---|---|---|
+| does something — refresh, run, save, approve, copy | `.btn-terminal` (+ `--ghost` / `--compact`), per the table above | a box |
+| turns one thing on or off — `follow`, `hide handled`, `live` | `<button type="button" class="filter-ctl" aria-pressed="true\|false">follow</button>` | `[ ] follow` / **`[x] follow`** |
+| picks one of several — which repository, range or view a panel reads | `<div class="filter-set" role="group" aria-label="repository"><span class="filter-set-label">repo</span>` + one `.filter-ctl` per option, exactly one `aria-pressed="true"` | `repo: ( ) a  `**`(•) b`**`  ( ) c` |
+| switches between whole panels of one page | `.tab` — it is a tab, not a filter | a filled block |
+
+- **The mark is drawn by the stylesheet, from `aria-pressed`.** Never type `[x] ` or `[ ] ` into a
+  label: the page and the state would have two sources, and they drift. A control without
+  `aria-pressed` gets no mark, because it is not a filter.
+- **The chosen one is loud.** Foreground colour, bold, its mark in `--primary`; the others are
+  `--muted-foreground`. The mark is `content: "…" / ""`, so a screen reader hears the label and the
+  pressed state once, not the brackets.
+- **A picker names what it picks.** `.filter-set-label` is the noun (`repo`, `range`, `view`); the
+  stylesheet adds the colon. Without it a row of names is a row of names.
+- **Never re-draw it locally**, and never reach for a button because the filter looked too quiet —
+  that is the loop this section records. If a filter is hard to find, fix it here.
+- Cockpit's `bin/cockpit-render-check` fails a `.btn-terminal` carrying `aria-pressed`, a label that
+  types its own mark, and the stats picker outside a labelled `.filter-set`.
 
 Netmon is the deliberate exception: it loads only `tokens.css` + `chrome.css`, and its range,
 preset and series chips are its own bordered vocabulary, argued for in its own stylesheet.

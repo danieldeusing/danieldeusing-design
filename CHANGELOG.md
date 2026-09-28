@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.59.0 (2026-09-28)
+
+### Changed
+
+- **A filter carries the mark of a choice.** `.filter-ctl[aria-pressed]` now draws `[ ] ` / `[x] `
+  before its label, and the pressed one is bold in `--foreground` with its mark in `--primary`.
+  0.58.0 made a filter bare muted text, which fixed "it looks like a button" and broke the other
+  half — Daniel, the same day: *"I as a user does not know if this is some filter possibility, I
+  barely even see if something is active or not."* The mark is the one the footer's `[x] anim`
+  already wears, drawn from `aria-pressed` so a page cannot forget it or disagree with its state;
+  it is `content: … / ""`, so a screen reader does not read the brackets.
+
+### Added
+
+- **`.filter-set` + `.filter-set-label` — one of several.** A picker choosing which repository,
+  range or view a panel reads is a labelled group (`repo:`, the colon added by the stylesheet)
+  whose options wear the radio mark `( )` / `(•)` instead of the checkbox.
+
+### Fixed
+
+- **The skill forbade the fix.** `references/components.md` said "No marker glyph … never add a
+  glyph to make a filter look clickable". That rule is gone; the section now says a filter must
+  say *this is a choice, and this one is chosen*, and that a page never types the mark itself.
+
 ## 0.58.0 (2026-09-28)
 
 ### Added

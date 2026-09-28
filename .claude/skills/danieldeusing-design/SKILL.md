@@ -261,7 +261,7 @@ not sit on `--background`, because on a `--card` surface the default paints a 1.
 | chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`, `--tablewrap-fade`) `.bleed-rail` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
 | `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`, **`[aria-current="page"]`**) `.ls-perm` `.ls-name` `.ls-group` | `src/chrome.css` |
 | text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
-| blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`, `--edit`, `:disabled`) `.filter-ctl` (`[aria-pressed]`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
+| blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`, `--edit`, `:disabled`) `.filter-ctl` (`[aria-pressed]`, marked `[x]`) `.filter-set` (+ `.filter-set-label`, marked `(•)`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
 | tabs | `.tabs` `.tab` (`[aria-selected]`) `section.doc.tab-panel` | `src/components.css` |
 | status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/chrome.css` (moved from components 0.17.0) |
 | diagram zoom | `.dgm-zoomable` `.dgm-overlay` `.dgm-stage` `.dgm-bar` `.dgm-btn` `.dgm-close` `.dgm-art` | `src/components.css` |
@@ -282,7 +282,7 @@ markup:
 
 | Building … | Read |
 |---|---|
-| any button (never a local button class), **a filter, a toggle or a picker — anything that only changes what is shown (`.filter-ctl`, never a button)**, a row action (link or button, edit, remove), the rail's current page, `.ls-perm`, a hover explanation (`data-tip`, never `title`), a change to `runtime/tooltip.js` (netmon carries an inline copy), an `.eli5` box | `references/components.md` |
+| any button (never a local button class), **a filter, a toggle or a picker — anything that only changes what is shown (`.filter-ctl` marked `[x]`, a picker a labelled `.filter-set` marked `(•)`; never a button, never bare text)**, a row action (link or button, edit, remove), the rail's current page, `.ls-perm`, a hover explanation (`data-tip`, never `title`), a change to `runtime/tooltip.js` (netmon carries an inline copy), an `.eli5` box | `references/components.md` |
 | a table (plain markup, column widths, horizontal scroll, paging, search / filter / sort), any `@tailwindcss/typography` (`.prose`) surface, a `<select>`, a settings panel (`.field-row`) | `references/tables-and-forms.md` |
 | a call into the runtime: the theme functions and every `init*()` | `references/runtime.md` |
 

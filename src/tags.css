@@ -1,0 +1,174 @@
+/*
+ * danieldeusing-design — tags and counts.
+ *
+ * A tag is a word that classifies the thing beside it: `installed`, `mcp`, `timed out`, `[ live ]`.
+ * A count is a number that says how many. The estate drew tags five ways — configr's Label (44 call
+ * sites), seedr's Label and Badge, pagr's bracketed status, cockpit's `.tag` with ~35 `.st-*` states
+ * on its own axes, netmon's chips — and counts three, every one of them a pill. This is one of each
+ * (0.60.0). Like feedback.css it needs tokens.css and nothing else, so it loads on any surface.
+ *
+ * BORDER-ONLY. seedr and configr both settled on the word in the colour with a 50% edge of the same
+ * colour and no fill (R81), and it is the right answer for a thing that appears twenty times in a
+ * table: a filled chip in every row is a column of loud boxes. The fill is kept for ONE modifier,
+ * `--solid`, for the one thing on the page with the widest blast radius.
+ *
+ * COLOUR IS AN ATTRIBUTE, NEVER A CLASS NAME. A STATE takes `data-tone` (tokens.css — success,
+ * warning, destructive, info, pending, primary, muted); an IDENTITY takes a categorical hue,
+ * `style="--tag-color: var(--cat-teal)"`. Both resolve to one private `--tag-c` that the text, the
+ * edge and the solid fill read, so the three cannot disagree. An untoned tag is muted.
+ *
+ * The meaning is always the WORD. Colour speeds the scan, the border style is a second axis a
+ * reader can use in grey (dashed = not the proof, dotted = off), and a tooltip is `data-tip` with
+ * no marker and no cursor change (R86).
+ */
+
+/* A tone never leaks into a child: see the same rule in feedback.css. A neutral tag inside a
+   `data-tone="success"` card must stay neutral, and without this it would read the card's tone. */
+:is(.tag, .count):not([data-tone]) { --tone: initial; }
+
+/* ── TAG ─────────────────────────────────────────────────────────────────────────────────── (T1)
+   20px tall (seedr's), the one text size, 600, never wrapping. `box-sizing` and `font: inherit`
+   are here because a tag is also a `<button>` (below), and a button keeps neither by default.
+
+   `vertical-align: middle`, because an inline-flex box takes its baseline from its FIRST item, and
+   on a tag with a glyph that item is the glyph — an empty box whose baseline is its bottom edge. On
+   one line of text a `[⬡ mcp]` then sat 2px off the `[installed]` beside it. Middle centres every
+   tag on the text's x-height instead, which leaves a word-only tag's own baseline within half a
+   pixel of the line's. */
+.tag {
+  --tag-c: var(--tag-color, var(--tone, var(--muted-foreground)));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  vertical-align: middle;
+  box-sizing: border-box;
+  min-block-size: 1.25rem;
+  padding: 0 0.375rem;
+  font: inherit;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--tag-c);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--tag-c) 50%, transparent);
+}
+/* An icon beside the word is the small glyph step — a tag is a word with a mark, not an icon with a
+   caption. A `.ico` child is drawn by its own class and only sized here; `data-icon` on the tag
+   itself draws the same glyph without a child element. */
+.tag > .ico { flex: none; inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+.tag[data-icon]::before {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+  background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+
+/* THE AXES A READER USES IN GREY. Cockpit's execution pages read state by border style as much as
+   by colour, and the vocabulary is kept exactly:
+     --dashed   not the proof, skipped, superseded — it happened, and it does not count
+     --dotted   the weakest mark: nothing happened here
+     --off      excluded, disabled, not actionable. Muted, dotted. It replaces the opacity .55-.75
+                cockpit used (R85): opacity dims the word below AA and makes the tag look broken
+                rather than off. It re-points `--tag-c`, not only `color`, so the edge recedes with
+                the word — a green edge around grey text is half an "off".
+   `--off` sits ABOVE `--dashed` / `--dotted` so an explicit border style still wins on a tag that
+   is both off and, say, not the proof. */
+.tag--off { --tag-c: var(--muted-foreground); border-style: dotted; }
+.tag--dashed { border-style: dashed; }
+.tag--dotted { border-style: dotted; }
+/* Must not be missed — a verdict. The full-strength edge and the weight, not a louder colour. */
+.tag--strong { border-color: var(--tag-c); font-weight: 700; }
+/* Retired. Still readable: it is history, not an error. */
+.tag--struck { text-decoration: line-through; }
+/* THE WIDEST BLAST RADIUS ONLY — `global` against `repo`, `public` against `internal`. The page
+   background as the text on the tone as the fill: the same pair as the tone on the page, reversed,
+   so it clears AA wherever the tone does (measured >= 5.39:1 for every tone and --cat-* hue). One per
+   view at most; a column of solid tags is how a loud badge stops meaning anything. */
+.tag--solid {
+  color: var(--background);
+  background: var(--tag-c);
+  border-color: var(--tag-c);
+  font-weight: 700;
+}
+/* Icon only — a square the height of the tag, and the one tag with a tint: with no word, the 12%
+   fill is what keeps a lone glyph reading as a tag rather than as a stray icon. It is `role="img"`
+   with an `aria-label`, since there is no word to read. */
+.tag--icon {
+  inline-size: 1.25rem;
+  padding: 0;
+  justify-content: center;
+  background: color-mix(in srgb, var(--tag-c) 12%, transparent);
+}
+/* pagr's `[ live ]` — the terminal's own badge. No box at all; the brackets are drawn so a page
+   never types them (and never types them twice). `white-space: pre` because a flex item trims its
+   own trailing space, which would draw `[live]`; `gap: 0` because the spaces are the gap. The
+   brackets have empty alternative text: a screen reader hears "live". */
+.tag--bracket { gap: 0; padding: 0; border: 0; }
+.tag--bracket::before { content: "[ "; content: "[ " / ""; white-space: pre; }
+.tag--bracket::after { content: " ]"; content: " ]" / ""; white-space: pre; }
+/* `.glow` (components.css) lights a tag in --primary. Said here too, because `.tag`'s own colour
+   would otherwise beat it on source order and leave only the text-shadow. */
+.tag.glow { --tag-c: var(--primary); }
+
+/* A TAG THAT DOES SOMETHING — cockpit's forge tag opens the forge's settings. Everything a control
+   needs, and nothing that makes it look like a button: it stays a tag whose edge firms up under
+   the pointer. No marker for a tooltip and no cursor change for one (R86); `pointer` because a
+   click does something, which is true with or without a tip. */
+button.tag { cursor: pointer; transition: border-color 0.15s ease; }
+button.tag:hover:not(:disabled) { border-color: var(--tag-c); }
+button.tag:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+button.tag:disabled { opacity: 0.45; cursor: default; }
+@media (pointer: coarse) {
+  button.tag { min-block-size: 44px; }
+}
+
+/* ── COUNT ──────────────────────────────────────────────────────────────────────────────── (T2)
+   How many — `12` beside a heading, `3` on the corner of a pull button. SQUARE (R83): every source
+   drew a pill (`rounded-full`, a 999px radius), and there is no pill in this estate. Tabular figures
+   so a count that ticks from 9 to 10 widens by a whole digit and never jitters in between. "99+" is
+   the page's cap to write; the box grows to fit whatever it is given. */
+.count {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-inline-size: 1.25rem;
+  block-size: 1.25rem;
+  padding: 0 0.25rem;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--tone, var(--muted-foreground));
+  border: 1px solid color-mix(in srgb, var(--tone, var(--muted-foreground)) 50%, transparent);
+}
+/* On the corner of its host (`position: relative` — `.btn-icon` already is), filled so it reads at
+   a glance, and ringed in the page colour so it cuts out of the host's edge instead of merging with
+   it. It is `aria-hidden`: the host's accessible name says the number ("3 commits behind — pull"),
+   so a screen reader hears it once, in a sentence. */
+.count--overlay {
+  position: absolute;
+  inset-block-start: -0.375rem;
+  inset-inline-end: -0.375rem;
+  color: var(--background);
+  background: var(--tone, var(--primary));
+  border-color: var(--background);
+}
+
+@media print {
+  /* Print drops background colours by default, and these two are the page colour ON a fill: without
+     the fill the word is white on white. Outlined on paper instead, which also spends no ink. */
+  .tag--solid {
+    color: var(--tag-c);
+    background: none;
+    border-color: currentColor;
+  }
+  .count--overlay {
+    color: var(--tone, var(--primary));
+    background: none;
+    border-color: currentColor;
+  }
+}

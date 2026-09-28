@@ -155,6 +155,10 @@
       table.demo { border-collapse: collapse; }
       table.demo td, table.demo th { padding: 0.3rem 0.9rem 0.3rem 0; text-align: left; vertical-align: top; }
       table.demo code { color: var(--muted-foreground); }
+      /* ?bare drops chrome.css, which owns .doc-link's colour; left alone the empty states' buttons
+         keep the UA's text colour — black, and invisible on green and mono. A tokens-only surface
+         colours its own links the same way. */
+      html[data-bare] .doc-link--forward { color: var(--primary); }
     </style>
   </head>
   <body>

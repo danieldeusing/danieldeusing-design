@@ -190,11 +190,15 @@ window.__wp7 = (() => {
       return got === exp ? null : sel + (pseudo || "") + " " + prop + ": got '" + got + "', want '" + exp + "'" +
         (typeof want === "object" ? "" : " (" + want + ")");
     },
-    // Every computed property a stylesheet here decides, for the full-vs-bare comparison.
+    // Every computed property a stylesheet here decides, for the full-vs-bare comparison. A
+    // .btn-icon host and an .ico glyph belong to other packages: once those land, the full stack
+    // draws the real class and ?bare the page's stand-in, and comparing the two would report a
+    // difference that is not these files'. Their placement and size are asserted in both modes above.
     snapshot(ids, props, ROOTS) {
       const out = {};
       for (const id of ids) {
         const el = document.getElementById(id);
+        if (el.matches(".btn-icon, .ico")) continue;
         for (const pseudo of ["", "::before", "::after"]) {
           const cs = getComputedStyle(el, pseudo || null);
           if (pseudo && cs.content === "none") continue;

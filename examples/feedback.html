@@ -79,17 +79,11 @@
         animation: none !important; transition: none !important;
       }
     </style>
-    <!-- I1 · glyph tokens: --ico-<name> masks, the [data-icon] → --ico mapping, and .ico. Filled in
-         by the script from the lucide paths it lists, so the block stays readable. -->
-    <style id="standin-i1" media="not all">
-      .ico {
-        display: inline-block; flex: none;
-        inline-size: var(--icon-size); block-size: var(--icon-size);
-        background: currentColor;
-        -webkit-mask: var(--ico) center / contain no-repeat;
-        mask: var(--ico) center / contain no-repeat;
-      }
-    </style>
+    <!-- I1 · glyphs. Three separate pieces, and WP1 ships only the first, for 21 words: the
+         --ico-<word> masks, the [data-icon] → --ico mapping every glyph rule reads, and the .ico
+         class. The script fills in ONLY the pieces that are missing — each absent token, the
+         mapping, the class — and names them in the header. -->
+    <style id="standin-i1" media="not all"></style>
     <!-- WP5 · C2 .btn-icon — only what the notice's dismiss and the overlay hosts need -->
     <style id="standin-wp5" media="not all">
       .btn-icon {
@@ -164,8 +158,9 @@
   <body>
     <script>
       /* Switch on each stand-in only where the real thing is missing, and say which are in force.
-         A probe per package: WP1 declares --icon-size, I1 declares --ico-x, WP5 draws .btn-icon as a
-         grid, WP3 resets button.doc-link. `?bare` first drops the data-full stylesheets. */
+         WP1 is probed by --icon-size, WP5 by .btn-icon drawing as a grid, WP3 by button.doc-link
+         losing its padding, and the glyphs piece by piece (see the I1 block). `?bare` first drops
+         the data-full stylesheets. */
       (() => {
         const root = document.documentElement;
         if (new URLSearchParams(location.search).has("bare")) {
@@ -196,10 +191,6 @@
         const svg = (body) => "url(\"data:image/svg+xml," + encodeURIComponent(
           "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' " +
           "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" + body + "</svg>") + "\")";
-        document.getElementById("standin-i1").textContent +=
-          ":root {" + Object.entries(ICONS).map(([n, b]) => "--ico-" + n + ": " + svg(b) + ";").join("") + "}" +
-          Object.keys(ICONS).map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
-
         const inForce = [];
         const use = (id, missing) => {
           if (!missing) return;
@@ -207,7 +198,32 @@
           inForce.push(id.replace("standin-", ""));
         };
         use("standin-wp1", !token("--icon-size"));
-        use("standin-i1", !token("--ico-x"));
+
+        const absent = Object.keys(ICONS).filter((n) => !token("--ico-" + n));
+        const unmapped = Object.keys(ICONS).filter((n) =>
+          !probe('<span data-icon="' + n + '"></span>', (s) => s.getPropertyValue("--ico").trim() !== ""));
+        const drawn = probe('<span class="ico"></span>', (s) => s.display !== "inline");
+        const glyphs = [];
+        let css = "";
+        if (absent.length) {
+          css += ":root {" + absent.map((n) => "--ico-" + n + ": " + svg(ICONS[n]) + ";").join("") + "}";
+          glyphs.push("tokens " + absent.join(" "));
+        }
+        if (unmapped.length) {
+          css += unmapped.map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
+          glyphs.push("mapping " + unmapped.join(" "));
+        }
+        if (!drawn) {
+          css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
+            " background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }";
+          glyphs.push(".ico");
+        }
+        if (css) {
+          const block = document.getElementById("standin-i1");
+          block.textContent = css;
+          block.media = "all";
+          inForce.push("i1 (" + glyphs.join("; ") + ")");
+        }
         use("standin-wp5", !probe('<button class="btn-icon"></button>', (s) => s.display === "inline-grid"));
         use("standin-wp3", !probe('<button class="doc-link"></button>', (s) => s.paddingTop === "0px"));
         root.dataset.standins = inForce.join(" ") || "none";

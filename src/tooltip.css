@@ -1,7 +1,12 @@
 /*
  * tooltip.css — styles for the [data-tip] tooltip system (runtime/tooltip.js).
- * The panel is a body-level singleton with position:fixed — it can never be
- * clipped by overflow containers and always sits on top.
+ * The panel is a singleton with position:fixed — it can never be clipped by overflow containers
+ * and always sits on top. It lives on <body>, or inside the open <dialog> its anchor is in: a modal
+ * dialog is in the top layer, and a panel on <body> would render beneath it.
+ *
+ * LOADS ALONE. Everything here resolves against tokens.css and nothing else, so a tokens-only app
+ * (configr, seedr studio) takes this file and initTooltips() rather than restyling #ddtip locally —
+ * studio's own --popover panel and its `cursor: help` are exactly what that local restyling became.
  */
 /* NO CURSOR, AND NO OTHER MARK EITHER (Daniel, 2026-08-28: "No cursor help").
  *
@@ -49,21 +54,38 @@
  * say what they do, after labels that were never ambiguous — and the furniture cost more than
  * the discovery was worth. A reader hovers and either something appears or it does not.
  *
- * The opt-outs below are kept: they cost nothing, and re-adding a marker would otherwise have
- * to re-derive which elements are already their own affordance.
+ * AND NO OPT-OUTS EITHER (0.60.0). `.minimap-bar[data-tip]::after, [data-tip][data-tip-bare]::after
+ * { content: none }` sat here for five releases, kept "so a future marker would not have to
+ * re-derive which elements are already their own affordance". The estate has ruled "no marker"
+ * twice since the ⓘ went; keeping the switches for a third attempt was keeping a door open for
+ * the thing that was ruled out. So this file holds NO rule keyed off [data-tip] at all — a tipped
+ * element is styled exactly as the same element untipped, which scripts/check-tooltip-marks.mjs
+ * now asserts in exactly those words. A consumer's `data-tip-bare` is inert and goes in its
+ * migration.
  */
 
-/* Opt OUT, for a [data-tip] whose element is already its own affordance. */
-.minimap-bar[data-tip]::after,
-[data-tip][data-tip-bare]::after { content: none; }
+/* THE PANEL IS A POPUP, and wears the one popup surface (0.60.0). It was a --background box on a
+   --muted-foreground edge with a black `0 4px 14px rgba(0,0,0,.25)` shadow — the one literal colour
+   left in the package, invisible on green and mono and another design language on warm and paper.
+   It is now what the menus and the listbox are: --popover under --popover-foreground (>= 9.57:1 on
+   all four themes), the --control-edge every popup and dialog is edged with, and the popup glow.
+   No radius, as everywhere. rem rather than px for the box, so the panel scales with the root like
+   the text inside it.
 
+   The panel ignores the pointer (`pointer-events: none`) and that is load-bearing, not cosmetic:
+   the click fixes in tooltip.js rest on the panel never being the thing a press lands on. So a tip
+   cannot be hovered or selected — it explains, and is never the only place a reader finds
+   something they must act on. */
 #ddtip {
-  position: fixed; z-index: 9999; display: none; max-width: 340px;
-  background: var(--background); color: var(--foreground);
-  border: 1px solid var(--muted-foreground); border-radius: var(--radius);
-  padding: 7px 10px; font-size: var(--fs-base); line-height: 1.45; font-weight: 400;
+  position: fixed; z-index: 9999; display: none;
+  box-sizing: border-box; max-inline-size: 21.25rem;
+  padding: 0.45rem 0.625rem;
+  font-family: var(--font-mono); font-size: var(--fs-base); line-height: 1.45; font-weight: 400;
   text-align: left; white-space: normal; pointer-events: none;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 1px solid var(--control-edge);
+  box-shadow: var(--elev-float);
 }
 
 /* ── the tip's own rows (0.57.0) ──
@@ -75,8 +97,9 @@
    than back to the margin, so it stays visibly one item rather than looking like the next one. */
 #ddtip .ddtip-line { padding-left: 0.75em; text-indent: -0.75em; }
 /* Row gap rather than margins between siblings: a `display: contents` row has no box to carry a
-   margin, so `+` selectors on the rows would silently apply to nothing. */
-#ddtip { row-gap: 0.2rem; }
+   margin, so `+` selectors on the rows would silently apply to nothing. The gap itself is declared
+   once, with the grid below: from 0.57.0 to 0.59.0 it was a `row-gap: 0.2rem` here followed by a
+   `gap: 0 0.9rem` there, and the shorthand, being later, zeroed it — measured, 0px between rows. */
 
 /* The FIRST part is the subject — a model name, a container, a repo — and every tip in the estate
    is written that way already. It carries the weight so the eye lands on it first. */
@@ -94,8 +117,14 @@
    `auto` against the LONGEST label in the tip, so every value lines up and the labels still cost
    only what they need. `tabular-nums` then makes the figures themselves line up digit for digit.
    (`show()` sets `display: grid`, not `block`, for this reason.) */
-#ddtip { grid-template-columns: auto 1fr; gap: 0 0.9rem; align-content: start; }
+#ddtip { grid-template-columns: auto 1fr; gap: 0.2rem 0.9rem; align-content: start; }
 #ddtip .ddtip-row { display: contents; }
 #ddtip .ddtip-line { grid-column: 1 / -1; }
 #ddtip .ddtip-k { color: var(--muted-foreground); }
 #ddtip .ddtip-v { font-variant-numeric: tabular-nums; }
+
+/* A tip is a screen affordance. print.css hides it too; this file says so itself because a
+   tokens-only app loads this file and never that one. */
+@media print {
+  #ddtip { display: none !important; }
+}

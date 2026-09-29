@@ -22,9 +22,18 @@
  * flips above when there is no room, and clamps horizontally to the viewport —
  * a tooltip must never be cut off. Event delegation means dynamically rendered
  * [data-tip] nodes just work.
+ *
+ * Escape hides it (WCAG 1.4.13: dismissible without moving the pointer or the
+ * focus), and it moves into an open <dialog> when its anchor is in one — see
+ * show().
  */
+let installed = false;
+
 export function initTooltips() {
-  if (document.getElementById("ddtip")) return;
+  // A module flag, not only the id: the panel can be inside a <dialog> that a page has since
+  // removed, and a second call must not build a second panel with a second set of listeners.
+  if (installed || document.getElementById("ddtip")) return;
+  installed = true;
   const tip = document.createElement("div");
   tip.id = "ddtip";
   tip.setAttribute("role", "tooltip");
@@ -52,7 +61,18 @@ export function initTooltips() {
   // trigger is a summary that very often carries the data-tip itself, so "hover, then click to
   // open" put the tip straight over the menu it had just explained. While a menu is open the
   // choices ARE the content; the aside waits.
+  //
+  // THE SAME RULE, WIDENED (0.60.0). Every list that drops down is a `.select-panel` now — the
+  // listbox, the filter dropdown, the autocomplete list and the context menu — so the one selector
+  // covers all of them. And a tip is refused on an anchor whose OWN popup is open
+  // (`[aria-haspopup][aria-expanded="true"]`, configr's rule): the popup the tip explains is on
+  // screen, and the tip would sit on top of it.
   const menuIsOpen = () => Boolean(document.querySelector(".select-panel, details.dropdown[open]"));
+  const OPEN_POPUP = '[aria-haspopup][aria-expanded="true"]';
+  // SHOWN MEANS ON SCREEN, not "display was set": a panel left inside a dialog that has since
+  // closed keeps its `display: grid` and has no box, and an Escape it swallowed would be an Escape
+  // the page never gets.
+  const showing = () => tip.style.display === "grid" && tip.getClientRects().length > 0;
 
   // SHOW IS IDEMPOTENT, AND THAT IS WHAT KEEPS A TIPPED CONTROL CLICKABLE.
   //
@@ -79,7 +99,7 @@ export function initTooltips() {
   // page scrolls, and a guard that made repositioning a no-op would trade a dead button for a
   // tooltip stranded where the anchor used to be.
   function show(el) {
-    if (menuIsOpen()) return;
+    if (menuIsOpen() || el.closest(OPEN_POPUP)) return;
     if (anchor === el) return;
     // POINT THE ANCHOR AT THE PANEL. `role="tooltip"` alone describes nothing: without
     // aria-describedby the panel is a div a screen reader never reaches, so `data-tip` was
@@ -92,6 +112,16 @@ export function initTooltips() {
     if (anchor && anchor !== el) removeDescription(anchor);
     anchor = el;
     describe(el);
+    // INTO THE TOP LAYER WITH ITS ANCHOR. A modal <dialog> renders above everything on the page,
+    // `z-index: 9999` included — z-index orders boxes WITHIN a layer, and the top layer is above
+    // all of them. So a panel on <body> showed for a control inside a dialog, correctly placed and
+    // entirely hidden behind the dialog. Appended to the dialog it is part of the dialog's layer,
+    // and `position: fixed` still escapes the dialog's own `overflow: hidden`.
+    //
+    // Moved only when it is not already there. Re-parenting is a DOM write during a hover, and
+    // this module's history (below) is what happens when writes during a hover are not idempotent.
+    const host = el.closest("dialog[open]") ?? document.body;
+    if (tip.parentNode !== host) host.appendChild(tip);
     renderTip(el.getAttribute("data-tip"));
     tip.style.display = "grid";
     place();
@@ -255,6 +285,25 @@ export function initTooltips() {
     if (el) show(el);
   });
   document.addEventListener("focusout", hide);
+  // ESCAPE HIDES THE TIP, AND ONLY THE TIP (WCAG 1.4.13). A tip can cover what the reader came to
+  // read, and they must be able to put it away without moving the pointer or the focus.
+  //
+  // Capture phase, and the press is CONSUMED — preventDefault and stopPropagation — so the same
+  // Escape does not also close the dialog or the menu the anchor sits in: a cancelled keydown
+  // raises no close request, and a stopped one reaches no menu. The first Escape takes the tip,
+  // the second the dialog, which is the order a reader sees them in.
+  //
+  // hidePanel, not hide: the anchor is kept, so the tip does NOT come straight back on the next
+  // `mouseover` of the same element (show() returns early for the anchor it already has) — the
+  // browser re-fires mouseover whenever it re-resolves the hover, and a tip that reappeared on
+  // that would make Escape useless. It returns when the pointer leaves and comes back, or when
+  // focus moves.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !showing()) return;
+    hidePanel();
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
   // place(), not show(): show() now returns early for the anchor it is already showing, which is
   // the whole click fix. Repositioning is the one case that must still recompute.
   document.addEventListener("scroll", () => anchor && place(), true);
@@ -306,9 +355,10 @@ export function initTooltips() {
   // the three rules that is ordering-independent, and it is what actually closes the bug.
   new MutationObserver((records) => {
     for (const record of records) {
-      // a dropdown's panel is already in the DOM; what ARRIVES is the `open` attribute
+      // a dropdown's panel is already in the DOM; what ARRIVES is the `open` attribute — and for a
+      // popup this module has no selector for (a framework's menu button), `aria-expanded`
       if (record.type === "attributes") {
-        if (record.target.matches?.("details.dropdown[open]")) { hide(); return; }
+        if (record.target.matches?.(`details.dropdown[open], ${OPEN_POPUP}`)) { hide(); return; }
         continue;
       }
       for (const node of record.addedNodes) {
@@ -316,5 +366,5 @@ export function initTooltips() {
         if (node.matches?.(".select-panel") || node.querySelector?.(".select-panel")) { hide(); return; }
       }
     }
-  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
+  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "aria-expanded"] });
 }

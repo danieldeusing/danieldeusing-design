@@ -269,7 +269,11 @@
           css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
             " vertical-align: -0.125em; background: var(--tone, currentColor);" +
             " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
-            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }";
+            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }" +
+            // WP4's forced-colours glyph (icons.css, X1): the parent's forced colour, CanvasText without it
+            "@media (forced-colors: active) { .ico, .ico[data-tone] { forced-color-adjust: none; background: CanvasText; }" +
+            " @supports (forced-color-adjust: preserve-parent-color) { .ico, .ico[data-tone] {" +
+            " forced-color-adjust: preserve-parent-color; background: currentColor; } } }";
           glyphs.push(".ico");
         }
         if (css) {

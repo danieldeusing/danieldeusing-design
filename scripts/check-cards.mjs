@@ -21,8 +21,10 @@
  *      :focus-visible rule exists to supply a ring the component forgot (X2).
  *   4. Does `hidden` hide every component? With tokens.css loaded, whatever display the class sets
  *      (X3). Until this branch carries WP1's rule the demo supplies it as a marked stand-in.
- *   5. Do the states survive forced colours (X1)? Each state pair must compute two different colours
- *      on the part that shows the state, and no glyph may be painted in the Canvas colour.
+ *   5. Do the states survive forced colours (X1)? Read from PIXELS, on four themes × both palettes and
+ *      again as an engine without preserve-parent-color sees the file: every glyph and line this file
+ *      draws reaches 3:1 on what it sits on, a chosen row sits on Highlight where its neighbour does
+ *      not, and the words on both reach 4.5:1.
  *
  * WHAT IT READS. examples/cards.html is the environment: its stylesheets, and stand-ins for the
  * tokens and classes other packages of 0.60.0 own. Those switch themselves off once the real ones
@@ -224,6 +226,45 @@ window.__wp8 = (() => {
       return got === exp ? null : sel + (pseudo || "") + " " + prop + ": got '" + got + "', want '" + exp + "'" +
         (typeof want === "object" ? "" : " (" + want + ")");
     },
+    // A box in DOCUMENT coordinates for a screenshot clip, brought into view first (a clip below the
+    // fold captures nothing), instantly (base.css scrolls smoothly). lead: only the row's ::before,
+    // the first thing in it — a chevron clip must not also hold the row's .ico or its words, which
+    // would pass for a chevron that is not there.
+    // inset: pixels kept off every edge — a splitter's line sits in the middle of its box, and the
+    // panes' own edges beside it are CanvasText too, so a clip that grazes one would pass a line that
+    // is not drawn.
+    shot(sel, lead, inset = 0) {
+      const el = q(sel);
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+      const r = el.getBoundingClientRect();
+      if (lead) return { x: r.x + scrollX + parseFloat(getComputedStyle(el).paddingLeft), y: r.y + scrollY,
+        w: parseFloat(getComputedStyle(el, "::before").width), h: r.height };
+      return { x: r.x + scrollX + inset, y: r.y + scrollY + inset, w: r.width - 2 * inset, h: r.height - 2 * inset };
+    },
+    // A SCREENSHOT of that box, decoded by the page itself (no image library): the colour most of it
+    // is (what the mark sits on), the strongest contrast any pixel reaches against it, that pixel's
+    // colour, and how many pixels reach 3:1. Forced colours are judged from this and not from computed
+    // style (X1): a glyph left in the AUTHOR's colour computes "not Canvas" and cannot be seen.
+    async ink(png) {
+      const img = new Image();
+      img.src = "data:image/png;base64," + png;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const x = c.getContext("2d");
+      x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height).data, seen = new Map();
+      for (let i = 0; i < d.length; i += 4) { const k = d[i] + ", " + d[i + 1] + ", " + d[i + 2]; seen.set(k, (seen.get(k) || 0) + 1); }
+      const rgb = (k) => { const [r, g, b] = k.split(", ").map(Number); return { r: r / 255, g: g / 255, b: b / 255, a: 1 }; };
+      const bg = [...seen].sort((a, b) => b[1] - a[1])[0][0];
+      let strongest = 1, mark = bg, n = 0;
+      for (const [k, m] of seen) {
+        const v = ratio(rgb(k), rgb(bg));
+        if (v > strongest) { strongest = v; mark = k; }
+        if (v >= 3) n += m;
+      }
+      return { bg: "rgb(" + bg + ")", mark: "rgb(" + mark + ")", strongest, n };
+    },
     near: (a, b, label, tol = 0.6) => (Math.abs(a - b) <= tol ? null : label + ": " + a.toFixed(2) + " vs " + b.toFixed(2)),
     // Every listed computed property of every fixture this file styles, for the full-vs-bare
     // comparison. Another package's class (.btn-icon, .ico, .tag, .count, .dot, .value-filter,
@@ -365,6 +406,7 @@ const FIXTURE = `
       </ul>
     </li>
   </ul>
+  <ul class="tree" role="tree" aria-label="chosen" id="fx-tree-chosen" style="width: 14rem"><li role="treeitem" aria-level="1" aria-expanded="false" aria-selected="true" tabindex="-1" id="fx-tree-selbranch"><span class="tree-row" id="fx-tree-selbranch-row"><span class="tree-label">docs</span></span></li></ul>
   <ul class="tree" role="tree" aria-label="settings" id="fx-navtree"><li role="treeitem" aria-expanded="true"><a class="tree-row" href="#fx" id="fx-navtree-parent"><span class="tree-label">agents</span></a><ul role="group"><li role="treeitem"><a class="tree-row" href="#fx" aria-current="page" id="fx-navtree-current"><span class="tree-label">codex</span></a></li></ul></li></ul>
 
   <div class="split" id="fx-split" style="--split-size: 12rem; width: 640px; height: 8rem">
@@ -1012,40 +1054,95 @@ const hiddenSweep = await evaluate(`(() => {
 await check(`\`hidden\` hides every element this file styles, whatever display its class sets — ${hiddenSweep.n} class combinations (tokens.css's rule, X3)`,
   () => (hiddenSweep.n < 45 ? [`only ${hiddenSweep.n} class combinations were swept — the sweep read too little`] : hiddenSweep.out));
 
-/* ── 4. forced colours (X1): every drawn state stays distinguishable, no glyph is Canvas ─────── */
-await load();
-await inject();
-await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }] });
-await check("forced colours are really in force (the emulation took)", () => evaluate(`matchMedia("(forced-colors: active)").matches ? [] : ["(forced-colors: active) does not match"]`));
-await check("forced colours: a current / selected row is a different colour from its neighbour, and its words are not boxed", () => W(`(() => {
-  const bg = (id) => getComputedStyle(W.q(id)).backgroundColor, out = [];
-  const pairs = [["#fx-sel", "#fx-sel-current", "a current row"], ["#fx-sel", "#fx-sel-selected", "an aria-selected row"],
-    ["#fx-tree-leaf-row", "#fx-tree-selected-row", "a selected tree row"], ["#fx-navtree-parent", "#fx-navtree-current", "a current tree link"],
-    ["#fx-console-line", "#fx-console-current", "the current console line"]];
-  for (const [rest, chosen, label] of pairs) if (bg(rest) === bg(chosen)) out.push(label + ": " + bg(chosen) + " both at rest and chosen");
-  const hl = W.sys("Highlight"), hlt = W.sys("HighlightText");
-  for (const [, chosen, label] of pairs) {
-    if (bg(chosen) !== hl) out.push(label + " is " + bg(chosen) + ", not Highlight " + hl);
-    const text = W.q(chosen).querySelector(".list-row-title, .tree-label") || W.q(chosen);
-    if (getComputedStyle(text).color !== hlt) out.push(label + ": its words are " + getComputedStyle(text).color + ", not HighlightText " + hlt);
-    if (getComputedStyle(text).forcedColorAdjust !== "none") out.push(label + ": its words are still forced (the Canvas backplate boxes them)");
+/* ── 4. forced colours (X1): what reaches the SCREEN, four themes × both palettes ────────────── */
+// Every glyph and line this file draws, and every chosen row, is screenshotted and read back as
+// pixels. A computed colour cannot tell a chevron painted in its row's forced colour from one left in
+// the author's: both are "not Canvas", and the second measures 1.1–1.8:1 on the palette its theme was
+// not written for. Emulated: forced-colors active, with prefers-color-scheme light and then dark —
+// Chromium picks its light or dark high-contrast palette from it.
+const inkOf = async (sel, lead = false, inset = 0) => {
+  const b = await W(`W.shot(${JSON.stringify(sel)}, ${lead}, ${inset})`);
+  const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: b.x, y: b.y, width: b.w, height: b.h, scale: 3 } });
+  return W(`W.ink(${JSON.stringify(data)})`);
+};
+// [what, selector, lead: the row's ::before alone, inset]
+const FORCED_GLYPHS = [
+  ["an open branch's chevron", "#fx-tree-branch-row", true], ["a closed branch's chevron", "#fx-tree-closed-row", true],
+  ["a navigation branch's chevron (a link row)", "#fx-navtree-parent", true], ["a selected branch's chevron", "#fx-tree-selbranch-row", true],
+  ["a branch's folder glyph (a .ico this file colours)", "#fx-tree-branch-ico"], ["a leaf's file glyph (a .ico this file colours)", "#fx-tree-leaf-ico"],
+  ["a selected leaf's glyph", "#fx-tree-selected-ico"], ["a panel head's glyph (a .ico this file colours)", "#fx-panel-ico"],
+  ["the vertical splitter's line", "#fx-vsplit", false, 2], ["the grip", "#fx-hsplit", false, 2],
+];
+// [what, the chosen row's words, the resting neighbour's words]
+const FORCED_STATES = [
+  ["a current row", "#fx-sel-current-title", "#fx-sel-title"], ["an aria-selected row", "#fx-sel-selected-title", "#fx-sel-title"],
+  ["a selected tree row", "#fx-tree-selected-label", "#fx-tree-long"], ["a current tree link", "#fx-navtree-current .tree-label", "#fx-navtree-parent .tree-label"],
+  ["the current console line", "#fx-console-current", "#fx-console-line"],
+];
+const forcedCell = async (label, theme, palette) => {
+  await setTheme(theme);
+  const where = `forced colours${label}, ${theme}, ${palette} palette`;
+  // Chromium's Highlight is translucent (0.8), so a Highlight fill reaches the screen composited
+  // over the Canvas behind it.
+  const env = await W(`(() => { const c = W.over(W.parse(W.sys("Highlight")), W.parse(W.sys("Canvas")));
+    return { forced: matchMedia("(forced-colors: active)").matches, dark: matchMedia("(prefers-color-scheme: dark)").matches,
+      highlight: [c.r, c.g, c.b].map((v) => Math.round(v * 255)) }; })()`);
+  const onHighlight = (rgb) => rgb.slice(4, -1).split(", ").map(Number).every((v, i) => Math.abs(v - env.highlight[i]) <= 2);
+  await check(`${where}: precondition — the emulation took`, () =>
+    [env.forced ? null : "(forced-colors: active) does not match", env.dark === (palette === "dark") ? null : "prefers-color-scheme is not " + palette].filter(Boolean));
+  const faint = [];
+  for (const [what, sel, lead, inset] of FORCED_GLYPHS) {
+    const ink = await inkOf(sel, lead, inset);
+    if (!(ink.n >= 30 && ink.strongest >= 3)) faint.push(`${what}: ${ink.strongest.toFixed(2)}:1 at best (${ink.mark} on ${ink.bg}), ${ink.n} px reach 3:1`);
   }
-  return out;
-})()`));
-await check("forced colours: the tree's chevrons and the splitter's lines are not painted in Canvas", () => W(`(() => {
-  const canvas = W.sys("Canvas"), out = [];
-  for (const [sel, label] of [["#fx-tree-branch-row", "an open branch's chevron"], ["#fx-tree-closed-row", "a closed branch's chevron"],
-    ["#fx-tree-selected-row", "(a leaf: no chevron)"], ["#fx-vsplit", "the vertical splitter's line"], ["#fx-hsplit", "the grip"]]) {
-    const cs = getComputedStyle(W.q(sel), "::before");
-    if (sel === "#fx-tree-selected-row") { if (cs.maskImage !== "none") out.push("a leaf draws a chevron"); continue; }
-    if (cs.backgroundColor === canvas || W.parse(cs.backgroundColor).a === 0) out.push(label + " is " + cs.backgroundColor + " — invisible on Canvas " + canvas);
+  await check(`${where}: every glyph and line reaches 3:1 on what it sits on (${FORCED_GLYPHS.length}, from pixels)`, () => faint);
+  const wrong = [];
+  for (const [what, chosen, rest] of FORCED_STATES) {
+    const c = await inkOf(chosen), r = await inkOf(rest);
+    if (!onHighlight(c.bg)) wrong.push(`${what}: its words sit on ${c.bg}, not Highlight (rgb(${env.highlight.join(", ")}) over Canvas)`);
+    if (c.bg === r.bg) wrong.push(`${what}: chosen and at rest on the same ${c.bg}`);
+    if (c.strongest < 4.5) wrong.push(`${what}: its words reach ${c.strongest.toFixed(2)}:1 (${c.mark} on ${c.bg})`);
+    if (r.strongest < 4.5) wrong.push(`${what}, the row at rest: its words reach ${r.strongest.toFixed(2)}:1`);
   }
+  await check(`${where}: a chosen row sits on Highlight, its neighbour does not, and both rows' words reach 4.5:1 (${FORCED_STATES.length}, from pixels)`, () => wrong);
+  const rest = await inkOf("#fx-hsplit", false, 2);
+  const lit = await hovering(["#fx-hsplit"], () => inkOf("#fx-hsplit", false, 2));
+  await check(`${where}: the grip under the pointer is another colour than at rest, and reaches 3:1`, () =>
+    [lit.mark === rest.mark ? `rest and hover are both ${rest.mark}` : null, lit.strongest >= 3 ? null : `hover reaches ${lit.strongest.toFixed(2)}:1`].filter(Boolean));
+};
+for (const palette of ["light", "dark"]) {
+  await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: palette }] });
+  await load();
+  await inject();
+  const sys = await W(`["Canvas", "CanvasText", "Highlight", "HighlightText", "LinkText", "ButtonText"].map((n) => n + " " + W.sys(n)).join(" · ")`);
+  console.log(`      ${palette} palette: ${sys}`);
+  for (const theme of THEMES) await forcedCell("", theme, palette);
+}
+// The fallback, as an engine without preserve-parent-color sees it: every @supports block that
+// declares it cut out of cards.css (and out of the icon stand-in, when it is in force). The chevron
+// is then CanvasText, and HighlightText on a chosen row, where CanvasText would sit on Highlight.
+const toFallback = String.raw`(async () => {
+  const cut = (css) => css.replace(/@supports \(forced-color-adjust: preserve-parent-color\) \{[^{}]*\{[^{}]*\}\s*\}/g, "");
+  const code = (css) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const link = [...document.querySelectorAll('link[rel="stylesheet"]')].find((l) => l.href.endsWith("/src/cards.css"));
+  const before = await (await fetch(link.href)).text();
+  const style = document.createElement("style");
+  style.textContent = cut(before);
+  link.replaceWith(style);
+  const i1 = document.getElementById("standin-i1");
+  i1.textContent = cut(i1.textContent);
+  const out = [];
+  if (!/preserve-parent-color/.test(code(before))) out.push("cards.css declares no preserve-parent-color to cut");
+  if (/preserve-parent-color/.test(code(style.textContent) + code(i1.textContent))) out.push("preserve-parent-color survived the cut");
   return out;
-})()`));
-await check("forced colours: a splitter at rest and under the pointer are two different colours", () => hovering(["#fx-hsplit"], () => W(`(() => {
-  const rest = getComputedStyle(W.q("#fx-vsplit"), "::before").backgroundColor, lit = getComputedStyle(W.q("#fx-hsplit"), "::before").backgroundColor;
-  return rest === lit ? ["rest and hover are both " + rest] : (lit === W.sys("Highlight") ? [] : ["hover is " + lit + ", not Highlight"]);
-})()`)));
+})()`;
+for (const palette of ["light", "dark"]) {
+  await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: palette }] });
+  await load();
+  await inject();
+  await check(`forced colours, the fallback (${palette} palette): precondition — preserve-parent-color is cut out of cards.css and nothing else`, () => evaluate(toFallback));
+  for (const theme of ["warm", "green"]) await forcedCell(" (the fallback)", theme, palette);
+}
 await send("Emulation.setEmulatedMedia", { features: [] });
 
 /* ── 5. contrast, every new pairing, four themes × three surfaces ────────────────────────────── */

@@ -1273,10 +1273,20 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
      · the current / selected row is a TINT and an inset SHADOW, both gone, which leaves the chosen row
        looking exactly like its neighbours;
      · the console's current search line is a fill.
-   So the chevron keeps its own paint (forced-color-adjust: none, in currentColor — the text colour
-   its row is forced to), the splitter rests in ButtonText and lights up in Highlight under the
-   pointer, on focus and while dragged, and a chosen row is drawn the way the platform draws a
-   selection: Highlight behind, HighlightText for everything in it.
+   So the chevron paints itself in the colour its ROW was forced to (CanvasText, LinkText in a
+   navigation tree, HighlightText on a chosen row), the splitter rests in ButtonText and lights up in
+   Highlight under the pointer, on focus and while dragged, and a chosen row is drawn the way the
+   platform draws a selection: Highlight behind, HighlightText for everything in it.
+
+   A GLYPH TAKES `preserve-parent-color`, NOT `none`. Forcing happens at used-value time and
+   inheritance carries computed values, so under `none` the chevron's currentColor is still the
+   AUTHOR's colour — warm's --foreground on a dark palette, green's on a light one: a chevron that is
+   technically painted and cannot be seen. `preserve-parent-color` hands it the row's FORCED colour
+   instead. An engine without that value keeps the first rule, CanvasText, which is always visible
+   on Canvas; on a chosen row, where CanvasText would sit on Highlight, the chevron is HighlightText.
+   For the same reason a glyph this file COLOURS (the panel head's and the tree's .ico) gives its
+   colour back here: the icon's own rule (icons.css) paints currentColor, and a colour declared on
+   the glyph itself is a colour the parent's forcing never reaches.
 
    THE CHOSEN ROW LEAVES THE MODE, and paints itself. Measured in Chromium: with only a Highlight
    fill, every text run inside the row keeps the mode's Canvas BACKPLATE, so the row showed black
@@ -1294,7 +1304,26 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   .tree [aria-expanded] > .tree-row::before,
   .tree .tree-row[aria-expanded]::before {
     forced-color-adjust: none;
-    background: currentColor;
+    background: CanvasText;
+  }
+  @supports (forced-color-adjust: preserve-parent-color) {
+    .tree [aria-expanded] > .tree-row::before,
+    .tree .tree-row[aria-expanded]::before {
+      forced-color-adjust: preserve-parent-color;
+      background: currentColor;
+    }
+  }
+  .tree [aria-selected="true"][aria-expanded] > .tree-row::before,
+  .tree [aria-selected="true"] > .tree-row[aria-expanded]::before,
+  .tree [aria-expanded] > .tree-row[aria-current="page"]::before,
+  .tree .tree-row[aria-current="page"][aria-expanded]::before {
+    background: HighlightText;
+  }
+  .panel-head > .ico,
+  .tree-row > .ico,
+  .tree [aria-expanded] > .tree-row > .ico,
+  .tree .tree-row[aria-expanded] > .ico {
+    color: inherit;
   }
   .splitter::before {
     forced-color-adjust: none;

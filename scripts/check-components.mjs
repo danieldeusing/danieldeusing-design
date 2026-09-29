@@ -254,6 +254,10 @@ const FORCED = `(() => {
     "busy spinner": standsOff("#btn-busy", "::before"), "bin": standsOff("#btn-bin", "::after"), "pencil": standsOff("#btn-edit", "::after"),
     "menu ✓": standsOff("#static-checked", "::before"), "listbox ✓": standsOff("#opt-chosen", "::before"),
     "zoom hint": standsOff("#dgm", "::after"), "theme dot": standsOff("#theme-menu .dd-dot"),
+    // An .ico (I1) opts out and paints currentColor, so it is only as good as the colour its host gives it.
+    "icon in a button": standsOff("#btn-ico .ico"), "icon in an option": standsOff("#static-listbox .select-option .ico"),
+    "icon in a fold summary": standsOff("#fold-count .ico"), "icon in a toned fold": standsOff("#fold-tone .ico"),
+    "icon in a dropdown summary": standsOff("#dd-history .ico"),
   };
   const pairs = {
     "menu ✓ — checked vs not": [bg("#static-checked", "::before"), bg('#static-menu [aria-checked="false"]', "::before")],

@@ -428,7 +428,10 @@ block, and a surface adds nothing.
   *given*, not the one the mode shows. Measured here, with only the opt-out: the spinner on the
   filled button came out `--primary-foreground` at 1.11:1 on the white Canvas, and the ✓ at 1.78:1
   on the black one. So the controls that carry a glyph are `ButtonText`, `CanvasText`,
-  `HighlightText` or `GrayText` inside the block, and the glyph inherits that.
+  `HighlightText` or `GrayText` inside the block, and the glyph inherits that. An `.ico` is such a
+  glyph: in a button or a row it inherits the row's system colour, and in a fold's or a dropdown's
+  summary, which keeps its author colour (muted, or the fold's tone — 2.89:1 on black), it is given
+  `CanvasText`.
 - `scripts/check-components.mjs` emulates the mode, light and dark, and asserts that every glyph
   stands 3:1 off what it sits on and that every state still differs from its neighbour.
 

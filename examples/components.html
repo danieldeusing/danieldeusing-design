@@ -64,6 +64,8 @@
       .ico[data-icon="history"] { --ico: var(--ico-history); }
       .ico[data-icon="package"] { --ico: var(--ico-package); }
       .ico[data-icon="triangle-alert"] { --ico: var(--ico-triangle-alert); }
+      /* X1 for I1: the mask opts out of forced colours and paints currentColor (WP4's .ico rule). */
+      @media (forced-colors: active) { .ico { forced-color-adjust: none; } }
       /* WP6 (runtime/select.js): writes `position: fixed` inline on the panel it appends. */
       body > .select-panel { position: fixed; }
       /* X3, WP1 (tokens.css): `hidden` beats every author `display`, once, for the whole system. */

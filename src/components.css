@@ -1631,6 +1631,10 @@ th:has(.tbl-tools) { white-space: nowrap; }
     forced-color-adjust: none;
     background: CanvasText;
   }
+  /* An .ico (icons.css) opts out and paints currentColor. A button and a row hand it a system colour
+     above; a summary keeps its author one (muted, or a fold's tone), so its icon is given one here. */
+  details.fold > summary .ico,
+  .dropdown > summary .ico { color: CanvasText; }
   .minimap-bar,
   .minimap-bar:hover { background: CanvasText; }
   .minimap-bar[aria-current="true"] { background: Highlight; }

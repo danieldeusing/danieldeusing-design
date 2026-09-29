@@ -1169,6 +1169,9 @@ try {
     !!beforePan && !!afterPan && Math.abs(afterPan[0] - beforePan[0] - 120) < 2 && Math.abs(afterPan[1] - beforePan[1] - 60) < 2, { beforePan, afterPan });
   await check("...and the click that ends the pan does NOT close the view (0.59.0 closed it after every pan)",
     () => evaluate(`document.querySelector("dialog.dgm-overlay").open`));
+  await drag(20, 880, 120, 830);
+  await check("...nor does one that begins on the empty stage (a pan by the background is still a pan)",
+    () => evaluate(`document.querySelector("dialog.dgm-overlay").open`));
   const beforeKeys = await translateOf();
   await key("ArrowRight");
   await key("ArrowDown");

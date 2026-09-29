@@ -777,9 +777,9 @@ await check("hidden hides every content.css component (tokens.css + the full pag
 // Computed colours are only half of it. Chromium paints a Canvas BACKPLATE behind every run of text
 // in this mode, and it is visible in no computed value, so a word can vanish while its computed
 // pair reads 21:1 (WP7 measured 1.14:1 that way). So each glyph and each word that carries a state
-// is also CAPTURED and decoded, and its brightest pixel measured against its darkest: a glyph box
-// holds only the glyph and what it sits on, a word's box only the word and its ground. Twice the
-// pixel density, so a 1px stroke covers whole pixels. (The decoder is WP7's, check-feedback.mjs.)
+// is also CAPTURED and decoded, twice — as drawn and with only it hidden — and the pixels that change
+// are measured against themselves without it (inkDiff, below). Twice the pixel density, so a 1px
+// stroke covers whole pixels. (The decoder is WP7's, check-feedback.mjs.)
 const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.captureScreenshot writes
   let pos = 8, width = 0, height = 0, bpp = 4;
   const idat = [];
@@ -810,8 +810,30 @@ const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.cap
   const [top] = [...counts].sort((p, q) => q[1] - p[1])[0];
   const mode = [top >> 16, (top >> 8) & 255, top & 255];
   // `mode`: the colour most of the capture is painted in, and its relative luminance
-  return { width, height, ratio: (hi + 0.05) / (lo + 0.05), mode, modeLum: lum(0, Buffer.from(mode)) };
+  return { width, height, bpp, px: out, lum, ratio: (hi + 0.05) / (lo + 0.05), mode, modeLum: lum(0, Buffer.from(mode)) };
 };
+// OWNERSHIP BY DIFFERENCE (X1, as WP6's re-review refined it). The same clip is taken twice: as drawn,
+// and with ONLY the thing being measured hidden. The pixels that change are that thing's ink and
+// nothing else's — a neighbour's border or fill is identical in both shots and counts for nothing —
+// and the ratio is read from them alone: each changed pixel as drawn against the same pixel without
+// it. Fewer than 3 changed pixels means the clip does not hold the target at all.
+const inkDiff = (drawn, bare) => {
+  let changed = 0, ratio = 1;
+  for (let i = 0; i < drawn.px.length; i += drawn.bpp) {
+    if (Math.max(...[0, 1, 2].map((k) => Math.abs(drawn.px[i + k] - bare.px[i + k]))) <= 2) continue;
+    changed += 1;
+    const [a, b] = [drawn.lum(i), bare.lum(i, bare.px)].sort((p, q) => q - p);
+    ratio = Math.max(ratio, (a + 0.05) / (b + 0.05));
+  }
+  return { changed, ratio };
+};
+// How each kind is hidden: a button's glyph is its ::before (the button, its border and its fill stay);
+// an element glyph is the element; a word goes transparent and loses its backplate, the box stays.
+const HIDE_PROBE = `<style id="own-probe">
+  [data-own-probe="pseudo"]::before { visibility: hidden !important; }
+  [data-own-probe="self"] { visibility: hidden !important; }
+  [data-own-probe="text"] { forced-color-adjust: none !important; color: transparent !important; }
+</style>`;
 const PAINTED = [
   ...["#states-icon .btn-icon:not(.btn-icon--bare):not([data-state])", "#states-icon .btn-icon:not(.btn-icon--bare)[data-state=copied]",
     "#states-icon .btn-icon:not(.btn-icon--bare)[data-state=failed]", "#states-icon .btn-icon--bare[data-state=copied]", "#cmd-one > button",
@@ -853,7 +875,7 @@ const focusRings = async () => {
 };
 // The yield, printed once after every cell has run: how many captures decoded, and the lowest ratio
 // of each kind. A pass says nothing fell under the bar; this says what the pixels actually were.
-const paintedYield = { captures: 0, owned: 0, hiddenMax: 0, glyph: Infinity, text: Infinity };
+const paintedYield = { captures: 0, owned: 0, glyph: Infinity, text: Infinity };
 const painted = async () => {
   const problems = [];
   for (const [sel, kind, min] of PAINTED) {
@@ -877,20 +899,21 @@ const painted = async () => {
     // page's centred column moves 7.5px right under a clip measured before it (measured: the at-rest
     // glyph's capture held its button's border, and a glyph painted at 1.34:1 passed at 21:1). The
     // element is scrolled into view above, so the viewport as it is holds it.
-    const { data } = await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false });
-    const { ratio } = decodePng(Buffer.from(data, "base64"));
+    const shot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data, "base64"));
+    const drawn = await shot();
+    await evaluate(`(() => {
+      if (!document.getElementById("own-probe")) document.head.insertAdjacentHTML("beforeend", ${JSON.stringify(HIDE_PROBE)});
+      const el = __t.el(${JSON.stringify(sel)});
+      el.dataset.ownProbe = ${JSON.stringify(kind)} === "text" ? "text" : el.classList.contains("ico") ? "self" : "pseudo";
+    })(); null`);
+    const bare = await shot();
+    await evaluate(`delete __t.el(${JSON.stringify(sel)}).dataset.ownProbe; null`);
+    const { changed, ratio } = inkDiff(drawn, bare);
     paintedYield.captures += 1;
     paintedYield[kind] = Math.min(paintedYield[kind], ratio);
-    if (!(ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${ratio.toFixed(2)}:1, wants ${min}`);
-    // CLIP OWNERSHIP (X1): with the element hidden the same clip must be ONE flat colour — the ground
-    // alone, ~1:1. Merely "different" is not enough: a clip slid onto a neighbour's border or fill
-    // still changes when the element goes, and would bank that neighbour's contrast as the glyph's.
-    await evaluate(`__t.el(${JSON.stringify(sel)}).style.visibility = "hidden"; null`);
-    const hidden = decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data, "base64"));
-    await evaluate(`__t.el(${JSON.stringify(sel)}).style.removeProperty("visibility"); null`);
-    paintedYield.hiddenMax = Math.max(paintedYield.hiddenMax, hidden.ratio);
-    if (!(hidden.ratio <= 1.1)) problems.push(`${sel} (${kind}): hidden, the clip still reads ${hidden.ratio.toFixed(2)}:1, want <= 1.1 — the pixels measured are not only its own`);
-    else paintedYield.owned += 1;
+    if (changed < 3) { problems.push(`${sel} (${kind}): hiding it changes ${changed} pixel(s) in the clip — the clip does not hold it`); continue; }
+    paintedYield.owned += 1;
+    if (!(ratio >= min)) problems.push(`${sel} (${kind}): its own ink reaches ${ratio.toFixed(2)}:1 over ${changed} changed pixels, wants ${min}`);
   }
   return problems;
 };
@@ -942,7 +965,7 @@ for (const theme of THEMES) {
   await send("Emulation.setEmulatedMedia", { features: [] });
 }
 console.log(`painted under forced colours: ${paintedYield.captures} of ${PAINTED.length * THEMES.length * 2} captures decoded, ` +
-  `${paintedYield.owned} proven to hold their own element's ink (hidden, the least flat clip reads ${paintedYield.hiddenMax.toFixed(2)}:1); ` +
+  `${paintedYield.owned} holding their own element's ink (measured from the pixels hiding it changes); ` +
   `lowest glyph ${paintedYield.glyph.toFixed(2)}:1, lowest state word ${paintedYield.text.toFixed(2)}:1; ` +
   `focus rings: ${ringYield.captures} of ${FOCUSABLE.length * THEMES.length * 2 * 2} captures, lowest ${ringYield.lowest.toFixed(2)}:1`);
 

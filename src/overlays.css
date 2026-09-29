@@ -26,6 +26,10 @@
  *   --icon-sm, --ico-maximize-2              the zoom hint
  *   --ring                                   the focus ring
  *
+ * `hidden` IS NOT REPEATED HERE. Several rules below set `display` (flex, grid, contents), and an
+ * author `display` beats the UA's `[hidden] { display: none }`; the system answers that once, in
+ * tokens.css (`[hidden]:not([hidden="until-found"])`), so no class here carries a guard of its own.
+ *
  * The runtime is runtime/dialog.js (initDialogs, openDialog, closeDialog) and
  * runtime/diagramzoom.js. The context menu has no module of its own: see references/overlays.md.
  */
@@ -302,6 +306,20 @@ dialog.dialog.dialog--drawer {
 .dgm-zoomable:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+/* FORCED COLOURS (Windows high contrast). Chromium repaints every background there in Canvas, and a
+   mask glyph IS a background, so the hint vanished — Canvas on Canvas — on the one graphic that says
+   the figure opens. Opted out of the forcing and inked in the system's own text colour it shows
+   again, and hover and focus keep their difference as Highlight. */
+@media (forced-colors: active) {
+  .dgm-zoomable::after {
+    forced-color-adjust: none;
+    color: CanvasText;
+  }
+  .dgm-zoomable:hover::after,
+  .dgm-zoomable:focus-visible::after {
+    color: Highlight;
+  }
 }
 
 /* THE VIEW IS A <dialog>, opened with showModal(). It was a `div[role=dialog][aria-modal]` on

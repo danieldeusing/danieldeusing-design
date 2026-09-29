@@ -147,6 +147,12 @@
       .console-body:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
     </style>
 
+    <!-- X3 · `hidden` hides everything: the one rule in tokens.css (WP1). Probed on its own, because a
+         tokens.css can carry the WP1 tokens and still lack it. -->
+    <style id="standin-x3" media="not all">
+      [hidden]:not([hidden="until-found"]) { display: none !important; }
+    </style>
+
     <link rel="stylesheet" href="../src/overlays.css" />
     <link rel="stylesheet" href="../src/tooltip.css" />
 
@@ -273,6 +279,7 @@
         use("standin-wp6", !probe('<span class="match-count"></span>', (s) => s.fontVariantNumeric === "tabular-nums"));
         use("standin-wp7", !probe('<div class="callout"></div>', (s) => s.borderInlineStartWidth === "2px"));
         use("standin-wp8", !probe('<div class="console"></div>', (s) => s.display === "flex"));
+        use("standin-x3", !probe('<div hidden style="display: block"></div>', (s) => s.display === "none"));
         root.dataset.standins = inForce.join(" ") || "none";
       })();
     </script>
@@ -352,6 +359,7 @@
             <div class="row">
               <span tabindex="0" data-t="tip-card" data-tip="dd-infra-cockpit · up 3 days · ddstudio">cockpit</span>
               <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-t="tip-button" data-tip="re-reads every host now, not at the next poll">refresh</button>
+              <button type="button" class="btn-icon" data-icon="download" aria-label="download the log" data-t="tip-icon" data-tip="the last 1 000 lines · as plain text"></button>
             </div>
           </div>
           <div class="surface" data-surface="muted">
@@ -500,7 +508,7 @@ PASS  the skill pins the current release</div></div>
       <header class="dialog-head">
         <button type="button" class="btn-icon dialog-back" data-icon="arrow-left" aria-label="back" data-t="rich-back"></button>
         <h2 class="dialog-title" id="dlg-rich-t" data-t="rich-title">a plan with a title long enough to be cut off before it pushes the X away</h2>
-        <button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh the plan" data-tip="refresh the plan"></button>
+        <button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh the plan" data-tip="re-reads the plan from the forge · (it was fetched 4 minutes ago)"></button>
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close" data-t="rich-x"></button>
       </header>
       <div class="dialog-toolbar" data-t="rich-toolbar">
@@ -773,16 +781,19 @@ PASS  the skill pins the current release</div></div>
         }
       }, true);
 
-      // A committing confirm: the action is busy and both answers are disabled until it is done.
+      // A committing confirm (X5): the action is aria-busy and both answers aria-disabled until the
+      // write returns — never `disabled`, which would throw focus to <body> mid-action. dialog.js
+      // ignores Escape, the backdrop and the cancel while the footer is busy; the page closes it.
       document.getElementById("discard-go").addEventListener("click", async (event) => {
         const go = event.currentTarget;
+        if (go.getAttribute("aria-disabled") === "true") return;
         const dialog = go.closest("dialog");
         const answers = dialog.querySelectorAll(".dialog-foot button");
         go.setAttribute("aria-busy", "true");
-        answers.forEach((b) => { b.disabled = true; });
-        await new Promise((done) => setTimeout(done, 1000));
+        answers.forEach((b) => b.setAttribute("aria-disabled", "true"));
+        await new Promise((done) => setTimeout(done, window.discardMs ?? 1000));
         go.removeAttribute("aria-busy");
-        answers.forEach((b) => { b.disabled = false; });
+        answers.forEach((b) => b.removeAttribute("aria-disabled"));
         closeDialog(dialog, "discard");
       });
 

@@ -268,8 +268,24 @@ export function initTooltips() {
   //
   // ⚠️ Do NOT "simplify" these two helpers back into bare setAttribute/removeAttribute calls. The
   // attribute is not the problem; writing it when it already says that is.
+  //
+  // A TIP THAT REPEATS THE NAME DESCRIBES NOTHING (0.60.0). An icon button's hover often says
+  // exactly what its `aria-label` says — it is the only visible label a sighted reader gets — and
+  // pointing the button at it made a screen reader announce the same words twice, once as the name
+  // and once as the description (the accessibility tree read name "refresh catalog", description
+  // "refresh catalog"). Such a tip still SHOWS; it is only not wired up as a description.
   function describe(el) {
+    if (repeatsName(el)) return;
     if (el.getAttribute("aria-describedby") !== "ddtip") el.setAttribute("aria-describedby", "ddtip");
+  }
+  // The name as far as a tip can repeat it: aria-label, else aria-labelledby, else the element's own
+  // text. Compared without case or runs of whitespace, because a listener hears them the same.
+  const words = (text) => String(text ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  function repeatsName(el) {
+    const ids = el.getAttribute("aria-labelledby");
+    const name = el.getAttribute("aria-label")
+      || (ids ? ids.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? "").join(" ") : el.textContent);
+    return words(name) === words(el.getAttribute("data-tip"));
   }
   function removeDescription(el) {
     if (el.getAttribute("aria-describedby") === "ddtip") el.removeAttribute("aria-describedby");

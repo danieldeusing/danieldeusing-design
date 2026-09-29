@@ -54,9 +54,14 @@
  *   · AN ALERT CANNOT BE DISMISSED BY ACCIDENT. `.dialog--alert` ignores the backdrop, and Escape
  *     does nothing — see onKeydown(): cancelling the `cancel` event alone is NOT enough on current
  *     Chromium, which lets the second Escape through regardless.
+ *   · NOR CAN A DIALOG WHOSE FOOTER IS COMMITTING. While an action in `.dialog-foot` is
+ *     `aria-busy="true"`, Escape, the backdrop and every `[data-dialog-close]` do nothing: they
+ *     would walk away from a write that is still running, and the page would have nowhere left to
+ *     say how it ended. The page closes it with closeDialog() when the write returns. Busy is
+ *     `aria-busy` + `aria-disabled`, never `disabled`, which would throw focus to <body>.
  *
- * FRAMEWORK APPS do not run this (they own their nodes, R32): they render the same markup on a
- * native <dialog>, call showModal() themselves and apply the same focus rule.
+ * FRAMEWORK APPS do not run this (they own their nodes — house rule 10): they render the same markup
+ * on a native <dialog>, call showModal() themselves and apply the same focus rule.
  */
 
 const opened = new WeakMap(); // dialog -> { returnTo, opener }, while this module has it open
@@ -88,6 +93,11 @@ function topmost() {
    and the one handling them is this module. */
 const inactive = (el) => el.getAttribute("aria-disabled") === "true";
 
+/* Only the footer: a list in the body that is loading (`aria-busy` on a region) is not a write, and
+   locking the dialog while content arrives would trap the reader in it. */
+const committing = (dialog) => Boolean(dialog.querySelector('.dialog-foot [aria-busy="true"]'));
+const undismissable = (dialog) => dialog.matches(".dialog--alert") || committing(dialog);
+
 /* The press has to be OUTSIDE the box, not merely on the <dialog> element: a press on its 1px edge
    targets the dialog too. Both operands are visual px, so a zoomed root needs no conversion. */
 function onBackdrop(dialog, event) {
@@ -96,11 +106,12 @@ function onBackdrop(dialog, event) {
 }
 
 function onCancel(event) {
-  if (event.currentTarget.matches(".dialog--alert")) event.preventDefault();
+  if (undismissable(event.currentTarget)) event.preventDefault();
 }
 
 /*
- * ESCAPE ON AN ALERT, CANCELLED AT THE KEY. Measured on HeadlessChrome 151: an alert whose `cancel`
+ * ESCAPE ON AN ALERT (or a committing dialog), CANCELLED AT THE KEY. Measured on HeadlessChrome 151:
+ * an alert whose `cancel`
  * is prevented survives the FIRST Escape (`cancel`, cancelable) and closes on the SECOND — the
  * close-watcher rule makes a cancel cancelable only once per user activation, and Escape is not
  * an activation. A cancelled `keydown` raises no close request at all, so the alert holds on the
@@ -112,7 +123,8 @@ function onCancel(event) {
  */
 function onKeydown(event) {
   if (event.key !== "Escape" || event.defaultPrevented) return;
-  if (topmost()?.matches(".dialog--alert")) event.preventDefault();
+  const top = topmost();
+  if (top && undismissable(top)) event.preventDefault();
 }
 
 function onClose(event) {
@@ -202,7 +214,9 @@ function onClick(event) {
   const closer = target.closest("[data-dialog-close]");
   if (closer) {
     const dialog = closer.closest("dialog");
-    if (dialog?.open && !inactive(closer)) dialog.close(closer.getAttribute("data-dialog-close") || undefined);
+    if (dialog?.open && !inactive(closer) && !committing(dialog)) {
+      dialog.close(closer.getAttribute("data-dialog-close") || undefined);
+    }
     return;
   }
   const backdrop = pressed;
@@ -212,16 +226,15 @@ function onClick(event) {
 
 function onPointerDown(event) {
   const target = event.target;
-  pressed = target instanceof HTMLDialogElement && target.matches(".dialog:not(.dialog--alert)") && onBackdrop(target, event)
-    ? target
-    : null;
+  pressed = target instanceof HTMLDialogElement && target.matches(".dialog") && !undismissable(target)
+    && onBackdrop(target, event) ? target : null;
 }
 
 /**
  * The declarative half: `[data-dialog-open="<id>"]` opens that dialog, `[data-dialog-close]` inside
  * one closes it (its value, if any, is the dialog's `returnValue`), and a press on the backdrop
- * closes a `.dialog` that is not an alert. Delegated, so dialogs and buttons rendered later work.
- * Call once, at startup.
+ * closes a `.dialog` — not an alert, and not one whose footer is committing. Delegated, so dialogs
+ * and buttons rendered later work. Call once, at startup.
  *
  * @param {Document | Element} [root=document] Where the delegated listeners go.
  */

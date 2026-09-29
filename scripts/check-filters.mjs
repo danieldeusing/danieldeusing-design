@@ -1,37 +1,51 @@
 #!/usr/bin/env node
 /*
  * check-filters.mjs — the filter package, in a real browser: where a popup goes (popup.js), the
- * filter dropdown (select.js), the search field (search.js), the sort control (sort.js), and the
- * boxes filters.css draws around them.
+ * filter dropdown (select.js), the search field (search.js), the sort control (sort.js), the
+ * boxes filters.css draws around them, and the demo page's own wiring.
  *
  * WHAT IS AT RISK, and why each half is here:
  *
  *   · "The list is never the OS list" (Daniel, 2026-09-28). The claim is about what a reader's
  *     POINTER and KEYBOARD reach, so it is asserted with dispatched input — a press at the
  *     trigger's pixel, Alt+ArrowDown on the trigger — not with element.click(), which proves only
- *     that a handler exists. A select rendered after the call, and one still carrying the removed
- *     `data-select="off"`, are asserted too: those are the two ways a page used to end up back on
- *     the system list.
- *   · The filter dropdown's four promises from seedr and configr: the trigger names the facet and
- *     then the value, the active state wears --primary, the clear is joined and named, the list
- *     has an "all" row that carries the ✓ when nothing is filtered. Plus the keyboard — APG
- *     select-only combobox, and the search row past twenty options.
- *   · search.js: the clear button tracks the value, clears like a person would (input, then
- *     change), Escape clears a filled box WITHOUT reaching the dialog around it and does nothing in
- *     an empty one, and the pending line lasts `ms` after the LAST keystroke, not the first.
+ *     that a handler exists. A select rendered after the call, one still carrying the removed
+ *     `data-select="off"`, and one MOVED out of its wrapper are asserted too: those are the ways a
+ *     page ends up back on the system list.
+ *   · The filter dropdown's promises from seedr and configr: the trigger names the facet and then
+ *     the value, the active state wears --primary, the clear is joined and named, the list has an
+ *     "all" row that carries the ✓ when nothing is filtered. Plus the keyboard — the APG
+ *     select-only combobox — and the search row, which only a FILTER past twenty options gets
+ *     unasked, and which sits OUTSIDE the listbox (asserted in the accessibility tree).
+ *   · search.js: the clear button tracks the value and the box's disabled state, clears like a
+ *     person would (input, then change), Escape clears a filled box WITHOUT reaching the dialog
+ *     around it, and the pending line lasts `ms` after the LAST keystroke, not the first.
  *   · sort.js: the arrow flips and is named by what it will do; one pick is one `sortchange`.
  *   · positionPopup(): flips above only when that helps, clamps to every viewport edge, keeps a
  *     scrolled list where it was, and survives a zoomed root.
  *   · filters.css on a surface that loads ONLY tokens.css and filters.css (house rule 4): the
- *     controls must carry their own box there, or netmon gets a half-drawn control.
+ *     controls must carry their own box, font, focus ring and forced-colours drawing there. Every
+ *     focus-ring and forced-colours assertion runs on that page, where no base.css can supply a
+ *     ring that the control's own rule has lost (X2).
  *
- * THE TOKENS THIS PACKAGE READS land with the foundations package (--control-h, --control-edge,
- * --icon-*, --ico-*). Until they do, the harness declares them in a <style> BEFORE tokens.css —
- * so the day tokens.css declares them, its values win and this suite measures the real ones.
+ * WHAT THIS RUN MEASURES AGAINST. Four things this package reads land with other packages. Until
+ * they do, the harness stands in for each — and says which on every run, because a check measured
+ * against a stand-in is a claim about the stand-in:
+ *   · the design tokens (WP1: --control-h, --control-edge, --icon-*, --ico-*), declared BEFORE
+ *     tokens.css so that tokens.css wins the day it declares them;
+ *   · the `[hidden]` rule (WP1, tokens.css), injected only while tokens.css lacks it;
+ *   · the `.btn-group` lifts (WP5, controls.css), injected only while there is no src/controls.css;
+ *   · an UNPLACED `.select-panel` (WP2, M0), `position: static` only while components.css still
+ *     places the panel itself — as 0.59's did, which hid the page scroll that the runtime's
+ *     place-before-scroll order exists to prevent.
  *
  * A REAL BROWSER, and no dependency: the headless chromium Playwright caches on these machines,
  * over the DevTools protocol, with Node's own fetch and WebSocket. It skips loudly with no browser;
  * DD_REQUIRE_BROWSER=1 makes a skip a failure, as for every DOM suite here.
+ *
+ * A THROW IS A FAIL, NEVER A BARE STACK. `check` takes a thunk and turns a throw inside it into a
+ * FAIL naming the error; anything that still escapes is reported as a FAIL naming the last check to
+ * complete, and the run exits 1. An aborted run must not read as a pass, nor as a detected mutant.
  *
  *   node scripts/check-filters.mjs
  */
@@ -41,6 +55,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateSync } from "node:zlib";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHROME = process.env.DD_CHROME
@@ -67,7 +82,41 @@ if (!CHROME) {
   process.exit(0);
 }
 
+/* ── the harness: a throw is a FAIL ───────────────────────────────────────── */
+
+let failures = 0;
+let passes = 0;
+let lastPassed = "(before the first check)";
+async function check(label, test, detail) {
+  let ok = false;
+  let why;
+  try {
+    ok = Boolean(await test());
+  } catch (error) {
+    why = `threw: ${String(error?.message || error).split("\n")[0]}`;
+  }
+  if (ok) {
+    passes += 1;
+    lastPassed = label;
+    console.log(`PASS  ${label}`);
+    return;
+  }
+  failures += 1;
+  if (why === undefined && detail !== undefined) {
+    try { why = typeof detail === "function" ? await detail() : detail; } catch (error) { why = `(detail threw: ${error?.message})`; }
+  }
+  console.log(`FAIL  ${label}${why === undefined ? "" : `\n        ${why}`}`);
+}
+const abort = (error) => {
+  console.log(`FAIL  the suite threw after: ${lastPassed}\n        ${String(error?.message || error).split("\n")[0]}`);
+  console.log("\ncheck-filters: ABORTED");
+  process.exit(1);
+};
+process.on("uncaughtException", abort);
+process.on("unhandledRejection", abort);
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const near = (a, b, tolerance = 1) => Math.abs(a - b) <= tolerance;
 
 /*
  * PORT 0, READ BACK. The other suites pin 19224, so two of them running at once — two worktrees,
@@ -89,17 +138,17 @@ process.on("exit", shutdown);
 let port = 0;
 for (let i = 0; !port; i += 1) {
   try { port = Number(readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]); } catch {}
-  if (!port && i > 80) { shutdown(); throw new Error("headless chromium did not come up"); }
+  if (!port && i > 80) throw new Error("headless chromium did not come up");
   if (!port) await sleep(250);
 }
 
-/* ── the pages ────────────────────────────────────────────────────────────── */
+/* ── what this run measures against ───────────────────────────────────────── */
 
 const svg = (body) => `url("data:image/svg+xml,${
   `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>${body}</svg>`
     .replace(/</g, "%3C").replace(/>/g, "%3E")}")`;
-// Declared BEFORE tokens.css: once the foundations package declares these, its values win.
-const TOKEN_SHIM = `<style>:root {
+// WP1 STAND-IN, declared BEFORE tokens.css: once the foundations package declares these, its values win.
+const TOKEN_SHIM = `<style id="standin-wp1-tokens">:root {
   --control-h: 1.75rem;
   --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
   --icon-sm: 0.75rem; --icon-size: 0.875rem;
@@ -110,6 +159,21 @@ const TOKEN_SHIM = `<style>:root {
   --ico-arrow-up: ${svg("<path d='m5 12 7-7 7 7M12 19V5'/>")};
   --ico-arrow-down: ${svg("<path d='M12 5v14M19 12l-7 7-7-7'/>")};
 }</style>`;
+
+const HIDDEN_RULE = /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important;?\s*\}/;
+const hiddenFromTokens = HIDDEN_RULE.test(readFileSync(join(root, "src/tokens.css"), "utf8"));
+// WP1 STAND-IN (X3): the one [hidden] rule, only while tokens.css does not carry it yet.
+const HIDDEN_SHIM = hiddenFromTokens ? "" :
+  `<style id="standin-wp1-hidden">[hidden]:not([hidden="until-found"]) { display: none !important; }</style>`;
+
+const controlsFromRepo = existsSync(join(root, "src/controls.css"));
+// WP5 STAND-IN: `.btn-group`'s lifts from controls.css (WP5 controls.css:149-151), only while there is
+// no src/controls.css. Which child of a joined pair is on top is decided there, and nowhere here.
+const CONTROLS = controlsFromRepo ? `<link rel="stylesheet" href="/src/controls.css">` :
+  `<style id="standin-wp5-btn-group">
+.btn-group > * + * { margin-inline-start: -1px; }
+.btn-group > :is(:hover, [aria-pressed="true"], [aria-expanded="true"]) { position: relative; z-index: 1; }
+.btn-group > :focus-within { position: relative; z-index: 2; }</style>`;
 
 const HELPERS = `
 window.log = [];
@@ -127,17 +191,20 @@ window.probe = (value, prop = "color") => {
 };
 window.cs = (s, prop, pseudo) => getComputedStyle(typeof s === "string" ? $(s) : s, pseudo || null).getPropertyValue(prop);
 window.box = (s) => (typeof s === "string" ? $(s) : s).getBoundingClientRect().toJSON();
+window.drawn = (s) => (typeof s === "string" ? $(s) : s).getClientRects().length > 0;
 window.tick = () => new Promise((r) => setTimeout(r, 0));
 `;
 
 const PAGES = {
-  "/main": `<!doctype html><html lang="en"><head><meta charset="utf-8">${TOKEN_SHIM}
+  "/main": `<!doctype html><html lang="en"><head><meta charset="utf-8">${TOKEN_SHIM}${HIDDEN_SHIM}
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/base.css">
-<link rel="stylesheet" href="/src/components.css"><link rel="stylesheet" href="/src/filters.css">
+<link rel="stylesheet" href="/src/components.css">${CONTROLS}<link rel="stylesheet" href="/src/filters.css">
 <style>body { margin: 0; padding: 20px; } body::after { display: none; }
 /* Computed styles are asserted at a state's END. A .15s transition would be sampled mid-flight —
-   an edge read as --control-edge a frame after it was told to turn --primary. */
-*, *::before, *::after { transition: none !important; }</style>
+   an edge read as --control-edge a frame after it was told to turn --primary. base.css's smooth
+   scrolling is the same trap for geometry: a scrollBy() still animating when the list is measured. */
+*, *::before, *::after { transition: none !important; }
+html { scroll-behavior: auto !important; }</style>
 </head><body><button id="start" type="button">start</button><div id="mount"></div>
 <script type="module">
 import { positionPopup } from "/runtime/popup.js";
@@ -149,6 +216,8 @@ ${HELPERS}
 window.triggerOf = (id) => document.getElementById(id).parentElement.querySelector(".select-trigger");
 window.clearOf = (id) => document.getElementById(id).closest(".filter-dd")?.querySelector(".filter-clear") || null;
 window.panel = () => document.querySelector(".select-panel");
+window.listbox = () => { const p = panel(); return p && (p.matches("[role=listbox]") ? p : p.querySelector("[role=listbox]")); };
+window.searchBox = () => panel()?.querySelector(".select-search input") || null;
 // The rows a reader SEES — rendered boxes, not the \`hidden\` attribute. The attribute is the
 // runtime's intent; \`.select-option { display: flex }\` once overrode it and every "filtered" row
 // stayed on screen while an attribute-reading check reported the filter working.
@@ -158,20 +227,51 @@ window.activeRow = (el = document.activeElement) => {
   const id = el && el.getAttribute("aria-activedescendant");
   return id ? document.getElementById(id).textContent : null;
 };
+window.activeRowEl = (el = document.activeElement) => {
+  const id = el && el.getAttribute("aria-activedescendant");
+  return id ? document.getElementById(id) : null;
+};
 window.ready = true;
 </script></body></html>`,
 
-  // ONLY tokens.css and filters.css — what a tokens + chrome surface like netmon would load.
-  "/bare": `<!doctype html><html lang="en"><head><meta charset="utf-8">${TOKEN_SHIM}
+  // filters.css BEFORE components.css: the filter trigger must not depend on which loads last.
+  "/reversed": `<!doctype html><html lang="en"><head><meta charset="utf-8">${TOKEN_SHIM}${HIDDEN_SHIM}
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/filters.css">
-<style>body { margin: 0; padding: 20px; font: 12px/1.5 monospace; }</style>
+<link rel="stylesheet" href="/src/components.css">
+<style>body { margin: 0; padding: 20px; }</style>
+</head><body>
+<select data-filter aria-label="source" id="rsrc"><option value="">all</option><option value="s">seedr</option></select>
+<script type="module">
+import { initSelects } from "/runtime/select.js";
+${HELPERS}
+window.triggerOf = (id) => document.getElementById(id).parentElement.querySelector(".select-trigger");
+initSelects();
+window.ready = true;
+</script></body></html>`,
+
+  // ONLY tokens.css and filters.css — what a tokens + chrome surface like netmon would load. Every
+  // focus-ring and forced-colours assertion runs here, where nothing else can draw one.
+  "/bare": `<!doctype html><html lang="en"><head><meta charset="utf-8">${TOKEN_SHIM}${HIDDEN_SHIM}
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/filters.css">
+<style>body { margin: 0; padding: 20px; font: 12px/1.5 monospace; } *, *::before, *::after { transition: none !important; }</style>
 </head><body><button id="start" type="button">start</button>
-<div class="search-field"><input type="search" id="q" aria-label="search"><button type="button" class="search-clear" aria-label="clear search"></button></div>
-<button type="button" class="chip" id="chip" aria-pressed="false">agents</button>
-<button type="button" class="chip" id="chip-on" aria-pressed="true">skills</button>
-<button type="button" class="sort-dir" id="dir" data-dir="asc" aria-label="sort descending"></button>
-<button type="button" class="filter-clear" id="clr" aria-label="clear source filter"></button>
+<search class="filter-bar" id="bar">
+  <div class="search-field" id="sf"><input type="search" id="q" aria-label="search" value="x"><button type="button" class="search-clear" id="sclr" aria-label="clear search"></button></div>
+  <span class="filter-bar-spacer" id="spacer"></span>
+  <span class="filter-dd" id="fdd"><button type="button" class="select-trigger select-trigger--filter" id="trig">source</button></span>
+  <button type="button" class="filter-clear" id="clr" aria-label="clear source filter"></button>
+  <div class="sort-ctl" id="sc"><button type="button" class="sort-dir" id="dir" data-dir="asc" aria-label="sort descending"></button></div>
+  <span class="sep" id="sep" aria-hidden="true"></span>
+</search>
+<div class="chip-set" id="cs" role="group" aria-label="tags">
+  <button type="button" class="chip" id="chip" aria-pressed="false">agents</button>
+  <a class="chip" id="link" href="#a">#a</a>
+</div>
+<div class="filter-chips" id="fch" role="group" aria-label="in force"><button type="button" class="chip chip--remove" id="rm" aria-label="remove filter source: seedr"><span class="chip-key">source:</span> seedr</button></div>
 <button type="button" class="value-filter" id="vf">official</button>
+<span class="match-count" id="mc">3/17</span><p class="result-count" id="rc">7 of 55</p><p class="load-more" id="lm">showing 8</p>
+<div class="select-search" id="ss"><div class="search-field"><input type="search" aria-label="row"></div></div>
+<ul class="select-list" id="sl"><li>a</li></ul><div class="select-optgroup" id="og">g</div><div class="select-empty" id="se">no matches</div>
 <script type="module">
 ${HELPERS}
 window.ready = true;
@@ -185,10 +285,12 @@ const server = createServer((req, res) => {
     res.end(PAGES[url]);
     return;
   }
-  if (/^\/(src|runtime)\/[a-z-]+\.(css|js)$/.test(url)) {
-    const type = extname(url) === ".css" ? "text/css" : "text/javascript";
+  if (url === "/examples/filters.html" || /^\/(src|runtime)\/[a-z-]+\.(css|js)$/.test(url)) {
+    const path = join(root, url);
+    if (!existsSync(path)) { res.writeHead(404); res.end(); return; }
+    const type = { ".css": "text/css", ".js": "text/javascript", ".html": "text/html" }[extname(url)];
     res.writeHead(200, { "content-type": `${type}; charset=utf-8` });
-    res.end(readFileSync(join(root, url)));
+    res.end(readFileSync(path));
     return;
   }
   res.writeHead(404);
@@ -223,6 +325,7 @@ await send("Runtime.enable");
 await send("Page.enable");
 await send("DOM.enable");
 await send("CSS.enable");
+await send("Accessibility.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
 
 const evaluate = async (expression) => {
@@ -233,23 +336,35 @@ const evaluate = async (expression) => {
   return result.value;
 };
 
-const open = async (path) => {
+const open = async (path, readiness = "window.ready === true") => {
   await send("Page.navigate", { url: base + path });
   for (let i = 0; ; i += 1) {
-    if (await evaluate("window.ready === true").catch(() => false)) return;
+    if (await evaluate(`document.readyState === "complete" && (${readiness})`).catch(() => false)) return;
     if (i > 50) throw new Error(`${path} never finished loading`);
     await sleep(100);
   }
 };
 
-// Where a real pointer would press. Dispatched, so the browser hit-tests it — which is the claim.
-const click = async (expression) => {
-  const { x, y } = await evaluate(`(() => { const b = (${expression}).getBoundingClientRect();
-    return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
-  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+const move = (x, y) => send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+const pressAt = async (x, y) => {
+  await move(x, y);
   await send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
 };
+// Where a real pointer would press. Dispatched, so the browser hit-tests it — which is the claim.
+// NOTHING TO PRESS is a FAIL of its own, and the run goes on: a control the runtime failed to build
+// must not take every later section down with it.
+const centre = async (expression) => {
+  const at = await evaluate(`(() => { const e = (${expression}); if (!e) return null; const b = e.getBoundingClientRect();
+    return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+  if (!at) {
+    failures += 1;
+    console.log(`FAIL  nothing to press: ${expression}\n        (after: ${lastPassed})`);
+  }
+  return at;
+};
+const click = async (expression) => { const at = await centre(expression); if (at) await pressAt(at.x, at.y); };
+const hover = async (expression) => { const at = await centre(expression); if (at) await move(at.x, at.y); };
 
 const KEYS = {
   Enter: { code: "Enter", keyCode: 13, text: "\r" },
@@ -276,7 +391,7 @@ const press = async (key, modifiers = 0) => {
 const typeText = (text) => send("Input.insertText", { text });
 // The pointer stays wherever the last press left it, and whatever is rendered under it next is
 // HOVERED. Parked in a corner nothing occupies before a look is asserted at rest.
-const park = () => send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 998, y: 698 });
+const park = () => move(998, 698);
 
 // A hover or a keyboard focus, FORCED on one node — so a state's look is asserted without depending
 // on the pointer heuristics that decide :focus-visible.
@@ -287,17 +402,96 @@ const force = async (selector, states) => {
   await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: states });
 };
 
-let failures = 0;
-const check = (label, condition, detail) => {
-  if (condition) { console.log(`PASS  ${label}`); return; }
-  failures += 1;
-  console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${detail}`}`);
+/*
+ * WHAT A SCREEN READER IS HANDED: the accessibility tree under one element, with containers that
+ * carry no role of their own (ignored, `presentation`, `generic`) looked through — so a text box
+ * wrapped in a presentational row still shows up as the listbox's child, which is the defect.
+ */
+const axTree = async (selector) => {
+  const { root: doc } = await send("DOM.getDocument", { depth: 0 });
+  const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector });
+  if (!nodeId) throw new Error(`ax: no node for ${selector}`);
+  const { node } = await send("DOM.describeNode", { nodeId });
+  const { nodes } = await send("Accessibility.getFullAXTree");
+  const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+  const self = nodes.find((n) => n.backendDOMNodeId === node.backendNodeId);
+  if (!self) throw new Error(`ax: ${selector} is not in the accessibility tree`);
+  const through = (n) => n.ignored || ["none", "presentation", "generic"].includes(n.role?.value);
+  const kids = (n) => (n.childIds || []).flatMap((id) => {
+    const c = byId.get(id);
+    return !c ? [] : through(c) ? kids(c) : [c];
+  });
+  const shape = (n) => ({ role: n.role?.value, name: n.name?.value ?? "", children: kids(n).map((c) => ({
+    role: c.role?.value, name: c.name?.value ?? "", children: kids(c).map((g) => g.role?.value) })) });
+  return shape(self);
 };
-const near = (a, b, tolerance = 1) => Math.abs(a - b) <= tolerance;
+
+// WHAT THE COMPOSITOR PAINTED: a screenshot of a clip, decoded, and WCAG contrast between two pixels.
+// The only honest answer to "which of two overlapping things is on top", and to whether a colour
+// that computes fine is visible at all.
+const lum = ([r, g, b]) => {
+  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+};
+const contrast = (p, q) => { const a = lum(p), b = lum(q); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+// A PNG screenshot, decoded: 8-bit RGB or RGBA, the five scanline filters.
+const decode = (png) => {
+  let w = 0, h = 0, type = 0;
+  const idat = [];
+  for (let offset = 8; offset < png.length;) {
+    const length = png.readUInt32BE(offset);
+    const tag = png.toString("ascii", offset + 4, offset + 8);
+    const body = png.subarray(offset + 8, offset + 8 + length);
+    if (tag === "IHDR") { w = body.readUInt32BE(0); h = body.readUInt32BE(4); type = body[9]; }
+    if (tag === "IDAT") idat.push(body);
+    offset += 12 + length;
+  }
+  const bpp = type === 6 ? 4 : 3;
+  const stride = w * bpp;
+  const raw = inflateSync(Buffer.concat(idat));
+  const out = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y += 1) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x += 1) {
+      const a = x >= bpp ? out[y * stride + x - bpp] : 0;
+      const b = y ? out[(y - 1) * stride + x] : 0;
+      const c = x >= bpp && y ? out[(y - 1) * stride + x - bpp] : 0;
+      let v = raw[y * (stride + 1) + 1 + x];
+      if (filter === 1) v += a;
+      else if (filter === 2) v += b;
+      else if (filter === 3) v += (a + b) >> 1;
+      else if (filter === 4) {
+        const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      out[y * stride + x] = v & 255;
+    }
+  }
+  return Array.from({ length: w * h }, (_, i) => [out[i * bpp], out[i * bpp + 1], out[i * bpp + 2]]);
+};
+const shot = async (clip) =>
+  decode(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip: { ...clip, scale: 1 } })).data, "base64"));
+const pixel = async (x, y) => `rgb(${(await shot({ x, y, width: 1, height: 1 }))[0].join(", ")})`;
 
 /* ═══ popup.js — positionPopup() ═══════════════════════════════════════════ */
 
 await open("/main");
+
+// WP2 STAND-IN, decided by measuring: 0.59's components.css places `.select-panel` itself
+// (position: fixed); 0.60.0's does not. Only an UNPLACED panel shows what the place-before-scroll
+// order in select.js prevents, so while the loaded components.css still places it, it is unplaced here.
+const panelPlaced = await evaluate(`(() => { const p = document.createElement("ul"); p.className = "select-panel";
+  document.body.append(p); const placed = getComputedStyle(p).position !== "static"; p.remove();
+  if (placed) { const s = document.createElement("style"); s.id = "standin-wp2-m0"; s.textContent = ".select-panel { position: static; }";
+    document.head.append(s); }
+  return placed; })()`);
+
+console.log("measuring against:");
+console.log(`  [hidden] rule ........ ${hiddenFromTokens ? "tokens.css's own" : "harness STAND-IN — tokens.css lacks it (WP1)"}`);
+console.log(`  .btn-group lifts ..... ${controlsFromRepo ? "src/controls.css" : "harness STAND-IN — no src/controls.css (WP5)"}`);
+console.log(`  .select-panel ........ ${panelPlaced ? "harness STAND-IN position: static — components.css still places it (WP2 M0)" : "unplaced by components.css itself"}`);
+console.log("");
+
 await evaluate(`window.place = (x, y, w, rows, opts, text = "row") => {
   document.getElementById("pa")?.remove(); document.getElementById("pp")?.remove();
   const a = document.createElement("button");
@@ -315,65 +509,65 @@ await evaluate(`window.place = (x, y, w, rows, opts, text = "row") => {
 }; null`);
 
 let r = await evaluate("place(20, 20, 120, 5)");
-check("popup: an anchor near the top opens BELOW, 4px under it, flush with its start",
-  r.side === "below" && near(r.p.top, r.a.bottom + 4) && near(r.p.left, r.a.left), JSON.stringify(r));
-check("popup: it is position: fixed, written inline — the CSS no longer places a .select-panel",
-  r.position === "fixed");
-check("popup: never narrower than the control that opened it", r.p.width >= r.a.width - 0.5,
-  `${r.p.width} < ${r.a.width}`);
+await check("popup: an anchor near the top opens BELOW, 4px under it, flush with its start",
+  () => r.side === "below" && near(r.p.top, r.a.bottom + 4) && near(r.p.left, r.a.left), () => JSON.stringify(r));
+await check("popup: it is position: fixed, written inline — the CSS no longer places a .select-panel",
+  () => r.position === "fixed");
+await check("popup: never narrower than the control that opened it", () => r.p.width >= r.a.width - 0.5,
+  () => `${r.p.width} < ${r.a.width}`);
 
 r = await evaluate("place(20, 640, 120, 5)");
-check("popup: near the bottom edge a short list FLIPS ABOVE, 4px over the anchor",
-  r.side === "above" && near(r.p.bottom, r.a.top - 4), JSON.stringify(r));
+await check("popup: near the bottom edge a short list FLIPS ABOVE, 4px over the anchor",
+  () => r.side === "above" && near(r.p.bottom, r.a.top - 4), () => JSON.stringify(r));
 
 r = await evaluate("place(20, 500, 120, 5)");
-check("popup: a list that fits below stays below, even with more room above",
-  r.side === "below" && near(r.p.top, r.a.bottom + 4), JSON.stringify(r));
+await check("popup: a list that fits below stays below, even with more room above",
+  () => r.side === "below" && near(r.p.top, r.a.bottom + 4), () => JSON.stringify(r));
 
 r = await evaluate("place(20, 640, 120, 100)");
-check("popup: a tall list near the bottom flips and is clamped to the room above, 8px off the top",
-  r.side === "above" && r.p.top >= 8 - 0.5 && near(r.p.bottom, r.a.top - 4) && r.maxH !== "", JSON.stringify(r));
+await check("popup: a tall list near the bottom flips and is clamped to the room above, 8px off the top",
+  () => r.side === "above" && r.p.top >= 8 - 0.5 && near(r.p.bottom, r.a.top - 4) && r.maxH !== "", () => JSON.stringify(r));
 
 r = await evaluate("place(20, 20, 120, 100)");
-check("popup: a tall list near the top stays below, clamped 8px short of the bottom edge",
-  r.side === "below" && r.p.bottom <= r.vh - 8 + 0.5 && near(r.p.top, r.a.bottom + 4), JSON.stringify(r));
+await check("popup: a tall list near the top stays below, clamped 8px short of the bottom edge",
+  () => r.side === "below" && r.p.bottom <= r.vh - 8 + 0.5 && near(r.p.top, r.a.bottom + 4), () => JSON.stringify(r));
 
 r = await evaluate("place(950, 100, 40, 3, {}, 'a considerably wider row than its anchor, so it must be pushed back in')");
-check("popup: at the right edge it is pushed back in, 8px short of the viewport edge",
-  r.p.right <= r.vw - 8 + 0.5 && r.p.left < r.a.left, JSON.stringify(r));
+await check("popup: at the right edge it is pushed back in, 8px short of the viewport edge",
+  () => r.p.right <= r.vw - 8 + 0.5 && r.p.left < r.a.left, () => JSON.stringify(r));
 
 r = await evaluate("place(2, 100, 40, 3)");
-check("popup: at the left edge it is kept 8px in", r.p.left >= 8 - 0.5, JSON.stringify(r));
+await check("popup: at the left edge it is kept 8px in", () => r.p.left >= 8 - 0.5, () => JSON.stringify(r));
 
 r = await evaluate("place(500, 100, 100, 3, { align: 'end' }, 'a row wider than the anchor')");
-check("popup: align 'end' lines its right edge up with the anchor's", near(r.p.right, r.a.right),
-  JSON.stringify(r));
+await check("popup: align 'end' lines its right edge up with the anchor's", () => near(r.p.right, r.a.right),
+  () => JSON.stringify(r));
 
 r = await evaluate("place(20, 100, 60, 3, { point: { x: 300, y: 200 }, minWidth: 140 })");
-check("popup: a POINT anchor (a context menu) opens at the point, below it by the gap",
-  near(r.p.left, 300) && near(r.p.top, 204), JSON.stringify(r));
-check("popup: ...and minWidth is the floor when there is no anchor width", r.p.width >= 140 - 0.5 && r.minW === "140px",
-  JSON.stringify(r));
+await check("popup: a POINT anchor (a context menu) opens at the point, below it by the gap",
+  () => near(r.p.left, 300) && near(r.p.top, 204), () => JSON.stringify(r));
+await check("popup: ...and minWidth is the floor when there is no anchor width",
+  () => r.p.width >= 140 - 0.5 && r.minW === "140px", () => JSON.stringify(r));
 
 r = await evaluate("place(20, 100, 200, 3, { minWidth: 260 })");
-check("popup: min-inline-size is max(anchor width, minWidth)", r.minW === "260px" && r.p.width >= 259.5,
-  JSON.stringify(r));
+await check("popup: min-inline-size is max(anchor width, minWidth)", () => r.minW === "260px" && r.p.width >= 259.5,
+  () => JSON.stringify(r));
 
 r = await evaluate("place(20, 640, 120, 5, { side: 'below' })");
-check("popup: `side` keeps the side it is given instead of re-choosing", r.side === "below" && r.p.top > r.a.bottom,
-  JSON.stringify(r));
+await check("popup: `side` keeps the side it is given instead of re-choosing", () => r.side === "below" && r.p.top > r.a.bottom,
+  () => JSON.stringify(r));
 
 r = await evaluate(`(() => { place(20, 20, 120, 100);
   const p = document.getElementById("pp"); p.scrollTop = 200;
   positionPopup(p, document.getElementById("pa"));
   return p.scrollTop; })()`);
-check("popup: re-placing a SCROLLED list leaves it where the reader had scrolled it", r === 200, `scrollTop ${r}`);
+await check("popup: re-placing a SCROLLED list leaves it where the reader had scrolled it", () => r === 200, () => `scrollTop ${r}`);
 
 r = await evaluate(`(() => { document.documentElement.style.zoom = "1.5";
   const out = place(100, 100, 120, 5);
   document.documentElement.style.zoom = ""; return out; })()`);
-check("popup: under a zoomed root it still lands on its anchor (the zoom is divided on the WRITE)",
-  near(r.p.left, r.a.left, 1.5) && near(r.p.top, r.a.bottom + 4, 1.5), JSON.stringify(r));
+await check("popup: under a zoomed root it still lands on its anchor (the zoom is divided on the WRITE)",
+  () => near(r.p.left, r.a.left, 1.5) && near(r.p.top, r.a.bottom + 4, 1.5), () => JSON.stringify(r));
 await evaluate(`document.getElementById("pa")?.remove(); document.getElementById("pp")?.remove(); null`);
 
 /* ═══ select.js — the list is never the OS list ═══════════════════════════ */
@@ -389,180 +583,233 @@ await evaluate(`mount(\`
   <select id="dis" data-filter aria-label="host" disabled><option value="">all</option><option value="m" selected>ddmini</option></select>
 \`); initSelects(); null`);
 
-check("never the OS list: every <select> is wrapped, including one still carrying data-select=\"off\"",
-  await evaluate(`[...document.querySelectorAll("#mount select")].every((s) =>
+await check("never the OS list: every <select> is wrapped, including one still carrying data-select=\"off\"",
+  () => evaluate(`[...document.querySelectorAll("#mount select")].every((s) =>
     s.parentElement.classList.contains("select-field") && s.parentElement.querySelector(".select-trigger"))`));
-check("never the OS list: the native control is out of the tab order and hidden from assistive tech",
-  await evaluate(`[...document.querySelectorAll("#mount select")].every((s) =>
+await check("never the OS list: the native control is out of the tab order and hidden from assistive tech",
+  () => evaluate(`[...document.querySelectorAll("#mount select")].every((s) =>
     s.getAttribute("tabindex") === "-1" && s.getAttribute("aria-hidden") === "true")`));
-check("never the OS list: the pixel a reader presses is the trigger, not the <select> laid over it",
-  await evaluate(`(() => { const t = triggerOf("plain"); const b = t.getBoundingClientRect();
+await check("never the OS list: the pixel a reader presses is the trigger, not the <select> laid over it",
+  () => evaluate(`(() => { const t = triggerOf("plain"); const b = t.getBoundingClientRect();
     return t.contains(document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)); })()`));
 
 await click(`triggerOf("plain")`);
-check("never the OS list: a pointer press opens the system's listbox, in the page",
-  await evaluate(`!!panel() && panel().matches("ul.select-panel[role=listbox]") && panel().parentElement === document.body`));
-check("never the OS list: ...one row per option, the current one aria-selected",
-  (await evaluate("rows().join(',')")) === "alpha,beta,gamma" &&
-  (await evaluate(`panel().querySelector("[aria-selected=true]").textContent`)) === "beta");
-check("never the OS list: ...placed by positionPopup (position: fixed inline)",
-  (await evaluate("panel().style.position")) === "fixed");
+await check("never the OS list: a pointer press opens the system's listbox, in the page",
+  () => evaluate(`!!panel() && panel().matches("ul.select-panel[role=listbox]") && panel().parentElement === document.body`));
+await check("never the OS list: ...one row per option, the current one aria-selected",
+  async () => (await evaluate("rows().join(',')")) === "alpha,beta,gamma" &&
+    (await evaluate(`panel().querySelector("[aria-selected=true]").textContent`)) === "beta");
+await check("never the OS list: ...placed by positionPopup (position: fixed inline)",
+  async () => (await evaluate("panel().style.position")) === "fixed");
+await check("never the OS list: ...and the trigger's aria-controls names that listbox",
+  () => evaluate(`triggerOf("plain").getAttribute("aria-controls") === listbox().id`));
 await press("Escape");
-check("Escape closes it, focus back on the trigger",
-  !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement === triggerOf("plain")`)));
+await check("Escape closes it, focus back on the trigger",
+  async () => !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement === triggerOf("plain")`)));
 await press("ArrowDown", ALT);
-check("never the OS list: Alt+ArrowDown on the trigger opens the system's list",
-  await evaluate("!!panel()"));
+await check("never the OS list: Alt+ArrowDown on the trigger opens the system's list", () => evaluate("!!panel()"));
 await press("Escape");
 await press(" ");
-check("...and so does Space", await evaluate("!!panel()"));
+await check("...and so does Space", () => evaluate("!!panel()"));
 await press("Escape");
 
 await evaluate(`document.getElementById("mount").insertAdjacentHTML("beforeend",
   '<select id="late"><option>rendered after initSelects()</option></select>'); null`);
 await evaluate("tick()");
-check("never the OS list: a <select> rendered AFTER the call is enhanced too",
-  await evaluate(`document.getElementById("late").parentElement.classList.contains("select-field")`));
+await check("never the OS list: a <select> rendered AFTER the call is enhanced too",
+  () => evaluate(`document.getElementById("late").parentElement.classList.contains("select-field")`));
 
 /* ═══ select.js — the filter dropdown (M5) ═════════════════════════════════ */
 
-check("filter: the select, its trigger and a clear sit in one labelled group",
-  await evaluate(`(() => { const g = document.getElementById("src").closest(".filter-dd");
+await check("filter: the select, its trigger and a clear sit in one labelled group",
+  () => evaluate(`(() => { const g = document.getElementById("src").closest(".filter-dd");
     return !!g && g.matches(".btn-group[role=group]") && g.getAttribute("aria-label") === "source filter"
       && g.children.length === 2 && g.children[0].matches(".select-field") && g.children[1].matches("button.filter-clear"); })()`));
-check("filter: the trigger is the filter variant",
-  await evaluate(`triggerOf("src").classList.contains("select-trigger--filter")`));
-check("filter: at rest the trigger names the FACET",
-  (await evaluate(`triggerOf("src").textContent`)) === "source");
-check("filter: ...its accessible name carries facet AND value, so state is never colour alone",
-  (await evaluate(`triggerOf("src").getAttribute("aria-label")`)) === "source filter: all");
-check("filter: ...it is not active, and there is no clear to press",
-  (await evaluate(`triggerOf("src").hasAttribute("data-active")`)) === false &&
-  (await evaluate(`clearOf("src").hidden`)) === true);
-check("filter: the clear names its facet, not a generic \"Clear filter\"",
-  (await evaluate(`clearOf("src").getAttribute("aria-label")`)) === "clear source filter");
+await check("filter: the trigger is the filter variant",
+  () => evaluate(`triggerOf("src").classList.contains("select-trigger--filter")`));
+await check("filter: at rest the trigger names the FACET",
+  async () => (await evaluate(`triggerOf("src").textContent`)) === "source");
+await check("filter: ...its accessible name carries facet AND value, so state is never colour alone",
+  async () => (await evaluate(`triggerOf("src").getAttribute("aria-label")`)) === "source filter: all");
+await check("filter: ...it is not active, and there is no clear to press",
+  async () => (await evaluate(`triggerOf("src").hasAttribute("data-active")`)) === false &&
+    (await evaluate(`clearOf("src").hidden`)) === true && !(await evaluate(`drawn(clearOf("src"))`)));
+await check("filter: the clear names its facet, not a generic \"Clear filter\"",
+  async () => (await evaluate(`clearOf("src").getAttribute("aria-label")`)) === "clear source filter");
 
 await click(`triggerOf("src")`);
-check("filter: the list opens on an \"all\" row that carries the ✓ while nothing is filtered",
-  (await evaluate("rows()[0]")) === "all" &&
-  (await evaluate(`panel().querySelector(".select-option").getAttribute("aria-selected")`)) === "true" &&
-  (await evaluate(`panel().querySelectorAll("[aria-selected=true]").length`)) === 1);
+await check("filter: the list opens on an \"all\" row that carries the ✓ while nothing is filtered",
+  async () => (await evaluate("rows()[0]")) === "all" &&
+    (await evaluate(`panel().querySelector(".select-option").getAttribute("aria-selected")`)) === "true" &&
+    (await evaluate(`panel().querySelectorAll("[aria-selected=true]").length`)) === 1);
 await press("Escape");
 await click(`triggerOf("order")`);
-check("filter: the \"all\" row comes FIRST even when the page wrote the empty option second",
-  (await evaluate("rows().join(',')")) === "all,agent,skill");
+await check("filter: the \"all\" row comes FIRST even when the page wrote the empty option second",
+  async () => (await evaluate("rows().join(',')")) === "all,agent,skill");
 await press("Escape");
 
 // Keyboard pick: ArrowDown opens on the value in force, ArrowDown moves, Enter picks.
 await evaluate(`triggerOf("src").focus(); log.length = 0; null`);
 await press("ArrowDown");
-check("filter: ArrowDown opens the list on the value in force",
-  await evaluate(`!!panel() && activeRow(triggerOf("src")) === "all"`));
+await check("filter: ArrowDown opens the list on the value in force",
+  () => evaluate(`!!panel() && activeRow(triggerOf("src")) === "all"`));
 await press("ArrowDown");
-check("filter: ArrowDown moves the highlight (aria-activedescendant)",
-  (await evaluate(`activeRow(triggerOf("src"))`)) === "seedr");
+await check("filter: ArrowDown moves the highlight (aria-activedescendant)",
+  async () => (await evaluate(`activeRow(triggerOf("src"))`)) === "seedr");
 await press("Enter");
-check("filter: Enter picks it — the <select> holds the value",
-  (await evaluate(`document.getElementById("src").value`)) === "seedr");
-check("filter: ...announced the native way: input, then change, once each",
-  (await evaluate("log.join(',')")) === "input:src,change:src", await evaluate("log.join(',')"));
-check("filter: FILTERING, the trigger names the VALUE",
-  (await evaluate(`triggerOf("src").textContent`)) === "seedr");
-check("filter: ...is marked active, and its name says so",
-  (await evaluate(`triggerOf("src").getAttribute("data-active")`)) === "true" &&
-  (await evaluate(`triggerOf("src").getAttribute("aria-label")`)) === "source filter: seedr");
-check("filter: ...and the clear is there, joined to it (sharing one edge)",
-  (await evaluate(`clearOf("src").hidden`)) === false &&
-  (await evaluate(`Math.abs(box(clearOf("src")).left - (box(triggerOf("src")).right - 1)) <= 0.5`)));
-check("filter: focus is back on the trigger after the pick",
-  await evaluate(`document.activeElement === triggerOf("src")`));
+await check("filter: Enter picks it — the <select> holds the value",
+  async () => (await evaluate(`document.getElementById("src").value`)) === "seedr");
+await check("filter: ...announced the native way: input, then change, once each",
+  async () => (await evaluate("log.join(',')")) === "input:src,change:src", () => evaluate("log.join(',')"));
+await check("filter: FILTERING, the trigger names the VALUE",
+  async () => (await evaluate(`triggerOf("src").textContent`)) === "seedr");
+await check("filter: ...is marked active, and its name says so",
+  async () => (await evaluate(`triggerOf("src").getAttribute("data-active")`)) === "true" &&
+    (await evaluate(`triggerOf("src").getAttribute("aria-label")`)) === "source filter: seedr");
+await check("filter: ...and the clear is there, joined to it (sharing one edge)",
+  async () => (await evaluate(`clearOf("src").hidden`)) === false &&
+    (await evaluate(`Math.abs(box(clearOf("src")).left - (box(triggerOf("src")).right - 1)) <= 0.5`)));
+await check("filter: focus is back on the trigger after the pick",
+  () => evaluate(`document.activeElement === triggerOf("src")`));
 
 const primary = await evaluate(`probe("var(--primary)")`);
 const edge = await evaluate(`probe("var(--control-edge)")`);
 const fg = await evaluate(`probe("var(--foreground)")`);
-check("filter: the active state carries --primary — ink, edge and funnel",
-  (await evaluate(`cs(triggerOf("src"), "color")`)) === primary &&
-  (await evaluate(`cs(triggerOf("src"), "border-top-color")`)) === primary &&
-  (await evaluate(`cs(triggerOf("src"), "background-color", "::before")`)) === primary,
-  `${await evaluate(`cs(triggerOf("src"), "color")`)} / ${await evaluate(`cs(triggerOf("src"), "border-top-color")`)} vs ${primary}`);
-check("filter: the clear is --primary on a --primary edge",
-  (await evaluate(`cs(clearOf("src"), "color")`)) === primary &&
-  (await evaluate(`cs(clearOf("src"), "border-top-color")`)) === primary);
+const muted = await evaluate(`probe("var(--muted-foreground)")`);
+const tint = await evaluate(`probe("color-mix(in srgb, var(--primary) 12%, transparent)", "background-color")`);
+await check("filter: the active state carries --primary — ink, edge and funnel",
+  async () => (await evaluate(`cs(triggerOf("src"), "color")`)) === primary &&
+    (await evaluate(`cs(triggerOf("src"), "border-top-color")`)) === primary &&
+    (await evaluate(`cs(triggerOf("src"), "background-color", "::before")`)) === primary,
+  async () => `${await evaluate(`cs(triggerOf("src"), "color")`)} / ${await evaluate(`cs(triggerOf("src"), "border-top-color")`)} vs ${primary}`);
+await check("filter: the clear is --primary on a --primary edge",
+  async () => (await evaluate(`cs(clearOf("src"), "color")`)) === primary &&
+    (await evaluate(`cs(clearOf("src"), "border-top-color")`)) === primary);
 
 await evaluate("log.length = 0; null");
 await click(`clearOf("src")`);
 await park();
-check("filter: the clear empties the filter", (await evaluate(`document.getElementById("src").value`)) === "");
-check("filter: ...announced as input then change", (await evaluate("log.join(',')")) === "input:src,change:src",
-  await evaluate("log.join(',')"));
-check("filter: ...the trigger names the facet again and is no longer active",
-  (await evaluate(`triggerOf("src").textContent`)) === "source" &&
-  !(await evaluate(`triggerOf("src").hasAttribute("data-active")`)));
-check("filter: ...the clear is gone, and focus did not go with it — it is on the trigger",
-  (await evaluate(`clearOf("src").hidden`)) === true &&
-  (await evaluate(`document.activeElement === triggerOf("src")`)));
-check("filter: at rest the ink is --foreground on a --control-edge edge; the funnel is muted",
-  (await evaluate(`cs(triggerOf("src"), "color")`)) === fg &&
-  (await evaluate(`cs(triggerOf("src"), "border-top-color")`)) === edge &&
-  (await evaluate(`cs(triggerOf("src"), "background-color", "::before")`)) === (await evaluate(`probe("var(--muted-foreground)")`)));
+await check("filter: the clear empties the filter", async () => (await evaluate(`document.getElementById("src").value`)) === "");
+await check("filter: ...announced as input then change", async () => (await evaluate("log.join(',')")) === "input:src,change:src",
+  () => evaluate("log.join(',')"));
+await check("filter: ...the trigger names the facet again and is no longer active",
+  async () => (await evaluate(`triggerOf("src").textContent`)) === "source" &&
+    !(await evaluate(`triggerOf("src").hasAttribute("data-active")`)));
+await check("filter: ...the clear is gone, and focus did not go with it — it is on the trigger",
+  async () => (await evaluate(`clearOf("src").hidden`)) === true &&
+    (await evaluate(`document.activeElement === triggerOf("src")`)));
+await check("filter: at rest the ink is --foreground on a --control-edge edge; the funnel is muted",
+  async () => (await evaluate(`cs(triggerOf("src"), "color")`)) === fg &&
+    (await evaluate(`cs(triggerOf("src"), "border-top-color")`)) === edge &&
+    (await evaluate(`cs(triggerOf("src"), "background-color", "::before")`)) === muted);
 
 // The "all" row is a way back too.
 await press("ArrowDown"); await press("ArrowDown"); await press("Enter");
 await press("ArrowDown"); await press("Home");
-check("filter: Home jumps to the \"all\" row", (await evaluate(`activeRow(triggerOf("src"))`)) === "all");
+await check("filter: Home jumps to the \"all\" row", async () => (await evaluate(`activeRow(triggerOf("src"))`)) === "all");
 await press("Enter");
-check("filter: ...and picking it clears the filter", (await evaluate(`document.getElementById("src").value`)) === "");
+await check("filter: ...and picking it clears the filter", async () => (await evaluate(`document.getElementById("src").value`)) === "");
 
 await press("ArrowDown"); await press("End");
-check("filter: End skips a disabled last option", (await evaluate(`activeRow(triggerOf("src"))`)) === "skills.sh");
+await check("filter: End skips a disabled last option", async () => (await evaluate(`activeRow(triggerOf("src"))`)) === "skills.sh");
 await press("Home"); await press("s");
-check("filter: typeahead finds the first match", (await evaluate(`activeRow(triggerOf("src"))`)) === "seedr");
+await check("filter: typeahead finds the first match", async () => (await evaluate(`activeRow(triggerOf("src"))`)) === "seedr");
 await press("s");
-check("filter: ...and the same letter again cycles to the next", (await evaluate(`activeRow(triggerOf("src"))`)) === "skills.sh");
+await check("filter: ...and the same letter again cycles to the next", async () => (await evaluate(`activeRow(triggerOf("src"))`)) === "skills.sh");
 await evaluate("log.length = 0; null");
 await press("Escape");
-check("filter: Escape closes without changing anything",
-  !(await evaluate("!!panel()")) && (await evaluate(`document.getElementById("src").value`)) === "" &&
-  (await evaluate("log.length")) === 0);
+await check("filter: Escape closes without changing anything",
+  async () => !(await evaluate("!!panel()")) && (await evaluate(`document.getElementById("src").value`)) === "" &&
+    (await evaluate("log.length")) === 0);
 await press("ArrowDown"); await press("ArrowDown"); await press("Tab");
-check("filter: Tab closes and commits nothing",
-  !(await evaluate("!!panel()")) && (await evaluate(`document.getElementById("src").value`)) === "");
+await check("filter: Tab closes and commits nothing",
+  async () => !(await evaluate("!!panel()")) && (await evaluate(`document.getElementById("src").value`)) === "");
 
-check("filter: a REQUIRED picker (no empty option) shows its value and is never \"active\"",
-  (await evaluate(`triggerOf("req").textContent`)) === "poi/vu3" &&
-  !(await evaluate(`triggerOf("req").hasAttribute("data-active")`)) &&
-  (await evaluate(`clearOf("req").hidden`)) === true);
+await check("filter: a REQUIRED picker (no empty option) shows its value and is never \"active\"",
+  async () => (await evaluate(`triggerOf("req").textContent`)) === "poi/vu3" &&
+    !(await evaluate(`triggerOf("req").hasAttribute("data-active")`)) &&
+    (await evaluate(`clearOf("req").hidden`)) === true);
 await evaluate(`triggerOf("req").focus(); null`);
 await press("ArrowDown"); await press("ArrowDown"); await press("Enter");
-check("filter: ...and after a pick it still offers no clear — there is nothing to go back to",
-  (await evaluate(`document.getElementById("req").value`)) === "infra" &&
-  (await evaluate(`triggerOf("req").textContent`)) === "dd/infra" &&
-  !(await evaluate(`triggerOf("req").hasAttribute("data-active")`)) &&
-  (await evaluate(`clearOf("req").hidden`)) === true);
+await check("filter: ...and after a pick it still offers no clear — there is nothing to go back to",
+  async () => (await evaluate(`document.getElementById("req").value`)) === "infra" &&
+    (await evaluate(`triggerOf("req").textContent`)) === "dd/infra" &&
+    !(await evaluate(`triggerOf("req").hasAttribute("data-active")`)) &&
+    (await evaluate(`clearOf("req").hidden`)) === true);
 
-check("filter: a DISABLED filter still shows that it filters, but its clear cannot be pressed",
-  (await evaluate(`clearOf("dis").hidden`)) === false && (await evaluate(`clearOf("dis").disabled`)) === true);
+await check("filter: a DISABLED filter still shows that it filters, but its clear cannot be pressed",
+  async () => (await evaluate(`clearOf("dis").hidden`)) === false && (await evaluate(`clearOf("dis").disabled`)) === true);
 await click(`clearOf("dis")`);
-check("filter: ...and a press on it changes nothing", (await evaluate(`document.getElementById("dis").value`)) === "m");
+await check("filter: ...and a press on it changes nothing", async () => (await evaluate(`document.getElementById("dis").value`)) === "m");
 
 /* ── aria-invalid and option icons (C8) ── */
 
-check("select: aria-invalid on the <select> is mirrored onto the trigger the reader sees",
-  (await evaluate(`triggerOf("bad").getAttribute("aria-invalid")`)) === "true");
+await check("select: aria-invalid on the <select> is mirrored onto the trigger the reader sees",
+  async () => (await evaluate(`triggerOf("bad").getAttribute("aria-invalid")`)) === "true");
 await evaluate(`document.getElementById("bad").removeAttribute("aria-invalid"); tick()`);
-check("select: ...and follows it when the page clears it",
-  !(await evaluate(`triggerOf("bad").hasAttribute("aria-invalid")`)));
-check("select: an <option data-icon> puts its .ico before the label in the trigger",
-  await evaluate(`(() => { const i = triggerOf("bad").querySelector(".ico");
+await check("select: ...and follows it when the page clears it",
+  async () => !(await evaluate(`triggerOf("bad").hasAttribute("aria-invalid")`)));
+await check("select: an <option data-icon> puts its .ico before the label in the trigger",
+  () => evaluate(`(() => { const i = triggerOf("bad").querySelector(".ico");
     return !!i && i.dataset.icon === "star" && i.nextElementSibling.matches(".select-value"); })()`));
 await click(`triggerOf("bad")`);
-check("select: ...and in its row", await evaluate(`(() => { const row = panel().querySelector(".select-option");
+await check("select: ...and in its row", () => evaluate(`(() => { const row = panel().querySelector(".select-option");
     return row.firstElementChild?.matches(".ico[data-icon=star]") && row.textContent === "claude"; })()`));
 await press("ArrowDown"); await press("Enter");
-check("select: ...and the trigger drops it when an option without one is chosen",
-  !(await evaluate(`!!triggerOf("bad").querySelector(".ico")`)));
+await check("select: ...and the trigger drops it when an option without one is chosen",
+  async () => !(await evaluate(`!!triggerOf("bad").querySelector(".ico")`)));
 
-/* ── the search row past twenty options ── */
+/* ── a select moved out of its wrapper is the system's list again ── */
+
+await evaluate(`mount(\`<div id="from"><select id="mv" data-filter aria-label="kind"><option value="">all</option>
+  <option value="a">agent</option><option value="s">skill</option></select></div><div id="to"></div>\`); initSelects(); null`);
+await evaluate(`document.getElementById("to").append(document.getElementById("mv")); tick()`);
+await check("moved: a known select moved out of its wrapper is wrapped again where it now is",
+  () => evaluate(`(() => { const s = document.getElementById("mv");
+    return s.parentElement.matches(".select-field") && !!s.closest("#to .filter-dd") && !!triggerOf("mv"); })()`),
+  () => evaluate(`document.getElementById("mv").parentElement.outerHTML.slice(0, 120)`));
+await check("moved: ...and the wrapper it left behind is gone — no trigger for a select that is not there",
+  () => evaluate(`!document.querySelector("#from .select-field, #from .filter-dd")`));
+await click(`triggerOf("mv")`);
+await press("ArrowDown"); await press("Enter");
+await check("moved: ...its new trigger opens the system's list and a pick reaches the select",
+  async () => (await evaluate(`document.getElementById("mv").value`)) === "a" &&
+    (await evaluate(`triggerOf("mv").textContent`)) === "agent");
+await evaluate(`document.getElementById("start").focus(); document.getElementById("mv").focus(); null`);
+await check("moved: ...focus aimed at the select lands on the NEW trigger (the old listeners are gone)",
+  () => evaluate(`document.activeElement === triggerOf("mv")`));
+
+/* ── which lists get a search row: only a long FILTER, or one that asks (C8) ── */
+
+const LANGS = ["ada", "basic", "cobol", "dart", "elixir", "fortran", "go", "haskell", "idris", "java", "kotlin",
+  "lua", "ml", "nim", "ocaml", "perl", "qml", "ruby", "swift", "tcl", "unison", "vala"];
+await evaluate(`mount(\`
+  <select id="p22" aria-label="language">${LANGS.map((l) => `<option>${l}</option>`).join("")}</select>
+  <select id="f22" data-filter aria-label="language"><option value="">all</option>${LANGS.slice(0, 21).map((l) => `<option value="${l}">${l}</option>`).join("")}</select>
+\`); initSelects(); null`);
+await check("scope: [premise] both selects hold 22 options, over the threshold of twenty",
+  () => evaluate(`document.getElementById("p22").options.length === 22 && document.getElementById("f22").options.length === 22`));
+await click(`triggerOf("p22")`);
+await check("scope: a PLAIN select of 22 opens as the listbox itself, with no search row, focus on its trigger",
+  () => evaluate(`panel().matches("ul.select-panel[role=listbox]") && !panel().querySelector(".select-search, input")
+    && document.activeElement === triggerOf("p22")`));
+await press("r");
+await check("scope: ...a typed letter JUMPS to the first option it starts",
+  async () => (await evaluate(`activeRow(triggerOf("p22"))`)) === "ruby", () => evaluate(`activeRow(triggerOf("p22"))`));
+await press("Home");
+await check("scope: ...Home moves the highlight to the first row", async () => (await evaluate(`activeRow(triggerOf("p22"))`)) === "ada");
+await press("End");
+await check("scope: ...End to the last", async () => (await evaluate(`activeRow(triggerOf("p22"))`)) === "vala");
+await press("Escape");
+await press("ArrowDown"); await press("End"); await press(" ");
+await check("scope: ...and Space picks",
+  async () => (await evaluate(`document.getElementById("p22").value`)) === "vala" && !(await evaluate("!!panel()")));
+await click(`triggerOf("f22")`);
+await check("scope: a data-filter select of 22 opens WITH the search row, and focus in its box",
+  () => evaluate(`!!searchBox() && document.activeElement === searchBox()`));
+await press("Escape");
+
+/* ── the search row: above the listbox, never in it ── */
 
 await evaluate(`mount(\`
   <div style="height: 520px"></div>
@@ -570,59 +817,147 @@ await evaluate(`mount(\`
     \${Array.from({ length: 24 }, (_, i) => '<option value="l' + i + '">label ' + i + '</option>').join("")}</select>
   <select id="few" data-search aria-label="scope"><option>user</option><option>project</option><option>local</option></select>
   <button id="after" type="button">after</button>
+  <select id="grouped" data-search aria-label="model"><option value="">default</option>
+    <optgroup label="anthropic"><option>claude</option><option>fable</option></optgroup>
+    <optgroup label="openai"><option>codex</option></optgroup></select>
   <div style="height: 1200px"></div>
 \`); initSelects(); scrollTo(0, 0); null`);
 
 await evaluate("log.length = 0; null");
 await click(`triggerOf("many")`);
-check("search row: a list of more than twenty opens with a search row at the top",
-  await evaluate(`panel().firstElementChild.matches("li.select-search") && !!panel().querySelector(".select-search .search-field > input[type=search]")`));
-check("search row: focus moves INTO it, so it can be typed into",
-  await evaluate(`document.activeElement === panel().querySelector(".select-search input")`));
-check("search row: it is named and points at the list it filters",
-  (await evaluate(`document.activeElement.getAttribute("aria-label")`)) === "search label" &&
-  (await evaluate(`document.activeElement.getAttribute("aria-controls") === panel().id`)));
-const sideBefore = await evaluate(`box(panel()).bottom <= box(triggerOf("many")).top + 1 ? "above" : "below"`);
+await check("search row: a long filter opens a div.select-panel — the search row, THEN the ul.select-list listbox",
+  () => evaluate(`panel().matches("div.select-panel") && panel().children[0].matches("div.select-search")
+    && panel().children[1].matches("ul.select-list[role=listbox]") && !listbox().querySelector("input")`));
+await check("search row: focus moves INTO its box, so it can be typed into",
+  () => evaluate(`document.activeElement === searchBox()`));
+await check("search row: the box is a searchbox, named, pointing at the listbox (aria-controls) — as is the trigger",
+  async () => (await evaluate(`searchBox().type`)) === "search" &&
+    (await evaluate(`searchBox().getAttribute("aria-label")`)) === "search label" &&
+    (await evaluate(`searchBox().getAttribute("aria-controls") === listbox().id && triggerOf("many").getAttribute("aria-controls") === listbox().id`)));
+// Whichever element is the listbox — the panel itself, or a list inside it — is the one measured.
+const LISTBOX = ".select-panel[role=listbox], .select-panel [role=listbox]";
+let ax = null;
+await check("search row: in the ACCESSIBILITY TREE the listbox owns only options — 25 of them, no searchbox, no text",
+  async () => { ax = await axTree(LISTBOX); return ax.role === "listbox" && ax.children.length === 25 && ax.children.every((c) => c.role === "option"); },
+  () => JSON.stringify(ax?.children.filter((c) => c.role !== "option").slice(0, 4)));
+await check("search row: ...and the listbox is named for what it lists",
+  () => ax.name === "label", () => `name "${ax?.name}"`);
 await typeText("1");
-check("search row: typing narrows to the labels containing the text, and the \"all\" row steps aside",
-  (await evaluate("rows().join(',')")) === "label 1,label 10,label 11,label 12,label 13,label 14,label 15,label 16,label 17,label 18,label 19,label 21",
-  await evaluate("rows().join(',')"));
-check("search row: the first match is highlighted, pointed at FROM THE BOX (aria-activedescendant)",
-  (await evaluate("activeRow()")) === "label 1");
-check("search row: the side it opened on is kept while the list shrinks under the typing",
-  (await evaluate(`box(panel()).bottom <= box(triggerOf("many")).top + 1 ? "above" : "below"`)) === sideBefore,
-  `opened ${sideBefore}`);
+await check("search row: typing narrows to the labels containing the text, and the \"all\" row steps aside",
+  async () => (await evaluate("rows().join(',')")) === "label 1,label 10,label 11,label 12,label 13,label 14,label 15,label 16,label 17,label 18,label 19,label 21",
+  () => evaluate("rows().join(',')"));
+await check("search row: the first match is highlighted, pointed at FROM THE BOX (aria-activedescendant)",
+  async () => (await evaluate("activeRow()")) === "label 1");
 await press("ArrowDown");
-check("search row: ArrowDown moves through the matches", (await evaluate("activeRow()")) === "label 10");
+await check("search row: ArrowDown moves through the matches", async () => (await evaluate("activeRow()")) === "label 10");
 await typeText("zz");
-check("search row: nothing matching says so", (await evaluate("rows().length")) === 0 &&
-  (await evaluate(`panel().querySelector(".select-empty").getClientRects().length`)) === 1 &&
-  (await evaluate(`panel().querySelector(".select-empty").textContent`)) === "no matches" &&
-  (await evaluate("activeRow()")) === null);
-await evaluate(`(() => { const i = panel().querySelector(".select-search input"); i.value = "label 2";
+await check("search row: nothing matching says so, below the listbox and outside it",
+  async () => (await evaluate("rows().length")) === 0 &&
+    (await evaluate(`drawn(panel().querySelector(".select-empty"))`)) &&
+    (await evaluate(`panel().querySelector(".select-empty").textContent`)) === "no matches" &&
+    (await evaluate(`!listbox().contains(panel().querySelector(".select-empty"))`)) &&
+    (await evaluate("activeRow()")) === null);
+await evaluate(`(() => { const i = searchBox(); i.value = "label 2";
   i.dispatchEvent(new Event("input", { bubbles: true })); })(); null`);
 await press("Enter");
-check("search row: Enter picks the highlighted match",
-  (await evaluate(`document.getElementById("many").value`)) === "l2" &&
-  (await evaluate("log.filter((e) => e.endsWith(':many')).join(',')")) === "input:many,change:many",
-  `value ${await evaluate(`document.getElementById("many").value`)}, log ${await evaluate("log.join(',')")}`);
-check("search row: the query's own keystrokes never reached the page as input/change events",
-  !(await evaluate("log.some((e) => /^(input|change):$/.test(e))")), await evaluate("log.join(',')"));
-check("search row: ...closes, and hands focus back to the trigger",
-  !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement === triggerOf("many")`)));
-await press("7");
-check("search row: a letter typed on the closed trigger opens it AS the search, not a lost key",
-  (await evaluate(`panel()?.querySelector(".select-search input").value`)) === "7" && (await evaluate("rows().join(',')")) === "label 7,label 17");
+await check("search row: Enter picks the highlighted match",
+  async () => (await evaluate(`document.getElementById("many").value`)) === "l2" &&
+    (await evaluate("log.filter((e) => e.endsWith(':many')).join(',')")) === "input:many,change:many",
+  async () => `value ${await evaluate(`document.getElementById("many").value`)}, log ${await evaluate("log.join(',')")}`);
+await check("search row: the query's own keystrokes never reached the page as input/change events",
+  async () => !(await evaluate("log.some((e) => /^(input|change):$/.test(e))")), () => evaluate("log.join(',')"));
+await check("search row: ...closes, and hands focus back to the trigger",
+  async () => !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement === triggerOf("many")`)));
+
+// The value in force matches the query too; the FIRST match must still be the highlight.
+await evaluate(`document.getElementById("many").value = "l12"; document.getElementById("many").dispatchEvent(new Event("change")); null`);
+await click(`triggerOf("many")`);
+await check("search row: [premise] it opens on the value in force", async () => (await evaluate("activeRow()")) === "label 12");
+await typeText("1");
+await check("search row: once anything is typed the FIRST match is the highlight, even when the value in force matches",
+  async () => (await evaluate("activeRow()")) === "label 1", () => evaluate("activeRow()"));
+await press("Enter");
+await check("search row: ...so \"type, Enter\" picks what was narrowed to",
+  async () => (await evaluate(`document.getElementById("many").value`)) === "l1");
+
+// A press on the row's padding — not on the box — must leave focus in the box.
+await click(`triggerOf("many")`);
+await evaluate(`scrollTo(0, 0); null`);
+const row = await evaluate(`box(".select-search")`);
+await pressAt(row.left + 2, row.top + 2);
+await check("search row: a press on the row's PADDING keeps focus in the box — only the box takes a press",
+  async () => (await evaluate(`!!panel() && document.activeElement === searchBox()`)),
+  () => evaluate(`document.activeElement.tagName + "." + document.activeElement.className`));
 await press("Escape");
-check("search row: Escape closes and returns focus to the trigger",
-  !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement === triggerOf("many")`)));
+
+await press("7");
+await check("search row: a letter typed on the closed trigger opens it AS the search, not a lost key",
+  async () => (await evaluate(`searchBox()?.value`)) === "7" && (await evaluate("rows().join(',')")) === "label 7,label 17");
+await press("Escape");
+await check("search row: Escape closes and returns focus to the trigger",
+  async () => !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement === triggerOf("many")`)));
 await click(`triggerOf("few")`);
-check("search row: `data-search` asks for one on a short list too",
-  await evaluate(`!!panel().querySelector(".select-search")`));
+await check("search row: `data-search` asks for one on a short list too", () => evaluate(`!!searchBox()`));
 await press("Tab");
-check("search row: Tab closes it and moves on from the TRIGGER, not from the end of <body>",
-  !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement.id`)) === "after",
-  `focus on ${await evaluate("document.activeElement.id || document.activeElement.tagName")}`);
+await check("search row: Tab closes it and moves on from the TRIGGER, not from the end of <body>",
+  async () => !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement.id`)) === "after",
+  () => evaluate("document.activeElement.id || document.activeElement.tagName"));
+
+// <optgroup>: a GROUP holding its rows, named by its heading — never a heading row in the listbox.
+await click(`triggerOf("grouped")`);
+ax = null;
+await check("optgroup: the listbox owns an option and two GROUPS, each named by its <optgroup> label as written",
+  async () => { ax = await axTree(LISTBOX); return ax.children.map((c) => `${c.role}:${c.name}`).join(",") === "option:default,group:anthropic,group:openai"; },
+  () => ax?.children.map((c) => `${c.role}:${c.name}`).join(","));
+await check("optgroup: ...and each group holds its own options and nothing else (the visible heading is not read twice)",
+  () => ax.children[1]?.children.join(",") === "option,option" && ax.children[2]?.children.join(",") === "option",
+  () => JSON.stringify(ax?.children.slice(1)));
+await typeText("codex");
+await check("optgroup: a group with no row left under the query is not drawn at all",
+  async () => (await evaluate("rows().join(',')")) === "codex" &&
+    (await evaluate(`[...panel().querySelectorAll(".select-optgroup")].map((g) => drawn(g)).join(",")`)) === "false,true");
+await press("Escape");
+
+// Where the list opens is KEPT while the query shrinks it — asserted where re-choosing would move it.
+await evaluate(`mount(\`<div style="position: fixed; left: 20px; top: 440px">
+  <select id="side" data-filter aria-label="label"><option value="">all</option>
+    \${Array.from({ length: 24 }, (_, i) => '<option value="l' + i + '">label ' + i + '</option>').join("")}</select></div>\`);
+  initSelects(); null`);
+await click(`triggerOf("side")`);
+const sideOf = () => evaluate(`box(panel()).bottom <= box(triggerOf("side")).top + 1 ? "above" : "below"`);
+await check("search row: [premise] a long filter this close to the bottom opens ABOVE its trigger", async () => (await sideOf()) === "above");
+await typeText("label 2");
+await check("search row: the side it opened on is KEPT while the list shrinks — though the 5 rows left would now fit below",
+  async () => (await evaluate("rows().length")) === 5 && (await sideOf()) === "above" &&
+    (await evaluate(`box(panel()).height <= innerHeight - box(triggerOf("side")).bottom - 4 - 8`)),
+  async () => `side ${await sideOf()}, rows ${await evaluate("rows().length")}, panel ${await evaluate("box(panel()).height")}px, room below ${await evaluate(`innerHeight - box(triggerOf("side")).bottom - 12`)}px`);
+await press("Escape");
+
+// A row the arrows bring into view lands BELOW the sticky search row, not under it — on a phone too.
+for (const [label, coarse] of [["a mouse", false], ["a coarse pointer (a 53px row)", true]]) {
+  if (coarse) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  await evaluate(`triggerOf("side").focus(); null`);
+  await press("ArrowDown");
+  await evaluate(`panel().scrollTop = panel().scrollHeight; tick()`);
+  await press("ArrowDown");
+  await check(`search row: under ${label}, a row scrolled back into view sits below the search row, not behind it`,
+    () => evaluate(`box(activeRowEl()).top >= box(".select-search").bottom - 0.5`),
+    async () => `row top ${await evaluate("box(activeRowEl()).top")}, search row bottom ${await evaluate(`box(".select-search").bottom`)}`);
+  await press("Escape");
+  if (coarse) await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+}
+
+/* ── the list is placed BEFORE anything scrolls ── */
+
+await evaluate(`mount(\`<select id="far">\${Array.from({ length: 80 }, (_, i) =>
+  "<option" + (i === 70 ? " selected" : "") + ">entry " + i + "</option>").join("")}</select><div style="height: 3000px"></div>\`);
+  initSelects(); scrollTo(0, 0); null`);
+await click(`triggerOf("far")`);
+await check("select: opening on a value far down the list scrolls the LIST to it, never the page",
+  async () => (await evaluate("scrollY")) === 0 && (await evaluate("panel().scrollTop")) > 0 && (await evaluate("activeRow(triggerOf('far'))")) === "entry 70",
+  async () => `page scrollY ${await evaluate("scrollY")}, list scrollTop ${await evaluate("panel().scrollTop")}`);
+await press("Escape");
+await evaluate("scrollTo(0, 0); null");
 
 /* ── a scrolled list stays put ── */
 
@@ -632,10 +967,10 @@ await evaluate(`mount(\`<div style="height: 200px"></div>
 await click(`triggerOf("long")`);
 await evaluate(`panel().scrollTop = 300; tick()`);
 await evaluate(`scrollBy(0, 12); new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)))`);
-check("select: when the PAGE scrolls, an open list follows its trigger and keeps its own scroll",
-  (await evaluate("panel().scrollTop")) === 300 &&
-  near(await evaluate(`box(panel()).top`), await evaluate(`box(triggerOf("long")).bottom + 4`)),
-  `scrollTop ${await evaluate("panel().scrollTop")}`);
+await check("select: when the PAGE scrolls, an open list follows its trigger and keeps its own scroll",
+  async () => (await evaluate("scrollY")) === 12 && (await evaluate("panel().scrollTop")) === 300 &&
+    near(await evaluate(`box(panel()).top`), await evaluate(`box(triggerOf("long")).bottom + 4`)),
+  async () => `page scrollY ${await evaluate("scrollY")}, list scrollTop ${await evaluate("panel().scrollTop")}, list top ${await evaluate("box(panel()).top")}, trigger bottom ${await evaluate(`box(triggerOf("long")).bottom`)}`);
 await press("Escape");
 await evaluate("scrollTo(0, 0); null");
 
@@ -645,11 +980,11 @@ await evaluate(`mount(\`<dialog id="dlg"><select id="indlg" data-filter data-sea
   <option value="">all</option><option value="u">user</option><option value="p">project</option></select></dialog>\`);
   initSelects(); document.getElementById("dlg").showModal(); null`);
 await click(`triggerOf("indlg")`);
-check("dialog: the list opens INSIDE the dialog — the top layer paints over anything on <body>",
-  await evaluate(`panel()?.parentElement === document.getElementById("dlg")`));
+await check("dialog: the list opens INSIDE the dialog — the top layer paints over anything on <body>",
+  () => evaluate(`panel()?.parentElement === document.getElementById("dlg")`));
 await press("Escape");
-check("dialog: Escape in the search row closes the list and NOT the dialog",
-  !(await evaluate("!!panel()")) && (await evaluate(`document.getElementById("dlg").open`)));
+await check("dialog: Escape in the search row closes the list and NOT the dialog",
+  async () => !(await evaluate("!!panel()")) && (await evaluate(`document.getElementById("dlg").open`)));
 await evaluate(`document.getElementById("dlg").close(); null`);
 
 /* ═══ search.js — .search-field ═══════════════════════════════════════════ */
@@ -661,71 +996,100 @@ await evaluate(`mount(\`
     <button type="button" class="search-clear" aria-label="clear search" hidden></button></div>
   <div id="host"><div class="search-field" id="sf3"><input type="search" id="q3" aria-label="in a dialog">
     <button type="button" class="search-clear" aria-label="clear search" hidden></button></div></div>
+  <div class="search-field" id="sfd"><input type="search" id="qd" value="kept" aria-label="switched off" disabled>
+    <button type="button" class="search-clear" aria-label="clear search" hidden></button></div>
+  <div class="search-field" id="sf4"><input type="search" id="q4" value="later" aria-label="switched off later">
+    <button type="button" class="search-clear" aria-label="clear search" hidden></button></div>
+  <div class="search-field" id="sf5"><input type="search" id="q5" aria-label="re-rendered">
+    <button type="button" class="search-clear" aria-label="clear search" hidden></button></div>
+  <button type="button" id="elsewhere">elsewhere</button>
 \`); initSearchFields(); window.escapes = 0;
   document.getElementById("host").addEventListener("keydown", (e) => {
     if (e.key === "Escape") { escapes += 1; window.lastPrevented = e.defaultPrevented; } }); null`);
 
-check("search: a box that already holds a value shows its clear from the start",
-  (await evaluate(`$("#sf2 .search-clear").hidden`)) === false);
-check("search: an empty one does not", (await evaluate(`$("#sf .search-clear").hidden`)) === true);
-check("search: a hidden clear is really not drawn — [hidden] wins over the class's display",
-  (await evaluate(`cs("#sf .search-clear", "display")`)) === "none");
+await check("search: a box that already holds a value shows its clear from the start",
+  async () => (await evaluate(`$("#sf2 .search-clear").hidden`)) === false);
+await check("search: an empty one does not, and a hidden clear is really not drawn",
+  async () => (await evaluate(`$("#sf .search-clear").hidden`)) === true && !(await evaluate(`drawn("#sf .search-clear")`)));
 await click(`$("#q")`);
 await typeText("abc");
-check("search: typing shows the clear", (await evaluate(`$("#sf .search-clear").hidden`)) === false);
+await check("search: typing shows the clear", async () => (await evaluate(`$("#sf .search-clear").hidden`)) === false);
 await evaluate("log.length = 0; null");
 await click(`$("#sf .search-clear")`);
-check("search: the clear empties the box", (await evaluate(`$("#q").value`)) === "");
-check("search: ...as a person would: input, then change, from the input, bubbling",
-  (await evaluate("log.join(',')")) === "input:q,change:q", await evaluate("log.join(',')"));
-check("search: ...hides itself and leaves focus in the box",
-  (await evaluate(`$("#sf .search-clear").hidden`)) === true && (await evaluate(`document.activeElement.id`)) === "q");
+await check("search: the clear empties the box", async () => (await evaluate(`$("#q").value`)) === "");
+await check("search: ...as a person would: input, then change, from the input, bubbling",
+  async () => (await evaluate("log.join(',')")) === "input:q,change:q", () => evaluate("log.join(',')"));
+await check("search: ...hides itself and leaves focus in the box",
+  async () => (await evaluate(`$("#sf .search-clear").hidden`)) === true && (await evaluate(`document.activeElement.id`)) === "q");
+
+// Focus goes back BEFORE the events: a handler that moves focus on purpose keeps it where it put it.
+await evaluate(`$("#q5").addEventListener("change", () => $("#elsewhere").focus()); null`);
+await click(`$("#q5")`);
+await typeText("abc");
+await click(`$("#sf5 .search-clear")`);
+await check("search: a change handler that moves focus keeps it there — the clear focuses the box BEFORE dispatching",
+  async () => (await evaluate(`document.activeElement.id`)) === "elsewhere", () => evaluate("document.activeElement.id"));
+
+await check("search: a DISABLED box holding a query shows its clear, and the clear is disabled too",
+  async () => (await evaluate(`$("#sfd .search-clear").hidden`)) === false && (await evaluate(`$("#sfd .search-clear").disabled`)) === true);
+await evaluate("log.length = 0; null");
+await click(`$("#sfd .search-clear")`);
+await check("search: ...a press on it clears nothing and fires nothing",
+  async () => (await evaluate(`$("#qd").value`)) === "kept" && (await evaluate("log.length")) === 0,
+  async () => `value "${await evaluate(`$("#qd").value`)}", log ${await evaluate("log.join(',')")}`);
+await check("search: ...and it looks it: .45, no pointer",
+  async () => (await evaluate(`cs("#sfd .search-clear", "opacity")`)) === "0.45" && (await evaluate(`cs("#sfd .search-clear", "cursor")`)) === "default");
+await evaluate(`$("#q4").disabled = true; tick()`);
+await check("search: a box switched off AFTER it was drawn takes its clear with it",
+  async () => (await evaluate(`$("#sf4 .search-clear").disabled`)) === true);
+await evaluate(`$("#q4").disabled = false; tick()`);
+await check("search: ...and back on again", async () => (await evaluate(`$("#sf4 .search-clear").disabled`)) === false);
 
 await click(`$("#q3")`);
 await typeText("x");
 await evaluate("log.length = 0; null");
 await press("Escape");
-check("search: Escape in a FILLED box clears it", (await evaluate(`$("#q3").value`)) === "" &&
-  (await evaluate("log.join(',')")) === "input:q3,change:q3");
-check("search: ...and goes no further — the dialog around it never hears the key",
-  (await evaluate("escapes")) === 0);
+await check("search: Escape in a FILLED box clears it",
+  async () => (await evaluate(`$("#q3").value`)) === "" && (await evaluate("log.join(',')")) === "input:q3,change:q3");
+await check("search: ...and goes no further — the dialog around it never hears the key",
+  async () => (await evaluate("escapes")) === 0);
 await press("Escape");
-check("search: Escape in an EMPTY box does nothing, so it reaches the dialog",
-  (await evaluate("escapes")) === 1 && (await evaluate(`$("#q3").value`)) === "");
+await check("search: Escape in an EMPTY box does nothing, so it reaches the dialog",
+  async () => (await evaluate("escapes")) === 1 && (await evaluate(`$("#q3").value`)) === "");
 await evaluate(`$("#q3").setAttribute("aria-expanded", "true"); null`);
 await typeText("y");
 await press("Escape");
-check("search: an OPEN autocomplete keeps its Escape — it reaches the page, not prevented, to dismiss the list",
-  (await evaluate("escapes")) === 2 && (await evaluate("lastPrevented")) === false);
+await check("search: an OPEN autocomplete keeps its Escape — it reaches the page, not prevented, to dismiss the list",
+  async () => (await evaluate("escapes")) === 2 && (await evaluate("lastPrevented")) === false);
 await evaluate(`$("#q3").removeAttribute("aria-expanded"); null`);
 
 // The pending line: markPending at t=0 and t=250 with ms=400 → still pending at t≈500 (the first
 // call alone would have expired at 400), gone by t≈800 (400 after the second).
 await evaluate(`window.t0 = performance.now(); markPending($("#sf"), 400); null`);
-check("pending: markPending marks the field and gives the line its duration",
-  (await evaluate(`$("#sf").hasAttribute("data-pending")`)) &&
-  (await evaluate(`$("#sf").style.getPropertyValue("--pending-ms")`)) === "400ms");
-check("pending: the line is the dd-drain animation, over exactly that long",
-  (await evaluate(`cs("#sf", "animation-name", "::after")`)) === "dd-drain" &&
-  (await evaluate(`cs("#sf", "animation-duration", "::after")`)) === "0.4s");
+await check("pending: markPending marks the field and gives the line its duration",
+  async () => (await evaluate(`$("#sf").hasAttribute("data-pending")`)) &&
+    (await evaluate(`$("#sf").style.getPropertyValue("--pending-ms")`)) === "400ms");
+await check("pending: the line is the dd-drain animation, over exactly that long",
+  async () => (await evaluate(`cs("#sf", "animation-name", "::after")`)) === "dd-drain" &&
+    (await evaluate(`cs("#sf", "animation-duration", "::after")`)) === "0.4s");
 await evaluate("new Promise((r) => setTimeout(r, 250))");
 await evaluate(`markPending($("#q"), 400); null`); // anything inside the field will do
 await evaluate(`new Promise((r) => setTimeout(r, Math.max(0, 500 - (performance.now() - t0))))`);
-check("pending: each call RESTARTS it — still pending past the first call's deadline",
-  await evaluate(`$("#sf").hasAttribute("data-pending")`));
+await check("pending: each call RESTARTS it — still pending past the first call's deadline",
+  () => evaluate(`$("#sf").hasAttribute("data-pending")`));
 await evaluate(`new Promise((r) => setTimeout(r, Math.max(0, 800 - (performance.now() - t0))))`);
-check("pending: ...and it settles `ms` after the LAST call", !(await evaluate(`$("#sf").hasAttribute("data-pending")`)));
+await check("pending: ...and it settles `ms` after the LAST call", async () => !(await evaluate(`$("#sf").hasAttribute("data-pending")`)));
 await evaluate(`markPending($("#sf2"), 5000); null`);
 await click(`$("#sf2 .search-clear")`);
-check("pending: clearing the box settles it at once — the pending query was thrown away",
-  !(await evaluate(`$("#sf2").hasAttribute("data-pending")`)));
+await check("pending: clearing the box settles it at once — the pending query was thrown away",
+  async () => !(await evaluate(`$("#sf2").hasAttribute("data-pending")`)));
 await evaluate(`document.documentElement.classList.add("anim-off"); markPending($("#sf"), 400); null`);
-check("pending: html.anim-off stops the drain (the line just stands)",
-  (await evaluate(`cs("#sf", "animation-name", "::after")`)) === "none");
+await check("pending: html.anim-off stops the drain (the line just stands)",
+  async () => (await evaluate(`cs("#sf", "animation-name", "::after")`)) === "none");
 await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
 await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
-check("pending: prefers-reduced-motion stops it too",
-  (await evaluate(`cs("#sf", "animation-name", "::after")`)) === "none");
+await check("pending: prefers-reduced-motion stops it too",
+  async () => (await evaluate(`cs("#sf", "animation-name", "::after")`)) === "none");
 await send("Emulation.setEmulatedMedia", { features: [] });
 
 /* ═══ sort.js — .sort-ctl ═════════════════════════════════════════════════ */
@@ -736,32 +1100,32 @@ await evaluate(`mount(\`
     <select data-sort aria-label="sort by" id="sortby"><option value="name">name</option><option value="updated">updated</option></select>
   </div>\`); initSelects(); initSortControls(); null`);
 
-check("sort: the arrow is named by what pressing it WILL do — an authored label is brought in line",
-  (await evaluate(`$(".sort-dir").getAttribute("aria-label")`)) === "sort descending");
+await check("sort: the arrow is named by what pressing it WILL do — an authored label is brought in line",
+  async () => (await evaluate(`$(".sort-dir").getAttribute("aria-label")`)) === "sort descending");
 const up = await evaluate(`probe("var(--ico-arrow-up)", "mask-image")`);
 const down = await evaluate(`probe("var(--ico-arrow-down)", "mask-image")`);
-check("sort: ascending shows the up arrow", (await evaluate(`cs(".sort-dir", "mask-image", "::before")`)) === up);
+await check("sort: ascending shows the up arrow", async () => (await evaluate(`cs(".sort-dir", "mask-image", "::before")`)) === up);
 await evaluate("log.length = 0; null");
 await click(`$(".sort-dir")`);
-check("sort: a press flips the direction", (await evaluate(`$(".sort-dir").dataset.dir`)) === "desc");
-check("sort: ...renames the button for the NEXT press", (await evaluate(`$(".sort-dir").getAttribute("aria-label")`)) === "sort ascending");
-check("sort: ...shows the down arrow", (await evaluate(`cs(".sort-dir", "mask-image", "::before")`)) === down);
-check("sort: ...and says so once: sortchange { field, dir } on the .sort-ctl",
-  (await evaluate("log.join(',')")) === "sortchange:sc:name/desc", await evaluate("log.join(',')"));
+await check("sort: a press flips the direction", async () => (await evaluate(`$(".sort-dir").dataset.dir`)) === "desc");
+await check("sort: ...renames the button for the NEXT press", async () => (await evaluate(`$(".sort-dir").getAttribute("aria-label")`)) === "sort ascending");
+await check("sort: ...shows the down arrow", async () => (await evaluate(`cs(".sort-dir", "mask-image", "::before")`)) === down);
+await check("sort: ...and says so once: sortchange { field, dir } on the .sort-ctl",
+  async () => (await evaluate("log.join(',')")) === "sortchange:sc:name/desc", () => evaluate("log.join(',')"));
 await evaluate(`log.length = 0; triggerOf("sortby").focus(); null`);
 await press("ArrowDown"); await press("ArrowDown"); await press("Enter");
-check("sort: picking a field is ONE sortchange carrying the new field and the direction in force",
-  (await evaluate("log.filter((e) => e.startsWith('sortchange')).join(',')")) === "sortchange:sc:updated/desc",
-  await evaluate("log.join(',')"));
+await check("sort: picking a field is ONE sortchange carrying the new field and the direction in force",
+  async () => (await evaluate("log.filter((e) => e.startsWith('sortchange')).join(',')")) === "sortchange:sc:updated/desc",
+  () => evaluate("log.join(',')"));
 await evaluate(`$("#sc").addEventListener("sortchange", (e) => {
   if (e.detail.field === "name") $(".sort-dir").dataset.dir = "asc"; }, { once: true }); null`);
 await evaluate(`triggerOf("sortby").focus(); null`);
 await press("ArrowDown"); await press("Home"); await press("Enter");
 await evaluate("tick()");
-check("sort: a page that resets the direction from its handler gets the label for free",
-  (await evaluate(`$(".sort-dir").dataset.dir`)) === "asc" &&
-  (await evaluate(`$(".sort-dir").getAttribute("aria-label")`)) === "sort descending");
-check("sort: the two halves share one edge", await evaluate(
+await check("sort: a page that resets the direction from its handler gets the label for free",
+  async () => (await evaluate(`$(".sort-dir").dataset.dir`)) === "asc" &&
+    (await evaluate(`$(".sort-dir").getAttribute("aria-label")`)) === "sort descending");
+await check("sort: the two halves share one edge", () => evaluate(
   `Math.abs(box(".sort-dir").right - 1 - box(triggerOf("sortby").parentElement).left) <= 0.5`));
 
 /* ═══ filters.css — the boxes ═════════════════════════════════════════════ */
@@ -772,9 +1136,12 @@ await evaluate(`mount(\`
       <button type="button" class="search-clear" aria-label="clear search"></button></div>
     <span class="filter-bar-spacer"></span>
     <select data-filter aria-label="source" id="bsrc"><option value="">all</option><option value="s" selected>seedr</option></select>
+    <select data-filter data-search aria-label="scope" id="bscope"><option value="">all</option><option value="u">user</option></select>
     <div class="sort-ctl btn-group" role="group" aria-label="sort"><button type="button" class="sort-dir" data-dir="asc"></button>
       <select data-sort aria-label="sort by" id="bsort"><option>name</option></select></div>
   </search>
+  <div class="search-field" id="esf"><input type="search" id="eq" aria-label="empty"><button type="button" class="search-clear" aria-label="clear search" hidden></button></div>
+  <div class="search-field" id="isf"><input type="search" id="iq" aria-label="bad query" aria-invalid="true" value="((("><button type="button" class="search-clear" aria-label="clear search"></button></div>
   <div class="chip-set" role="group" aria-label="tags">
     <button type="button" class="chip" id="c-all" aria-pressed="true">all</button>
     <button type="button" class="chip" id="c-off" aria-pressed="false">#agents <span class="chip-count">12</span></button>
@@ -782,127 +1149,359 @@ await evaluate(`mount(\`
     <button type="button" class="chip" id="c-dis" aria-pressed="false" disabled>disabled</button>
     <button type="button" class="chip" id="c-pc" aria-pressed="true">#infra <span class="chip-count">31</span></button>
   </div>
-  <div class="filter-chips"><button type="button" class="chip chip--remove" id="c-rm" aria-label="remove filter source: seedr"><span class="chip-key">source:</span> seedr</button></div>
+  <div class="filter-chips" role="group" aria-label="in force"><button type="button" class="chip chip--remove" id="c-rm" aria-label="remove filter source: seedr"><span class="chip-key">source:</span> seedr</button></div>
   <button type="button" class="value-filter" id="vf" aria-label="filter by source: official">official</button>
   <input type="search" id="stray" aria-label="a bare search input, outside any .search-field">
 \`); initSelects(); initSearchFields(); initSortControls(); null`);
 
 const h = (expression) => evaluate(`box(${expression}).height`);
 await park();
-check("css: the search box, the filter trigger and its clear are --control-h (28px) tall",
-  (await h(`"#bq"`)) === 28 && (await h(`triggerOf("bsrc")`)) === 28 && (await h(`clearOf("bsrc")`)) === 28,
-  [await h(`"#bq"`), await h(`triggerOf("bsrc")`), await h(`clearOf("bsrc")`)].join("/"));
+await check("css: the search box, the filter trigger and its clear are --control-h (28px) tall",
+  async () => (await h(`"#bq"`)) === 28 && (await h(`triggerOf("bsrc")`)) === 28 && (await h(`clearOf("bsrc")`)) === 28,
+  async () => [await h(`"#bq"`), await h(`triggerOf("bsrc")`), await h(`clearOf("bsrc")`)].join("/"));
 // The sort pair is one row: its arrow stretches to the field beside it. The FIELD's own height is
 // the plain select's (components.css), so this asserts the join; the arrow's 28px alone is asserted
 // on the bare page below.
-check("css: the direction button and its field stand at one height",
-  (await h(`".sort-dir"`)) === (await h(`triggerOf("bsort")`)),
-  [await h(`".sort-dir"`), await h(`triggerOf("bsort")`)].join("/"));
-check("css: the clear and the direction button are 1.5rem wide",
-  (await evaluate(`box(clearOf("bsrc")).width`)) === 24 && (await evaluate(`box(".sort-dir").width`)) === 24);
-check("css: no corner is rounded, on any control or its glyphs",
-  await evaluate(`[...document.querySelectorAll("#mount *")].every((e) =>
-    ["", "::before", "::after"].every((p) => getComputedStyle(e, p || null).borderTopLeftRadius === "0px"))`));
-check("css: the search box's edge is --control-edge, not the --border hairline",
-  (await evaluate(`cs("#bq", "border-top-color")`)) === edge);
-check("css: the box keeps its text clear of the magnifier and the clear (2rem each side)",
-  (await evaluate(`cs("#bq", "padding-left")`)) === "32px" && (await evaluate(`cs("#bq", "padding-right")`)) === "32px");
-check("css: the magnifier sits inside the box, centred on it",
-  await evaluate(`(() => { const f = box("#bsf"), g = getComputedStyle($("#bsf"), "::before");
-    return g.position === "absolute" && g.width === "14px" && g.insetInlineStart === "10px"; })()`));
-check("css: a bare input[type=search] outside a .search-field is untouched by this file",
-  (await evaluate(`cs("#stray", "padding-left")`)) !== "32px");
+await check("css: the direction button and its field stand at one height",
+  async () => (await h(`".sort-dir"`)) === (await h(`triggerOf("bsort")`)),
+  async () => [await h(`".sort-dir"`), await h(`triggerOf("bsort")`)].join("/"));
+await check("css: the clear and the direction button are 1.5rem wide",
+  async () => (await evaluate(`box(clearOf("bsrc")).width`)) === 24 && (await evaluate(`box(".sort-dir").width`)) === 24);
+await click(`triggerOf("bscope")`);
+await check("css: no corner is rounded — all four, on every control, its glyphs, and an open list with its search row",
+  () => evaluate(`[...document.querySelectorAll("#mount *, .select-panel, .select-panel *")].every((e) =>
+    ["", "::before", "::after"].every((p) => { const s = getComputedStyle(e, p || null);
+      return [s.borderTopLeftRadius, s.borderTopRightRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius].every((v) => v === "0px"); }))`),
+  () => evaluate(`[...document.querySelectorAll("#mount *, .select-panel, .select-panel *")].flatMap((e) =>
+    ["", "::before", "::after"].map((p) => { const s = getComputedStyle(e, p || null);
+      const v = [s.borderTopLeftRadius, s.borderTopRightRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius];
+      return v.every((x) => x === "0px") ? null : (e.id || e.className) + p + " " + v.join(" "); })).filter(Boolean).slice(0, 3).join("; ")`));
+await press("Escape");
+await check("css: the search box's edge is --control-edge, not the --border hairline",
+  async () => (await evaluate(`cs("#bq", "border-top-color")`)) === edge);
+await check("css: the box keeps its text clear of the magnifier and the clear (2rem each side)",
+  async () => (await evaluate(`cs("#bq", "padding-left")`)) === "32px" && (await evaluate(`cs("#bq", "padding-right")`)) === "32px");
+await check("css: the magnifier sits inside the box, 10px in — and centred on it vertically",
+  () => evaluate(`(() => { const f = box("#bsf"), i = box("#bq"), g = getComputedStyle($("#bsf"), "::before");
+    const middle = f.top + parseFloat(g.top) + parseFloat(g.height) / 2;
+    return g.position === "absolute" && g.width === "14px" && g.insetInlineStart === "10px"
+      && Math.abs(middle - (i.top + i.height / 2)) <= 0.5; })()`),
+  () => evaluate(`(() => { const f = box("#bsf"), i = box("#bq"), g = getComputedStyle($("#bsf"), "::before");
+    return "glyph middle " + (f.top + parseFloat(g.top) + parseFloat(g.height) / 2) + ", box middle " + (i.top + i.height / 2); })()`));
+await check("css: a bare input[type=search] outside a .search-field is untouched by this file",
+  async () => (await evaluate(`cs("#stray", "padding-left")`)) !== "32px");
 
-await force("#bq", ["focus-visible"]);
-check("css: focus on the search box is ONE box — a 2px --ring outline 2px out, and a --primary edge",
-  (await evaluate(`cs("#bq", "outline-style")`)) === "solid" && (await evaluate(`cs("#bq", "outline-width")`)) === "2px" &&
-  (await evaluate(`cs("#bq", "outline-offset")`)) === "2px" &&
-  (await evaluate(`cs("#bq", "outline-color")`)) === (await evaluate(`probe("var(--ring)")`)) &&
-  (await evaluate(`cs("#bq", "border-top-color")`)) === primary &&
-  (await evaluate(`cs("#bsf", "outline-style")`)) === "none");
-await force("#bq", []);
-for (const [label, selector] of [["the clear", "#bsf .search-clear"], ["the filter clear", ".filter-dd .filter-clear"],
-  ["the filter trigger", ".select-trigger--filter"], ["the direction button", ".sort-dir"], ["a chip", "#c-off"],
-  ["a value filter", "#vf"]]) {
-  await force(selector, ["focus-visible"]);
-  check(`css: ${label} takes the 2px --ring focus ring`,
-    (await evaluate(`cs(${JSON.stringify(selector)}, "outline-width")`)) === "2px" &&
-    (await evaluate(`cs(${JSON.stringify(selector)}, "outline-color")`)) === (await evaluate(`probe("var(--ring)")`)));
-  await force(selector, []);
-}
+const destructive = await evaluate(`probe("var(--destructive)")`);
+await check("css: an INVALID search box wears the --destructive edge at rest…",
+  async () => (await evaluate(`cs("#iq", "border-top-color")`)) === destructive, () => evaluate(`cs("#iq", "border-top-color")`));
+await force("#iq", ["hover"]);
+await check("css: …under the pointer…", async () => (await evaluate(`cs("#iq", "border-top-color")`)) === destructive);
+await force("#iq", ["focus-visible"]);
+await check("css: …and in focus, where the ring is still --ring",
+  async () => (await evaluate(`cs("#iq", "border-top-color")`)) === destructive &&
+    (await evaluate(`cs("#iq", "outline-color")`)) === (await evaluate(`probe("var(--ring)")`)));
+await force("#iq", []);
+
 await force(".sort-dir", ["hover"]);
-check("css: hovering the direction button lights its edge and a 12% --primary tint",
-  (await evaluate(`cs(".sort-dir", "border-top-color")`)) === primary &&
-  (await evaluate(`cs(".sort-dir", "background-color")`)) === (await evaluate(`probe("color-mix(in srgb, var(--primary) 12%, transparent)", "background-color")`)));
+await check("css: hovering the direction button lights its edge and a 12% --primary tint",
+  async () => (await evaluate(`cs(".sort-dir", "border-top-color")`)) === primary &&
+    (await evaluate(`cs(".sort-dir", "background-color")`)) === tint);
 await force(".sort-dir", []);
 
-check("css: a pressed chip is --primary, bold, on a 12% --primary fill",
-  (await evaluate(`cs("#c-all", "color")`)) === primary && (await evaluate(`cs("#c-all", "font-weight")`)) === "700" &&
-  (await evaluate(`cs("#c-all", "background-color")`)) === (await evaluate(`probe("color-mix(in srgb, var(--primary) 12%, transparent)", "background-color")`)));
-check("css: an unpressed chip is muted, regular weight, on the --border hairline",
-  (await evaluate(`cs("#c-off", "color")`)) === (await evaluate(`probe("var(--muted-foreground)")`)) &&
-  (await evaluate(`cs("#c-off", "font-weight")`)) === "400" &&
-  (await evaluate(`cs("#c-off", "border-top-color")`)) === (await evaluate(`probe("var(--border)")`)));
-check("css: a count inside a PRESSED chip takes the chip's ink — muted on the 12% fill fails AA",
-  (await evaluate(`cs("#c-pc .chip-count", "color")`)) === primary &&
-  (await evaluate(`cs("#c-off .chip-count", "color")`)) === (await evaluate(`probe("var(--muted-foreground)")`)));
+/*
+ * WHICH OF TWO JOINED CONTROLS IS ON TOP, asserted as PIXELS. The trigger holds keyboard focus; its
+ * ring's right band lies 2-4px past its edge, which is inside the clear it is joined to. Hovering the
+ * clear lifts it — and it must not be lifted above the child that holds focus.
+ *
+ * The clear's own hover fill is a 12% tint of the ring's own hue: painted over the ring it moves the
+ * pixel by ONE unit (measured on the unfixed code), too little to trust. So for this measurement the
+ * hovered clear is dyed an opaque colour nothing else uses — the question is the stacking order, and
+ * a dye makes it visible.
+ */
+await evaluate(`document.head.insertAdjacentHTML("beforeend",
+  '<style id="dye">.filter-dd > .filter-clear:hover { background: rgb(0, 255, 0) !important; }</style>'); null`);
+await evaluate(`$("#bsf .search-clear").focus(); null`);
+await press("Tab");
+await park();
+await check("css: [premise] the filter trigger holds KEYBOARD focus (:focus-visible), its clear showing",
+  () => evaluate(`document.activeElement === triggerOf("bsrc") && triggerOf("bsrc").matches(":focus-visible") && drawn(clearOf("bsrc"))`));
+const ringAt = await evaluate(`(() => { const t = box(triggerOf("bsrc")), c = box(clearOf("bsrc"));
+  const x = Math.round(t.right) + 3, y = Math.round(t.top + t.height / 2);
+  return { x, y, inClear: x > c.left && x < c.right }; })()`);
+const ringAlone = await pixel(ringAt.x, ringAt.y);
+await hover(`clearOf("bsrc")`);
+const ringHovered = await pixel(ringAt.x, ringAt.y);
+await check("css: a HOVERED clear does not paint over the focused trigger's ring (.btn-group lifts focus above hover)",
+  () => ringAt.inClear && ringHovered === ringAlone && ringAlone !== "rgb(0, 255, 0)",
+  () => `ring pixel ${ringAlone} alone, ${ringHovered} with the clear hovered (x in clear: ${ringAt.inClear})`);
+await park();
+await evaluate(`document.getElementById("dye").remove(); null`);
+
+await check("css: a pressed chip is --primary, bold, on a 12% --primary fill",
+  async () => (await evaluate(`cs("#c-all", "color")`)) === primary && (await evaluate(`cs("#c-all", "font-weight")`)) === "700" &&
+    (await evaluate(`cs("#c-all", "background-color")`)) === tint);
+await check("css: an unpressed chip is muted, regular weight, on the --border hairline",
+  async () => (await evaluate(`cs("#c-off", "color")`)) === muted &&
+    (await evaluate(`cs("#c-off", "font-weight")`)) === "400" &&
+    (await evaluate(`cs("#c-off", "border-top-color")`)) === (await evaluate(`probe("var(--border)")`)));
+await check("css: a count inside a PRESSED chip takes the chip's ink — muted on the 12% fill fails AA",
+  async () => (await evaluate(`cs("#c-pc .chip-count", "color")`)) === primary &&
+    (await evaluate(`cs("#c-off .chip-count", "color")`)) === muted);
 // Rest BEFORE the forced hover: clearing a FORCED pseudo-state does not restyle descendants keyed
 // on it (measured — `.chip--remove:hover .chip-key` kept its hover ink with :hover false), which is
 // a DevTools artifact, not the page's behaviour.
-check("css: the key of a remove chip at rest is muted", (await evaluate(`cs("#c-rm .chip-key", "color")`)) ===
-  (await evaluate(`probe("var(--muted-foreground)")`)));
+await check("css: the key of a remove chip at rest is muted", async () => (await evaluate(`cs("#c-rm .chip-key", "color")`)) === muted);
 await force("#c-rm", ["hover"]);
-check("css: ...and on the hovered remove chip's fill it takes the chip's ink",
-  (await evaluate(`cs("#c-rm .chip-key", "color")`)) === primary);
+await check("css: ...and on the hovered remove chip's fill it takes the chip's ink",
+  async () => (await evaluate(`cs("#c-rm .chip-key", "color")`)) === primary);
 await force("#c-rm", []);
-check("css: a row of in-force chips hidden with the attribute is really hidden",
-  (await evaluate(`($(".filter-chips").hidden = true, cs(".filter-chips", "display"))`)) === "none");
-check("css: an identity chip takes its --chip-accent instead of --primary",
-  (await evaluate(`cs("#c-id", "color")`)) === "rgb(0, 128, 0)" && (await evaluate(`cs("#c-id", "border-top-color")`)) === "rgb(0, 128, 0)");
+await check("css: an identity chip takes its --chip-accent instead of --primary",
+  async () => (await evaluate(`cs("#c-id", "color")`)) === "rgb(0, 128, 0)" && (await evaluate(`cs("#c-id", "border-top-color")`)) === "rgb(0, 128, 0)");
+await check("css: a remove chip is --primary with its × after the label",
+  async () => (await evaluate(`cs("#c-rm", "color")`)) === primary &&
+    (await evaluate(`cs("#c-rm", "mask-image", "::after")`)) === (await evaluate(`probe("var(--ico-x)", "mask-image")`)));
+
+await send("Emulation.setEmulatedMedia", { media: "print" });
+await check("print: a search box holding NO query does not print — its clear is hidden exactly then",
+  async () => (await evaluate(`cs("#esf", "display")`)) === "none");
+await check("print: ...one holding a query prints, without its clear",
+  async () => (await evaluate(`cs("#bsf", "display")`)) !== "none" && (await evaluate(`cs("#bsf .search-clear", "display")`)) === "none");
+await check("print: a filtering trigger still prints its value; the clear beside it does not",
+  async () => (await evaluate(`drawn(triggerOf("bsrc"))`)) && (await evaluate(`cs(clearOf("bsrc"), "display")`)) === "none");
+await send("Emulation.setEmulatedMedia", { media: "" });
+
 await evaluate(`$("#bsrc").disabled = true; tick()`);
-check("css: disabled is .45 opacity (chip, and a disabled filter trigger)",
-  (await evaluate(`cs("#c-dis", "opacity")`)) === "0.45" &&
-  (await evaluate(`cs(triggerOf("bsrc"), "opacity")`)) === "0.45");
-check("css: a remove chip is --primary with its × after the label",
-  (await evaluate(`cs("#c-rm", "color")`)) === primary &&
-  (await evaluate(`cs("#c-rm", "mask-image", "::after")`)) === (await evaluate(`probe("var(--ico-x)", "mask-image")`)));
+await check("css: disabled is .45 opacity (chip, and a disabled filter trigger)",
+  async () => (await evaluate(`cs("#c-dis", "opacity")`)) === "0.45" &&
+    (await evaluate(`cs(triggerOf("bsrc"), "opacity")`)) === "0.45");
 
 // Touch emulation is what makes (pointer: coarse) match; setEmulatedMedia accepts the feature and
 // changes nothing (measured).
 await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
-check("css: under a coarse pointer every control is at least 44px",
-  (await h(`"#bq"`)) >= 44 && (await h(`clearOf("bsrc")`)) >= 44 && (await h(`".sort-dir"`)) >= 44 &&
-  (await h(`"#c-off"`)) >= 44 && (await evaluate(`box(".sort-dir").width`)) >= 44,
-  [await h(`"#bq"`), await h(`clearOf("bsrc")`), await h(`".sort-dir"`), await h(`"#c-off"`)].join("/"));
+await check("css: under a coarse pointer every control is at least 44px",
+  async () => (await h(`"#bq"`)) >= 44 && (await h(`clearOf("bsrc")`)) >= 44 && (await h(`".sort-dir"`)) >= 44 &&
+    (await h(`"#c-off"`)) >= 44 && (await evaluate(`box(".sort-dir").width`)) >= 44,
+  async () => [await h(`"#bq"`), await h(`clearOf("bsrc")`), await h(`".sort-dir"`), await h(`"#c-off"`)].join("/"));
 await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 
 await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 700, deviceScaleFactor: 1, mobile: false });
-check("css: on a phone the search takes the bar's whole first row and the spacer is gone",
-  near(await evaluate(`box("#bsf").width`), await evaluate(`box("#bar").width`)) &&
-  (await evaluate(`cs(".filter-bar-spacer", "display")`)) === "none",
-  `${await evaluate(`box("#bsf").width`)} of ${await evaluate(`box("#bar").width`)}`);
+await check("css: on a phone the search takes the bar's whole first row and the spacer is gone",
+  async () => near(await evaluate(`box("#bsf").width`), await evaluate(`box("#bar").width`)) &&
+    (await evaluate(`cs(".filter-bar-spacer", "display")`)) === "none",
+  async () => `${await evaluate(`box("#bsf").width`)} of ${await evaluate(`box("#bar").width`)}`);
 await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
+
+/* ── load order: filters.css FIRST, components.css after it ── */
+
+await open("/reversed");
+await check("css: the filter trigger does not depend on load order — filters.css first, it is still 28px on .3rem",
+  async () => (await evaluate(`box(triggerOf("rsrc")).height`)) === 28 && (await evaluate(`cs(triggerOf("rsrc"), "padding-top")`)) === "4.8px",
+  async () => `${await evaluate(`box(triggerOf("rsrc")).height`)}px, padding-top ${await evaluate(`cs(triggerOf("rsrc"), "padding-top")`)}`);
 
 /* ── self-sufficient: tokens.css + filters.css and nothing else ── */
 
 await open("/bare");
-check("bare: the search box still has its whole box — 28px, 1px --control-edge, border-box, the page's font",
-  (await evaluate(`box("#q").height`)) === 28 && (await evaluate(`cs("#q", "border-top-width")`)) === "1px" &&
-  (await evaluate(`cs("#q", "border-top-color")`)) === (await evaluate(`probe("var(--control-edge)")`)) &&
-  (await evaluate(`cs("#q", "box-sizing")`)) === "border-box" &&
-  (await evaluate(`cs("#q", "font-family")`)) === (await evaluate(`cs("body", "font-family")`)));
-check("bare: the chip, the direction button and the clear keep theirs",
-  (await evaluate(`box("#chip").height`)) === 24 && (await evaluate(`cs("#chip", "border-top-width")`)) === "1px" &&
-  (await evaluate(`box("#dir").height`)) === 28 && (await evaluate(`box("#dir").width`)) === 24 &&
-  (await evaluate(`box("#clr").height`)) === 28 && (await evaluate(`cs("#chip", "font-family")`)) === (await evaluate(`cs("body", "font-family")`)));
-check("bare: no user-agent button chrome survives (no UA padding, no UA grey fill)",
-  (await evaluate(`["#dir", "#clr", "#vf"].every((s) => cs(s, "padding-top") === "0px")`)) &&
-  (await evaluate(`["#chip", "#dir", "#clr", "#vf"].every((s) => cs(s, "background-color") === "rgba(0, 0, 0, 0)")`)));
-await force("#chip", ["focus-visible"]);
-check("bare: focus is still the 2px ring, with no base.css to supply one",
-  (await evaluate(`cs("#chip", "outline-width")`)) === "2px" && (await evaluate(`cs("#chip", "outline-style")`)) === "solid");
+await check("bare: the search box still has its whole box — 28px, 1px --control-edge, border-box",
+  async () => (await evaluate(`box("#q").height`)) === 28 && (await evaluate(`cs("#q", "border-top-width")`)) === "1px" &&
+    (await evaluate(`cs("#q", "border-top-color")`)) === (await evaluate(`probe("var(--control-edge)")`)) &&
+    (await evaluate(`cs("#q", "box-sizing")`)) === "border-box");
+await check("bare: the chip, the direction button and the clear keep theirs",
+  async () => (await evaluate(`box("#chip").height`)) === 24 && (await evaluate(`cs("#chip", "border-top-width")`)) === "1px" &&
+    (await evaluate(`box("#dir").height`)) === 28 && (await evaluate(`box("#dir").width`)) === 24 &&
+    (await evaluate(`box("#clr").height`)) === 28);
+await check("bare: no user-agent button chrome survives (no UA padding, no UA grey fill)",
+  async () => (await evaluate(`["#dir", "#clr", "#vf", "#sclr"].every((s) => cs(s, "padding-top") === "0px")`)) &&
+    (await evaluate(`["#chip", "#dir", "#clr", "#vf", "#sclr"].every((s) => cs(s, "background-color") === "rgba(0, 0, 0, 0)")`)));
+for (const selector of ["#q", "#sclr", "#clr", "#dir", "#chip", "#link", "#vf"]) {
+  await check(`bare: ${selector} is in the page's font — family AND size (a lost \`font: inherit\` is Arial 13.33px)`,
+    () => evaluate(`cs(${JSON.stringify(selector)}, "font-family") === cs("body", "font-family") && cs(${JSON.stringify(selector)}, "font-size") === cs("body", "font-size")`),
+    () => evaluate(`cs(${JSON.stringify(selector)}, "font-family") + " " + cs(${JSON.stringify(selector)}, "font-size") + " vs " + cs("body", "font-family") + " " + cs("body", "font-size")`));
+}
+await check("bare: a filter bar's separator draws itself — 1px wide, 1.5rem tall, on --border",
+  async () => (await evaluate(`box("#sep").width`)) === 1 && (await evaluate(`box("#sep").height`)) === 24 &&
+    (await evaluate(`cs("#sep", "background-color")`)) === (await evaluate(`probe("var(--border)", "background-color")`)),
+  async () => `${await evaluate(`box("#sep").width`)}x${await evaluate(`box("#sep").height`)} ${await evaluate(`cs("#sep", "background-color")`)}`);
+
+// X2: every ring is asserted HERE, where no base.css can draw one the control's own rule has lost.
+const ring = await evaluate(`probe("var(--ring)")`);
+for (const [label, selector] of [["the search box", "#q"], ["the search clear", "#sclr"], ["the filter clear", "#clr"],
+  ["the filter trigger", "#trig"], ["the direction button", "#dir"], ["a chip", "#chip"], ["a link chip", "#link"],
+  ["a value filter", "#vf"]]) {
+  await force(selector, ["focus-visible"]);
+  await check(`bare: ${label} draws its OWN focus ring — 2px solid --ring, 2px out`,
+    async () => (await evaluate(`cs(${JSON.stringify(selector)}, "outline-style")`)) === "solid" &&
+      (await evaluate(`cs(${JSON.stringify(selector)}, "outline-width")`)) === "2px" &&
+      (await evaluate(`cs(${JSON.stringify(selector)}, "outline-offset")`)) === "2px" &&
+      (await evaluate(`cs(${JSON.stringify(selector)}, "outline-color")`)) === ring,
+    () => evaluate(`["outline-style", "outline-width", "outline-offset", "outline-color"].map((p) => cs(${JSON.stringify(selector)}, p)).join(" ")`));
+  await force(selector, []);
+}
+await force("#q", ["focus-visible"]);
+await check("bare: focus on the search box is ONE box — the ring and a --primary edge on the input, nothing on the wrapper",
+  async () => (await evaluate(`cs("#q", "border-top-color")`)) === (await evaluate(`probe("var(--primary)")`)) &&
+    (await evaluate(`cs("#sf", "outline-style")`)) === "none");
+await force("#q", []);
+
+// X3: `hidden` hides every class here — by the ONE rule tokens.css carries, not by a guard per class.
+const HIDEABLE = ["#sf", "#sclr", "#fdd", "#trig", "#clr", "#sc", "#dir", "#bar", "#spacer", "#sep", "#cs", "#chip", "#link",
+  "#fch", "#rm", "#vf", "#mc", "#rc", "#lm", "#ss", "#sl", "#og", "#se"];
+const stillDrawn = await evaluate(`${JSON.stringify(HIDEABLE)}.filter((s) => { const e = $(s); e.hidden = true;
+  const shown = e.getClientRects().length > 0; e.hidden = false; return shown; })`);
+await check(`bare: \`hidden\` hides each of ${HIDEABLE.length} components — the one rule in tokens.css, no guard per class`,
+  () => stillDrawn.length === 0, () => `still drawn: ${stillDrawn.join(" ")}`);
+
+/*
+ * X1 · FORCED COLOURS, measured in PAINTED PIXELS. Chromium repaints author backgrounds with Canvas and
+ * puts a Canvas backplate behind text, so a mask glyph, a state drawn by fill, and text on a redrawn
+ * state can each vanish while every computed value still reads 21:1 (WP7 measured 1.78:1 and 1.14:1 in
+ * pixels that computed-colour checks passed). So every assertion here is read off a screenshot, under
+ * both palettes the emulation offers (light and dark) and, for the glyphs, on all four themes — a glyph
+ * that keeps an AUTHOR colour passes on one cell and disappears on another.
+ *
+ *   · a glyph is shot twice, with and without itself; its contrast is the largest between the same
+ *     pixel in the two shots — what it paints against what it covers. >= 3:1 (WCAG 1.4.11);
+ *   · a state pair: the part that shows the state paints differently in the two states;
+ *   · text on a state: the commonest colour in its line box is what it sits on (a backplate included),
+ *     the pixel furthest from that is its ink. >= 4.5:1.
+ *
+ * On the FULL page, not the bare one: the filter trigger's glyph is sized as a flex item of the
+ * trigger components.css draws, and on a page without components.css it paints nothing at all —
+ * measured, 1.00:1 — which says nothing about the filter as it ships.
+ */
+await open("/main");
+await evaluate(`mount(\`
+  <div class="search-field" id="sf"><input type="search" aria-label="search" value="x"><button type="button" class="search-clear" id="sclr" aria-label="clear search"></button></div>
+  <select data-filter aria-label="source" id="fx-rest"><option value="">all</option><option value="s">seedr</option></select>
+  <select data-filter aria-label="type" id="fx-on"><option value="">all</option><option value="a" selected>agent</option></select>
+  <button type="button" class="sort-dir" id="dir" data-dir="asc" aria-label="sort descending"></button>
+  <button type="button" class="sort-dir" id="dir-off" data-dir="asc" aria-label="sort descending" disabled></button>
+  <div class="filter-chips" role="group" aria-label="in force"><button type="button" class="chip chip--remove" id="rm" aria-label="remove filter source: seedr"><span class="chip-key">source:</span> seedr</button></div>
+  <div class="search-field" id="sf-pend" data-pending style="--pending-ms: 600000ms"><input type="search" aria-label="pending"></div>
+  <div class="search-field" id="sf-off"><input type="search" aria-label="off" value="y" disabled><button type="button" class="search-clear" id="sclr-off" aria-label="clear search"></button></div>
+  <div class="chip-set" role="group" aria-label="tags"><button type="button" class="chip" id="chip" aria-pressed="false">agents</button>
+    <button type="button" class="chip" id="chip-on" aria-pressed="true">skills <span class="chip-count">3</span></button>
+    <a class="chip" id="link" href="#a">#a</a><a class="chip" id="link-on" href="#b" aria-current="page">#b</a></div>
+\`); initSelects(); initSearchFields(); null`);
+const boxOf = (selector) => evaluate(`(() => { const b = $(${JSON.stringify(selector)}).getBoundingClientRect();
+  return { x: Math.floor(b.left), y: Math.floor(b.top), width: Math.ceil(b.right) - Math.floor(b.left), height: Math.ceil(b.bottom) - Math.floor(b.top) }; })()`);
+// What a glyph paints against what it covers: its host shot with the glyph and without it.
+const glyphPaint = async (selector, pseudo) => {
+  const clip = await boxOf(selector);
+  const drawn = await shot(clip);
+  await evaluate(`document.head.insertAdjacentHTML("beforeend", ${JSON.stringify(`<style id="unglyph">${selector}${pseudo} { visibility: hidden !important; }</style>`)}); null`);
+  const bare = await shot(clip);
+  await evaluate(`document.getElementById("unglyph").remove(); null`);
+  let best = { ratio: 1, ink: null };
+  drawn.forEach((p, i) => { const q = contrast(p, bare[i]); if (q > best.ratio) best = { ratio: q, ink: p.join(",") }; });
+  return best;
+};
+// The text's contrast as PAINTED: the commonest colour in its line box is what it sits on; the pixel
+// furthest from that is the text's own ink.
+const textPaint = async (selector) => {
+  const clip = await evaluate(`(() => { const e = $(${JSON.stringify(selector)});
+    const text = [...e.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+    const range = document.createRange(); range.selectNodeContents(text);
+    const b = [...range.getClientRects()].filter((x) => x.width > 2).pop();
+    return { x: Math.floor(b.left), y: Math.floor(b.top), width: Math.ceil(b.width), height: Math.ceil(b.height) }; })()`);
+  const px = await shot(clip);
+  const counts = new Map();
+  for (const p of px) counts.set(p.join(","), (counts.get(p.join(",")) || 0) + 1);
+  const ground = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
+  return Math.max(...px.map((p) => contrast(p, ground)));
+};
+// A fill, read 3px inside the left edge, halfway down — padding, never text.
+const fillPaint = async (selector) => {
+  const b = await evaluate(`box(${JSON.stringify(selector)})`);
+  return (await shot({ x: Math.floor(b.left) + 3, y: Math.floor(b.top + b.height / 2), width: 1, height: 1 }))[0].join(",");
+};
+// An edge, read down the middle of the top border: of the rows it may straddle, the one furthest from Canvas.
+const edgePaint = async (selector, canvas) => {
+  const b = await evaluate(`box(${JSON.stringify(selector)})`);
+  const strip = await shot({ x: Math.floor(b.left + b.width / 2), y: Math.floor(b.top) - 1, width: 1, height: 3 });
+  return strip.reduce((far, p) => (contrast(p, canvas) > contrast(far, canvas) ? p : far)).join(",");
+};
+
+const GLYPHS = [["magnifier", "#sf", "::before"], ["search clear ×", "#sclr", "::before"],
+  ["filter funnel", "#fx-rest ~ .select-trigger", "::before"], ["filter funnel, filtering", "#fx-on ~ .select-trigger", "::before"],
+  ["filter clear ×", ".filter-dd:has(#fx-on) > .filter-clear", "::before"], ["sort arrow", "#dir", "::before"],
+  ["remove chip ×", "#rm", "::after"], ["pending line", "#sf-pend", "::after"], ["magnifier, switched-off box", "#sf-off", "::before"],
+  ["search clear ×, disabled", "#sclr-off", "::before"], ["sort arrow, disabled", "#dir-off", "::before"]];
+for (const scheme of ["light", "dark"]) {
+  await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
+  const canvas = (await evaluate(`probe("Canvas")`)).match(/\d+/g).slice(0, 3).map(Number);
+  const faint = [];
+  const inks = {};
+  for (const theme of ["warm", "green", "mono", "paper"]) {
+    await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
+    for (const [name, selector, pseudo] of GLYPHS) {
+      const paint = await glyphPaint(selector, pseudo);
+      if (!(paint.ratio >= 3)) faint.push(`${theme} ${name} ${paint.ratio.toFixed(2)}:1`);
+      if (theme === "warm") inks[name] = paint.ink;
+    }
+  }
+  await evaluate(`delete document.documentElement.dataset.theme; null`);
+  await check(`forced colours (${scheme}): every glyph PAINTS at >= 3:1 on what it covers — ${GLYPHS.length} glyphs x 4 themes, in pixels`,
+    () => faint.length === 0, () => faint.slice(0, 6).join("; "));
+  await check(`forced colours (${scheme}): a disabled glyph paints differently from an enabled one (GrayText), at full strength`,
+    async () => inks["sort arrow, disabled"] !== inks["sort arrow"] && inks["search clear ×, disabled"] !== inks["search clear ×"] &&
+      (await evaluate(`cs("#dir-off", "opacity") === "1" && cs("#dir-off", "color") === probe("GrayText")`)),
+    () => `sort arrow ${inks["sort arrow"]} / disabled ${inks["sort arrow, disabled"]}`);
+  const fills = { chip: await fillPaint("#chip"), chipOn: await fillPaint("#chip-on"), link: await fillPaint("#link"), linkOn: await fillPaint("#link-on") };
+  await check(`forced colours (${scheme}): a PRESSED chip and the current LINK chip paint a fill their neighbours do not`,
+    () => fills.chipOn !== fills.chip && fills.linkOn !== fills.link, () => JSON.stringify(fills));
+  const edges = { rest: await edgePaint("#fx-rest ~ .select-trigger", canvas), on: await edgePaint("#fx-on ~ .select-trigger", canvas) };
+  await check(`forced colours (${scheme}): a FILTERING trigger paints a different edge from one at rest`,
+    () => edges.on !== edges.rest, () => JSON.stringify(edges));
+  const texts = [];
+  for (const [name, selector] of [["pressed chip", "#chip-on"], ["its count", "#chip-on .chip-count"], ["current link chip", "#link-on"]]) {
+    texts.push([name, await textPaint(selector)]);
+  }
+  await check(`forced colours (${scheme}): text on a redrawn state reads at >= 4.5:1 in pixels (no Canvas backplate)`,
+    () => texts.every(([, q]) => q >= 4.5), () => texts.map(([name, q]) => `${name} ${q.toFixed(2)}:1`).join("; "));
+}
+await send("Emulation.setEmulatedMedia", { features: [] });
+
+/* ═══ the demo page — its own code paths ══════════════════════════════════ */
+
+const I1 = new Set(("check search filter arrow-up arrow-down trash-2 pencil minus loader-circle star-filled x chevron-down " +
+  "chevron-left download history home image-plus package refresh-cw star triangle-alert circle-check circle-alert circle-x info " +
+  "copy clock arrow-up-down external-link github mail plus eye eye-off power upload send arrow-left arrow-right " +
+  "circle-fading-arrow-up chevron-right chevrons-up-down chevrons-down-up folder-tree folder-open file-code panel-left-open " +
+  "maximize-2 folder file panel-left-close").split(" "));
+await open("/examples/filters.html", `!!document.querySelector("#f-type")?.parentElement?.classList.contains("select-field")`);
+await evaluate(`window.$ = (s) => document.querySelector(s);
+  window.cs = (s, prop, pseudo) => getComputedStyle(typeof s === "string" ? $(s) : s, pseudo || null).getPropertyValue(prop);
+  window.tick = () => new Promise((r) => setTimeout(r, 0)); null`);
+const icons = await evaluate(`[...new Set([...document.querySelectorAll("[data-icon]")].map((e) => e.dataset.icon))]`);
+await check("demo: every data-icon it names is in I1's set (X6)",
+  () => icons.length > 0 && icons.every((name) => I1.has(name)), () => icons.filter((name) => !I1.has(name)).join(" "));
+await check("demo: every labelled .filter-chips row is a group (role=group)",
+  () => evaluate(`[...document.querySelectorAll(".filter-chips[aria-label]")].every((e) => e.getAttribute("role") === "group")`));
+await check("demo: no link carries aria-pressed — a link chip says where it is with aria-current",
+  () => evaluate(`!document.querySelector("a[aria-pressed]")`));
+await check("demo: a .filter-bar--sticky example is on the page, and it sticks",
+  () => evaluate(`!!$(".filter-bar--sticky") && cs(".filter-bar--sticky", "position") === "sticky"`));
+
+// M13: the demo's autocomplete, driven through its own handlers — typed into by a real keyboard.
+await evaluate(`$("#cmd").scrollIntoView({ block: "center", behavior: "instant" }); null`);
+await click(`$("#cmd")`);
+await typeText("/");
+await evaluate("tick()");
+const highlight = () => evaluate(`(() => { const rows = [...document.querySelectorAll("#cmd-list .select-option")];
+  return { n: rows.length, attr: rows[0]?.getAttribute("data-active") ?? null,
+    active: rows[0] ? cs(rows[0], "background-color") : null, rest: rows[1] ? cs(rows[1], "background-color") : null }; })()`);
+await check("demo: the autocomplete's highlighted row carries data-active=\"true\" — the value the system reads",
+  async () => { const s = await highlight(); return s.n > 1 && s.attr === "true"; }, async () => JSON.stringify(await highlight()));
+await check("demo: ...and so it IS highlighted: its fill differs from a row at rest",
+  async () => { const s = await highlight(); return s.n > 1 && s.active !== s.rest; }, async () => JSON.stringify(await highlight()));
+await press("ArrowDown");
+await check("demo: ArrowDown moves the highlight — the next row takes data-active=\"true\", the first loses it",
+  () => evaluate(`(() => { const rows = [...document.querySelectorAll("#cmd-list .select-option")];
+    return rows[1].getAttribute("data-active") === "true" && !rows[0].hasAttribute("data-active")
+      && $("#cmd").getAttribute("aria-activedescendant") === rows[1].id; })()`));
+await press("Escape");
 
 console.log(failures
-  ? `\ncheck-filters: ${failures} FAILED`
-  : "\ncheck-filters: all checks passed");
+  ? `\ncheck-filters: ${failures} FAILED, ${passes} passed`
+  : `\ncheck-filters: all ${passes} checks passed`);
 process.exit(failures ? 1 : 0);

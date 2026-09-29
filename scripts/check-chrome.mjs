@@ -587,7 +587,10 @@ const paint = (pixels) => {
 // glyph that is not there). Only an element outside the viewport is scrolled to: the sticky layers
 // are always on screen, and scrolling for them would move the TOC's current entry mid-measurement.
 // INK hides just the ink a figure is about (the element, one of its pseudo-elements, or a child), so
-// the clip can be shown to hold it: a clip that reads the same with its ink hidden read nothing.
+// the clip can be shown to hold it and nothing else, on each forced palette: with the ink hidden the
+// clip must change AND be empty. Forced colours can paint ink normal colours never did (a neighbour's
+// transparent text), and a clip holding a stranger's ink passes every ratio. `visibility: hidden`
+// removes the element's paint without moving its neighbours, so the clip still means the same box.
 const REGIONS = `window.R = (selector, part) => {
   const e = document.querySelector(selector);
   if (!e) return null;
@@ -624,6 +627,7 @@ const measure = async (items) => {
     await evaluate(`INK(${JSON.stringify(selector)}, ${JSON.stringify(ink)}, false)`);
     await frames(1);
     out[name].holds = shown.some((p, i) => p.join() !== hidden[i].join());
+    out[name].rest = paint(hidden).ratio;
   }
   return out;
 };
@@ -634,15 +638,24 @@ const ringOf = async (selector) => {
   const clip = await evaluate(`R(${JSON.stringify(selector)}, "ring")`);
   await frames(1);
   const before = await shoot(clip);
-  await evaluate(`document.querySelector(${JSON.stringify(selector)}).focus({ focusVisible: true, preventScroll: true }); null`);
+  // REAL keyboard focus: the focusable element before this one, then Tab. A :focus-visible forced
+  // through DevTools computes the outline and paints nothing (RULES-CROSSCUT X1).
+  const primed = await evaluate(`(() => { const target = document.querySelector(${JSON.stringify(selector)});
+    const all = [...document.querySelectorAll('a[href], button:not(:disabled), summary, [tabindex]:not([tabindex="-1"])')].filter((e) => e.getClientRects().length);
+    const prev = all[all.indexOf(target) - 1];
+    if (!prev) return false;
+    prev.focus({ preventScroll: true });
+    return true; })()`);
+  for (const type of ["rawKeyDown", "keyUp"]) await send("Input.dispatchKeyEvent", { type, key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
   await frames(1);
+  const tabbed = primed && await evaluate(`document.activeElement === document.querySelector(${JSON.stringify(selector)}) && document.activeElement.matches(":focus-visible")`);
   const focused = await shoot(clip);
   await evaluate(`document.activeElement.blur(); null`);
   await frames(1);
   const changed = before.map((p, i) => [p, focused[i]]).filter(([p, q]) => p.join() !== q.join());
-  if (!changed.length) return { ratio: 1, changed: 0 };
+  if (!changed.length) return { ratio: 1, changed: 0, tabbed };
   const ring = commonest(changed.map(([, q]) => q)), under = commonest(changed.map(([p]) => p));
-  return { ring: ring.join(), under: under.join(), ratio: Math.round(ratioOf(ring, under) * 100) / 100, changed: changed.length };
+  return { ring: ring.join(), under: under.join(), ratio: Math.round(ratioOf(ring, under) * 100) / 100, changed: changed.length, tabbed };
 };
 const PALETTES = ["light", "dark"], THEMES = ["warm", "green", "mono", "paper"];
 // [name, selector, part, ink] — text on a state (4.5:1), a glyph (3:1), a state's neighbour (must differ)
@@ -701,9 +714,9 @@ const PREPARE = `(() => {
   document.head.append(s);
   document.querySelector('.ls-nav .ls-row:not([aria-current])').classList.add("__selected");
   for (const a of document.querySelectorAll(".toc a, #series a")) a.innerHTML = '<span class="__ink">' + a.innerHTML + "</span>";
-  for (const [id, text] of [["__blank", ""], ["__ink", "MMMM"]]) {
-    const e = document.createElement("div"); e.id = id; e.textContent = text;
-    e.style.cssText = "position:fixed;left:8px;top:" + (id === "__blank" ? 300 : 340) + "px;width:60px;height:24px;font:16px monospace;background:white;z-index:99";
+  for (const [id, html, top] of [["__blank", "", 300], ["__ink", "MMMM", 340], ["__two", '<span class="__one">MM</span>MM', 380]]) {
+    const e = document.createElement("div"); e.id = id; e.innerHTML = html;
+    e.style.cssText = "position:fixed;left:8px;top:" + top + "px;width:60px;height:24px;font:16px monospace;background:white;z-index:99";
     document.body.append(e);
   } })(); null`;
 const cells = [];
@@ -711,7 +724,8 @@ for (const scheme of PALETTES) {
   await load("nobanner", { forced: true, scheme });
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 450 });
   await page(PREPARE);
-  const probe = await measure([["an empty patch", "#__blank"], ["a line of body text", "#__ink", null, "self"]]);
+  const probe = await measure([["an empty patch", "#__blank"], ["a line of body text", "#__ink", null, "self"],
+    ["a clip holding a stranger's ink", "#__two", null, ".__one"]]);
   for (const theme of THEMES) {
     await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
     // Parked on the TOC's own section: the TOC has a current entry (nothing is current above the
@@ -750,12 +764,15 @@ for (const [group, key] of [["text on a state", "text"], ["glyph", "glyphs"], ["
   }
 }
 const below = (key, floor) => cells.flatMap((c) => Object.entries(c[key]).filter(([, m]) => !m || m.ratio < floor).map(([n, m]) => `${cellName(c)} ${n}: ${m ? m.ratio : "not found"}`));
-await check("forced colours, the reader can tell: an empty patch paints nothing (1:1), a line of text paints ink (≥ 7:1), on both palettes",
-  () => cells.every((c) => c.probe["an empty patch"].ratio < 1.1 && c.probe["a line of body text"].ratio >= 7), cells.map((c) => [cellName(c), c.probe]));
-const missed = cells.flatMap((c) => [c.probe, c.text, c.glyphs, { disabled: c.disabled[0], enabled: c.disabled[1] }]
-  .flatMap((group) => Object.entries(group).filter(([, m]) => m && "holds" in m && !m.holds).map(([n]) => `${cellName(c)} ${n}`)));
-await check("…and every clip a figure comes from holds that element's ink: hiding the ink changes the clip",
-  () => missed.length === 0 && cells.every((c) => Object.values(c.text).concat(Object.values(c.glyphs)).every((m) => m && "holds" in m)), missed);
+await check("forced colours, the reader can tell: an empty patch paints nothing (1:1), a line of text paints ink (≥ 7:1), and a clip that "
+  + "still holds a stranger's ink once its own is hidden is seen, on both palettes",
+  () => cells.every((c) => c.probe["an empty patch"].ratio < 1.1 && c.probe["a line of body text"].ratio >= 7 && c.probe["a clip holding a stranger's ink"].rest >= 7),
+  cells.map((c) => [cellName(c), c.probe]));
+const figures = (c) => ({ ...c.text, ...c.glyphs, "disabled action": c.disabled[0], "enabled action": c.disabled[1] });
+const missed = cells.flatMap((c) => Object.entries(figures(c)).filter(([, m]) => !m || !m.holds || m.rest >= 1.1)
+  .map(([n, m]) => `${cellName(c)} ${n}: ${m ? (m.holds ? `${m.rest}:1 left with its ink hidden` : "unchanged with its ink hidden") : "not found"}`));
+await check("…and every clip a figure comes from holds that element's ink and nothing else: hidden, the clip changes and is empty",
+  () => missed.length === 0, missed);
 await check("forced colours: every piece of text on a drawn state paints at 4.5:1 or better, on both palettes and all four themes",
   () => below("text", 4.5).length === 0, () => below("text", 4.5));
 await check("…every glyph the chrome shows paints at 3:1 or better against what it sits on",
@@ -763,8 +780,9 @@ await check("…every glyph the chrome shows paints at 3:1 or better against wha
 const strays = cells.flatMap((c) => c.followed.filter(([, paint, context]) => !paint || paint !== context).map(([n, paint, context]) => `${cellName(c)} ${n}: ${paint} in ${context}`));
 await check("…and every glyph paints its context's forced colour, so it follows a palette the reader chose (never an author colour)",
   () => strays.length === 0, strays);
-await check("…a focused element this file opts out draws its ring in a system colour, at 3:1 or better against what it covers",
-  () => below("rings", 3).length === 0, () => below("rings", 3));
+const untabbed = cells.flatMap((c) => Object.entries(c.rings).filter(([, m]) => !m.tabbed).map(([n]) => `${cellName(c)} ${n}`));
+await check("…a focused element this file opts out, reached with Tab, draws its ring in a system colour, at 3:1 or better against what it covers",
+  () => untabbed.length === 0 && below("rings", 3).length === 0, () => ({ untabbed, below: below("rings", 3) }));
 const same = cells.flatMap((c) => Object.entries(c.pairs).filter(([, p]) => !p || p[0] === p[1]).map(([n, p]) => `${cellName(c)} ${n}: ${p ? p[0] : "not found"}`));
 await check("…each state paints a different background from its neighbour (the rail's row, the TOC's and the series' current entries)",
   () => same.length === 0, same);

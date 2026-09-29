@@ -45,6 +45,12 @@
  * `retrospectives` left the address bar on `#sec-learnings` and a reload landed on the wrong tab —
  * measured in a browser, which is worse than no deep link at all.
  *
+ * RE-RENDERING. A renderer that re-renders a row renders the current selection. A patcher such as
+ * cockpit's `cockpitPatch` writes ATTRIBUTES into the tabs already there and adds no node, so the
+ * observer also hears `aria-selected` and `tabindex`: the tab the row marks selected gets the one Tab
+ * stop, the panels follow (those outside the patched mount too), and a selection the patch moved is
+ * announced. Before that, one patch left every tab at tabindex 0 and the outside panels behind.
+ *
  * KEYS (APG, automatic activation): on a focused tab ←/→ move to the previous/next tab with wrap and
  * Home/End to the first/last, skipping disabled tabs (`disabled` or `aria-disabled="true"`); focus
  * moves and the tab is activated. Anything with Alt/Ctrl/Meta is left to the browser, so Alt+←
@@ -55,6 +61,7 @@ const TAB = '[role="tab"]';
 const LIST = '[role="tablist"]';
 
 const seen = new WeakSet(); // tablists that have had their initial state
+const current = new WeakMap(); // tablist -> the tab this module last selected in it
 let installed = false;
 
 const listOf = (tab) => tab.closest(LIST);
@@ -81,18 +88,20 @@ function hashPanel() {
   return panel && ownerOf(panel) ? panel : null;
 }
 
-// Select one tab within its own group. Returns whether the selection changed.
+// Select one tab within its own group. Returns whether the selection changed. Only what differs is
+// written: the observer below hears every write, and a write that changes nothing would wake it.
 function select(tab) {
   const list = listOf(tab);
   if (!list) return false;
   const changed = tab.getAttribute("aria-selected") !== "true";
   for (const each of tabsOf(list)) {
     const on = each === tab;
-    each.setAttribute("aria-selected", String(on));
-    each.tabIndex = on ? 0 : -1;
+    if (each.getAttribute("aria-selected") !== String(on)) each.setAttribute("aria-selected", String(on));
+    if (each.getAttribute("tabindex") !== (on ? "0" : "-1")) each.tabIndex = on ? 0 : -1;
     const panel = panelOf(each);
-    if (panel) panel.hidden = !on;
+    if (panel && panel.hidden === on) panel.hidden = !on;
   }
+  current.set(list, tab);
   return changed;
 }
 
@@ -136,37 +145,48 @@ function activate(tab, { writeHash = false } = {}) {
   announce(first || tab, Boolean(first));
 }
 
-// A group's initial state: the tab the address names (or whose panel encloses what it names), else
-// the one the markup selected, else the first enabled one. The address is consulted only the first
-// time a group is seen — a group re-rendered later keeps what the page selected since.
-function normalize(list, first) {
+// A group's state: the tab the address names (or whose panel encloses what it names), else the one
+// the markup selected — a newly marked one before the one selected until now — else the one
+// selected until now, else the first enabled one. The address is consulted only the first time a
+// group is seen — a group re-rendered later keeps what the page selected since.
+function normalize(list, first, before) {
   const tabs = tabsOf(list);
   if (!tabs.length) return null;
   const target = first ? hashPanel() : null;
+  const marked = tabs.filter((tab) => tab.getAttribute("aria-selected") === "true");
   const chosen =
     (target && tabs.find((tab) => {
       const panel = panelOf(tab);
       return enabled(tab) && panel && (panel === target || panel.contains(target));
     })) ||
-    tabs.find((tab) => tab.getAttribute("aria-selected") === "true") ||
+    marked.find((tab) => tab !== before) ||
+    marked[0] ||
+    (tabs.includes(before) ? before : null) ||
     tabs.find(enabled) ||
     tabs[0];
   select(chosen);
   return chosen;
 }
 
-// Document order, so an outer group is settled (and announced) before the groups inside it.
-function adopt(lists) {
-  const fresh = [];
-  for (const list of lists) {
+// Every group that appeared, or whose tabs changed under it, settled in document order so an outer
+// group is settled before the groups inside it. A new group announces its tab; a group whose
+// selection a re-render MOVED (the tab selected until now is still in the page, and another one is
+// selected) announces the new one and the groups its panel shows, like an activation. A group whose
+// tabs were rebuilt as new nodes says nothing, as before: a renderer that rebuilds its row on every
+// poll would otherwise announce on every poll.
+function settle(lists) {
+  const said = [];
+  for (const list of Array.from(lists).sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))) {
     const first = !seen.has(list);
-    const chosen = normalize(list, first);
-    if (!chosen) continue; // no tabs yet: a tablist still being parsed is adopted when they arrive
+    const before = current.get(list);
+    const chosen = normalize(list, first, before);
+    if (!chosen) continue; // no tabs yet: a tablist still being parsed is settled when they arrive
     seen.add(list);
-    if (first) fresh.push(chosen);
+    if (first && !said.some(([tab, cascade]) => cascade && panelOf(tab)?.contains(list))) said.push([chosen, false]);
+    else if (!first && chosen !== before && before?.isConnected) said.push([chosen, true]);
   }
-  for (const tab of fresh) {
-    if (!tab.closest('[role="tabpanel"][hidden]')) announce(tab, false);
+  for (const [tab, cascade] of said) {
+    if (!tab.closest('[role="tabpanel"][hidden]')) announce(tab, cascade);
   }
 }
 
@@ -216,11 +236,19 @@ export function initTabs() {
     if (tab && listOf(tab) && enabled(tab)) activate(tab);
   });
 
-  adopt(document.querySelectorAll(LIST));
+  settle(document.querySelectorAll(LIST));
 
   new MutationObserver((records) => {
     const lists = new Set();
     for (const record of records) {
+      // A DOM patcher (cockpit's `cockpitPatch`) re-renders a row by writing ATTRIBUTES into the tabs
+      // already there, so no node is added: one patch left every tab at tabindex 0 and the panels
+      // outside the patched mount on the old selection. The bar's `aria-selected` is the truth.
+      if (record.type === "attributes") {
+        const owner = record.target.matches(TAB) ? listOf(record.target) : null;
+        if (owner) lists.add(owner);
+        continue;
+      }
       for (const node of record.addedNodes) {
         if (!(node instanceof Element)) continue;
         if (node.matches(LIST)) lists.add(node);
@@ -232,8 +260,11 @@ export function initTabs() {
         }
       }
     }
-    if (lists.size) {
-      adopt(Array.from(lists).sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)));
-    }
-  }).observe(document.documentElement, { childList: true, subtree: true });
+    if (lists.size) settle(lists);
+  }).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["aria-selected", "tabindex"],
+  });
 }

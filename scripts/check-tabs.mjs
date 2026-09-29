@@ -21,9 +21,10 @@
  *
  *   node scripts/check-tabs.mjs
  */
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { launch, reporter, requireBrowser, serve } from "./lib/chromium.mjs";
+import { launch, reporter, requireBrowser, serve, sleep } from "./lib/chromium.mjs";
 
 requireBrowser("check-tabs", "Keys, focus, the hash and a MutationObserver are browser behaviour; no stub can prove them.");
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -65,6 +66,10 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8">
 <script type="module">
   import { initTabs } from "/runtime/tabs.js";
   window.events = [];
+  // Whether each key's default action (scrolling the page, for Home/End and the arrows) was cancelled.
+  // Read on window, which hears a keydown after the document listener that handles it.
+  window.keys = [];
+  addEventListener("keydown", (event) => window.keys.push(event.key + ":" + event.defaultPrevented));
   document.addEventListener("tab-activated", (event) => window.events.push(
     event.target.id + ">" + (event.detail && event.detail.panel ? event.detail.panel.id : "none") + (event.bubbles ? "" : "(no-bubble)")));
   window.initTabs = initTabs;
@@ -122,7 +127,7 @@ await check("...and a group with data-tabs-hash writes the panel into the addres
 
 /* ── the keyboard ─────────────────────────────────────────────────────────────────────────────── */
 
-await evaluate(`document.getElementById("t-b").focus(); events.length = 0; null`);
+await evaluate(`document.getElementById("t-b").focus(); events.length = 0; keys.length = 0; null`);
 await press("ArrowRight");
 await check("→ moves focus AND selection to the next tab, skipping an aria-disabled one (c)",
   () => evaluate(`focused() === "t-d" && sel("outer") === "t-d" && shown().split(",").includes("p-d")`), state);
@@ -135,11 +140,13 @@ await press("Home");
 await check("Home goes to the first tab", () => evaluate(`focused() === "t-a" && sel("outer") === "t-a"`), state);
 await press("End");
 await check("End goes to the last ENABLED tab", () => evaluate(`focused() === "t-d" && sel("outer") === "t-d"`), state);
+await check("...and the keys are the tab row's: each one's default action is cancelled, so Home and End do not also scroll the page",
+  () => evaluate(`keys.join() === "ArrowRight:true,ArrowRight:true,ArrowLeft:true,Home:true,End:true"`), () => evaluate("keys.join()"));
 await check("every key activation fired tab-activated — and d, whose panel holds a group, revealed and announced it — with the address on the panel",
   () => evaluate(`events.join(" ") === "t-d>p-d t-h1>p-h1 t-a>p-a t-d>p-d t-h1>p-h1 t-a>p-a t-d>p-d t-h1>p-h1" && location.hash === "#p-d"`), state);
 await press("ArrowLeft", 1 /* Alt */);
 await check("Alt+← is left to the browser (history back), not taken by the tab row",
-  () => evaluate(`focused() === "t-d" && sel("outer") === "t-d"`), state);
+  () => evaluate(`focused() === "t-d" && sel("outer") === "t-d" && keys.at(-1) === "ArrowLeft:false"`), state);
 
 /* ── disabled, the code route, the opt-in hash ────────────────────────────────────────────────── */
 
@@ -213,6 +220,79 @@ await open("#p-e");
 await evaluate("window.initTabs(); null");
 await check("a deep link to a DISABLED tab's panel is not honoured — the markup's selection stands",
   () => evaluate(`sel("outer") === "t-a" && shown().split(",").includes("p-a")`), state);
+
+/* ── a DOM patcher re-renders the row ─────────────────────────────────────────────────────────────
+   cockpit re-renders with `cockpitPatch` (cockpit/pages/dom-patch.js), which writes ATTRIBUTES into
+   the nodes already there instead of replacing them — so no childList record ever fires. Before
+   0.60.0's fix one patch left every tab at tabindex 0, left panels outside the mount on the old
+   selection, and changed a selection with no tab-activated. The REAL patcher is driven, read from
+   the danieldeusing-infra checkout beside this one (or DD_COCKPIT_DOM_PATCH), through three shapes:
+     S1 · cockpit's own: the renderer mirrors the selection it heard in tab-activated, panels inside
+          the mount, no tabindex in its markup;
+     S2 · the documented markup, a fixed selection, panels OUTSIDE the mount;
+     S3 · the same with the panels inside. */
+const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
+const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
+  .find((path) => path && existsSync(path));
+if (!DOM_PATCH) {
+  console.log("check-tabs: the dom-patch section SKIPPED — no danieldeusing-infra checkout beside this one (set DD_COCKPIT_DOM_PATCH).");
+} else {
+  const PATCH = `<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/data.css">
+<script>${readFileSync(DOM_PATCH, "utf8").replaceAll("</script", "<\\/script")}</script></head><body>
+<button type="button" id="start">start</button>
+<div id="m1"></div>
+<div id="m2"></div><div id="s2-p-a" role="tabpanel">a</div><div id="s2-p-b" role="tabpanel" hidden>b</div><div id="s2-p-c" role="tabpanel" hidden>c</div>
+<div id="m3"></div>
+<script type="module">
+  import { initTabs } from "/runtime/tabs.js";
+  const H = ["a", "b", "c"];
+  window.events = [];
+  document.addEventListener("tab-activated", (e) => window.events.push(e.target.id));
+  let open1 = "a";
+  document.addEventListener("tab-activated", (e) => { if (e.target.id.startsWith("s1-")) open1 = e.target.id.slice(3); });
+  const html1 = () => '<div class="tabs" role="tablist" aria-label="s1">' +
+    H.map((h) => '<button type="button" class="tab" role="tab" id="s1-' + h + '" aria-controls="s1-p-' + h + '" aria-selected="' + (open1 === h) + '">' + h + "</button>").join("") +
+    "</div>" + H.map((h) => '<div id="s1-p-' + h + '" role="tabpanel"' + (open1 === h ? "" : " hidden") + ">" + h + "</div>").join("");
+  const html2 = () => '<div class="tabs" role="tablist" aria-label="s2">' +
+    H.map((h, i) => '<button type="button" class="tab" role="tab" id="s2-' + h + '" aria-controls="s2-p-' + h + '" aria-selected="' + (i === 0) + '"' + (i ? ' tabindex="-1"' : "") + ">" + h + "</button>").join("") + "</div>";
+  const html3 = () => html2().replaceAll("s2", "s3") + H.map((h, i) => '<div id="s3-p-' + h + '" role="tabpanel"' + (i ? " hidden" : "") + ">" + h + "</div>").join("");
+  window.R = {
+    s1: () => cockpitPatch(document.getElementById("m1"), html1()),
+    s2: () => cockpitPatch(document.getElementById("m2"), html2()),
+    s3: () => cockpitPatch(document.getElementById("m3"), html3()),
+  };
+  window.state = (p) => JSON.stringify({
+    selected: H.filter((h) => document.getElementById(p + "-" + h).getAttribute("aria-selected") === "true").join(","),
+    tabIndex: H.map((h) => document.getElementById(p + "-" + h).tabIndex).join(","),
+    shown: H.filter((h) => !document.getElementById(p + "-p-" + h).hidden).join(","),
+  });
+  R.s1(); R.s2(); R.s3();
+  initTabs();
+  window.ready = true;
+</script></body></html>`;
+  const patchServer = await serve(root, { "/__patch.html": PATCH });
+  await navigate(`${patchServer.origin}/__patch.html`);
+  await until("window.ready === true");
+  const after = {};
+  for (const p of ["s1", "s2", "s3"]) {
+    await evaluate(`document.getElementById("${p}-b").click(); events.length = 0; R.${p}(); null`);
+    await sleep(100); // the MutationObserver's turn
+    after[p] = { ...JSON.parse(await evaluate(`state("${p}")`)), events: await evaluate("events.join(' ')") };
+  }
+  console.log(`dom-patch: ${DOM_PATCH}`);
+  await check("S1 — cockpit's renderer mirrors the selection: after a patch the row keeps ONE tab stop, on the selected tab, and says nothing",
+    () => after.s1.selected === "b" && after.s1.tabIndex === "-1,0,-1" && after.s1.shown === "b" && after.s1.events === "", JSON.stringify(after.s1));
+  await check("S2 — a patch that puts the selection back on a: the panels OUTSIDE the mount follow the bar, one tab stop, and tab-activated says so",
+    () => after.s2.selected === "a" && after.s2.tabIndex === "0,-1,-1" && after.s2.shown === "a" && after.s2.events === "s2-a", JSON.stringify(after.s2));
+  await check("S3 — the same with the panels inside the mount: consistent, and the changed selection is announced",
+    () => after.s3.selected === "a" && after.s3.tabIndex === "0,-1,-1" && after.s3.shown === "a" && after.s3.events === "s3-a", JSON.stringify(after.s3));
+  await evaluate(`document.getElementById("start").focus(); null`);
+  const stops = [];
+  for (let i = 0; i < 3; i += 1) { await press("Tab"); stops.push(await evaluate("document.activeElement.id")); }
+  await check("...and Tab walks one stop per row, onto each row's selected tab", () => stops.join() === "s1-b,s2-a,s3-a", stops.join());
+  patchServer.close();
+}
 
 browser.close();
 server.close();

@@ -151,6 +151,11 @@ redraw when the plot resizes — one ResizeObserver per plot, coalesced to a fra
 observer draws a chart that measured 0 when it was rendered, which is every chart inside a hidden
 tab. Height is `--chart-h` (default 12rem) on the plot; width is the column's.
 
+**What is inside `.chart-plot` belongs to the runtime.** A renderer that re-renders the figure must
+not own the plot's children: one patch of the figure with cockpit's `cockpitPatch` makes the plot
+match markup that has no chart in it, which erases the drawn chart, and the ResizeObserver does not
+redraw it because the plot did not change size. Patch around the plot, or draw again after the patch.
+
 **Colour comes from classes, never attributes.** A CSS variable in an SVG presentation attribute is
 invalid and silently paints black, which on the two dark themes is invisible. So the runtime writes
 geometry and class names only, and a theme switch recolours a chart without a redraw. A series'
@@ -207,6 +212,12 @@ followed the hash, which one opened an ancestor, which one told a lazy panel it 
   listens to; cockpit's stats tab loaded on `click`, one route of three, and sat on "loading…"
   whenever it was reached by a key or a link. When an outer tab reveals a nested row, that row's
   selected tab is announced too. **To switch from code, call `tab.click()`.**
+- **A renderer that re-renders a tab row renders the current selection** — `aria-selected` on the
+  tab the reader is on, which it heard in `tab-activated` — never the selection it started with. A
+  patcher such as cockpit's `cockpitPatch` writes attributes into the tabs already there, and the
+  runtime hears that too: the tab the row marks selected gets the one Tab stop, the panels follow it
+  (panels outside the patched mount included), and a selection the patch MOVED is announced. So a
+  row rendered with a fixed selection takes the reader back to that tab on every poll.
 - **Keys** (APG, automatic activation): ←/→ with wrap, Home/End; disabled tabs are skipped. Alt, Ctrl
   and Meta combinations are left to the browser.
 - **Deep links.** On load and on every `hashchange`, a hash naming a panel opens it — **ancestors

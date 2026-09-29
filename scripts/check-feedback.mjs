@@ -40,6 +40,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateSync } from "node:zlib";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHROME = process.env.DD_CHROME
@@ -311,6 +312,17 @@ const FIXTURE = `
   </div>
   <span class="tag tag--dotted" id="fx-gone-dotted">removed</span>
   <div class="banner banner--sticky" id="fx-gone-sticky"><p>removed</p></div>
+  <div id="fx-fc" style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px">
+    <div class="empty" id="fx-fc-empty" data-icon="folder-open"></div>
+    <div class="empty" id="fx-fc-empty-warn" data-tone="warning" data-icon="triangle-alert"></div>
+    <div class="notice notice--lg" id="fx-fc-notice-lg" data-tone="success" data-icon="circle-check"></div>
+    <p class="callout" id="fx-fc-callout" data-tone="info" data-icon="info"> </p>
+    <span class="tag" id="fx-fc-tag-glyph" data-tone="info" data-icon="package"></span>
+    <span class="tag tag--icon" id="fx-fc-tag-icon" data-tone="info" data-icon="eye-off" role="img" aria-label="private"></span>
+    <span class="tag" style="--tag-color: var(--cat-teal)"><span class="ico" id="fx-fc-ico" data-icon="package"></span></span>
+    <span class="spinner" id="fx-fc-spinner"></span>
+    <span class="dot" id="fx-fc-dot" data-tone="success"></span>
+  </div>
   <div id="fx-hidden">${HIDDEN.map(([id, html]) => html.replace(/ hidden>/, ` id="fx-h-${id}" hidden>`)).join("")}</div>
 </div>`;
 const inject = () => evaluate(`document.querySelector("main").insertAdjacentHTML("afterbegin", ${JSON.stringify(FIXTURE)}); null`);
@@ -780,6 +792,64 @@ const PAIRS = [["#fx-tag", "background-color", "#fx-tag-solid", "background-colo
   ["#fx-tag", "border-top-style", "#fx-tag-dashed", "border-top-style", "--dashed against a plain tag"],
   ["#fx-tag", "font-weight", "#fx-tag-strong", "font-weight", "--strong against a plain tag"],
   ["#fx-tag", "text-decoration-line", "#fx-tag-struck", "text-decoration-line", "--struck against a plain tag"]];
+/* ── X1, painted: what reaches the screen, read back as pixels ─────────────────────────────────
+   Computed colours cannot see the one failure that matters most here. Under `forced-color-adjust:
+   auto` Chromium paints a Canvas BACKPLATE behind every run of text, so a --solid tag's word, drawn
+   Canvas on a CanvasText fill, lands on Canvas and vanishes — while its computed pair still says
+   21:1. So each glyph fixture (nothing in it but the glyph) and each word on a fill is captured and
+   decoded, and the brightest pixel is measured against the darkest: a glyph must reach 3:1, a word
+   4.5:1. Twice the pixel density, so a 1px stroke has pixels it covers fully. */
+const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.captureScreenshot writes
+  let pos = 8, width = 0, height = 0, bpp = 4;
+  const idat = [];
+  while (pos < png.length) {
+    const length = png.readUInt32BE(pos), type = png.toString("ascii", pos + 4, pos + 8), data = png.subarray(pos + 8, pos + 8 + length);
+    if (type === "IHDR") { width = data.readUInt32BE(0); height = data.readUInt32BE(4); bpp = data[9] === 6 ? 4 : 3; }
+    if (type === "IDAT") idat.push(data);
+    pos += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(idat)), stride = width * bpp, out = Buffer.alloc(height * stride);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)], line = y * (stride + 1) + 1;
+    for (let x = 0; x < stride; x += 1) {
+      const a = x >= bpp ? out[y * stride + x - bpp] : 0, b = y ? out[(y - 1) * stride + x] : 0;
+      const c = x >= bpp && y ? out[(y - 1) * stride + x - bpp] : 0, p = a + b - c;
+      const paeth = Math.abs(p - a) <= Math.abs(p - b) && Math.abs(p - a) <= Math.abs(p - c) ? a : Math.abs(p - b) <= Math.abs(p - c) ? b : c;
+      out[y * stride + x] = (raw[line + x] + [0, a, b, (a + b) >> 1, paeth][filter]) & 255;
+    }
+  }
+  const lum = (i) => [0, 1, 2].map((k) => out[i + k] / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, v, k) => sum + v * [0.2126, 0.7152, 0.0722][k], 0);
+  let lo = 1, hi = 0;
+  for (let i = 0; i < out.length; i += bpp) { const l = lum(i); lo = Math.min(lo, l); hi = Math.max(hi, l); }
+  return { width, height, ratio: (hi + 0.05) / (lo + 0.05) };
+};
+const PAINTED = [...["#fx-fc-empty", "#fx-fc-empty-warn", "#fx-fc-notice-lg", "#fx-fc-callout", "#fx-fc-tag-glyph", "#fx-fc-tag-icon",
+  "#fx-fc-ico", "#fx-fc-spinner", "#fx-fc-dot"].map((sel) => [sel, "glyph", 3]), ["#fx-tag-solid", "text", 4.5], ["#fx-count-overlay", "text", 4.5]];
+const painted = async () => {
+  const problems = [];
+  for (const [sel, kind, min] of PAINTED) {
+    // A glyph fixture: its box inside the border, where nothing but the glyph is drawn. A word: the
+    // box of its own text, where a backplate would sit.
+    const clip = await evaluate(`(() => {
+      const el = document.querySelector(${JSON.stringify(sel)});
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+      let r;
+      if (${JSON.stringify(kind)} === "text") { const range = document.createRange(); range.selectNodeContents(el); r = range.getBoundingClientRect(); }
+      else {
+        const b = el.getBoundingClientRect(), cs = getComputedStyle(el), px = (p) => parseFloat(cs.getPropertyValue(p));
+        r = { left: b.left + px("border-left-width"), top: b.top + px("border-top-width"),
+          width: b.width - px("border-left-width") - px("border-right-width"), height: b.height - px("border-top-width") - px("border-bottom-width") };
+      }
+      return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, scale: 1 };
+    })()`);
+    const { data } = await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: true });
+    const { ratio } = decodePng(Buffer.from(data, "base64"));
+    if (!(ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${ratio.toFixed(2)}:1, wants ${min}`);
+  }
+  return problems;
+};
+
 const FORCED = String.raw`(() => {
   const W = window.__wp7, probe = document.createElement("div");
   probe.style.cssText = "forced-color-adjust: none; background: Canvas";
@@ -817,6 +887,11 @@ for (const scheme of ["light", "dark"]) {
       return va === vb ? [what + ": both " + va] : [];
     });
   })()`));
+  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
+  await evaluate(`document.documentElement.classList.add("anim-off"); null`);
+  await check(`X1 forced colours, ${scheme} palette, PAINTED: every glyph reaches 3:1 and every word on a fill 4.5:1 (pixels read back)`, painted);
+  await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
+  await send("Emulation.clearDeviceMetricsOverride");
 }
 await send("Emulation.setEmulatedMedia", { features: [] });
 

@@ -166,8 +166,11 @@ button.tag:disabled { opacity: 0.45; cursor: default; }
    engine without that value gets the palette's text colour by name. And the two fills that MEAN
    something — a `--solid` tag against a plain one, an overlay count against a plain one — would
    collapse into their neighbours, so they are redrawn in the palette's own pair, inverted:
-   CanvasText fill, Canvas word. Every other axis is a border style, a weight or a strike, and those
-   survive untouched (a disabled button.tag is GrayText from the browser's own forced-colours sheet). */
+   CanvasText fill, Canvas word. Those two DO opt out with `none`, because they carry text: left in
+   the palette, Chromium paints a Canvas backplate behind the word, which puts a Canvas word on
+   Canvas — measured 1.14:1 from the pixels, while the computed pair still read 21:1. Every other
+   axis is a border style, a weight or a strike, and those survive untouched (a disabled button.tag
+   is GrayText from the browser's own forced-colours sheet). */
 @media (forced-colors: active) {
   .tag[data-icon]::before,
   .tag > .ico {
@@ -176,6 +179,7 @@ button.tag:disabled { opacity: 0.45; cursor: default; }
   }
   .tag--solid,
   .count--overlay {
+    forced-color-adjust: none;
     color: Canvas;
     background: CanvasText;
   }

@@ -744,6 +744,9 @@ const PAINTED = [
     "#p1-glyph .page-title > .ico", "#meta-stats .meta-stat:first-child > .ico", "#meta-stats .meta-stat:last-child > .ico"].map((sel) => [sel, "glyph", 3]),
   ...["#states-text [data-state=copied]", "#states-text [data-state=failed]", "#seq a[aria-current=page]"].map((sel) => [sel, "text", 4.5]),
 ];
+// The yield, printed once after every cell has run: how many captures decoded, and the lowest ratio
+// of each kind. A pass says nothing fell under the bar; this says what the pixels actually were.
+const paintedYield = { captures: 0, glyph: Infinity, text: Infinity };
 const painted = async () => {
   const problems = [];
   for (const [sel, kind, min] of PAINTED) {
@@ -769,6 +772,8 @@ const painted = async () => {
     // element is scrolled into view above, so the viewport as it is holds it.
     const { data } = await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false });
     const { ratio } = decodePng(Buffer.from(data, "base64"));
+    paintedYield.captures += 1;
+    paintedYield[kind] = Math.min(paintedYield[kind], ratio);
     if (!(ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${ratio.toFixed(2)}:1, wants ${min}`);
   }
   return problems;
@@ -821,6 +826,8 @@ for (const theme of THEMES) {
   }
   await send("Emulation.setEmulatedMedia", { features: [] });
 }
+console.log(`painted under forced colours: ${paintedYield.captures} of ${PAINTED.length * THEMES.length * 2} captures decoded; ` +
+  `lowest glyph ${paintedYield.glyph.toFixed(2)}:1, lowest state word ${paintedYield.text.toFixed(2)}:1`);
 await load("?theme=warm");
 
 /* ── the same classes on tokens.css alone ───────────────────────────────────────────────────── */

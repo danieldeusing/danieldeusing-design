@@ -55,7 +55,7 @@
  *   node scripts/check-controls.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize, sep } from "node:path";
@@ -144,7 +144,12 @@ const chrome = spawn(CHROME, [
   "--no-default-browser-check", "--disable-gpu", "--hide-scrollbars", `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+const shutdown = () => {
+  try { socket?.close(); } catch {}
+  chrome.kill("SIGKILL");
+  server.close();
+  rmSync(profile, { recursive: true, force: true });
+};
 process.on("exit", shutdown);
 
 let port;

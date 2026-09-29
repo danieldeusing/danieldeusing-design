@@ -183,7 +183,7 @@ uses) and the template's `code.inline` / `pre.block` are deleted in the migratio
 ```html
 <pre class="code-block" tabindex="0">…</pre>
 <pre class="code-block code-block--wrap">…a log line that should wrap…</pre>
-<pre class="code-block code-block--scroll" tabindex="0" style="--code-max-h: 22rem">…</pre>
+<pre class="code-block code-block--scroll" tabindex="0">…</pre>
 ```
 
 - `.code-block` is the bare `pre`'s look — `--muted` box, `--border` hairline, the one text size,
@@ -192,6 +192,8 @@ uses) and the template's `code.inline` / `pre.block` are deleted in the migratio
 - `--wrap` breaks long lines instead of scrolling them: a log or a trace is read, not compared column
   by column. `--scroll` caps the height at `--code-max-h` (40vh unless you set it) and scrolls. It
   deliberately does not contain overscroll — a contained scroller swallows the wheel at its ends.
+  Set `--code-max-h` in the page's stylesheet (`#build-log { --code-max-h: 22rem }`), never in a
+  style attribute: a page under `style-src 'self'` refuses those.
 - **A block that can scroll takes `tabindex="0"`**, or a keyboard reader cannot reach its hidden
   part; the focus ring is drawn for you. **A block that needs a name is `role="region"` with an
   `aria-label`** — an `aria-label` on a bare `pre` names nothing, because a `pre` has no role.
@@ -200,13 +202,15 @@ uses) and the template's `code.inline` / `pre.block` are deleted in the migratio
 ### `.code-view` — a file with line numbers
 
 ```html
-<pre class="code-block code-view" style="--code-gutter: 3ch" tabindex="0" role="region" aria-label="SKILL.md"><code><span class="line"><span class="tok-keyword">export</span> …
+<pre class="code-block code-view" tabindex="0" role="region" aria-label="SKILL.md"><code><span class="line"><span class="tok-keyword">export</span> …
 </span><span class="line">…
 </span></code></pre>
 ```
 
 - **The contract:** one `span.line` per line, each ending with its own newline, nothing between two
-  lines. Set `--code-gutter` to the digit count plus one: `3ch` up to 99 lines, `4ch` to 999.
+  lines. Set `--code-gutter` to the digit count plus one, `3ch` up to 99 lines and `4ch` to 999, in
+  the page's stylesheet or from script (`view.style.setProperty("--code-gutter", "4ch")`, which a
+  strict CSP allows), never in a style attribute.
 - **The numbers are a CSS counter, not text.** Selecting the view and copying gives the file — its
   line breaks, and none of the numbers (measured in Chromium). Read `textContent` from script;
   `innerText` doubles every newline, because each `.line` is a block.
@@ -310,7 +314,8 @@ second call installs nothing.
 
 ```html
 <p class="meta"><time datetime="2026-09-02">02 Sep 2026</time><span class="meta-sep" aria-hidden="true">·</span><a class="doc-link" href="/about">by Daniel Deusing</a><span class="meta-sep" aria-hidden="true">·</span><span>~6 min read</span></p>
-<span class="meta-stat"><span class="ico ico--sm" data-icon="package" data-tone aria-hidden="true" style="--tone: var(--cat-teal)"></span>12</span>
+<span class="meta-stat skill-stat"><span class="ico ico--sm" data-icon="package" data-tone aria-hidden="true"></span>12</span>
+<!-- the page's stylesheet: .skill-stat > .ico { --tone: var(--cat-teal); } -->
 ```
 
 The line under a title or in a card's foot. Muted, and laid out as items that wrap **with** their
@@ -322,8 +327,9 @@ separators, never as one sentence that breaks in the middle of a date.
   louder than its key is `.meta-val` (configr's key/value lines).
 - **`.meta-stat`** is a glyph and a count, tabular so a column of counts does not jitter. The glyph
   is 12px whatever class it carries. Its colour, when it names a TYPE, is the surface's categorical
-  choice (`--cat-*`), and it goes in through **`--tone`**, with `data-tone` on the `.ico` — **never
-  as a `color` on the glyph.** Forced colours drop a tone and paint the glyph in its parent's forced
+  choice (`--cat-*`), and it goes in through **`--tone`**, set in the page's stylesheet, with
+  `data-tone` on the `.ico` — **never as a `color` on the glyph**, and never in a style attribute,
+  which a page under `style-src 'self'` refuses. Forced colours drop a tone and paint the glyph in its parent's forced
   colour; a glyph with a `color` of its own keeps that colour instead, and the teal above measured
   2.19:1 on a light palette that way. The count stays muted.
 
@@ -387,11 +393,11 @@ and the way home. **Start from the template**; it carries the standard chrome
 (`page-chrome.html`) and this body:
 
 ```html
-<main class="wrap" id="main" style="padding-block: 6rem 5rem">
+<main class="wrap error-page" id="main">
   <p class="prompt" data-requested-path>page</p>
   <h1 class="page-title page-title--display">404: command not found<span class="cursor-block" aria-hidden="true"></span></h1>
   <p class="lede">no such file or directory.</p>
-  <p style="margin-block-start: 1.5rem"><a class="link-quiet" href="/">cd ~</a></p>
+  <p><a class="link-quiet" href="/">cd ~</a></p>
 </main>
 ```
 

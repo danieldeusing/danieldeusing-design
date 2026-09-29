@@ -13,9 +13,10 @@
  * `--solid`, for the one thing on the page with the widest blast radius.
  *
  * COLOUR IS AN ATTRIBUTE, NEVER A CLASS NAME. A STATE takes `data-tone` (tokens.css — success,
- * warning, destructive, info, pending, primary, muted); an IDENTITY takes a categorical hue,
- * `style="--tag-color: var(--cat-teal)"`. Both resolve to one private `--tag-c` that the text, the
- * edge and the solid fill read, so the three cannot disagree. An untoned tag is muted.
+ * warning, destructive, info, pending, primary, muted); an IDENTITY takes a categorical hue by name,
+ * `data-hue="teal"` — the attribute a chart series takes (data.css), and never a style attribute,
+ * which a page under `style-src 'self'` refuses. Both resolve to one private `--tag-c` that the text,
+ * the edge and the solid fill read, so the three cannot disagree. An untoned tag is muted.
  *
  * The meaning is always the WORD. Colour speeds the scan, the border style is a second axis a
  * reader can use in grey (D10: dashed = it does not count, dotted = off), opacity is never an axis,
@@ -53,6 +54,20 @@
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--tag-c) 50%, transparent);
 }
+/* THE TWELVE HUES by name (F2). An unknown name sets nothing, so the tag falls back to its tone, or to
+   muted. `--tag-color` stays the one hook, for a surface that computes a hue in its own stylesheet. */
+.tag[data-hue="red"] { --tag-color: var(--cat-red); }
+.tag[data-hue="orange"] { --tag-color: var(--cat-orange); }
+.tag[data-hue="amber"] { --tag-color: var(--cat-amber); }
+.tag[data-hue="lime"] { --tag-color: var(--cat-lime); }
+.tag[data-hue="green"] { --tag-color: var(--cat-green); }
+.tag[data-hue="teal"] { --tag-color: var(--cat-teal); }
+.tag[data-hue="cyan"] { --tag-color: var(--cat-cyan); }
+.tag[data-hue="blue"] { --tag-color: var(--cat-blue); }
+.tag[data-hue="indigo"] { --tag-color: var(--cat-indigo); }
+.tag[data-hue="violet"] { --tag-color: var(--cat-violet); }
+.tag[data-hue="purple"] { --tag-color: var(--cat-purple); }
+.tag[data-hue="pink"] { --tag-color: var(--cat-pink); }
 /* An icon beside the word is the small glyph step — a tag is a word with a mark, not an icon with a
    caption. A `.ico` child is drawn by its own class and only sized here; `data-icon` on the tag
    itself draws the same glyph without a child element. */

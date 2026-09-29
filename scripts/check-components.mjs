@@ -866,6 +866,20 @@ await section("SILENT — an icon is for the eye; a menu's label names its group
   check("references: every .ico in an example is aria-hidden", loud.length === 0, loud);
 });
 
+/* ── A SELECT'S OWN STYLE ────────────────────────────────────────────────── */
+await section("A select's own inline style reaches its wrapper, through the CSSOM", async () => {
+  // A page sizes its control on the <select>; once enhanced, the wrapper holds the space. select.js
+  // copies the declarations with style.cssText, never setAttribute("style"), which a page under
+  // `style-src 'self'` refuses (check-integration.mjs reads the source for that half).
+  const copied = await evaluate(`(async () => {
+    const s = document.createElement("select"); s.setAttribute("style", "max-width: 7rem; --probe: 1");
+    s.innerHTML = "<option>a</option>"; document.querySelector("main").append(s);
+    for (let i = 0; i < 40 && !s.closest(".select-field"); i += 1) await new Promise((r) => setTimeout(r, 25));
+    const f = s.closest(".select-field"); const out = f ? [f.style.maxWidth, f.style.getPropertyValue("--probe").trim(), f.hasAttribute("style")] : null;
+    (f || s).remove(); return out; })()`);
+  check("the wrapper takes the select's max-width and custom property", copied?.[0] === "7rem" && copied?.[1] === "1", copied);
+});
+
 /* ── REMOVED ──────────────────────────────────────────────────────────────── */
 // Code, not prose: the comments that record a removal name the class, so they are stripped first.
 await section("REMOVED — the classes 0.60.0 removed are not declared (§1.1), and the glyph lists agree", async () => {

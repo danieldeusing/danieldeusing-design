@@ -292,7 +292,7 @@ const FIXTURE = `
 <p>a line of text <span class="tag" id="fx-tl-glyph" data-tone="info" data-icon="package">glyph</span> <span class="tag" id="fx-tl-word">word</span> <span class="tag tag--icon" id="fx-tl-icon" data-icon="eye-off" role="img" aria-label="private"></span></p>
     <span class="tag" id="fx-tag">untoned</span>
   <span class="tag" id="fx-tag-success" data-tone="success">installed</span>
-  <span class="tag" id="fx-tag-cat" style="--tag-color: var(--cat-teal)"><span class="ico" id="fx-tag-ico" data-icon="package"></span>mcp</span>
+  <span class="tag" id="fx-tag-cat" data-hue="teal"><span class="ico" id="fx-tag-ico" data-icon="package"></span>mcp</span>
   <span class="tag" id="fx-tag-dataicon" data-tone="info" data-icon="package">glyph</span>
   <span class="tag tag--dashed" id="fx-tag-dashed">dashed</span>
   <span class="tag tag--off" id="fx-tag-off" data-tone="success">off</span>
@@ -300,7 +300,7 @@ const FIXTURE = `
   <span class="tag tag--strong" id="fx-tag-strong" data-tone="destructive">FAIL</span>
   <span class="tag tag--struck" id="fx-tag-struck">retired</span>
   <span class="tag tag--solid" id="fx-tag-solid" data-tone="primary">global</span>
-  <span class="tag tag--solid" id="fx-tag-solid-cat" style="--tag-color: var(--cat-violet)">public</span>
+  <span class="tag tag--solid" id="fx-tag-solid-cat" data-hue="violet">public</span>
   <span class="tag tag--icon" id="fx-tag-icon" data-tone="info" data-icon="eye-off" role="img" aria-label="private"></span>
   <span class="tag tag--bracket" id="fx-tag-bracket">beta</span>
   <span class="tag tag--bracket glow" id="fx-tag-glow">live</span>
@@ -325,7 +325,7 @@ const FIXTURE = `
     <p class="callout" id="fx-fc-callout" data-tone="info" data-icon="info">i</p>
     <span class="tag" id="fx-fc-tag-glyph" data-tone="info" data-icon="package"></span>
     <span class="tag tag--icon" id="fx-fc-tag-icon" data-tone="info" data-icon="eye-off" role="img" aria-label="private"></span>
-    <span class="tag" style="--tag-color: var(--cat-teal)"><span class="ico" id="fx-fc-ico" data-icon="package"></span></span>
+    <span class="tag" data-hue="teal"><span class="ico" id="fx-fc-ico" data-icon="package"></span></span>
     <span class="spinner" id="fx-fc-spinner"></span>
     <span class="dot" id="fx-fc-dot" data-tone="success"></span>
     <button type="button" class="tag tag--solid" id="fx-fc-solid-button" data-tone="primary">global</button>
@@ -603,10 +603,25 @@ await check("the demo page shows every element and state the spec names", () => 
    ...${JSON.stringify(STATES)}.map((s) => ".state[data-state='" + s + "']"), "p.state", ".spinner", ".spinner--lg", ".loading[role='status']",
    "[aria-busy='true'] .loading", ".fence .fence-label", ".fence .fence-end", ".fence-body:empty", ".dot", ".dot--pulse", ".dot--overlay",
    ...["primary", "success", "warning", "destructive", "info", "pending", "muted"].map((t) => ".tag[data-tone='" + t + "']"),
-   ".tag:not([data-tone]):not([style])", ".tag[style*='--cat-']", ".tag--dashed", ".tag--off", ".tag--strong",
+   ".tag:not([data-tone]):not([data-hue])", ".tag[data-hue]", ".tag--dashed", ".tag--off", ".tag--strong",
    ".tag--struck", ".tag--solid", ".tag--icon[role='img'][aria-label]", ".tag--bracket", ".tag--bracket.glow", ".tag > .ico",
    ".tag[data-icon]", "button.tag", "button.tag:disabled", ".count", ".count[data-tone]", ".count--overlay"]
   .filter((sel) => !document.querySelector(sel)).map((sel) => "missing on the demo page: " + sel)`));
+
+// ONE HUE API: a tag's identity is `data-hue`, the name a chart series takes, never a style attribute
+// (a page under `style-src 'self'` refuses those). Each of the twelve names must reach its --cat-* hue;
+// a missing mapping would fall back to muted, which passes every contrast row, so it is asked here.
+await check("data-hue gives a tag each of the twelve --cat-* hues; an unknown name sets nothing; no demo tag has a style attribute", () => evaluate(`(() => {
+  const out = [];
+  const colour = (html) => { const h = document.createElement("div"); h.innerHTML = html; document.body.append(h);
+    const c = getComputedStyle(h.firstElementChild).color; h.remove(); return c; };
+  for (const c of ${JSON.stringify(CAT_NAMES)}) {
+    const want = colour('<span style="color: var(--cat-' + c + ')">x</span>'), got = colour('<span class="tag" data-hue="' + c + '">x</span>');
+    if (got !== want) out.push(c + ": the tag is " + got + ", --cat-" + c + " is " + want);
+  }
+  if (colour('<span class="tag" data-hue="nonsense">x</span>') !== colour('<span class="tag">x</span>')) out.push("an unknown hue changed the tag");
+  out.push(...[...document.querySelectorAll(".tag[style]")].map((el) => "a style attribute on a demo tag: " + el.outerHTML.slice(0, 70)));
+  return out; })()`));
 
 await check("every icon the demo names is in I1's set (X6)", () => evaluate(`
   [...new Set([...document.querySelectorAll("[data-icon]")].map((el) => el.dataset.icon))]
@@ -1059,7 +1074,7 @@ await load();
 const TONES = ["primary", "success", "warning", "destructive", "info", "pending", "muted"];
 const CATS = ["red", "orange", "amber", "lime", "green", "teal", "cyan", "blue", "indigo", "violet", "purple", "pink"];
 const toneAttr = (t) => (t ? ` data-tone="${t}"` : "");
-const catStyle = (c) => ` style="--tag-color: var(--cat-${c})"`;
+const catStyle = (c) => ` data-hue="${c}"`;
 /* Each sample: markup, and what to measure in it. kind: text ≥ 4.5 · glyph ≥ 3 (non-text graphic,
    WCAG 1.4.11) · ring ≥ 3 (focus indicator) · info (a decorative or text-labelled edge — reported,
    not gated). fg: the property that paints the mark; against: "own" = the element's own

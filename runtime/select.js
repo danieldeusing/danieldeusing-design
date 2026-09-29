@@ -287,8 +287,10 @@ function enhance(select) {
   // once the select is out of the flow that sizing has nothing to act on. The
   // wrapper is what occupies the space now, so it takes the inline style. Copied,
   // not moved: the select's own style attribute is still the page's to read.
-  const inlineStyle = select.getAttribute("style");
-  if (inlineStyle) field.setAttribute("style", inlineStyle);
+  // Through the CSSOM, never setAttribute("style"): under a `style-src 'self'`
+  // policy the attribute write is refused (and reported), while an inline style
+  // the policy already refused on the <select> is simply empty here.
+  if (select.style.length) field.style.cssText = select.style.cssText;
 
   const trigger = document.createElement("button");
   trigger.type = "button";

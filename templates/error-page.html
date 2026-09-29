@@ -147,23 +147,24 @@
       </div>
     </header>
 
-    <!-- THE 404. The gap under the lede is danieldeusing.de's (1.5rem, as between the prompt and the
-         title): the way out is a separate thought from the error, not its last line. -->
-    <main class="wrap" id="main" style="padding-block: 6rem 5rem">
+    <!-- THE 404. `.error-page` (content.css) spaces it: room above the prompt, and the way out 1.5rem
+         under the lede — a separate thought from the error, not its last line. No style attribute
+         anywhere: a strict CSP refuses them. -->
+    <main class="wrap error-page" id="main">
       <p class="prompt" data-requested-path>{{REQUESTED_PATH}}</p>
       <h1 class="page-title page-title--display">404: command not found<span class="cursor-block" aria-hidden="true"></span></h1>
       <p class="lede">no such file or directory.</p>
-      <p style="margin-block-start: 1.5rem"><a class="link-quiet" href="/">cd ~</a></p>
+      <p><a class="link-quiet" href="/">cd ~</a></p>
     </main>
 
     <!-- THE CRASH VARIANT, in place of the <main> above:
 
-    <main class="wrap" id="main" style="padding-block: 6rem 5rem">
+    <main class="wrap error-page" id="main">
       <div role="alert">
         <p class="prompt">{{FAILING_ROUTE}}</p>
         <h1 class="page-title page-title--display">something broke<span class="cursor-block" aria-hidden="true"></span></h1>
         <p class="lede">{{ERROR_MESSAGE}}</p>
-        <p style="margin-block-start: 1.5rem"><button type="button" class="btn-terminal btn-terminal--compact" data-reload>reload</button></p>
+        <p><button type="button" class="btn-terminal btn-terminal--compact" data-reload>reload</button></p>
       </div>
     </main>
 
@@ -185,7 +186,7 @@
             <span data-theme-label>warm</span>
             <span aria-hidden="true">▾</span>
           </summary>
-          <ul class="dropdown-panel" role="list">
+          <ul class="dropdown-panel">
             <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
             <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
             <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>

@@ -93,7 +93,7 @@ The parts:
 | `.card-head` | the top row — a value filter, a tag, a glyph, a star. Wraps, first item start, last item end |
 | `.card-title` | the name, **any heading level**; the class sets the size (body size, weight 500). 500, not bold: forty bold titles in a grid are a wall |
 | `.card-link` | the title's link. Takes the title's colour, no underline; the card's hover is its hover |
-| `.card-desc` | the description, muted, clamped to 3 lines (`style="--clamp-lines: 2"` to change it). Left-aligned — seedr's justified text opens rivers in a narrow monospace column |
+| `.card-desc` | the description, muted, clamped to 3 lines (`--clamp-lines: 2` on it, in the page's stylesheet, to change it). Left-aligned — seedr's justified text opens rivers in a narrow monospace column |
 | `.card-foot` | stats and a date, muted. Sits on the card's floor, so every foot in a row of cards lines up |
 
 The parts are spaced as a column (0.5rem apart) by the card itself: inside a `.card-grid`, and on any
@@ -124,7 +124,8 @@ is answered only where a click lands.
 ## `.card-grid`
 
 ```html
-<ul class="card-grid" style="--card-min: 18rem; --card-gap: 0.75rem">…cards…</ul>
+<ul class="card-grid skill-grid">…cards…</ul>
+<!-- the page's stylesheet: .skill-grid { --card-min: 18rem; --card-gap: 0.75rem; } -->
 ```
 
 As many columns of at least `--card-min` (16rem) as fit, and one column on a phone — `min(…, 100%)`
@@ -259,7 +260,7 @@ alike.
 
 | part | what it is |
 |---|---|
-| `.list-row-lead` | a date or an id, muted, tabular, never wrapped. `style="--row-lead-w: 10.5rem"` on the list gives every lead one width, so the titles start on one line |
+| `.list-row-lead` | a date or an id, muted, tabular, never wrapped. `--row-lead-w: 10.5rem` on the list, in the page's stylesheet, gives every lead one width, so the titles start on one line |
 | `.list-row-title` | bold `--primary`, cut off on one line from 40rem up and wrapped below it (on a phone the title is the only thing the row has) |
 | `.list-row-desc` | a line under the row, muted, clamped to 2 lines |
 | `.list-row-meta` | at the row's end, muted: a tag, a permission string, `↗` |
@@ -436,7 +437,7 @@ when it is selected, and arrowing past forty files must not fetch forty.
 ## `.split`, `.splitter`, `.pane-collapsed`
 
 ```html
-<div class="split" style="--split-size: 18rem">
+<div class="split" id="explorer">   <!-- the page's stylesheet: #explorer { --split-size: 18rem; } -->
   <section class="panel split-pane" id="files">…</section>
   <div class="splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="files"
        aria-label="resize file list" aria-valuemin="160" aria-valuemax="640" aria-valuenow="288"></div>

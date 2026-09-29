@@ -165,5 +165,41 @@ for (const dir of ["examples", "templates"]) {
 check(`no demo or template carries a stand-in for a sibling package (${scanned.length} files read)`, () =>
   scanned.length ? found : ["read no files"]);
 
+/* ── a strict CSP (style-src 'self') ────────────────────────────────────────── */
+
+// seedr serves the playgrounds under `style-src 'self'`, and publishing a release deploys them. Under
+// that policy a style ATTRIBUTE is refused (style-src-attr) and so is an injected <style>, while the
+// CSSOM (`el.style.x = …`, `style.cssText`, `setProperty`) applies. So the runtime writes styles only
+// through the CSSOM, and documented markup — the templates and the skill's code blocks, which surfaces
+// copy — carries no style attribute (the lead's ruling). Code only: the prose explaining the rule quotes
+// it, and comments are stripped first.
+const code = (js) => js.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, "")).replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+const cspRuntime = [];
+for (const file of modules.concat("index.js")) {
+  const js = code(readFileSync(join(root, "runtime", file), "utf8"));
+  js.split("\n").forEach((line, i) => {
+    if (/setAttribute\(\s*["'`]style["'`]/.test(line) || /createElement\(\s*["'`]style["'`]/.test(line) || /<style\b|\sstyle=\\?["']/.test(line)) {
+      cspRuntime.push(`runtime/${file}:${i + 1}  ${line.trim().slice(0, 90)}`);
+    }
+  });
+}
+check(`the runtime writes no style attribute and injects no <style> (${modules.length + 1} modules read)`, () => cspRuntime);
+const docs = [
+  ...readdirSync(join(root, "templates")).filter((f) => f.endsWith(".html")).map((f) => `templates/${f}`),
+  ...readdirSync(join(root, ".claude/skills/danieldeusing-design/references")).filter((f) => f.endsWith(".md"))
+    .map((f) => `.claude/skills/danieldeusing-design/references/${f}`),
+  ".claude/skills/danieldeusing-design/SKILL.md",
+];
+const cspDocs = [];
+for (const file of docs) {
+  const text = read(file);
+  const markup = file.endsWith(".md")
+    ? [...text.matchAll(/^```[a-z]*\n([\s\S]*?)^```/gm)].map((m) => m[1]).join("\n")
+    : text.replace(/<!--[\s\S]*?-->/g, "");
+  for (const tag of markup.match(/<[a-z][a-z0-9-]*\b[^>]*\sstyle\s*=[^>]*>/gi) || []) cspDocs.push(`${file}: ${tag.slice(0, 90)}`);
+}
+check(`no documented markup carries a style attribute (${docs.length} files: the templates and the skill's code blocks)`, () =>
+  docs.length > 10 ? cspDocs : [`read ${docs.length} files — the wrong directory`]);
+
 console.log(failures ? `\ncheck-integration: ${failures} FAILED` : "\ncheck-integration: all checks passed");
 process.exit(failures ? 1 : 0);

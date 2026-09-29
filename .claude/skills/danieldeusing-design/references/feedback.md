@@ -57,8 +57,10 @@ its own resets `--tone` and falls back to its own default: a tag or a count to m
 child its own `data-tone` when you want it coloured. Never rely on the one around it.
 
 An **identity** (which agent, which type, which host) is not a state: it takes one of the twelve
-categorical hues, `style="--tag-color: var(--cat-teal)"`, on a tag. Which thing gets which hue is
-the surface's decision. The palette is shared and measured (`--cat-*`, foundations.md).
+categorical hues by name, `data-hue="teal"` on a tag — the attribute a chart series takes (`data.md`),
+never a style attribute, which a page under `style-src 'self'` refuses. The twelve names are `red`
+`orange` `amber` `lime` `green` `teal` `cyan` `blue` `indigo` `violet` `purple` `pink`; an unknown
+one sets nothing. Which thing gets which hue is the surface's decision. The palette is shared and measured (`--cat-*`, foundations.md).
 
 ## `.empty` — which nothing (S1)
 
@@ -320,7 +322,7 @@ that changes is `role="status"`. With no `data-tone` the dot takes the colour of
 
 ```html
 <span class="tag" data-tone="success">installed</span>
-<span class="tag" style="--tag-color: var(--cat-teal)"><span class="ico" data-icon="package"></span>mcp</span>
+<span class="tag" data-hue="teal"><span class="ico" data-icon="package"></span>mcp</span>
 <span class="tag tag--bracket glow">live</span>
 <button type="button" class="tag" data-tone="info" data-tip="open the forge's settings">github.com</button>
 ```
@@ -330,7 +332,7 @@ both settled on this (R81). A filled chip in every row of a twenty-row table is 
 
 | modifier | means | reach for it when |
 |---|---|---|
-| (none) | a state (`data-tone`) or an identity (`--tag-color`) | almost always |
+| (none) | a state (`data-tone`) or an identity (`data-hue`) | almost always |
 | `--dashed` | it does not count | not the proof, skipped, superseded, not actionable |
 | `--off` | off — muted and dotted, the only dotted edge | excluded, disabled; it would once have been `opacity: .6` |
 | `--strong` | must not be missed — full edge, bold | a verdict: PASS / FAIL |

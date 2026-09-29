@@ -659,6 +659,15 @@ ul.dash > li::before {
 }
 
 
+/* ── THE ERROR PAGE (S9) ───────────────────────────────────────────────────────────────────────
+   templates/error-page.html's own rhythm: room above the prompt and below the way home, and the way
+   home 1.5rem under the lede — danieldeusing.de's gap, the one between the prompt and the title: a
+   separate thought from the error, not its last line. A class, because the page ships under strict
+   CSPs (seedr's `style-src 'self'`), where the style attributes the template used to carry are
+   refused and the page loses both gaps. */
+.error-page { padding-block: 6rem 5rem; }
+.error-page .lede + p { margin-block-start: 1.5rem; }
+
 /* ── PRINT ────────────────────────────────────────────────────────────────────────────────────
    A copy button copies nothing from paper. A block that scrolls on screen has no scrollbar in
    print, so whatever sat past its edge would simply be gone: code and commands wrap and lose their

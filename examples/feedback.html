@@ -298,7 +298,7 @@
       <section id="tag">
         <h2>T1 · .tag</h2>
         <p class="lede">Border-only; colour from <code>data-tone</code> (a state) or
-          <code>--tag-color: var(--cat-*)</code> (an identity).</p>
+          <code>data-hue</code>, one of the twelve <code>--cat-*</code> names (an identity).</p>
 
         <h3>tones</h3>
         <div class="surfaces">
@@ -315,18 +315,18 @@
 
         <h3>identities — the twelve categorical hues</h3>
         <div class="row">
-          <span class="tag" style="--tag-color: var(--cat-red)">red</span>
-          <span class="tag" style="--tag-color: var(--cat-orange)">orange</span>
-          <span class="tag" style="--tag-color: var(--cat-amber)">amber</span>
-          <span class="tag" style="--tag-color: var(--cat-lime)">lime</span>
-          <span class="tag" style="--tag-color: var(--cat-green)">green</span>
-          <span class="tag" style="--tag-color: var(--cat-teal)"><span class="ico" data-icon="package"></span>mcp</span>
-          <span class="tag" style="--tag-color: var(--cat-cyan)">cyan</span>
-          <span class="tag" style="--tag-color: var(--cat-blue)">blue</span>
-          <span class="tag" style="--tag-color: var(--cat-indigo)">indigo</span>
-          <span class="tag" style="--tag-color: var(--cat-violet)">violet</span>
-          <span class="tag" style="--tag-color: var(--cat-purple)">purple</span>
-          <span class="tag" style="--tag-color: var(--cat-pink)">pink</span>
+          <span class="tag" data-hue="red">red</span>
+          <span class="tag" data-hue="orange">orange</span>
+          <span class="tag" data-hue="amber">amber</span>
+          <span class="tag" data-hue="lime">lime</span>
+          <span class="tag" data-hue="green">green</span>
+          <span class="tag" data-hue="teal"><span class="ico" data-icon="package"></span>mcp</span>
+          <span class="tag" data-hue="cyan">cyan</span>
+          <span class="tag" data-hue="blue">blue</span>
+          <span class="tag" data-hue="indigo">indigo</span>
+          <span class="tag" data-hue="violet">violet</span>
+          <span class="tag" data-hue="purple">purple</span>
+          <span class="tag" data-hue="pink">pink</span>
         </div>
 
         <h3>modifiers</h3>
@@ -336,8 +336,8 @@
             <tr><td><span class="tag tag--off" data-tone="success">excluded</span> <span class="tag tag--off">disabled</span></td><td><code>--off</code> — off; muted and dotted, the only dotted edge; replaces opacity</td></tr>
             <tr><td><span class="tag tag--strong" data-tone="destructive">FAIL</span> <span class="tag tag--strong" data-tone="success">PASS</span></td><td><code>--strong</code> — a verdict</td></tr>
             <tr><td><span class="tag tag--struck" data-tone="muted">retired</span></td><td><code>--struck</code></td></tr>
-            <tr><td><span class="tag tag--solid" data-tone="primary">global</span> <span class="tag tag--solid" data-tone="destructive">unreachable</span> <span class="tag tag--solid" style="--tag-color: var(--cat-violet)">public</span></td><td><code>--solid</code> — the widest blast radius only</td></tr>
-            <tr><td><span class="tag tag--icon" data-tone="info" data-icon="eye-off" role="img" aria-label="private"></span> <span class="tag tag--icon" style="--tag-color: var(--cat-teal)" role="img" aria-label="mcp server"><span class="ico" data-icon="package"></span></span></td><td><code>--icon</code> — role="img" + aria-label</td></tr>
+            <tr><td><span class="tag tag--solid" data-tone="primary">global</span> <span class="tag tag--solid" data-tone="destructive">unreachable</span> <span class="tag tag--solid" data-hue="violet">public</span></td><td><code>--solid</code> — the widest blast radius only</td></tr>
+            <tr><td><span class="tag tag--icon" data-tone="info" data-icon="eye-off" role="img" aria-label="private"></span> <span class="tag tag--icon" data-hue="teal" role="img" aria-label="mcp server"><span class="ico" data-icon="package"></span></span></td><td><code>--icon</code> — role="img" + aria-label</td></tr>
             <tr><td><span class="tag tag--bracket glow">live</span> <span class="tag tag--bracket">beta</span></td><td><code>--bracket</code> (+ <code>.glow</code>) — pagr's <code>[ live ]</code></td></tr>
             <tr><td><span class="tag" data-tone="info" data-icon="package">data-icon</span> <span class="tag tag--dashed tag--strong" data-tone="pending">timed out</span></td><td>a glyph from <code>data-icon</code>; modifiers compose</td></tr>
             <tr><td><button type="button" class="tag" data-tone="info" data-tip="open the forge's settings">github.com</button> <button type="button" class="tag" data-tone="info" disabled>gitlab</button></td><td><code>button.tag</code> — rest, disabled (hover and focus: try it)</td></tr>

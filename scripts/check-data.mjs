@@ -387,6 +387,7 @@ await send("Emulation.setEmulatedMedia", { features: [] });
 //  the surfaces it is gated on when not all three — a value outside them is printed in brackets]
 const PIN = "color-mix(in srgb, var(--warning) 5%, transparent)";
 const HOVER = "color-mix(in srgb, var(--primary) 10%, transparent)";
+const STALE = "color-mix(in srgb, var(--destructive) 8%, transparent)";
 const PAIRS = [
   ["pinned row: --foreground on the 6% --warning tint", "var(--foreground)", [PIN], 4.5],
   // --muted is a menu item's hover fill (components.css), never a table's surface; on warm, muted text
@@ -413,6 +414,9 @@ const PAIRS = [
   ["tab row rule: --border 80% (decoration)", "color-mix(in srgb, var(--border) 80%, transparent)", [], 0],
   ["for WP3 — running tick: --info on the strip", "var(--info)", [], 4.5],
   ["for WP3 — .tick-sep: --border (decoration, aria-hidden)", "var(--border)", [], 0],
+  // WP3's today: a stale row's 8% --destructive tint, on the strip's --card. Reported, not gated here.
+  ["for WP3 — stale tick: --destructive (its age) on the 8% tint", "var(--destructive)", ["var(--card)", STALE], 0],
+  ["for WP3 — stale tick: --muted-foreground (next, the figures' labels) on the 8% tint", "var(--muted-foreground)", ["var(--card)", STALE], 0],
 ];
 const results = [];
 for (const t of THEMES) {

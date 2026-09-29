@@ -1360,7 +1360,9 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   /* Leaving the mode also stops the forcing of outline-color, so a focused chosen row would keep the
      author's --ring. Its ring is inset, on the Highlight fill, where CanvasText and Highlight both
      fail (CanvasText measured 1.86:1 there on the light palette and 2.41:1 on the dark one), so it
-     takes the colour of the row's words. */
+     takes the colour of the row's words. forced-color-adjust inherits, so a control INSIDE the row
+     (the tree's hover-revealed action) has left the mode as well; the rule below gives its ring the
+     same colour. */
   .list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]):focus-visible,
   .tree [aria-selected="true"]:focus-visible > .tree-row,
   .tree .tree-row[aria-current="page"]:focus-visible {
@@ -1369,6 +1371,7 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   :is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"], .console-line--current) * {
     color: HighlightText !important;
     border-color: HighlightText !important;
+    outline-color: HighlightText !important;
     text-shadow: none !important;
   }
   :is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"], .console-line--current) :is(.ico, .dot) {

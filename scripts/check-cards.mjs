@@ -273,10 +273,12 @@ window.__wp8 = (() => {
     },
     // A strip along an element's start edge, just inside it: where its inset focus ring is drawn.
     // Half a pixel in, so a clip that begins between device pixels takes nothing from outside.
-    edge(sel) {
+    // outside: the strip just OUTSIDE the start edge instead, for a ring drawn at a positive offset.
+    edge(sel, outside) {
       const el = q(sel);
       el.scrollIntoView({ block: "center", behavior: "instant" });
       const r = el.getBoundingClientRect();
+      if (outside) return { x: r.x + scrollX - 8, y: r.y + scrollY + 1, w: 7.5, h: r.height - 2 };
       return { x: r.x + scrollX + 0.5, y: r.y + scrollY + 4, w: 5.5, h: r.height - 8 };
     },
     near: (a, b, label, tol = 0.6) => (Math.abs(a - b) <= tol ? null : label + ": " + a.toFixed(2) + " vs " + b.toFixed(2)),
@@ -414,7 +416,7 @@ const FIXTURE = `
   <ul class="tree" role="tree" aria-label="files" id="fx-tree" style="width: 14rem">
     <li role="treeitem" aria-level="1" aria-expanded="true" tabindex="0" id="fx-tree-branch"><span class="tree-row" id="fx-tree-branch-row"><span class="ico" data-icon="folder-open" id="fx-tree-branch-ico" aria-hidden="true"></span><span class="tree-label">src</span></span>
       <ul role="group" id="fx-tree-group">
-        <li role="treeitem" aria-level="2" aria-selected="true" tabindex="-1" id="fx-tree-selected"><span class="tree-row" id="fx-tree-selected-row"><span class="ico" data-icon="file-code" id="fx-tree-selected-ico" aria-hidden="true"></span><span class="tree-label" id="fx-tree-selected-label">app.ts</span><span class="tree-meta" id="fx-tree-selected-meta">3</span></span></li>
+        <li role="treeitem" aria-level="2" aria-selected="true" tabindex="-1" id="fx-tree-selected"><span class="tree-row" id="fx-tree-selected-row"><span class="ico" data-icon="file-code" id="fx-tree-selected-ico" aria-hidden="true"></span><span class="tree-label" id="fx-tree-selected-label">app.ts</span><span class="tree-meta" id="fx-tree-selected-meta"><button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="star" id="fx-tree-selected-action" aria-label="favourite app.ts"></button>3</span></span></li>
         <li role="treeitem" aria-level="2" aria-expanded="false" tabindex="-1" id="fx-tree-closed"><span class="tree-row" id="fx-tree-closed-row"><span class="ico" data-icon="folder" aria-hidden="true"></span><span class="tree-label">lib</span></span></li>
         <li role="treeitem" aria-level="2" tabindex="-1" id="fx-tree-leaf"><span class="tree-row" id="fx-tree-leaf-row"><span class="ico" data-icon="file" id="fx-tree-leaf-ico" aria-hidden="true"></span><span class="tree-label" id="fx-tree-long">a-file-name-long-enough-to-truncate-in-a-narrow-tree.md</span><span class="tree-meta" id="fx-tree-meta">m</span></span></li>
         <li role="treeitem" aria-level="2" aria-disabled="true" tabindex="-1" id="fx-tree-disabled"><span class="tree-row" id="fx-tree-disabled-row"><span class="tree-label">off</span></span></li>
@@ -1114,10 +1116,11 @@ const FORCED_GLYPHS = [
   ["a selected leaf's glyph", "#fx-tree-selected-ico", {}], ["a panel head's glyph (a .ico this file colours)", "#fx-panel-ico", {}],
   ["the vertical splitter's line", "#fx-vsplit", LINE], ["the grip", "#fx-hsplit", LINE],
 ];
-// [what, the focusable element, the element that draws its inset ring]
+// [what, the focusable element, the element that draws its ring, whether the ring sits outside it]
 const FORCED_RINGS = [
   ["a current row", "#fx-sel-current", "#fx-sel-current"], ["an aria-selected row", "#fx-sel-selected", "#fx-sel-selected"],
   ["a selected tree row", "#fx-tree-selected", "#fx-tree-selected-row"], ["a current tree link", "#fx-navtree-current", "#fx-navtree-current"],
+  ["a control inside a selected tree row", "#fx-tree-selected-action", "#fx-tree-selected-action", true],
   ["a row at rest", "#fx-sel", "#fx-sel"],
 ];
 // [what, the chosen row's words, the resting neighbour's words]
@@ -1165,8 +1168,8 @@ const forcedCell = async (label, theme, palette) => {
   // inset ring is read from a strip along its start edge, focused and not: the unfocused strip must
   // be blank, or the ring measured is something else's ink.
   const rings = [];
-  for (const [what, focusable, drawer] of FORCED_RINGS) {
-    const b = await W(`W.edge(${JSON.stringify(drawer)})`);
+  for (const [what, focusable, drawer, outside = false] of FORCED_RINGS) {
+    const b = await W(`W.edge(${JSON.stringify(drawer)}, ${outside})`);
     const off = await clipInk(b);
     const on = await forcing("focus-visible", [focusable], () => clipInk(b));
     if (!(on.n >= 30 && on.strongest >= 3)) rings.push(`${what}: its ring reaches ${on.strongest.toFixed(2)}:1 (${on.mark} on ${on.bg}), ${on.n} px`);

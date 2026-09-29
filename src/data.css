@@ -625,6 +625,16 @@ section.doc.tab-panel { margin-top: 1.35rem; }
   }
   .tab:is(:disabled, [aria-disabled="true"]) * { color: inherit; }
   .tab:is(:disabled, [aria-disabled="true"]):focus-visible { outline-color: CanvasText; }
+  /* SELECTED AND DISABLED — a view whose subject went away while it was open. It is still the one
+     shown, so it keeps the Highlight fill, and its word takes the disabled treatment on it: HighlightText
+     at 45% into Highlight. Its ring is the selected one, HighlightText: the disabled CanvasText ring
+     on Highlight measured 1.86:1 (light) and 2.41:1 (dark). Without this the disabled rule above won
+     and the fill went. */
+  .tab[aria-selected="true"]:is(:disabled, [aria-disabled="true"]) {
+    background: Highlight;
+    color: color-mix(in srgb, HighlightText 45%, Highlight);
+  }
+  .tab[aria-selected="true"]:is(:disabled, [aria-disabled="true"]):focus-visible { outline-color: HighlightText; }
   table.dense tr[data-pin] > :first-child { border-inline-start: 3px solid CanvasText; }
   tr[aria-disabled="true"] > :not(:first-child) { color: GrayText; }
   .chart text { fill: CanvasText; }

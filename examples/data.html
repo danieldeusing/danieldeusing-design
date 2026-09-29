@@ -494,6 +494,12 @@
             <div id="sec-plain" role="tabpanel" aria-labelledby="tab-plain"><p>the plain view.</p></div>
             <div id="sec-formatted" role="tabpanel" aria-labelledby="tab-formatted" hidden><p>the formatted view.</p></div>
             <div id="sec-syntax" role="tabpanel" aria-labelledby="tab-syntax" hidden><p>not for this file.</p></div>
+            <div class="tabs tabs--compact" role="tablist" aria-label="review view" id="stale-tabs">
+              <button type="button" class="tab" role="tab" id="tab-stale" aria-controls="sec-stale" aria-selected="true" aria-disabled="true">diff (gone)</button>
+              <button type="button" class="tab" role="tab" id="tab-log" aria-controls="sec-log" aria-selected="false" tabindex="-1">log</button>
+            </div>
+            <div id="sec-stale" role="tabpanel" aria-labelledby="tab-stale"><p>selected AND disabled: the diff this view was opened on is gone.</p></div>
+            <div id="sec-log" role="tabpanel" aria-labelledby="tab-log" hidden><p>the log.</p></div>
           </div>
           <div>
             <div class="strip-host">

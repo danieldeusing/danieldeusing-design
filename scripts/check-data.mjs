@@ -539,7 +539,7 @@ for (const scheme of ["light", "dark"]) {
   const owned = [];
   for (const [clip, target, kind] of [
     ["#page-tabs", "#tab-activity", "fill"], ["#page-tabs", "#tab-queue", "text"], ["#page-tabs", "#tab-modes", "text"],
-    ["#tab-syntax", "#tab-syntax", "text"],
+    ["#tab-syntax", "#tab-syntax", "text"], ["#stale-tabs", "#tab-stale", "fill"],
     ["#dense-table", "#row-pinned > td:first-child", "mark"], ["#dense-table", "#row-disabled > td:nth-child(3)", "text"],
     ["#trend", "#trend text", "mark"], ["#trend", "#trend circle.chart-dot:nth-of-type(3)", "mark"], ["#trend", "#trend .chart-dot--hollow", "mark"],
   ]) owned.push(await owns(clip, target, kind));
@@ -551,7 +551,7 @@ for (const scheme of ["light", "dark"]) {
     const sel = box("#tab-activity"), off = box("#tab-queue");
     const selFill = px(sel.left + 3, sel.top + sel.height / 2), offFill = px(off.left + 3, off.top + off.height / 2);
     const label = ink(text("#tab-activity")), offLabel = ink(text("#tab-queue")), disabled = ink(text("#tab-modes"));
-    return { fills: M.ratio(selFill, offFill), label: label.ratio, onFill: same(label.bg, selFill), offLabel: offLabel.ratio,
+    return { fills: M.ratio(selFill, offFill), label: label.ratio, onFill: same(label.bg, selFill), offLabel: offLabel.ratio, selFill, labelInk: label.ink,
       disabled: disabled.ratio, disabledInk: disabled.ink, enabledInk: offLabel.ink };`);
   await check(`X1 ${scheme} — the selected tab's label is painted on its fill, not on a backplate, at ${r2(tabs.label)}:1`,
     () => tabs.onFill && tabs.label >= 4.5, shown(tabs));
@@ -567,6 +567,16 @@ for (const scheme of ["light", "dark"]) {
   await check(`X1 ${scheme} — a disabled tab is GrayText at .45 (painted ${r2(tabs.disabled)}:1 disabled, ${r2(syntax.ratio)}:1 aria-disabled), not the enabled tabs' ink`,
     () => faded.every(Boolean) && tabs.disabled >= 2 && syntax.ratio >= 2 && tabs.disabledInk.join() !== tabs.enabledInk.join(),
     shown([faded, tabs.disabled, syntax.ratio, tabs.disabledInk, tabs.enabledInk]));
+
+  // Selected AND disabled keeps the selected tab's Highlight fill, with its word faded on it — told
+  // apart from an enabled selected tab by that word, and still readable as painted.
+  await shoot("#stale-tabs");
+  const stale = await measure(`
+    const r = box("#tab-stale"), fill = px(r.left + 3, (r.top + r.bottom) / 2), word = ink(text("#tab-stale"));
+    return { fill, word: word.ratio, wordInk: word.ink, onFill: same(word.bg, fill),
+      fillAsSelected: same(fill, ${JSON.stringify(tabs.selFill)}), inkApart: M.ratio(word.ink, ${JSON.stringify(tabs.labelInk)}) };`);
+  await check(`X1 ${scheme} — a SELECTED disabled tab keeps the Highlight fill, its word faded on it (${r2(stale.word)}:1, ${r2(stale.inkApart)}:1 off an enabled selected tab's word)`,
+    () => stale.fillAsSelected && stale.onFill && stale.word >= 1.5 && stale.inkApart >= 1.5, shown([stale, tabs.selFill, tabs.labelInk]));
 
   await shoot("#dense-table");
   const rows = await measure(`
@@ -605,7 +615,8 @@ for (const scheme of ["light", "dark"]) {
     await theme(t);
     const ringAt = (id) => `const r = box("#${id}"), y = (r.top + r.bottom) / 2; return M.ratio(px(r.left + 1, y), px(r.left + 4.5, y));`;
     const rings = [];
-    for (const id of ["tab-activity", "tab-queue", "tab-syntax"]) {
+    const clipOf = { "tab-syntax": "#tab-syntax", "tab-stale": "#stale-tabs" };
+    for (const id of ["tab-activity", "tab-queue", "tab-syntax", "tab-stale"]) {
       if (id === "tab-activity") {
         await evaluate(`document.querySelector("#tabs .lede a").focus(); null`);
         await press("Tab");
@@ -614,12 +625,11 @@ for (const scheme of ["light", "dark"]) {
       }
       const focus = await evaluate(`document.activeElement.id === "${id}" && document.activeElement.matches(":focus-visible")`);
       await settle();
-      await shoot("#page-tabs");
-      await shoot(id === "tab-syntax" ? "#tab-syntax" : "#page-tabs");
+      await shoot(clipOf[id] || "#page-tabs");
       const on = await measure(ringAt(id));
       await evaluate(`document.activeElement.blur(); null`);
       await settle();
-      await shoot(id === "tab-syntax" ? "#tab-syntax" : "#page-tabs");
+      await shoot(clipOf[id] || "#page-tabs");
       const off = await measure(ringAt(id));
       rings.push({ id, focus, on, off });
     }
@@ -628,6 +638,8 @@ for (const scheme of ["light", "dark"]) {
     // A disabled tab's text is faded, its focus ring is not (2.4.7): a whole CanvasText ring, 3:1.
     await check(`X1 ${scheme} ${t} — ...and an aria-disabled tab's ring is NOT faded with it: ${r2(rings[2].on)}:1 off its fill, gone without the focus`,
       () => rings[2].focus && rings[2].on >= 3 && rings[2].off < 1.1, shown(rings[2]));
+    await check(`X1 ${scheme} ${t} — ...and a SELECTED disabled tab's ring stays visible on its Highlight fill: ${r2(rings[3].on)}:1, gone without the focus`,
+      () => rings[3].focus && rings[3].on >= 3 && rings[3].off < 1.1, shown(rings[3]));
   }
   await theme("warm");
 }

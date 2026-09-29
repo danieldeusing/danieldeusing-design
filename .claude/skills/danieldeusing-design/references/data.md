@@ -386,7 +386,9 @@ says what was asked for, not what reached the screen:
   under a forced palette: one look for unavailable everywhere, and WCAG exempts a disabled control
   from contrast. It paints at about 3:1. The .45 is in its ink (`GrayText` mixed into `Canvas`, under
   `none`), not the tab's opacity, which faded its focus ring to 2.4:1 — the ring is a whole
-  `CanvasText` one (21:1). A disabled row, which is muted text rather than faded, is `GrayText`.
+  `CanvasText` one (21:1). A tab both selected and disabled keeps the `Highlight` fill with its word at
+  the disabled treatment (`HighlightText` 45% into `Highlight`) and the selected `HighlightText` ring.
+  A disabled row, which is muted text rather than faded, is `GrayText`.
 - A pinned row's bar is a real 3px `CanvasText` border, on the card's edge when stacked.
 - **A chart is repainted.** SVG keeps its theme colours under a forced palette, so on a dark one
   warm's chart text measured 3.52:1, its line 2.94:1 and its first series' bars 2.93:1, and the key's

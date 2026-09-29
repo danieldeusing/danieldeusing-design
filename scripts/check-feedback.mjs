@@ -35,7 +35,7 @@
  *   node scripts/check-feedback.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname, extname, sep } from "node:path";
@@ -89,7 +89,8 @@ const chrome = spawn(CHROME, [
   "--window-size=1280,900", `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close();
+  rmSync(profile, { recursive: true, force: true, maxRetries: 10 }); };
 process.on("exit", shutdown);
 
 let port = 0;
@@ -142,6 +143,14 @@ const check = async (label, thunk) => {
   const lines = Array.isArray(problems) ? problems : [String(problems)];
   console.log(`FAIL  ${label}${lines.map((line) => `\n        ${line}`).join("")}`);
 };
+// Whatever still escapes a check is a FAIL naming the last check to pass, never a bare stack.
+for (const event of ["uncaughtException", "unhandledRejection"]) {
+  process.on(event, (error) => {
+    console.log(`FAIL  the suite threw after: ${lastPassed}\n        ${String(error?.message || error).split("\n")[0]}`);
+    console.log("\ncheck-feedback: ABORTED");
+    process.exit(1);
+  });
+}
 
 /* ── in the page: colour maths, and "does this element compute what this declaration would" ─── */
 const HELPERS = String.raw`
@@ -316,7 +325,7 @@ const FIXTURE = `
     <div class="empty" id="fx-fc-empty" data-icon="folder-open"></div>
     <div class="empty" id="fx-fc-empty-warn" data-tone="warning" data-icon="triangle-alert"></div>
     <div class="notice notice--lg" id="fx-fc-notice-lg" data-tone="success" data-icon="circle-check"></div>
-    <p class="callout" id="fx-fc-callout" data-tone="info" data-icon="info"> </p>
+    <p class="callout" id="fx-fc-callout" data-tone="info" data-icon="info">i</p>
     <span class="tag" id="fx-fc-tag-glyph" data-tone="info" data-icon="package"></span>
     <span class="tag tag--icon" id="fx-fc-tag-icon" data-tone="info" data-icon="eye-off" role="img" aria-label="private"></span>
     <span class="tag" style="--tag-color: var(--cat-teal)"><span class="ico" id="fx-fc-ico" data-icon="package"></span></span>
@@ -856,9 +865,8 @@ const PAIRS = [["#fx-tag", "background-color", "#fx-tag-solid", "background-colo
    Computed colours cannot see the one failure that matters most here. Under `forced-color-adjust:
    auto` Chromium paints a Canvas BACKPLATE behind every run of text, so a --solid tag's word, drawn
    Canvas on a CanvasText fill, lands on Canvas and vanishes — while its computed pair still says
-   21:1. So each glyph fixture (nothing in it but the glyph) and each word on a fill is captured and
-   decoded, and the brightest pixel is measured against the darkest: a glyph must reach 3:1, a word
-   4.5:1. Twice the pixel density, so a 1px stroke has pixels it covers fully. */
+   21:1. So each glyph, each word on a fill and each focus ring is captured and decoded. Twice the
+   pixel density, so a 1px stroke has pixels it covers fully. */
 const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.captureScreenshot writes
   let pos = 8, width = 0, height = 0, bpp = 4;
   const idat = [];
@@ -878,62 +886,127 @@ const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.cap
       out[y * stride + x] = (raw[line + x] + [0, a, b, (a + b) >> 1, paeth][filter]) & 255;
     }
   }
-  const lum = (i) => [0, 1, 2].map((k) => out[i + k] / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
-    .reduce((sum, v, k) => sum + v * [0.2126, 0.7152, 0.0722][k], 0);
-  let lo = 1, hi = 0;
-  for (let i = 0; i < out.length; i += bpp) { const l = lum(i); lo = Math.min(lo, l); hi = Math.max(hi, l); }
-  return { width, height, ratio: (hi + 0.05) / (lo + 0.05) };
+  return { width, height, at: (x, y) => { const i = y * stride + x * bpp; return [out[i], out[i + 1], out[i + 2]]; } };
 };
-/* [what, how it is clipped, minimum]. A glyph: the box inside the border, where nothing but the glyph
-   is drawn. A word: the box of its own text, where a backplate would sit. A ring: the outline's top
-   band (offset 2px, width 2px) and the 2px outside it — an element opted out with `none` owns its
-   ring too, and keeps --ring unless the forced block says otherwise. */
-const PAINTED = [...["#fx-fc-empty", "#fx-fc-empty-warn", "#fx-fc-notice-lg", "#fx-fc-callout", "#fx-fc-tag-glyph", "#fx-fc-tag-icon",
-  "#fx-fc-ico", "#fx-fc-spinner", "#fx-fc-dot"].map((sel) => [sel, "glyph", 3]), ["#fx-tag-solid", "text", 4.5], ["#fx-count-overlay", "text", 4.5],
+const lum8 = (p) => p.map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+  .reduce((sum, v, k) => sum + v * [0.2126, 0.7152, 0.0722][k], 0);
+const ratio8 = (p, q) => { const [hi, lo] = [lum8(p), lum8(q)].sort((a, b) => b - a); return (hi + 0.05) / (lo + 0.05); };
+/* [what, its kind, minimum]. What each clip is FOR, and what hides only it:
+   · a glyph: its ::before's own box — hidden as that ::before — or, for a glyph that is an element
+     (.ico, .spinner, .dot), the box inside its border — hidden as the element;
+   · a word: the box of its own text, where a backplate would sit — hidden as its text nodes, wrapped
+     in a `visibility: hidden` span (the word and its backplate go, nothing else; `color: transparent`
+     is repainted by a forced palette, measured);
+   · a ring: the outline's top band (offset 2px, width 2px), edge to edge along the outline box — an element opted out with
+     `none` owns its ring too, and keeps --ring unless the forced block says otherwise — hidden as its outline. */
+const PAINTED = [...["#fx-fc-empty", "#fx-fc-empty-warn", "#fx-fc-notice-lg", "#fx-fc-callout", "#fx-fc-tag-glyph", "#fx-fc-tag-icon"]
+  .map((sel) => [sel, "glyph", 3, "::before"]), ...["#fx-fc-ico", "#fx-fc-spinner", "#fx-fc-dot"].map((sel) => [sel, "glyph", 3, ""]),
+  ["#fx-tag-solid", "text", 4.5], ["#fx-count-overlay", "text", 4.5],
   ...["#fx-fc-solid-button", "#fx-fc-tag-button", "#fx-fc-banner-link"].map((sel) => [sel, "ring", 3])];
-/* Captured WITHOUT captureBeyondViewport, after scrolling the element into view: that flag re-lays the
+/* OWNERSHIP, by a TWO-SHOT DIFF (X1). The same clip is captured twice, as drawn and with ONLY the target
+   hidden, and only the pixels that change are the target's: at least 3, all of them inside the target's
+   box ±1px (a ring: its band, edge to edge), the clip grown by PAD so ink that lands beside the box is
+   seen there. A neighbour's ink is the same in both shots and counts for nothing; a clip that slid off
+   its target (a scrollbar, captureBeyondViewport's re-layout, a box measured before a scroll) reads the
+   ink in the wrong place and fails. The first form of this proof — "the clip measures under 1.2:1 with
+   the element taken away" — passed a clip slid 8px along a fixture: the element took its border with it.
+   Then the ratio:
+   · a glyph or a ring: over the changed pixels, drawn against hidden — what it paints on what it covers;
+   · a word: inside the DRAWN shot, over its text box less the outermost 1px ring (where a backplate's
+     anti-aliased edge lands), changed pixels against the box's commonest colour — what the word
+     actually sits on. Never against the hidden shot: that is what lies UNDER a backplate, and a word
+     painted in its backplate's colour would read 21:1.
+   Captured WITHOUT captureBeyondViewport, after scrolling the element into view: that flag re-lays the
    page without its scrollbar, and a clip computed beforehand then reads pixels up to 7.5px away (WP12
    measured a 1.34:1 glyph passing at 21:1 that way). */
-const shoot = async (sel, kind) => {
-  const clip = await evaluate(`(() => {
-    const el = document.querySelector(${JSON.stringify(sel)});
-    el.scrollIntoView({ block: "center", behavior: "instant" });
-    const b = el.getBoundingClientRect(), cs = getComputedStyle(el), px = (p) => parseFloat(cs.getPropertyValue(p));
-    let r;
-    if (${JSON.stringify(kind)} === "text") { const range = document.createRange(); range.selectNodeContents(el); r = range.getBoundingClientRect(); }
-    else if (${JSON.stringify(kind)} === "ring") r = { left: b.left - 4, top: b.top - 6, width: b.width + 8, height: 4 };
-    else r = { left: b.left + px("border-left-width"), top: b.top + px("border-top-width"),
-      width: b.width - px("border-left-width") - px("border-right-width"), height: b.height - px("border-top-width") - px("border-bottom-width") };
-    return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, scale: 1 };
-  })()`);
-  const { data } = await send("Page.captureScreenshot", { format: "png", clip });
-  return decodePng(Buffer.from(data, "base64")).ratio;
+const PAD = 3;
+const targetOf = (sel, kind) => evaluate(`(() => {
+  const el = document.querySelector(${JSON.stringify(sel)});
+  el.scrollIntoView({ block: "center", behavior: "instant" });
+  const b = el.getBoundingClientRect(), cs = getComputedStyle(el), px = (p) => parseFloat(cs.getPropertyValue(p));
+  let r;
+  if (${JSON.stringify(kind)} === "text") { const range = document.createRange(); range.selectNodeContents(el); r = range.getBoundingClientRect(); }
+  else if (${JSON.stringify(kind)} === "ring") r = { left: b.left - 4, top: b.top - 4, width: b.width + 8, height: b.height + 8 };
+  else r = { left: b.left + px("border-left-width"), top: b.top + px("border-top-width"),
+    width: b.width - px("border-left-width") - px("border-right-width"), height: b.height - px("border-top-width") - px("border-bottom-width") };
+  return { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height };
+})()`);
+const HIDE = {
+  glyph: (sel, pseudo) => `(() => { const s = document.createElement("style"); s.id = "fx-unown";
+    s.textContent = ${JSON.stringify(`${sel}${pseudo} { visibility: hidden !important; }`)}; document.head.append(s); })()`,
+  text: (sel) => `(() => { const n = document.querySelector(${JSON.stringify(sel)});
+    for (const t of [...n.childNodes].filter((c) => c.nodeType === 3)) { const s = document.createElement("span"); s.className = "fx-unown"; s.style.visibility = "hidden"; t.replaceWith(s); s.append(t); } })()`,
+  // the outline alone: blurring would also take whatever else focus draws on the element
+  ring: (sel) => `document.querySelector(${JSON.stringify(sel)}).style.setProperty("outline-style", "none", "important")`,
 };
-const measure = async (sel, kind) => { if (kind === "ring") await tabTo(sel); return shoot(sel, kind); };
-/* Before any ratio is trusted, each clip must be reading ITS element: ink with the element there,
-   none with it taken away (hidden, its word made transparent, or its focus removed). A clip that lands
-   on a neighbour's ink fails here instead of passing everywhere below. */
-const HIDE = { glyph: "el.style.visibility = 'hidden'", text: "el.style.color = 'transparent'", ring: "el.blur()" };
-/* Under forced colours the page paints ink it did not paint before (a forced border, a Highlight ring),
-   so ownership is proven there too, on each palette: whatever ink the clip holds must go when the
-   element goes. Whether there IS ink is the painted check's question in that mode, not this one's. */
-const owned = (needInk) => async () => {
+const UNHIDE = `(() => { document.getElementById("fx-unown")?.remove(); for (const n of document.querySelectorAll("[style*=outline-style]")) n.style.removeProperty("outline-style"); for (const s of document.querySelectorAll("span.fx-unown")) s.replaceWith(...s.childNodes); })()`;
+/* A ::before glyph's OWN box, from the protocol: the page has no rect for a pseudo-element, and the
+   fixture's box is no stand-in for it. A glyph sitting 8px or more inside its panel reads the same
+   ink slid 8px and is still inside the panel (the callout, the large notice and the tag passed an 8px
+   slide that way). `DOM.getBoxModel` answers in the viewport's CSS px. */
+const pseudoBox = async (sel, pseudo) => {
+  const { root } = await send("DOM.getDocument", { depth: 0 });
+  const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: sel });
+  const { node } = await send("DOM.describeNode", { nodeId, depth: 1 });
+  const own = (node.pseudoElements || []).find((p) => p.pseudoType === pseudo.replace(/^::/, ""));
+  if (!own) throw new Error(`${sel} has no ${pseudo} to measure`);
+  const q = (await send("DOM.getBoxModel", { backendNodeId: own.backendNodeId })).model.border;
+  const xs = [q[0], q[2], q[4], q[6]], ys = [q[1], q[3], q[5], q[7]];
+  const [sx, sy] = await evaluate("[scrollX, scrollY]");
+  return { x: Math.min(...xs) + sx, y: Math.min(...ys) + sy, w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+};
+const paintOf = async (sel, kind, pseudo = "") => {
+  if (kind === "ring") await tabTo(sel);
+  let t = await targetOf(sel, kind); // scrolls it into view
+  if (kind === "glyph" && pseudo) t = await pseudoBox(sel, pseudo);
+  // a ring is read along its top band only (2px), but it is the whole outline box its ink must sit in
+  const clip = { x: t.x - PAD, y: t.y - PAD, width: t.w + 2 * PAD, height: (kind === "ring" ? 2 : t.h) + 2 * PAD, scale: 1 };
+  const drawn = decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip })).data, "base64"));
+  await evaluate(HIDE[kind](sel, pseudo));
+  const bare = decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip })).data, "base64"));
+  await evaluate(UNHIDE);
+  // the target's box in the capture's pixels (device pixels: k per CSS px), where the code believes the clip was placed
+  const k = drawn.width / clip.width, L = PAD * k, T = PAD * k, R = (PAD + t.w) * k, B = (PAD + t.h) * k;
+  const changed = (x, y) => { const p = drawn.at(x, y), q = bare.at(x, y); return Math.max(...p.map((v, i) => Math.abs(v - q[i]))) > 2; };
+  let n = 0, carried = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let y = 0; y < drawn.height; y += 1) for (let x = 0; x < drawn.width; x += 1) {
+    if (!changed(x, y)) continue;
+    n += 1; carried = Math.max(carried, ratio8(drawn.at(x, y), bare.at(x, y)));
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x + 1); y0 = Math.min(y0, y); y1 = Math.max(y1, y + 1);
+  }
+  const slack = k; // 1 CSS px
+  const inside = n > 0 && x0 >= L - slack && x1 <= R + slack && y0 >= T - slack && y1 <= B + slack;
+  const owns = n >= 3 && inside && (kind !== "ring" || (Math.abs(x0 - L) <= slack && Math.abs(x1 - R) <= slack && Math.abs(y0 - T) <= slack));
+  let ratio = carried;
+  if (kind === "text") {
+    const counts = new Map(), il = Math.ceil(L), it = Math.ceil(T), ir = Math.floor(R), ib = Math.floor(B);
+    for (let y = it; y < ib; y += 1) for (let x = il; x < ir; x += 1) { const key = drawn.at(x, y).join(","); counts.set(key, (counts.get(key) || 0) + 1); }
+    const ground = [...counts].sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
+    ratio = 1;
+    const e = Math.round(k); // the outermost 1 CSS px, in device pixels
+    for (let y = it + e; y < ib - e; y += 1) for (let x = il + e; x < ir - e; x += 1) if (changed(x, y)) ratio = Math.max(ratio, ratio8(drawn.at(x, y), ground));
+  }
+  const off = n ? [x0 - L, y0 - T, x1 - R, y1 - B].map((v) => Math.round(v / k)).join(",") : "";
+  return { owns, ratio, got: `${n} px changed${n ? `, off its box by [${off}] CSS px` : ""}, ${ratio.toFixed(2)}:1` };
+};
+/* Before any ratio is trusted, each clip must be reading ITS element: in normal colours first, then on
+   each forced palette, which paints ink the page did not paint before (a forced border, a Highlight
+   ring). `painted` asks the same again with each ratio, per theme: a ratio is never read off a clip
+   whose changed pixels are not its target's. */
+const owned = async () => {
   const problems = [];
-  for (const [sel, kind] of PAINTED) {
-    const on = await measure(sel, kind);
-    await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); ${HIDE[kind]}; })(); null`);
-    const off = await shoot(sel, kind);
-    await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.style.visibility = ""; el.style.color = ""; })(); null`);
-    if (!(off < 1.2)) problems.push(`${sel} (${kind}): ${off.toFixed(2)}:1 with it taken away — the ink in this clip is not this ${kind}'s`);
-    else if (needInk && !(on >= 1.5)) problems.push(`${sel} (${kind}): ${on.toFixed(2)}:1 with it there — the clip holds none of its ink`);
+  for (const [sel, kind, , pseudo] of PAINTED) {
+    const p = await paintOf(sel, kind, pseudo);
+    if (!p.owns) problems.push(`${sel} (${kind}): ${p.got} — the ink in this clip is not this ${kind}'s, or not where it is`);
   }
   return problems;
 };
 const painted = async () => {
   const problems = [];
-  for (const [sel, kind, min] of PAINTED) {
-    const ratio = await measure(sel, kind);
-    if (!(ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${ratio.toFixed(2)}:1, wants ${min}`);
+  for (const [sel, kind, min, pseudo] of PAINTED) {
+    const p = await paintOf(sel, kind, pseudo);
+    if (!p.owns) problems.push(`${sel} (${kind}): ${p.got} — not its own ink, no ratio read`);
+    else if (!(p.ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${p.ratio.toFixed(2)}:1, wants ${min} (${p.got})`);
   }
   return problems;
 };
@@ -956,7 +1029,7 @@ const FORCED = String.raw`(() => {
    sits with (its host's, or its parent's for a glyph that is an element), on both palettes. */
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
 await evaluate(`document.documentElement.classList.add("anim-off"); null`);
-await check("X1 painted: every clip reads its own element (ink with it, none without it), before any forced ratio is trusted", owned(true));
+await check("X1 painted: every clip reads its own element (its changed pixels, where the element is), before any forced ratio is trusted", owned);
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   await sleep(100);
@@ -978,7 +1051,7 @@ for (const scheme of ["light", "dark"]) {
       return va === vb ? [what + ": both " + va] : [];
     });
   })()`));
-  await check(`X1 forced colours, ${scheme} palette: whatever ink each clip holds is its element's (none with it taken away)`, owned(false));
+  await check(`X1 forced colours, ${scheme} palette: each clip's changed pixels are its element's, where the element is`, owned);
   // Every theme: a forced palette overrides the glyphs and the words, but a ring under `none` keeps
   // the THEME's --ring, which is dark on warm and paper and light on green and mono.
   for (const theme of THEMES) {

@@ -422,8 +422,13 @@ a.stat-cta:hover {
   inline-size: var(--icon-size);
   block-size: var(--icon-size);
 }
-.panel-head > .disclosure-btn,
-.panel-actions {
+/* Everything else in the head is --foreground at zero specificity, so a class, a link's colour or a
+   tag's own wins. The disclosure button inherits by its own rule, so it is named. Bare text directly
+   in the head takes the head's colour: wrap it (a <span>, a <time>). */
+:where(.panel-head > :not(.ico)) {
+  color: var(--foreground);
+}
+.panel-head > .disclosure-btn {
   color: var(--foreground);
 }
 /* Any heading level; the class sets the size. 500 like K2's card title. */
@@ -853,7 +858,8 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   border-inline-start: 1px solid color-mix(in srgb, var(--muted-foreground) 40%, transparent);
 }
 /* The row's colour is its glyph's (muted on a leaf, --primary on a branch): a glyph paints the colour
-   of its parent, never one of its own. The label states --foreground. */
+   of its parent, never one of its own. The label states --foreground, which is why `.tree-label` is
+   REQUIRED around the label text: text straight in the row would take the glyph's colour. */
 .tree-row {
   display: flex;
   align-items: center;

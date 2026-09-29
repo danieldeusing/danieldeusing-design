@@ -209,7 +209,7 @@ transparent, rule-less entity cards move to. **A container: no hover, no focus o
 
 | part | what it is |
 |---|---|
-| `.panel-head` | the strip. Its colour is `--primary`, and a glyph in it takes that colour (the title, a disclosure button and the actions state their own) |
+| `.panel-head` | the strip. Its colour is `--primary`, which only its glyph takes: every other child is `--foreground` (a link keeps its link colour). Bare text straight in the head takes the head's colour — wrap it |
 | `.panel-title` | any heading level; body size, weight 500 like a card title; cut off with an ellipsis rather than wrapped, so the head stays one line |
 | `.panel-head--eyebrow` | the title in eyebrow type — studio's pane heads and explorer strips |
 | `.panel-actions` | at the head's end: `.btn-icon`s, a `.segmented`, a select |
@@ -290,8 +290,10 @@ tree's selected row is the same marker.
   `.count` or glyph from any package: 7.80:1 or better on every theme.
 - **A tone on the tint fails too** — a warning tag measured 3.73:1 (paper, over `--muted`), and no
   lighter tint saves it. Inside a chosen row every tone (`data-tone`) is mixed 20% toward
-  `--foreground`: it keeps its hue and reaches 4.63:1 or better on every theme and surface. Nothing
-  to do in the markup; tags, counts and dots in a chosen row are safe.
+  `--foreground`: it keeps its hue and reaches 4.63:1 or better on every theme and surface. Only the
+  five status tones are lifted — `success`, `warning`, `destructive`, `info`, `pending`; `primary`
+  (4.72) and `muted` (7.80) need no lift. A category hue (`--cat-*`) is not lifted and passes by
+  its own margin (4.70 at worst). Any other colour inside a chosen row is not covered: measure it.
 - **The rail's trailing `←` is not copied.** It points from the right-hand rail back at the content;
   a list or a tree sits on the content's left, where the same arrow points away from what it
   describes.
@@ -379,8 +381,10 @@ framework components (a framework never lets a design-system script walk nodes i
 
 - **Depth is drawn, as in the rail**: each level hangs 1rem further in off a vertical guide, so the
   eye can follow which parent a row belongs to.
-- **The label goes in `.tree-label`** — that span is what is cut off with an ellipsis when the name
-  is longer than the tree is wide.
+- **The label goes in `.tree-label`, and it is required.** The row carries its glyph's colour (muted
+  on a leaf, `--primary` on a branch), because a glyph paints its parent's colour; the label resets
+  to `--foreground`. Text straight in the row would take the glyph's colour. The span is also what
+  is cut off with an ellipsis when the name is longer than the tree is wide.
 - **A branch** (a treeitem with `aria-expanded`) gets a chevron — right when closed, down when open —
   and its folder glyph is `--primary`; a leaf gets a spacer, so leaves and branches line up. Glyphs:
   `folder-open` / `folder` for a branch, `file` / `file-code` for a leaf. The chevron is

@@ -362,6 +362,7 @@ const FIXTURE = `
   </ul>
   <div data-tone="warning"><article class="card-terminal card-terminal--flash" id="fx-card-flash-leak"><h3 class="card-title">untoned flash in a toned box</h3></article></div>
   <div style="width: 20rem"><article class="card-terminal" id="fx-card-lone"><h3 class="card-title">lone</h3><p class="card-desc">desc</p></article></div>
+  <section class="panel" id="fx-panel-leak"><header class="panel-head"><span class="ico" data-icon="folder-tree" id="fx-leak-ico" aria-hidden="true"></span><span id="fx-leak-text">bare</span><time id="fx-leak-time" datetime="2026-09-29">today</time><span class="dot" id="fx-leak-dot" aria-hidden="true"></span></header></section>
   <div style="width: 20rem"><article class="card-terminal" id="fx-card-p-title"><p class="card-title" id="fx-title-on-p">a title on a p</p></article></div>
   <div style="width: 20rem"><div class="card-terminal" id="fx-card-orphan" style="position: relative"><h3 class="card-title"><a class="card-link" id="fx-card-orphan-link" href="#fx">no --link on the card</a></h3><p class="card-desc" id="fx-card-orphan-text">text</p></div></div>
   <ul class="card-grid" id="fx-grid-narrow" style="--card-min: 12rem; width: 150px"><li class="card-terminal">a</li></ul>
@@ -701,6 +702,9 @@ const runExpect = async (suffix) => {
 
 /* Geometry: what the declarations are FOR. Measured from the laid-out boxes. */
 const GEOMETRY = [
+  ["K5 the head's --primary reaches its glyph only: text, a <time> and an untoned dot in the head are --foreground", () => evaluate(`(${JSON.stringify([
+    ["#fx-leak-ico", "", "color", "var(--primary)"], ["#fx-leak-text", "", "color", "var(--foreground)"],
+    ["#fx-leak-time", "", "color", "var(--foreground)"], ["#fx-leak-dot", "", "background-color", "var(--foreground)"]])}).map((r) => window.__wp8.expect(...r)).filter(Boolean)`)],
   ["K2/K5/K7 a card, panel or entry title leads --lh-tight whatever element carries it (base.css gives only h1-h3 that leading)", () => W(`(() => {
     const want = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lh-tight"));
     return ["#fx-card-title", "#fx-panel-title", "#fx-entry-title", "#fx-title-on-p"].map((id) => {
@@ -877,14 +881,21 @@ await check("the demo page shows every element and state the spec names", () => 
    ".console .console-dots", ".console .console-status .dot--pulse", ".console-line--current", ".console-body mark"]
   .filter((sel) => !document.querySelector(sel)).map((sel) => "missing on the demo page: " + sel)`));
 
-await check("every tree on the demo is ONE tab stop, and every treeitem is focusable (APG, a navigation tree included)", () => evaluate(`
-  [...document.querySelectorAll('[role="tree"]')].flatMap((tree) => {
+await check("every tree and listbox on the demo is ONE tab stop, and every item is focusable (APG, a navigation tree included)", () => evaluate(`
+  [...document.querySelectorAll('[role="tree"], [role="listbox"]')].flatMap((tree) => {
     const out = [], name = tree.id || tree.getAttribute("aria-label");
     const stops = [...tree.querySelectorAll("a[href], button, [tabindex]")].filter((el) => el.tabIndex >= 0);
     if (stops.length !== 1) out.push(name + ": " + stops.length + " tab stops, want 1 (a roving tabindex)");
-    const items = [...tree.querySelectorAll('[role="treeitem"]')];
-    if (!items.length) out.push(name + ": no treeitem");
+    const items = [...tree.querySelectorAll('[role="treeitem"], [role="option"]')];
+    if (!items.length) out.push(name + ": no item");
     for (const it of items) if (!it.hasAttribute("tabindex")) out.push(name + ": a treeitem that cannot take focus (" + it.textContent.trim().slice(0, 20) + ")");
+    return out;
+  })`));
+await check("every tree row's words on the demo sit in a .tree-label (the row carries the glyph's colour)", () => evaluate(`
+  [...document.querySelectorAll(".tree-row")].flatMap((row) => {
+    const walk = document.createTreeWalker(row, NodeFilter.SHOW_TEXT), out = [];
+    for (let n = walk.nextNode(); n; n = walk.nextNode())
+      if (n.textContent.trim() && !n.parentElement.closest(".tree-label, .tree-meta")) out.push("text outside .tree-label: " + n.textContent.trim().slice(0, 30));
     return out;
   })`));
 await check("aria-selected on the demo sits only on roles that support it (option, row, gridcell, tab, treeitem)", () => evaluate(`
@@ -1143,9 +1154,11 @@ const inkOf = async (sel, { lead = false, inset = 0, hide = "" } = {}) => {
   await setHide(`${sel}${hide} { visibility: hidden !important; }`);
   const blank = await clipInk(b);
   await setHide("");
-  return { ...ink, blank: blank.n };
+  return { ...ink, blank: blank.strongest };
 };
-const owns = (ink) => ink.blank <= Math.max(2, ink.n * 0.05);
+// The estate's form: with the mark hidden, no pixel of the clip may stand out from the rest by more
+// than 1.1:1. A count of stray pixels let a clip that grazed a neighbour pass.
+const owns = (ink) => ink.blank <= 1.1;
 // [what, selector, how to clip it and what to hide to take its mark away]
 const CHEVRON = { lead: true, hide: "::before" }, LINE = { inset: 2, hide: "::before" };
 const FORCED_GLYPHS = [
@@ -1180,7 +1193,7 @@ const forcedCell = async (label, theme, palette) => {
   await check(`${where}: precondition — the emulation took`, () =>
     [env.forced ? null : "(forced-colors: active) does not match", env.dark === (palette === "dark") ? null : "prefers-color-scheme is not " + palette].filter(Boolean));
   const faint = [], foreign = [];
-  const own = (what, ink) => { if (!owns(ink)) foreign.push(`${what}: ${ink.blank} of its ${ink.n} px of ink stay with its mark hidden`); };
+  const own = (what, ink) => { if (!owns(ink)) foreign.push(`${what}: with its mark hidden the clip still holds a ${ink.blank.toFixed(2)}:1 pair`); };
   for (const [what, sel, how] of FORCED_GLYPHS) {
     const ink = await inkOf(sel, how);
     own(what, ink);
@@ -1221,7 +1234,7 @@ const forcedCell = async (label, theme, palette) => {
       if (was === "") el.removeAttribute("tabindex"); else el.setAttribute("tabindex", was); })(); null`);
     rings.push(...landed.map((l) => `${what}: ${l}`));
     if (!(on.n >= 30 && on.strongest >= 3)) rings.push(`${what}: its ring reaches ${on.strongest.toFixed(2)}:1 (${on.mark} on ${on.bg}), ${on.n} px`);
-    if (off.n > Math.max(2, on.n * 0.05)) rings.push(`${what}: ${off.n} px of ink in the strip unfocused — it reads something else`);
+    if (off.strongest > 1.1) rings.push(`${what}: the strip holds a ${off.strongest.toFixed(2)}:1 pair unfocused — it reads something else`);
   }
   await check(`${where}: a focused row draws its ring at 3:1 on its own fill, chosen rows included (${FORCED_RINGS.length}, from pixels)`, () => rings);
   await check(`${where}: every clip holds its element's ink — hidden, the mark takes its ink with it (${FORCED_GLYPHS.length + 2 * FORCED_STATES.length + 1} clips)`, () => foreign);
@@ -1347,6 +1360,12 @@ const SAMPLES = [
   { name: "K9 selected row · untoned tag", html: `<ul class="tree"><li aria-selected="true"><span class="tree-row"><span class="tree-meta"><span class="tag" data-m>t</span></span></span></li></ul>`, kind: "text" },
   { name: "K9 selected row · count", html: `<ul class="tree"><li aria-selected="true"><span class="tree-row"><span class="tree-meta"><span class="count" data-m>3</span></span></span></li></ul>`, kind: "text" },
   ...TONES.map((t) => ({ name: `K9 selected row · ${t} tag`, html: `<ul class="tree"><li aria-selected="true"><span class="tree-row"><span class="tree-meta"><span class="tag" data-tone="${t}" data-m>t</span></span></span></li></ul>`, kind: "text" })),
+  { name: "K9 nav current row · untoned tag", html: `<ul class="tree"><li role="none"><a class="tree-row" role="treeitem" aria-current="page" href="#"><span class="tree-label">x</span><span class="tree-meta"><span class="tag" data-m>t</span></span></a></li></ul>`, kind: "text" },
+  { name: "K9 nav current row · count", html: `<ul class="tree"><li role="none"><a class="tree-row" role="treeitem" aria-current="page" href="#"><span class="tree-label">x</span><span class="tree-meta"><span class="count" data-m>3</span></span></a></li></ul>`, kind: "text" },
+  ...TONES.map((t) => ({ name: `K9 nav current row · ${t} tag`, html: `<ul class="tree"><li role="none"><a class="tree-row" role="treeitem" aria-current="page" href="#"><span class="tree-label">x</span><span class="tree-meta"><span class="tag" data-tone="${t}" data-m>t</span></span></a></li></ul>`, kind: "text" })),
+  { name: "K6 selected option · untoned tag", html: `<ul class="row-list row-list--select" role="listbox"><li role="none"><button class="list-row" role="option" aria-selected="true"><span class="list-row-meta"><span class="tag" data-m>t</span></span></button></li></ul>`, kind: "text" },
+  { name: "K6 selected option · count", html: `<ul class="row-list row-list--select" role="listbox"><li role="none"><button class="list-row" role="option" aria-selected="true"><span class="list-row-meta"><span class="count" data-m>3</span></span></button></li></ul>`, kind: "text" },
+  ...TONES.map((t) => ({ name: `K6 selected option · ${t} tag`, html: `<ul class="row-list row-list--select" role="listbox"><li role="none"><button class="list-row" role="option" aria-selected="true"><span class="list-row-meta"><span class="tag" data-tone="${t}" data-m>t</span></span></button></li></ul>`, kind: "text" })),
   { name: "K9 leaf glyph · selected row", html: `<ul class="tree"><li aria-selected="true"><span class="tree-row"><span class="ico" data-icon="file" data-m></span></span></li></ul>`, kind: "glyph", fg: "background-color", against: "outside" },
   { name: "K9 row ring (inset, on the selected row)", html: `<ul class="tree"><li aria-selected="true"><span class="tree-row" data-m>x</span></li></ul>`, kind: "ring" },
   { name: "K9 guide per level", html: `<ul class="tree"><li><ul role="group" data-m><li>x</li></ul></li></ul>`, kind: "info", fg: "border-left-color", against: "outside" },

@@ -1165,13 +1165,22 @@ const forcedCell = async (label, theme, palette) => {
   await check(`${where}: the grip under the pointer is another colour than at rest, and reaches 3:1`, () =>
     [lit.mark === rest.mark ? `rest and hover are both ${rest.mark}` : null, lit.strongest >= 3 ? null : `hover reaches ${lit.strongest.toFixed(2)}:1`].filter(Boolean));
   // An element under forced-color-adjust: none keeps its author outline-color too. Each focused row's
-  // inset ring is read from a strip along its start edge, focused and not: the unfocused strip must
-  // be blank, or the ring measured is something else's ink.
+  // ring is read from a strip along its edge, focused and not: the unfocused strip must be blank, or
+  // the ring measured is something else's ink. The focus is a REAL keyboard focus (Tab, as the X2
+  // cases do): a :focus-visible forced through DevTools computes an outline that need not paint. A
+  // roving treeitem (tabindex -1) is made tabbable for the press, as the focused item of a tree is.
   const rings = [];
   for (const [what, focusable, drawer, outside = false] of FORCED_RINGS) {
-    const b = await W(`W.edge(${JSON.stringify(drawer)}, ${outside})`);
-    const off = await clipInk(b);
-    const on = await forcing("focus-visible", [focusable], () => clipInk(b));
+    const off = await clipInk(await W(`W.edge(${JSON.stringify(drawer)}, ${outside})`));
+    await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(focusable)});
+      el.dataset.tabindexWas = el.getAttribute("tabindex") ?? ""; if (el.tabIndex < 0) el.setAttribute("tabindex", "0"); })(); null`);
+    await tabTo(focusable);
+    const landed = await focused(focusable);
+    const on = await clipInk(await W(`W.edge(${JSON.stringify(drawer)}, ${outside})`));
+    await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(focusable)}); el.blur();
+      const was = el.dataset.tabindexWas; delete el.dataset.tabindexWas;
+      if (was === "") el.removeAttribute("tabindex"); else el.setAttribute("tabindex", was); })(); null`);
+    rings.push(...landed.map((l) => `${what}: ${l}`));
     if (!(on.n >= 30 && on.strongest >= 3)) rings.push(`${what}: its ring reaches ${on.strongest.toFixed(2)}:1 (${on.mark} on ${on.bg}), ${on.n} px`);
     if (off.n > Math.max(2, on.n * 0.05)) rings.push(`${what}: ${off.n} px of ink in the strip unfocused — it reads something else`);
   }

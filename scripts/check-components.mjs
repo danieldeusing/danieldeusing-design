@@ -20,6 +20,8 @@
  *   HIDDEN  `hidden` hides every component, whatever `display` the component sets;
  *   STATES  disabled is .45 and does not answer the pointer; busy is full strength and keeps focus;
  *           a popup whose first child is not a row still lays its rows out flush;
+ *   COARSE  under a coarse pointer every control is a 44px target;
+ *   MOTION  reduced motion stops the busy spinner and the cursor blink, and nothing else does;
  *   RADIUS  no corner on the page is rounded, except a circle.
  *
  * A real browser (layout, cascade and the forced-colours mode are the subject), served off the
@@ -171,6 +173,7 @@ for (let i = 0; i < 50; i += 1) {
 // A forced :hover would otherwise be read mid-transition. The select.js trigger gets a name to aim at.
 await evaluate(`(() => {
   const s = document.createElement("style");
+  s.id = "no-motion";
   s.textContent = "*, *::before, *::after { transition: none !important; animation: none !important; }";
   document.head.append(s);
   document.querySelector("#sel-model").closest(".select-field").querySelector(".select-trigger").id = "trigger-model";
@@ -405,6 +408,39 @@ await section("STATES — disabled, busy, and a panel that starts with something
   })()`);
   check("a panel whose first child is not a row (a search row, then the listbox) lays its rows out flush",
     flush.ulPad === "0px" && flush.ulMargin === "0px" && flush.rowLeft === 1, flush);
+});
+
+/* ── COARSE and MOTION ────────────────────────────────────────────────────── */
+await section("COARSE — a 44px target under a coarse pointer", async () => {
+  // Touch emulation is what makes (pointer: coarse) match in a headless shell; the media override alone does not.
+  await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  await send("Emulation.setEmulatedMedia", { features: [{ name: "pointer", value: "coarse" }] });
+  await sleep(80);
+  const box = await evaluate(`(() => {
+    const b = (sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return [Math.round(r.width * 100) / 100, Math.round(r.height * 100) / 100]; };
+    return { coarse: matchMedia("(pointer: coarse)").matches, ghost: b("#btn-ghost"), bin: b("#btn-bin"), pencil: b("#btn-edit"), disclosure: b("#disc-1"),
+      label: b("#f-hint"), fold: b("#fold-plain > summary"), compactFold: b("#fold-compact > summary") };
+  })()`);
+  await send("Emulation.setEmulatedMedia", { features: [] });
+  await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  check("the coarse pointer is emulated (the check can see it at all)", box.coarse, box);
+  check("buttons, a button label and every fold summary are 44px tall; the bin, the pencil and the disclosure 44px square",
+    box.ghost[1] >= 44 && box.label[1] >= 44 && box.fold[1] >= 44 && box.compactFold[1] >= 44 &&
+    [box.bin, box.pencil, box.disclosure].every(([w, h]) => w >= 44 && h >= 44), box);
+});
+
+await section("MOTION — reduced motion stops the spinner and the blink", async () => {
+  const read = `[cs("#btn-busy", "::before").animationName, cs(".cursor-block").animationName]`;
+  await evaluate(`document.getElementById("no-motion").disabled = true; null`);
+  const moving = await evaluate(read);
+  await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+  await sleep(80);
+  const still = await evaluate(read);
+  const glyph = await evaluate(`cs("#btn-busy", "::before").maskImage.startsWith("url(")`);
+  await send("Emulation.setEmulatedMedia", { features: [] });
+  await evaluate(`document.getElementById("no-motion").disabled = false; null`);
+  check("without the preference the spinner turns and the cursor blinks (so the check can fail)", moving.every((n) => n !== "none"), moving);
+  check("with it both stop, and the spinner's glyph stays", still.every((n) => n === "none") && glyph, { still, glyph });
 });
 
 /* ── RADIUS ───────────────────────────────────────────────────────────────── */

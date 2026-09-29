@@ -57,9 +57,10 @@ says "60 minutes ago", and an old item reads "1 year ago", not "400 days ago". A
 and a year 365: a relative label is an approximation by nature.
 
 **Only an ISO-8601 string, a `Date` or epoch milliseconds is an instant.** Anything else is echoed,
-however date-like: V8 reads `"2026-13-45 junk"` as the 13th of June while Firefox refuses it, and a
-stored value that means a date in one browser and nothing in another is the estate disagreeing with
-itself. A space may stand for the `T`; it is then local time, like the system's own stamp.
+however date-like: V8 reads `"2026-13-45 junk"` as the 13th of June and rolls `"2026-02-30"` into
+March while Firefox refuses both, and a stored value that means a date in one browser and nothing in
+another is the estate disagreeing with itself. A space may stand for the `T`; it is then local time,
+like the system's own stamp.
 
 **Data stays UTC.** Stored values, comparison keys, filename stamps and ISO sorts never go through
 these functions — only what a person reads converts. A calendar DATE (a publication day, "last

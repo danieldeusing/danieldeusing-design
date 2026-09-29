@@ -87,7 +87,13 @@ function formatter(kind) {
 // The ISO-8601 shape every store in the estate writes: a date, or a date and time with an optional
 // fraction and an optional `Z` / `±HH:MM`. A space may stand for the `T` — the system's own stamp
 // shape reads back as local time.
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+const ISO_INSTANT = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+
+// The right shape can still name a day that does not exist, and V8 ROLLS it over: "2026-02-30" is the
+// 2nd of March to Chrome and nothing to Firefox. So the fields are checked before any engine sees them.
+const onTheCalendar = ([, year, month, day, hour = 0, minute = 0, second = 0]) =>
+  month >= 1 && month <= 12 && day >= 1 && day <= new Date(Date.UTC(year, month, 0)).getUTCDate() &&
+  hour <= 23 && minute <= 59 && second <= 59;
 
 /**
  * An instant as epoch milliseconds, or null when there is none to read.
@@ -106,7 +112,11 @@ export function parseInstant(value) {
   if (value == null || value === "") return null;
   let time = NaN;
   if (value instanceof Date || typeof value === "number") time = new Date(value).getTime();
-  else if (typeof value === "string" && ISO_INSTANT.test(value.trim())) time = new Date(value.trim().replace(" ", "T")).getTime();
+  else if (typeof value === "string") {
+    const text = value.trim();
+    const fields = ISO_INSTANT.exec(text);
+    if (fields && onTheCalendar(fields)) time = new Date(text.replace(" ", "T")).getTime();
+  }
   return Number.isFinite(time) ? time : null;
 }
 

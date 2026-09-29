@@ -303,6 +303,9 @@ dropdown `initTableTools()` builds in a table header had no click-away and no Es
   `dd-menu-*` ids. If a patch strips one anyway, `initDropdowns()` puts it back — it watches those
   attributes, and writes only a value that differs, so it cannot loop. Focus and node identity across
   a patch are the renderer's to keep.
+  **Give the summary, and each label, its own id.** Otherwise the runtime writes a `dd-menu-*` id the
+  new markup does not carry, the patcher sees a different element, rebuilds the summary and the panel,
+  and focus is lost.
 - **A summary may be an icon button**: `<summary class="btn-icon btn-icon--bare" data-icon="history"
   aria-label="history"></summary>` (`.btn-icon` is in `controls.md`).
 - **A menu the page builds and places itself** — a context menu, a menu under a button — gets the

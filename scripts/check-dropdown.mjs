@@ -127,6 +127,11 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8"><style>
       <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" id="g-desc">descending</button></li>
     </ul></li>
   </ul></details>
+<span id="rowhdr">row actions</span>
+<details class="dropdown" id="ddn"><summary id="sn">⋯</summary>
+  <ul class="dropdown-panel" aria-labelledby="rowhdr"><li><button type="button" class="dropdown-item" id="n1">copy</button></li></ul></details>
+<details class="dropdown" id="ddu"><summary>view</summary>
+  <ul class="dropdown-panel"><li><button type="button" class="dropdown-item" id="u1">compact</button></li></ul></details>
 <div id="patch-mount"></div>
 <button id="pm-opener">opener</button>
 <ul id="pm" role="menu" aria-label="page menu" hidden>
@@ -523,6 +528,24 @@ await section("a renderer that patches attributes cannot un-mark a menu (N1)", a
   await press("ArrowDown");
   check("...and the arrow keys still walk it", (await focused()) === "i-dup", await focused());
   await reset();
+
+  // The menu's NAME through a strip: an author's aria-labelledby is the author's; the runtime's own
+  // (a dd-menu-* id on the summary) follows the summary to the id the runtime has to re-make.
+  const nameOf = (id) => evaluate(`(() => { const p = document.querySelector("#${id} .dropdown-panel"); const ref = p.getAttribute("aria-labelledby");
+    return { ref, name: document.getElementById(ref)?.textContent.trim() ?? null }; })()`);
+  await evaluate(`(() => { const p = document.querySelector("#ddn .dropdown-panel"); p.removeAttribute("role");
+    const s = document.getElementById("sn"); s.removeAttribute("id"); s.removeAttribute("aria-haspopup"); })()`);
+  await sleep(40);
+  const authored = await nameOf("ddn");
+  check("a menu the author names (aria-labelledby → \"row actions\") keeps that name through a strip and repair",
+    authored.ref === "rowhdr" && authored.name === "row actions"
+      && (await evaluate(`document.querySelector("#ddn .dropdown-panel").getAttribute("role")`)) === "menu", authored);
+  const own = (await nameOf("ddu")).ref;
+  await evaluate(`document.querySelector("#ddu summary").removeAttribute("id"); null`);
+  await sleep(40);
+  const renamed = await nameOf("ddu");
+  check("remove ONLY the summary's id: the runtime's own aria-labelledby moves to the summary's new dd-menu-* id, and the menu keeps its name",
+    renamed.ref !== own && /^dd-menu-/.test(renamed.ref) && renamed.name === "view", { before: own, after: renamed });
 
   const candidates = [process.env.DD_COCKPIT_DOM_PATCH, join(root, "../danieldeusing-infra/cockpit/pages/dom-patch.js"),
     join(root, "../../danieldeusing-infra/cockpit/pages/dom-patch.js")].filter(Boolean);

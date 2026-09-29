@@ -295,6 +295,14 @@ dropdown `initTableTools()` builds in a table header had no click-away and no Es
   open: a `<button>`'s own handler ignores it, and an `<a>` item does not follow its link (the
   runtime cancels it). In a `<dialog>`, Escape closes the menu and stops there — the dialog stays
   open.
+- **A renderer that re-renders a menu writes the grouped shape and leaves the runtime's attributes
+  alone.** A page that patches its markup in place (cockpit's `cockpitPatch`) writes each labelled
+  section as the group below, never the flat label-then-items, and does not answer for what the
+  runtime wrote: `role` on the panel, the rows and the `li`s, `tabindex="-1"` on the items, the
+  summary's `aria-haspopup` and `aria-expanded`, an `aria-labelledby` the runtime set, and its
+  `dd-menu-*` ids. If a patch strips one anyway, `initDropdowns()` puts it back — it watches those
+  attributes, and writes only a value that differs, so it cannot loop. Focus and node identity across
+  a patch are the renderer's to keep.
 - **A summary may be an icon button**: `<summary class="btn-icon btn-icon--bare" data-icon="history"
   aria-label="history"></summary>` (`.btn-icon` is in `controls.md`).
 - **A menu the page builds and places itself** — a context menu, a menu under a button — gets the

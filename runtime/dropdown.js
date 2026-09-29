@@ -35,6 +35,11 @@
  *     left exactly as the platform made it: no menu roles, and Tab walks through it. Announcing a
  *     text field as a menu would be a lie the reader acts on.
  *
+ * A RENDERER MAY PATCH, BUT NOT UN-MARK. A page that re-renders by patching attributes strips
+ * every attribute its markup does not carry. The observer also watches the attributes the runtime
+ * owns (OWNED) and re-marks; every write is conditional, so a re-mark of a correct menu writes
+ * nothing and cannot loop.
+ *
  * DELEGATED, AND IT KEEPS MARKING. The old version bound the dropdowns that existed when it was
  * called. runtime/tabletools.js builds its header dropdowns AFTER that, from rows that arrive over
  * the network, so every one of them had no click-away and no Escape — on the pages that have the
@@ -65,7 +70,22 @@ const isMenu = (panel) => panel?.getAttribute("role") === "menu";
 
 const only = (el) => (el.tagName === "LI" && el.childElementCount === 1 ? el.firstElementChild : null);
 const rowOf = (el) => (el.matches(ROW) ? el : only(el)?.matches(ROW) ? only(el) : null);
-const groupOf = (el) => (el.matches('[role="group"]') ? el : only(el)?.matches('[role="group"]') ? only(el) : null);
+// A group is a list (or a div) whose first row is a `.dropdown-label` — what groupSections() writes
+// and what an author may write already. Recognised by its SHAPE, not its role: a renderer that
+// patches attributes can strip `role="group"`, and the group must still be found to be re-named.
+const LIST = /^(UL|OL|DIV)$/;
+const groupOf = (el) => {
+  const box = LIST.test(el.tagName) && !el.matches(ROW) ? el : only(el) && LIST.test(only(el).tagName) ? only(el) : null;
+  const first = box?.firstElementChild && rowOf(box.firstElementChild);
+  return first?.matches(".dropdown-label") ? box : null;
+};
+// Every attribute the runtime owns is written only when it differs, so re-marking after a renderer
+// stripped one is a repair, and re-marking a menu that is already right writes nothing — the
+// observer that watches these attributes can never feed itself.
+const set = (el, name, value) => {
+  if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+};
+const OWNED = ["role", "tabindex", "aria-haspopup", "aria-expanded", "aria-labelledby", "id"];
 
 /* The rows a panel is made of — through the groups mark() made — or null when it holds anything
    that is not a row. */
@@ -91,11 +111,8 @@ function groupSections(panel) {
     const section = [children[i]];
     while (i + 1 < children.length && rowOf(children[i + 1])?.matches(".dropdown-item")) section.push(children[(i += 1)]);
     if (section.length < 2) continue;
-    if (!label.id) label.id = `dd-menu-${(counter += 1)}`;
     const inList = section[0].tagName === "LI";
     const group = document.createElement(inList ? "ul" : "div");
-    group.setAttribute("role", "group");
-    group.setAttribute("aria-labelledby", label.id);
     const holder = inList ? document.createElement("li") : group;
     if (inList) holder.append(group);
     section[0].before(holder);
@@ -103,7 +120,8 @@ function groupSections(panel) {
   }
 }
 
-/* Idempotent: called on insert, whenever a panel's rows change, and on open. */
+/* Idempotent: called on insert, whenever a panel's rows change or a renderer strips one of the
+   runtime's attributes, and on open. It writes only what differs (`set`). */
 function mark(details) {
   const summary = summaryOf(details);
   const panel = summary && panelOf(details);
@@ -112,20 +130,27 @@ function mark(details) {
   // roles. No surface changes a panel's kind today — add an unmark when one does.
   if (!rows) return;
 
-  panel.setAttribute("role", "menu");
+  set(panel, "role", "menu");
   if (!summary.id) summary.id = `dd-menu-${(counter += 1)}`;
-  if (!panel.hasAttribute("aria-label") && !panel.hasAttribute("aria-labelledby")) {
-    panel.setAttribute("aria-labelledby", summary.id);
-  }
-  summary.setAttribute("aria-haspopup", "menu");
-  summary.setAttribute("aria-expanded", String(details.open));
+  // The runtime names the menu only where the author did not: an `aria-labelledby` of its own
+  // (a `dd-menu-*` id) is re-pointed when the summary's id had to be re-made.
+  const named = panel.getAttribute("aria-labelledby");
+  if (!panel.hasAttribute("aria-label") && (!named || named.startsWith("dd-menu-"))) set(panel, "aria-labelledby", summary.id);
+  set(summary, "aria-haspopup", "menu");
+  set(summary, "aria-expanded", String(details.open));
   groupSections(panel);
-  for (const li of panel.querySelectorAll("li:not(.dropdown-sep)")) li.setAttribute("role", "none");
+  for (const group of [...panel.children].map(groupOf).filter(Boolean)) {
+    const label = rowOf(group.firstElementChild);
+    if (!label.id) label.id = `dd-menu-${(counter += 1)}`;
+    set(group, "role", "group");
+    set(group, "aria-labelledby", label.id);
+  }
+  for (const li of panel.querySelectorAll("li:not(.dropdown-sep)")) set(li, "role", "none");
   for (const row of rows) {
-    if (row.matches(".dropdown-sep")) row.setAttribute("role", "separator");
+    if (row.matches(".dropdown-sep")) set(row, "role", "separator");
     else if (row.matches(".dropdown-item")) {
-      if (!CHOICE_ROLES.includes(row.getAttribute("role"))) row.setAttribute("role", "menuitem");
-      row.tabIndex = -1;
+      if (!CHOICE_ROLES.includes(row.getAttribute("role"))) set(row, "role", "menuitem");
+      set(row, "tabindex", "-1");
     }
   }
 }
@@ -272,7 +297,7 @@ export function attachMenuKeys(panel, { onClose, returnFocusTo } = {}) {
 function setOpen(details, open) {
   details.open = open;
   const summary = summaryOf(details);
-  if (summary?.hasAttribute("aria-haspopup")) summary.setAttribute("aria-expanded", String(open));
+  if (summary?.hasAttribute("aria-haspopup")) set(summary, "aria-expanded", String(open));
   if (open) closeAll(details);
 }
 
@@ -294,7 +319,7 @@ function onToggle(event) {
   if (!(details instanceof HTMLDetailsElement) || !details.classList.contains("dropdown")) return;
   mark(details);
   const summary = summaryOf(details);
-  if (summary?.hasAttribute("aria-haspopup")) summary.setAttribute("aria-expanded", String(details.open));
+  if (summary?.hasAttribute("aria-haspopup")) set(summary, "aria-expanded", String(details.open));
   if (details.open) closeAll(details);
 }
 
@@ -410,7 +435,11 @@ export function initDropdowns(root = document) {
     document.addEventListener("toggle", onToggle, true);
     document.addEventListener("click", onClick);
     document.addEventListener("keydown", onKeydown);
-    new MutationObserver(onMutations).observe(document.documentElement, { childList: true, subtree: true });
+    // Attributes too: a renderer that patches attributes (cockpit's cockpitPatch) strips the ones
+    // no markup carries — the menu roles, tabindex="-1", the summary's aria-* — and a menu stripped
+    // mid-read is a list of loose buttons in the tab order. Re-marking puts back exactly those.
+    new MutationObserver(onMutations).observe(document.documentElement,
+      { childList: true, subtree: true, attributes: true, attributeFilter: OWNED });
   }
   for (const details of root.querySelectorAll("details.dropdown")) mark(details);
   return closeAll;

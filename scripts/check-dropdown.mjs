@@ -24,6 +24,12 @@
  * machine cannot talk to each other's browser. No browser: it SKIPS loudly (and fails under
  * DD_REQUIRE_BROWSER=1), as the other browser checks do.
  *
+ * A RENDERER THAT PATCHES ATTRIBUTES must not un-mark a menu: a page that strips the runtime's
+ * attributes while the menu is open, and cockpit's real dom-patch.js (`cockpitPatch`), read from
+ * the infra checkout beside this repository or DD_COCKPIT_DOM_PATCH. Missing, that case SKIPS
+ * loudly, and fails under DD_REQUIRE_COCKPIT_DOM_PATCH=1. After the runtime has put the attributes
+ * back, 1.5s must pass with no mutation at all: a re-mark that wrote even an equal value would loop.
+ *
  *   node scripts/check-dropdown.mjs
  */
 import { spawn } from "node:child_process";
@@ -107,6 +113,21 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8"><style>
 <span id="late-slot"></span>
 <dialog id="dlg"><details class="dropdown" id="ddd"><summary id="sd">in a dialog</summary>
   <ul class="dropdown-panel"><li><button type="button" class="dropdown-item" id="id1">one</button></li></ul></details></dialog>
+<details class="dropdown" id="ddg"><summary id="sg">pre-grouped</summary>
+  <ul class="dropdown-panel">
+    <li role="none"><ul role="group" aria-labelledby="g-sort">
+      <li role="none"><span class="dropdown-label" id="g-sort">sort by</span></li>
+      <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true" id="g-name">name</button></li>
+      <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" id="g-stars">stars</button></li>
+    </ul></li>
+    <li class="dropdown-sep" role="separator"></li>
+    <li role="none"><ul role="group" aria-labelledby="g-order">
+      <li role="none"><span class="dropdown-label" id="g-order">order</span></li>
+      <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true" id="g-asc">ascending</button></li>
+      <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" id="g-desc">descending</button></li>
+    </ul></li>
+  </ul></details>
+<div id="patch-mount"></div>
 <button id="pm-opener">opener</button>
 <ul id="pm" role="menu" aria-label="page menu" hidden>
   <li role="none"><button type="button" role="menuitem" id="pm1">open</button></li>
@@ -173,10 +194,22 @@ socket.onmessage = (event) => {
   pending.delete(message.id);
   message.error ? slot.bad(new Error(JSON.stringify(message.error))) : slot.ok(message.result);
 };
+// Declared before send(): its timeout can fire before the first check has run.
+let last = "(none yet)";
+// A page stuck in a loop (a MutationObserver that feeds itself) never answers again, and a suite
+// that waits for it forever says nothing at all. So no DevTools call waits longer than 20s: past
+// that the run ends with a FAIL naming the last check that completed.
 const send = (method, params = {}) => new Promise((ok, bad) => {
   messageId += 1;
-  pending.set(messageId, { ok, bad });
-  socket.send(JSON.stringify({ id: messageId, method, params }));
+  const id = messageId;
+  const timer = setTimeout(() => {
+    console.log(`FAIL  the page stopped answering (${method}, 20s) after "${last}" — a runaway loop in the page`);
+    console.log("\ncheck-dropdown: FAILED");
+    shutdown();
+    process.exit(1);
+  }, 20000);
+  pending.set(id, { ok: (v) => { clearTimeout(timer); ok(v); }, bad: (e) => { clearTimeout(timer); bad(e); } });
+  socket.send(JSON.stringify({ id, method, params }));
 });
 const evaluate = async (expression) => {
   const { result, exceptionDetails } = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -218,7 +251,6 @@ const reset = () => evaluate("closeAll(); document.getElementById('before').focu
 const focusOn = (id) => evaluate(`document.getElementById(${JSON.stringify(id)}).focus(); null`);
 
 let failures = 0;
-let last = "(none yet)";
 const check = (label, condition, detail) => {
   last = label;
   if (condition) { console.log(`PASS  ${label}`); return; }
@@ -288,6 +320,16 @@ await section("a panel of rows is a menu; a panel holding a field is not", async
     (await evaluate(`document.querySelector("#ddv .dropdown-label").hasAttribute("aria-hidden")`)) === false);
   await reset(); await focusOn("sv"); await press("ArrowDown"); await press("ArrowDown"); await press("ArrowDown"); await press("ArrowDown");
   check("...and the arrow keys walk from one group into the next", (await focused()) === "v-asc", await focused());
+
+  // Markup already written in the grouped shape (a renderer that writes it, a page-built menu
+  // copied into a details) is read through its groups, not rejected as "holds something else".
+  const pre = await shape("ddg", "pre-grouped");
+  check("a details.dropdown written ALREADY GROUPED is a menu with its two named groups",
+    (await evaluate(`document.querySelector("#ddg .dropdown-panel").getAttribute("role")`)) === "menu"
+      && JSON.stringify(pre) === JSON.stringify([{ group: "sort by", items: ["menuitemradio", "menuitemradio"] },
+        { group: "order", items: ["menuitemradio", "menuitemradio"] }]), pre);
+  await reset(); await focusOn("sg"); await press("ArrowDown"); await press("ArrowDown"); await press("ArrowDown");
+  check("...and ArrowDown crosses from its first group into its second", (await focused()) === "g-asc", await focused());
   await reset();
 
   const disclosure = await evaluate(`({ role: document.querySelector("#ddx .dropdown-panel").getAttribute("role"),
@@ -452,6 +494,65 @@ await section("markup rendered later", async () => {
   check("a row ADDED to an existing menu is marked too (a pick list rebuilt from new values)",
     (await attr("l3", "role")) === "menuitem" && (await attr("l3", "tabindex")) === "-1",
     { role: await attr("l3", "role"), tabindex: await attr("l3", "tabindex") });
+});
+
+/* ── a renderer that patches attributes ──────────────────────────────────── */
+// Every attribute the runtime owns inside a dropdown, as one string to compare before and after.
+const OWNED = ["role", "tabindex", "aria-haspopup", "aria-expanded", "aria-labelledby", "id"];
+const owned = (id) => evaluate(`JSON.stringify([...document.getElementById(${JSON.stringify(id)}).querySelectorAll("*")]
+  .map((el) => ${JSON.stringify(OWNED)}.map((a) => el.getAttribute(a))))`);
+// Mutation records under `id` in a window of `ms`, starting now.
+const quiet = (id, ms) => evaluate(`new Promise((ok) => { let n = 0; const o = new MutationObserver((r) => { n += r.length; });
+  o.observe(document.getElementById(${JSON.stringify(id)}), { attributes: true, childList: true, subtree: true });
+  setTimeout(() => { o.disconnect(); ok(n); }, ${ms}); })`);
+
+await section("a renderer that patches attributes cannot un-mark a menu (N1)", async () => {
+  await reset(); await focusOn("s1"); await press("ArrowDown");
+  const before = await owned("dd1");
+  const stripped = quiet("dd1", 80);
+  await evaluate(`(() => { const p = document.querySelector("#dd1 .dropdown-panel");
+    p.removeAttribute("role"); p.removeAttribute("aria-labelledby");
+    for (const el of p.querySelectorAll("li, .dropdown-item, [role='group']")) { el.removeAttribute("role"); el.removeAttribute("tabindex"); el.removeAttribute("aria-labelledby"); }
+    const s = document.getElementById("s1"); s.removeAttribute("aria-haspopup"); s.setAttribute("aria-expanded", "false"); })()`);
+  const seen = await stripped;
+  const after = await owned("dd1");
+  const settled = await quiet("dd1", 1500);
+  check("the page strips the menu's roles, tabindex and aria-* while it is open, and the runtime puts every one back",
+    seen > 0 && after === before, { records: seen, same: after === before });
+  check(`...and then nothing moves for 1.5s — ${settled} mutation records (a re-mark that rewrites loops)`, settled === 0, settled);
+  await press("ArrowDown");
+  check("...and the arrow keys still walk it", (await focused()) === "i-dup", await focused());
+  await reset();
+
+  const candidates = [process.env.DD_COCKPIT_DOM_PATCH, join(root, "../danieldeusing-infra/cockpit/pages/dom-patch.js"),
+    join(root, "../../danieldeusing-infra/cockpit/pages/dom-patch.js")].filter(Boolean);
+  const file = candidates.find((path) => existsSync(path));
+  if (!file) {
+    console.log(`SKIP  cockpit's dom-patch.js is not beside this checkout (looked in ${candidates.join(", ")})`);
+    check("DD_REQUIRE_COCKPIT_DOM_PATCH is not set, so a missing dom-patch.js may skip", process.env.DD_REQUIRE_COCKPIT_DOM_PATCH !== "1");
+    return;
+  }
+  await evaluate(readFileSync(file, "utf8"));
+  // What a cockpit renderer writes: no runtime attribute, and a labelled section in the grouped shape.
+  const html = '<details class="dropdown" id="ddp"><summary id="sp">patched</summary><ul class="dropdown-panel">' +
+    '<li><ul role="group" aria-labelledby="p-lbl"><li><span class="dropdown-label" id="p-lbl">view</span></li>' +
+    '<li><button type="button" class="dropdown-item" id="p1">one</button></li><li><button type="button" class="dropdown-item" id="p2">two</button></li></ul></li>' +
+    '<li class="dropdown-sep"></li><li><button type="button" class="dropdown-item" id="p3">three</button></li></ul></details>';
+  await evaluate(`document.getElementById("patch-mount").innerHTML = ${JSON.stringify(html)}; null`);
+  await sleep(40);
+  await focusOn("sp"); await press("ArrowDown");
+  const marked = await owned("patch-mount");
+  const patched = quiet("patch-mount", 80);
+  await evaluate(`cockpitPatch(document.getElementById("patch-mount"), ${JSON.stringify(html)}); null`);
+  const touched = await patched;
+  const repaired = await owned("patch-mount");
+  const calm = await quiet("patch-mount", 1500);
+  check(`cockpitPatch (${file.split("/").slice(-3).join("/")}) strips the runtime's attributes, and the runtime puts every one back`,
+    touched > 0 && repaired === marked && (await evaluate(`document.querySelector("#ddp .dropdown-panel").getAttribute("role")`)) === "menu",
+    { records: touched, same: repaired === marked });
+  check(`...and then nothing moves for 1.5s — ${calm} mutation records`, calm === 0, calm);
+  await evaluate(`document.getElementById("patch-mount").innerHTML = ""; null`);
+  await reset();
 });
 
 /* ── attachMenuKeys: a menu the page builds itself ───────────────────────── */

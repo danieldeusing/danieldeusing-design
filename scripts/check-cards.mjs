@@ -10,13 +10,15 @@
  *      takes the room, the stretched link that takes the click) are measured as geometry.
  *   2. Is every new pairing legible? WCAG contrast of each text, glyph, edge and ring on four themes
  *      and the three surfaces a component can land on (--background, --card, --muted), composited
- *      through every translucent layer. Printed as a table; text under 4.5:1, or a glyph or ring
- *      under 3:1, FAILS. An `info` row is a divider or a decorative edge, reported and not gated.
+ *      through every translucent layer and every opacity between the mark and the surface. Printed
+ *      as a table; text under 4.5:1, or a glyph or ring under 3:1, FAILS. An `info` row is a
+ *      divider or a decorative edge, reported and not gated.
  *   3. Does the file stand alone? The demo page is rendered twice — with reset, base, components and
- *      chrome, and with `?bare` (tokens.css + cards.css) — and 60 listed computed properties of
- *      every fixture this file styles must agree between the two, font-family and font-size among
- *      them (X2). The focus rings are asserted ONLY in ?bare, where no global :focus-visible rule
- *      exists to supply a ring the component forgot (X2).
+ *      chrome, and with `?bare` (tokens.css + cards.css) — and 58 listed properties of every fixture
+ *      this file styles must agree between the two, font-family and font-size among them (X2); an
+ *      element's size is its rendered box, since computed width and height follow the page's
+ *      box-sizing reset. The focus rings are asserted ONLY in ?bare, where no global
+ *      :focus-visible rule exists to supply a ring the component forgot (X2).
  *   4. Does `hidden` hide every component? With tokens.css loaded, whatever display the class sets
  *      (X3). Until this branch carries WP1's rule the demo supplies it as a marked stand-in.
  *   5. Do the states survive forced colours (X1)? Each state pair must compute two different colours
@@ -190,6 +192,14 @@ window.__wp8 = (() => {
     for (const n of chain.reverse()) colour = over(parse(getComputedStyle(n).backgroundColor), colour);
     return colour;
   };
+  // How much of a mark reaches the screen: every opacity from the surface down to the element, and the
+  // pseudo-element's own. A colour read without it measures a glyph at full strength that is drawn at
+  // 60% — the spec's first tree chevron was exactly that, and passed a colour-only reading.
+  const alpha = (el, pseudo) => {
+    let a = pseudo ? Number(getComputedStyle(el, pseudo).opacity) : 1;
+    for (let n = el; n; n = n.parentElement) { a *= Number(getComputedStyle(n).opacity); if (n.dataset && n.dataset.surface) break; }
+    return a;
+  };
   const probe = (el, prop, expr) => {
     const p = document.createElement("div");
     p.style.cssText = "position:absolute;visibility:hidden;display:block";
@@ -202,7 +212,7 @@ window.__wp8 = (() => {
   const q = (sel) => { const el = document.querySelector(sel); if (!el) throw new Error(sel + ": no such element"); return el; };
   const box = (sel) => q(sel).getBoundingClientRect();
   return {
-    parse, over, ratio, behind, q, box,
+    parse, over, ratio, behind, alpha, q, box,
     tok: (name) => probe(document.body, "color", "var(" + name + ")"),
     sys: (name) => probe(document.body, "color", name),
     // [sel, pseudo, prop, expr | {is}] → a problem string, or null when it matches
@@ -1160,12 +1170,15 @@ for (const theme of THEMES) {
         // the current row's inset edge: --primary over the row's own tint
         fg = W.over(W.parse(W.tok("--primary")), W.behind(el)); bg = W.behind(el);
       } else if (s.against === "outside") {
-        const under = W.behind(el.parentElement);
-        fg = W.over(W.parse(cs.getPropertyValue(s.fg)), W.over(W.parse(getComputedStyle(el).backgroundColor), under));
+        const under = W.behind(el.parentElement), mark = W.parse(cs.getPropertyValue(s.fg));
+        mark.a *= W.alpha(el, s.pseudo);
+        fg = W.over(mark, W.over(W.parse(getComputedStyle(el).backgroundColor), under));
         bg = under;
       } else {
         bg = W.behind(el);
-        fg = W.over(W.parse(cs.getPropertyValue(s.fg || "color")), bg);
+        const mark = W.parse(cs.getPropertyValue(s.fg || "color"));
+        mark.a *= W.alpha(el, s.pseudo);
+        fg = W.over(mark, bg);
       }
       out.push([s.name, s.kind, surface, W.ratio(fg, bg)]);
     }

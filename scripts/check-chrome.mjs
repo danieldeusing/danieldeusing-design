@@ -68,8 +68,19 @@ const overrides = new Map(
   }),
 );
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript", ".svg": "image/svg+xml" };
+/*
+ * THE TAILWIND ENTRY'S CASCADE, without Tailwind: tokens.css unlayered, chrome.css in
+ * `layer(components)`, exactly as src/tailwind.css imports them. An unlayered declaration beats
+ * every layered one, custom properties included — so a phone override of a token that tokens.css
+ * declares only survives there if it is !important. The unlayered `:root` line is the adversary:
+ * the token's own declaration, as tokens.css makes it.
+ */
+const LAYERED = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>@import url("/src/tokens.css"); @import url("/src/chrome.css") layer(components); :root { --status-h: 2rem; }</style>
+</head><body><main>content</main><footer class="status"><span class="status-left">x</span><nav class="status-right">y</nav></footer></body></html>`;
 const server = createServer((req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname)).replace(/^\/+/, "");
+  if (path === "__layered.html") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(LAYERED); return; }
   const file = overrides.get(path) ?? join(root, path);
   if (path.includes("..") || !existsSync(file)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "content-type": `${TYPES[extname(path)] || "application/octet-stream"}; charset=utf-8`, "cache-control": "no-store" });
@@ -547,6 +558,20 @@ const paper = await page(`({ toolbar: [T.cs(".page-toolbar", "position"), T.cs("
   body: T.cs(document.body, "paddingBottom"), toc: T.cs(".toc", "display") })`);
 await check("print: the toolbar stops sticking and loses its rule, the stack does not stick, the body drops the footer's room",
   () => paper.toolbar[0] === "static" && paper.toolbar[1] === "0px" && paper.stack === "static" && paper.body === "0px" && paper.toc === "none", paper);
+
+/* ═══ 13b. the phone overrides survive the Tailwind entry's layering ═══════════════════════════ */
+await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+await send("Emulation.setEmulatedMedia", { media: "", features: [] });
+{
+  const loaded = next("Page.loadEventFired");
+  await send("Page.navigate", { url: BASE.replace("examples/chrome.html", "__layered.html") });
+  await loaded;
+  await frames(2);
+}
+const layered = await evaluate(`({ status: getComputedStyle(document.documentElement).getPropertyValue("--status-h").trim(),
+  pad: getComputedStyle(document.body).paddingBottom, layers: [...document.styleSheets[0].cssRules].filter((r) => r.layerName === "components").length })`);
+await check("with chrome.css in layer(components) under an unlayered tokens.css (the Tailwind entry), a phone footer still gets 3.25rem",
+  () => layered.layers === 1 && layered.status === "3.25rem" && layered.pad === "52px", layered);
 
 /* ═══ 14. contrast of every text pairing the chrome adds, on four themes and three surfaces ═════ */
 await load("nobanner");

@@ -21,8 +21,11 @@
  *
  * The line is the bottom of the band `rootMargin: 0 0 -70% 0`, the value both sources had settled
  * on independently: a section becomes current as it reaches the top of the page, not when its last
- * line leaves the bottom. The observer fires whenever a target's top crosses that line, in either
- * direction, and its own entries say which side each target is on — so no rectangle is read.
+ * line leaves the bottom. The observer only says WHEN to look: on every callback the current entry
+ * is recomputed from where every target is now (one rect read per target). Its entries alone are
+ * not enough, because an instant jump can carry a target from above the band to below it without
+ * ever crossing it, and then no entry is delivered for that target at all: measured, 6 of 11
+ * upward TOC clicks left a lower section marked, and scrollTo(0) from the bottom left the last one.
  *
  * THE LAST TARGET PAST THE LINE, NOT THE TOPMOST ONE IN THE BAND. Both sources marked the topmost
  * target intersecting the band, which is right for small targets (pagr's headings) and wrong for
@@ -35,17 +38,19 @@
  * section shorter than the lower 70% of the viewport never reaches the line; give the page room
  * below it (its bottom padding) if its TOC must be able to mark it.
  *
- * Entries and targets rendered after the call are picked up (one MutationObserver, as the other
- * runtime modules do), so a page that builds its sections from data needs no second call. The
- * entry for the current section is re-marked after a re-render replaces the list.
+ * Entries and targets rendered after the call are picked up, and a target that goes is let go (one
+ * MutationObserver, as the other runtime modules do), so a page that builds its sections from data
+ * needs no second call. The mark is re-asserted when a renderer rewrites it: a list re-rendered
+ * from markup that never carries `aria-current` (cockpit's dom-patch writes attributes in place)
+ * would otherwise lose the mark until the next scroll crossed a line.
  *
  * @param {ParentNode} [root=document] where the entries live
  * @returns {{ destroy(): void }} stops the spy and clears the mark
  */
 export function initToc(root = document) {
-  const reached = new Set();
   const observed = new Set();
   let current = null;
+  let line = innerHeight * 0.3;
 
   const links = () => [...root.querySelectorAll("[data-toc-link]")];
   // Writes only what changed: this runs on every re-render the page does, not only on a scroll.
@@ -56,25 +61,29 @@ export function initToc(root = document) {
       else if (!on && link.hasAttribute("aria-current")) link.removeAttribute("aria-current");
     }
   };
+  // The last entry, in the ORDER OF THE LIST (the order of the page), whose target's top has
+  // reached the line — read from where the targets are now, never from which ones crossed.
+  const update = () => {
+    current = null;
+    for (const link of links()) {
+      const target = document.getElementById(link.getAttribute("data-toc-link"));
+      if (target && target.getBoundingClientRect().top <= line) current = link.getAttribute("data-toc-link");
+    }
+    mark();
+  };
 
   const spy = new IntersectionObserver(
     (entries) => {
-      for (const entry of entries) {
-        const line = entry.rootBounds ? entry.rootBounds.bottom : innerHeight * 0.3;
-        if (entry.boundingClientRect.top <= line) reached.add(entry.target.id);
-        else reached.delete(entry.target.id);
-      }
-      // The last in the ORDER OF THE LIST, which is the order of the page.
-      const past = links().filter((link) => reached.has(link.getAttribute("data-toc-link")));
-      current = past.length ? past[past.length - 1].getAttribute("data-toc-link") : null;
-      mark();
+      const bounds = entries[0]?.rootBounds;
+      if (bounds) line = bounds.bottom;
+      update();
     },
     { rootMargin: "0px 0px -70% 0px" },
   );
 
   const observeTargets = () => {
-    // A target a re-render replaced is let go, or a page that redraws its sections every poll
-    // would pile up detached nodes in the observer for the life of the tab.
+    // A target that left the page is let go, or a page that redraws its sections every poll would
+    // pile up detached nodes in the observer for the life of the tab.
     for (const target of observed) {
       if (target.isConnected) continue;
       spy.unobserve(target);
@@ -90,12 +99,25 @@ export function initToc(root = document) {
   observeTargets();
 
   const watcher = new MutationObserver((records) => {
-    if (!records.some((record) => record.addedNodes.length)) return;
-    observeTargets();
-    mark();
+    let moved = false;
+    let rewritten = false;
+    for (const record of records) {
+      if (record.type === "attributes") {
+        if (record.attributeName === "data-toc-link") moved = true;
+        else rewritten = true;
+      } else if ([...record.addedNodes, ...record.removedNodes].some((node) => node instanceof Element)) {
+        moved = true;
+      }
+    }
+    if (moved) {
+      observeTargets();
+      update();
+    } else if (rewritten) {
+      mark();
+    }
   });
   // The whole document, not `root`: the entries live in root, their targets anywhere on the page.
-  watcher.observe(document, { childList: true, subtree: true });
+  watcher.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-current", "data-toc-link"] });
 
   return {
     destroy() {

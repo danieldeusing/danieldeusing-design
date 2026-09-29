@@ -29,6 +29,8 @@
  */
 const KEY = "ls-nav";
 const TOGGLE = "[data-ls-nav-toggle]";
+// Everything measureChrome() reads a size from.
+const CHROME = "header.bar, .bar-stack, footer.status, .page-toolbar";
 
 /*
  * The rail runs BETWEEN the chrome — it must not cover the header bar or the
@@ -98,6 +100,14 @@ function write(root, name, value) {
 }
 
 let wired = false;
+let sizes = null;
+
+// Every piece of chrome on the page NOW, including one mounted after the first call (a route that
+// renders its own toolbar): observing an element twice is a no-op, so this is safe to repeat.
+function watchSizes() {
+  if (!sizes) return;
+  for (const el of document.querySelectorAll(CHROME)) sizes.observe(el);
+}
 
 export function initLsNav() {
   // MEASURED ON EVERY PAGE, RAIL OR NOT (0.60.0). This used to return early on a page with no
@@ -105,7 +115,10 @@ export function initLsNav() {
   // to sit between the chrome, silently fell back to 3rem / 2.2rem on exactly the rail-less docs
   // the template recommends. The sticky layers read what this writes too.
   measureChrome();
-  if (wired) return;
+  if (wired) {
+    watchSizes();
+    return;
+  }
   wired = true;
 
   addEventListener("resize", measureChrome);
@@ -119,10 +132,8 @@ export function initLsNav() {
   // dismissed from it, a toolbar that wraps when a filter chip is added, a status word that grows.
   // Nothing scrolled and the window did not resize, so without this the rail and the TOC would sit
   // at the old edge — under the new banner — until the reader happened to scroll.
-  if (typeof ResizeObserver === "function") {
-    const sizes = new ResizeObserver(measureChrome);
-    for (const el of Object.values(chrome())) if (el) sizes.observe(el);
-  }
+  if (typeof ResizeObserver === "function") sizes = new ResizeObserver(measureChrome);
+  watchSizes();
 
   const root = document.documentElement;
   const sync = () => {
@@ -150,14 +161,25 @@ export function initLsNav() {
   });
 
   // THE STATE IS WATCHED, NOT THE CLICK: every toggle is re-synced whenever html[data-ls-nav]
-  // changes, whoever changed it, and whenever a toggle is added — a second toggle rendered later
-  // would otherwise show its markup's default until the first press.
+  // changes, whoever changed it, whenever a toggle is added — a second toggle rendered later would
+  // otherwise show its markup's default until the first press — and whenever something rewrites a
+  // toggle's own state: a renderer that patches attributes in place (cockpit's dom-patch) puts the
+  // markup's aria-expanded back on a rail the reader hid. Chrome mounted later is measured too.
+  const has = (node, selector) => node instanceof Element && (node.matches(selector) || node.querySelector(selector));
   new MutationObserver((records) => {
-    const relevant = records.some(
-      (record) =>
-        record.type === "attributes" ||
-        [...record.addedNodes].some((node) => node instanceof Element && (node.matches(TOGGLE) || node.querySelector(TOGGLE))),
-    );
-    if (relevant) sync();
-  }).observe(root, { attributes: true, attributeFilter: ["data-ls-nav"], childList: true, subtree: true });
+    let toggles = false;
+    let chromeAdded = false;
+    for (const record of records) {
+      if (record.type === "attributes") toggles ||= record.target === root || record.target.matches(TOGGLE);
+      for (const node of record.addedNodes) {
+        toggles ||= has(node, TOGGLE);
+        chromeAdded ||= has(node, CHROME);
+      }
+    }
+    if (toggles) sync();
+    if (chromeAdded) {
+      watchSizes();
+      measureChrome();
+    }
+  }).observe(root, { attributes: true, attributeFilter: ["data-ls-nav", "aria-expanded", "aria-pressed"], childList: true, subtree: true });
 }

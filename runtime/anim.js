@@ -33,12 +33,14 @@ let wired = false;
 function sync() {
   const on = !document.documentElement.classList.contains("anim-off");
   for (const toggle of document.querySelectorAll(TOGGLE)) {
-    toggle.setAttribute("aria-pressed", String(on));
+    // Writes only what differs: the observer below re-runs this on every rewrite of a toggle.
+    if (toggle.getAttribute("aria-pressed") !== String(on)) toggle.setAttribute("aria-pressed", String(on));
     const box = toggle.querySelector("[data-anim-box]");
-    if (box) box.textContent = on ? "[x]" : "[ ]";
+    const mark = on ? "[x]" : "[ ]";
+    if (box && box.textContent !== mark) box.textContent = mark;
     const label = toggle.querySelector("[data-anim-label]");
     const text = toggle.getAttribute(on ? "data-label-on" : "data-label-off");
-    if (label && text !== null) label.textContent = text;
+    if (label && text !== null && label.textContent !== text) label.textContent = text;
   }
 }
 
@@ -67,11 +69,18 @@ export function initAnimToggle() {
     sync();
   });
 
-  // A toggle added later is told the current state at once, not on the next press.
+  // A toggle added later is told the current state at once, not on the next press — and a toggle
+  // something rewrites (a renderer patching its attributes or its text in place, cockpit's
+  // dom-patch) is put back: the state lives on <html>, the toggle only shows it.
+  const html = document.documentElement;
+  const inToggle = (node) => (node instanceof Element ? node : node.parentElement)?.closest(TOGGLE);
   new MutationObserver((records) => {
-    const added = records.some((record) =>
-      [...record.addedNodes].some((node) => node instanceof Element && (node.matches(TOGGLE) || node.querySelector(TOGGLE))),
+    const touched = records.some((record) =>
+      record.type === "attributes"
+        ? record.target === html || record.target.matches(TOGGLE)
+        : inToggle(record.target) ||
+          [...record.addedNodes].some((node) => node instanceof Element && (node.matches(TOGGLE) || node.querySelector(TOGGLE))),
     );
-    if (added) sync();
-  }).observe(document.documentElement, { childList: true, subtree: true });
+    if (touched) sync();
+  }).observe(html, { attributes: true, attributeFilter: ["class", "aria-pressed"], childList: true, characterData: true, subtree: true });
 }

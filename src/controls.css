@@ -590,6 +590,12 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
    .btn-icon's disabled .45: a disabled remove button lit up at full strength on hover and on every
    phone, looking pressable.
 
+   A PRESSED TOGGLE IS NEVER HIDDEN (the lead's ruling). A favourite that is on is something the row
+   says, not an action waiting for the pointer; configr's FavoriteToggle keeps its resting glyph for
+   the same reason. So a pressed toggle stays at rest, whether it is the .reveal itself or a direct
+   child of one, and the rest of that .reveal still waits: the rule then hides its other children
+   one by one, because an opacity on the wrapper would take the pressed one with it.
+
    A thumbnail's remove button follows the same rule without the classes: .thumb is its host. The
    transition names the colour properties too, so a revealed .btn-icon keeps its own hover fade. */
 .reveal-host .reveal,
@@ -597,7 +603,7 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
   transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 @media (hover: hover) {
-  .reveal-host:not(:hover, :focus-within) .reveal,
+  .reveal-host:not(:hover, :focus-within) :is(.reveal:not(:has(> [aria-pressed="true"])), .reveal:has(> [aria-pressed="true"]) > *):not([aria-pressed="true"]),
   .thumb:not(:hover, :focus-within) > .btn-icon { opacity: 0; }
 }
 
@@ -735,7 +741,11 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
    Canvas: a solid block where the word was (measured in both palettes; the computed colours were
    right, which is why the check reads pixels for it). Opted out, the pressed segment and the chosen
    card name every colour they draw, their focus ring included, and forced-color-adjust inherits, so a
-   card's title and description go with it. */
+   card's title and description go with it.
+
+   TRANSITIONS are stopped in forced colours by tokens.css (`*, *::before, *::after { transition: none
+   !important }`, WP1), so a state never fades through the author colours it replaces. Nothing here
+   repeats it per selector. */
 @media (forced-colors: active) {
   @supports (forced-color-adjust: preserve-parent-color) {
     .btn-icon:is([data-icon], [aria-busy="true"])::before,
@@ -807,17 +817,17 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
 /* ── PRINT ─────────────────────────────────────────────────────────────────────────────────────────
    Paper cannot be pressed. The controls that only ACT (icon buttons, groups, form footers, drop
    zones, revealed actions, the confirmations) are removed. The ones that carry a VALUE stay, and keep
-   it: a checkbox's fill, a radio's dot and a switch's knob are backgrounds, which a browser drops on
-   paper by default, so a checked box would print as an empty one. print-color-adjust keeps them,
-   against print.css's black-on-white palette.
+   it: a checkbox's fill, a radio's dot, a switch's knob, the chosen segment's fill and an icon
+   segment's glyph are backgrounds, which a browser drops on paper by default, so a checked box would
+   print as an empty one. print-color-adjust keeps them, against print.css's black-on-white palette.
 
    A group is removed only when it is a group of actions. The filter dropdown and the sort control
    are .btn-group too (filters.css), and they carry the value a printed list was filtered and sorted
-   by: removing them would print a filtered list with nothing saying so. */
+   by: removing them would print a filtered list with nothing saying so. A .segmented carries a value
+   the same way (the range a printed chart shows), so it prints. */
 @media print {
   .btn-icon,
   .btn-group:not(.filter-dd, .sort-ctl),
-  .segmented,
   .form-actions,
   .btn-row,
   .dropzone,
@@ -830,7 +840,9 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
   input[type="radio"],
   input[type="checkbox"]::before,
   input[type="radio"]::before,
-  .switch::after {
+  .switch::after,
+  .segmented > button[aria-pressed="true"],
+  .segmented > button[data-icon]::before {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

@@ -50,6 +50,13 @@ value the form sends later.** That is the whole difference, and it is the one th
 flipping a switch must change the page at once, and ticking a box must not change anything until the
 form is saved.
 
+**There are two "on" looks, on purpose; do not unify them.** A control with words (a `.segmented`
+segment here, a filter chip in `filters.md`) is on as a 12% `--primary` wash with a `--primary` edge
+and bold words: the words carry the state, and a solid fill behind them would shout over the row. An
+icon-only toggle (`.btn-icon` with `aria-pressed`) has no words to make bold, so it is on as a solid
+`--primary` fill with the glyph cut out of it. Hover is neither of them: it is a wash that leaves with
+the pointer.
+
 ## `.btn-icon`: the icon-only button
 
 ```html
@@ -103,7 +110,18 @@ toolbar could hold three sizes of the same button. There is one box now.
 - **Disabled**: `disabled` dims it to .45. It still shows its `data-tip` to the pointer (measured in
   Chromium), but it leaves the tab order, so a keyboard user cannot reach the reason. When the reason
   matters, use `aria-disabled="true"` instead: same look, still focusable, and the page must then
-  ignore the click itself.
+  ignore the click itself. One listener in the capture phase does that for every handler on the page,
+  the busy one's included, and for any handler written later; a guard in each handler is the one the
+  next handler forgets:
+
+  ```js
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("button")?.getAttribute("aria-disabled") === "true") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+  ```
 - It is `position: relative`, so a `.count--overlay` sits on its corner; the button's name then carries
   the number (`aria-label="3 commits behind — pull"`), because the overlay is hidden from assistive
   technology.
@@ -342,6 +360,10 @@ The reveal only ever takes opacity AWAY (while the host is neither hovered nor f
 action therefore shows at its own opacity, so a **disabled** one stays at .45 when its row is hovered
 and on a phone, instead of lighting up at full strength and looking pressable.
 
+**A pressed toggle is never hidden.** A favourite that is on is something the row says, not an action
+waiting for the pointer, so a pressed toggle stays visible at rest: as the `.reveal` itself, or as a
+direct child of one, beside actions that still wait.
+
 Do not reveal the only way to do something that matters. Hover-revealed actions are for secondary
 actions on items in a list; the item's primary action stays visible.
 
@@ -409,11 +431,12 @@ it, so the decision cannot be a reflex.
   code input. A checkbox grows through its `.check` label, which is what a thumb actually hits.
 - **Motion** is `.15s` transitions and the busy spinner. `html.anim-off` stops all of it, and
   `prefers-reduced-motion` stops the spinner (the loader glyph stays).
-- **On paper**, the controls that only act (icon buttons, groups, segmented controls, footers, drop
-  zones, revealed actions, the confirmations) are removed. Checkboxes, radios and switches carry a
+- **On paper**, the controls that only act (icon buttons, groups, footers, drop zones, revealed
+  actions, the confirmations) are removed. Checkboxes, radios, switches and `.segmented` carry a
   value, so they print, with their fills kept (`print-color-adjust: exact`): without it a checked box
-  would print empty. A `.btn-group` that is a filter dropdown or a sort control (`filters.md`) prints
-  too: it says how the printed list was narrowed and ordered.
+  would print empty, and an icon segment would print without its glyph. A `.btn-group` that is a
+  filter dropdown or a sort control (`filters.md`) prints too: it says how the printed list was
+  narrowed and ordered.
 - **Forced colours** (Windows High Contrast) are answered in the file, on every theme and both
   palettes. Glyphs take `forced-color-adjust: preserve-parent-color` and paint in the colour their
   control was forced to (CanvasText where the engine lacks it). The drawn states are redrawn in system

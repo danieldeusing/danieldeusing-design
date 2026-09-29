@@ -17,14 +17,14 @@
       This branch was cut from 0.59.0, before the packages that declare these landed. Each rule
       below is a copy of what SPEC.md gives another package, here ONLY so this page renders:
         · WP1 (tokens.css): --control-h, --control-edge, --icon-*, [data-tone] -> --tone (F1, F7),
-          @keyframes dd-spin and html.anim-off stopping transitions (F6), and the one [hidden] rule
-          (X3) that makes `hidden` beat a component's own display
+          @keyframes dd-spin and html.anim-off stopping transitions (F6)
         · the icon set (WP4, tokens.css): --ico-* masks (lucide), [data-icon] -> --ico (I1)
         · WP2: .btn-terminal--danger (C1)          · WP6: .filter-bar, .filter-bar-spacer (M7)
       Tokens and attribute mappings are wrapped in :where(), so the day tokens.css declares the
-      real ones they win on specificity and this block goes inert. The [hidden] rule is the same
-      line tokens.css will carry, so a duplicate is harmless. The three CLASS stand-ins are
+      real ones they win on specificity and this block goes inert. The three CLASS stand-ins are
       ordinary rules and would shadow the real ones: they must go.
+      The [hidden] rule (X3) is not here: the check measures it on a page of its own, from
+      tokens.css and controls.css alone, and stands it in there only while tokens.css lacks it.
       Nothing here is ever copied into src/.
     -->
     <style id="stand-ins">
@@ -86,7 +86,6 @@
 
       @keyframes dd-spin { to { transform: rotate(1turn); } }
       html.anim-off *, html.anim-off *::before, html.anim-off *::after { animation: none !important; transition: none !important; }
-      [hidden]:not([hidden="until-found"]) { display: none !important; }
 
       /* WP2 (C1) and WP6 (M7) — ordinary class rules: DELETE at integration. */
       .btn-terminal--danger { color: var(--destructive); border-color: color-mix(in srgb, var(--destructive) 60%, var(--border)); }
@@ -403,10 +402,11 @@
       <section id="c13" aria-labelledby="c13-h">
         <h2 id="c13-h">.reveal</h2>
         <p class="demo-lede">Actions show on hover and on focus, always on a touch screen, and are never taken out of the tab
-          order. Tab into the list to see the first row's actions appear.</p>
+          order. Tab into the list to see the first row's actions appear. A pressed toggle is never hidden:
+          pagr's star is on, so it stays.</p>
         <ul class="demo-list">
           <li class="reveal-host" data-t="reveal-host"><span>poi/vu3</span><span class="reveal btn-row" data-t="reveal"><button type="button" class="btn-icon btn-icon--sm" data-icon="star" aria-pressed="false" aria-label="favourite poi/vu3" data-t="reveal-btn"></button><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove poi/vu3"></button></span></li>
-          <li class="reveal-host"><span>danieldeusing/pagr</span><span class="reveal btn-row"><button type="button" class="btn-icon btn-icon--sm" data-icon="star" aria-pressed="true" aria-label="favourite danieldeusing/pagr"></button><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove danieldeusing/pagr"></button></span></li>
+          <li class="reveal-host" data-t="reveal-host-pressed"><span>danieldeusing/pagr</span><span class="reveal btn-row"><button type="button" class="btn-icon btn-icon--sm" data-icon="star" aria-pressed="true" aria-label="favourite danieldeusing/pagr" data-t="reveal-pressed"></button><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove danieldeusing/pagr" data-t="reveal-pressed-remove"></button></span></li>
           <li class="reveal-host"><span>danieldeusing/seedr</span><span class="reveal btn-row"><button type="button" class="btn-icon btn-icon--sm" data-icon="star" aria-pressed="false" aria-label="favourite danieldeusing/seedr"></button><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove danieldeusing/seedr"></button></span></li>
           <li class="reveal-host" data-t="reveal-host-disabled"><span>built-in/registry <span class="check-meta">· built in, cannot be removed</span></span><button type="button" class="btn-icon btn-icon--sm reveal" data-tone="destructive" data-icon="x" aria-label="remove built-in/registry" disabled data-t="reveal-disabled"></button></li>
         </ul>
@@ -533,13 +533,22 @@
         for (const sibling of button.parentElement.children) sibling.setAttribute("aria-pressed", String(sibling === button));
       };
 
+      // aria-disabled keeps a control focusable, so the page must ignore its presses itself. ONE guard,
+      // in the capture phase, stops the click before any handler on this page sees it: an unavailable
+      // control and a busy one alike, in every listener below and in any added later. A guard written
+      // into each handler instead is one that the next handler forgets.
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("button")?.getAttribute("aria-disabled") === "true") {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
+
       // Every state below is an attribute the page flips; controls.css draws it. This is the whole
       // "runtime" a build-free page needs, and a framework app does the same in its own handlers.
-      // aria-disabled keeps a control focusable, so the page ignores its presses itself, once, here:
-      // that covers an unavailable control and a busy one alike.
       document.addEventListener("click", (event) => {
         const target = event.target.closest("button");
-        if (!target || target.disabled || target.getAttribute("aria-disabled") === "true" || target.closest("[data-surface]")) return;
+        if (!target || target.closest("[data-surface]")) return;
 
         if (target.matches("[data-demo-theme] > button")) {
           pressOne(target);
@@ -599,7 +608,7 @@
       input.addEventListener("change", () => { addThumbs(input.files); input.value = ""; });
       thumbs.addEventListener("click", (event) => {
         const remove = event.target.closest(".thumb > .btn-icon");
-        if (!remove || remove.disabled) return;
+        if (!remove) return;
         // Focus goes to the next remove button that can take it, or back to the zone's input, never
         // to <body>.
         const live = [...thumbs.querySelectorAll(".thumb > .btn-icon:not(:disabled)")];

@@ -14,11 +14,12 @@
  *
  * WHAT IT COVERS, in the order below:
  *   · each element's box, edge, colour and every state (rest, hover, pressed, disabled, busy)
- *   · busy keeps keyboard focus on the button for the whole press, and ignores a second press
+ *   · busy keeps keyboard focus on the button for the whole press, and ignores a second press; an
+ *     aria-disabled button does nothing in any of the demo's handlers (remove, bin, confirm)
  *   · the drop zone's keyboard path: Tab reaches the hidden input and rings the ZONE; a mouse click
  *     opens the picker and draws no ring; Space opens it too. Its drag state survives WebKit's null
  *     dragleave.relatedTarget
- *   · `hidden` hides every control (the one [hidden] rule, X3)
+ *   · a revealed action waits for the pointer, except a pressed toggle, which shows at rest
  *   · BARE MODE, with base.css and components.css switched off:
  *       - every focus ring. base.css draws the same 2px ring on every element, so with it loaded a
  *         control whose own :focus-visible rule was deleted still passed; switched off, only the
@@ -37,6 +38,9 @@
  *     3:1 and every word on a redrawn state 4.5:1; a part that opts out of forcing paints only system
  *     colours; and the PIXELS are read, because a text backplate paints over a word whose computed
  *     colours are perfect
+ *   · `hidden` hides every control (X3), measured on a page of tokens.css and controls.css alone; the
+ *     [hidden] rule is stood in there only while tokens.css lacks it, and DD_FORBID_STANDINS=1 fails
+ *     the run instead (as it does while the demo's stand-in block covers anything)
  *   · CONTRAST: every new text and edge pairing, on warm / green / mono / paper, over --background,
  *     --card and --muted. Text >= 4.5:1, control edges and glyphs >= 3:1. The table it prints is the
  *     one in the release notes. Pressed is told from hovered on every theme.
@@ -86,14 +90,52 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ── the worktree, served read-only (the page loads ../src and ../runtime by relative url) ── */
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png" };
+
+// X3 is measured on a page of its own: tokens.css and controls.css and nothing else (no demo, no
+// stand-in block), every control with `hidden`. `?standin` adds WP1's rule, spelt as WP1 spells it,
+// and the check only asks for that page while tokens.css does not hide the controls by itself.
+const HIDDEN_PAGE = (standin) => `<!doctype html><html lang="en" data-theme="warm"><head><meta charset="utf-8">
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/controls.css">
+${standin ? '<style id="x3-standin">[hidden]:not([hidden="until-found" i]) { display: none !important; }</style>' : ""}</head><body>
+<button type="button" class="btn-icon" data-icon="x" aria-label="shown" id="shown"></button>
+<button type="button" class="btn-icon" data-icon="x" aria-label="x" hidden data-case=".btn-icon"></button>
+<button type="button" class="btn-icon btn-icon--sm" data-icon="x" aria-label="x" hidden data-case=".btn-icon--sm"></button>
+<button type="button" role="switch" aria-checked="true" class="switch" hidden data-case=".switch">follow</button>
+<input type="checkbox" aria-label="x" hidden data-case="checkbox"><input type="radio" aria-label="x" hidden data-case="radio">
+<label class="check" hidden data-case=".check"><input type="checkbox"> label</label>
+<div class="btn-group" hidden data-case=".btn-group"><button type="button" class="btn-icon" data-icon="x" aria-label="x"></button></div>
+<div class="form-actions" hidden data-case=".form-actions"><button type="button">save</button></div>
+<div class="form-actions"><p class="form-status" hidden data-case=".form-status">saved</p></div>
+<div class="btn-row" hidden data-case=".btn-row"><button type="button">run</button></div>
+<div class="segmented" hidden data-case=".segmented"><button type="button" aria-pressed="true">a</button></div>
+<div class="segmented"><button type="button" aria-pressed="false" hidden data-case=".segmented > button">b</button></div>
+<div class="choice-grid" hidden data-case=".choice-grid"></div>
+<button type="button" class="choice-card" aria-pressed="false" hidden data-case=".choice-card"><span class="choice-title">t</span></button>
+<label class="dropzone" data-icon="x" hidden data-case=".dropzone"><input type="file"> drop</label>
+<ul class="thumb-grid" hidden data-case=".thumb-grid"></ul>
+<ul class="thumb-grid"><li class="thumb" hidden data-case=".thumb"></li></ul>
+<div class="reveal-host"><span class="reveal btn-row" hidden data-case=".reveal"><button type="button">a</button></span></div>
+<span class="confirm-inline" hidden data-case=".confirm-inline"><button type="button">remove</button></span>
+<span class="confirm-inline-note" hidden data-case=".confirm-inline-note">note</span>
+<div class="confirm-code" hidden data-case=".confirm-code"></div>
+<div class="confirm-code"><input class="confirm-code-input" aria-label="x" hidden data-case=".confirm-code-input"><p class="confirm-code-status" hidden data-case=".confirm-code-status">x</p></div>
+</body></html>`;
+
 const server = createServer((req, res) => {
-  const path = normalize(join(root, decodeURIComponent(new URL(req.url, "http://x").pathname)));
+  const url = new URL(req.url, "http://x");
+  if (url.pathname === "/__harness/hidden.html") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(HIDDEN_PAGE(url.searchParams.has("standin")));
+    return;
+  }
+  const path = normalize(join(root, decodeURIComponent(url.pathname)));
   if (!path.startsWith(root + sep) || !existsSync(path)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "content-type": (TYPES[extname(path)] || "application/octet-stream") + "; charset=utf-8" });
   res.end(readFileSync(path));
 }).listen(0, "127.0.0.1");
 await new Promise((ok) => server.on("listening", ok));
-const PAGE = `http://127.0.0.1:${server.address().port}/examples/controls.html`;
+const ORIGIN = `http://127.0.0.1:${server.address().port}`;
+const PAGE = `${ORIGIN}/examples/controls.html`;
 
 /* ── the browser ── */
 const profile = mkdtempSync(join(tmpdir(), "dd-controls-"));
@@ -250,7 +292,9 @@ const T = (id) => `[data-t="${id}"]`;
  * stand-in still in the page would keep this suite green over a declaration nobody made, and real
  * pages would paint a solid square where a glyph should be. So every run reports what the block is
  * still COVERING FOR: each item is measured with the block on and off, and listed if it changes.
- * Delete the block at integration; anything missing then fails below, loudly.
+ * Delete the block at integration; anything missing then fails below, loudly. DD_FORBID_STANDINS=1,
+ * for the integration build, fails the run while the block covers anything (and while the X3 page
+ * below needs its stand-in).
  */
 const covering = await evaluate(`(() => {
   const block = document.getElementById('stand-ins');
@@ -261,7 +305,6 @@ const covering = await evaluate(`(() => {
       '--control-h / --control-edge / --icon-*': ['--control-h', '--control-edge', '--icon-size'].map((p) => root.getPropertyValue(p)).join('|'),
       '[data-tone] -> --tone': getComputedStyle(c.el('${T("destructive")}')).getPropertyValue('--tone'),
       '[data-icon] -> --ico': getComputedStyle(c.el('${T("rest")}')).getPropertyValue('--ico'),
-      '[hidden] (X3)': (() => { const n = c.el('${T("rest")}'); n.hidden = true; const d = getComputedStyle(n).display; n.hidden = false; return d; })(),
       'dd-spin + html.anim-off transitions': [...document.styleSheets].some((s) => { try { return [...s.cssRules].some((r) => r.name === 'dd-spin'); } catch { return false; } }) + '|' + (document.documentElement.classList.add('anim-off'), c.cs('${T("rest")}').transitionDuration),
       '.btn-terminal--danger': c.cs('${T("confirm-armed")} .btn-terminal--danger').color,
       '.filter-bar': c.cs('${T("filter-bar")}').display,
@@ -276,6 +319,9 @@ const covering = await evaluate(`(() => {
 console.log(covering === null
   ? "NOTE  no stand-in block: every token and class is the real one"
   : `NOTE  the demo's stand-in block is still covering for: ${covering.length ? covering.join(", ") : "nothing (delete it)"}`);
+if (process.env.DD_FORBID_STANDINS === "1") {
+  check("DD_FORBID_STANDINS=1: the demo's stand-in block covers nothing", covering === null || covering.length === 0, covering);
+}
 
 /* ── .btn-icon ────────────────────────────────────────────────────────────────── */
 
@@ -565,12 +611,48 @@ check("...a disabled .btn-icon.reveal rests hidden like the others", s === "0", 
 s = await withForced(T("reveal-host-disabled"), ["hover"], `__c.cs('${T("reveal-disabled")}').opacity`);
 check("...and shows at the disabled .45 when its host is hovered: the reveal never outranks disabled", s === "0.45", s);
 
+// A PRESSED TOGGLE IS NEVER HIDDEN (the lead's ruling): pagr's star is on, so it shows at rest on a
+// pointer device while the remove beside it still waits. Read as the opacity that reaches the
+// screen, every ancestor's multiplied in: the reveal hid the WRAPPER, and a child cannot undo that.
+const SEEN = (id) => `(() => { let o = 1; for (let n = __c.el('${T(id)}'); n; n = n.parentElement) o *= +getComputedStyle(n).opacity; return o; })()`;
+s = { hover: await evaluate("matchMedia('(hover: hover)').matches"), star: await evaluate(SEEN("reveal-pressed")),
+  remove: await evaluate(SEEN("reveal-pressed-remove")), unpressed: await evaluate(SEEN("reveal-btn")) };
+check("a PRESSED toggle in a .reveal shows at rest on a pointer device; the remove beside it and an unpressed star stay hidden",
+  s.hover && s.star === 1 && s.remove === 0 && s.unpressed === 0, s);
+s = await withForced(T("reveal-host-pressed"), ["hover"], SEEN("reveal-pressed-remove"));
+check("...and hovering that row still shows the rest", s === 1, s);
+
 /* ── .confirm-inline and .confirm-code ────────────────────────────────────────── */
 
 s = await evaluate(`(() => { const { cs, resolve, same } = __c; const c = cs('${T("confirm-armed")}');
   return [['inline-flex', 'flex'].includes(c.display), c.alignItems, c.columnGap, same(cs('${T("confirm-note")}').color, resolve('var(--warning)'))]; })()`);
 // inline-flex, or flex once blockified as the item of a flex row, which is where the demo puts it.
 check(".confirm-inline: an inline row 8px apart, its note in --warning", s.join() === "true,center,8px,true", s);
+
+// ONE GUARD FOR EVERY HANDLER. aria-disabled leaves a button focusable and clickable, so the page
+// must ignore it, and the demo is the reference for those handlers. Each of its click handlers gets an
+// aria-disabled button: a thumbnail's remove (on a thumbnail of its own, so a handler that does remove
+// it costs the rest of the run nothing), a row's bin, and the confirm of an armed pair. Every step
+// puts the page back whichever way it went, so a failure here reports here and stops nothing below.
+s = await evaluate(`(() => {
+  const { el } = __c, out = {};
+  const li = document.createElement('li');
+  li.className = 'thumb';
+  li.innerHTML = '<button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove probe.png" aria-disabled="true"></button>';
+  el('${T("thumbs")}').append(li); li.firstChild.click(); out.removeKept = li.isConnected; li.remove();
+  const bin = el('${T("confirm-rest")}'), slot = bin.closest('[data-demo-confirm-slot]'), status = el('[data-demo-confirm-status]'), before = status.textContent;
+  bin.setAttribute('aria-disabled', 'true'); bin.click(); out.binArmed = !!slot.querySelector('.confirm-inline');
+  slot.querySelector('[data-demo-keep]')?.click(); bin.removeAttribute('aria-disabled');
+  bin.click(); out.armsWhenEnabled = !!slot.querySelector('.confirm-inline');
+  const go = slot.querySelector('[data-demo-confirm]');
+  go?.setAttribute('aria-disabled', 'true'); go?.click();
+  out.confirmIgnored = status.textContent === before && !!slot.querySelector('.confirm-inline');
+  slot.querySelector('[data-demo-keep]')?.click(); out.disarmed = !slot.querySelector('.confirm-inline') && slot.contains(bin);
+  status.textContent = before;
+  return out; })()`);
+check("aria-disabled: a thumbnail's remove does nothing", s.removeKept === true, s);
+check("...a row's bin does not arm", s.binArmed === false, s);
+check("...the confirm of an armed pair does not confirm (and the same bin arms once enabled)", s.armsWhenEnabled && s.confirmIgnored && s.disarmed, s);
 
 s = await evaluate(`(() => { const { cs, rect, resolve, same } = __c; const v = cs('${T("code-value")}'), i = cs('${T("code-input")}'), st = cs('${T("code-status")}'), bad = cs('${T("code-status-bad")}');
   return { value: [v.fontSize, v.fontWeight, v.letterSpacing, v.fontVariantNumeric, same(v.color, resolve('var(--primary)')), v.marginTop, v.fontFamily === resolve('var(--font-mono)', 'font-family')],
@@ -604,28 +686,6 @@ s = await evaluate(`(() => {
   }
   return bad; })()`);
 check("no border-radius on any control or pseudo-element, except the radio and its dot (50%)", s.length === 0, s.slice(0, 6));
-
-/* ── hidden hides every control (X3) ──────────────────────────────────────────── */
-
-// Every class here sets its own display, and an author display beats the browser's [hidden] rule, so
-// `hidden` hid NOTHING until tokens.css carried the one rule that answers it for the whole system
-// (until this branch contains it, the demo's stand-in block carries the same line, and the NOTE at
-// the top says so). Display none, and no box at all.
-s = await evaluate(`(() => {
-  const sels = ['${T("rest")}', '${T("sm")}', '${T("switch-off")}', '${T("cb-off")}', '${T("radio-off")}', 'label:has(> ${T("cb-off")})', '${T("group-icons")}',
-    '${T("actions")}', '${T("actions")} .form-status', '${T("btn-row")}', '${T("seg-text")}', '${T("seg-text")} > :nth-child(2)', '${T("choice-grid")}', '${T("choice-off")}',
-    '${T("dropzone")}', '${T("thumbs")}', '${T("thumbs")} > .thumb', '${T("reveal")}', '${T("confirm-armed")}', '${T("confirm-note")}', '${T("confirm-code")}',
-    '${T("code-input")}', '${T("code-status")}'];
-  const shown = [];
-  for (const sel of sels) {
-    const n = __c.el(sel);
-    n.hidden = true;
-    const d = getComputedStyle(n).display, r = n.getBoundingClientRect();
-    if (d !== 'none' || r.width * r.height > 0) shown.push(sel + ' -> ' + d);
-    n.hidden = false;
-  }
-  return shown; })()`);
-check("hidden: every control, group and row is display: none and draws no box (23 cases)", s.length === 0, s);
 
 /* ── BARE MODE: base.css and components.css switched off ──────────────────────── */
 
@@ -780,14 +840,17 @@ await evaluate(`(() => { const host = __c.el('#c3 .demo-states');
   for (const kind of ['filter-dd', 'sort-ctl']) { const g = document.createElement('div'); g.className = 'btn-group ' + kind; g.dataset.t = 'print-' + kind; g.innerHTML = '<button type="button">source: seedr</button>'; host.append(g); } })(); null`);
 await send("Emulation.setEmulatedMedia", { media: "print" });
 s = await evaluate(`(() => { const shown = (sel) => getComputedStyle(__c.el(sel)).display;
-  return { gone: ['${T("rest")}', '${T("group-icons")}', '${T("seg-text")}', '${T("actions")}', '${T("btn-row")}', '${T("dropzone")}', '${T("reveal")}', '${T("confirm-armed")}', '${T("confirm-code")}'].map(shown),
+  return { gone: ['${T("rest")}', '${T("group-icons")}', '${T("actions")}', '${T("btn-row")}', '${T("dropzone")}', '${T("reveal")}', '${T("confirm-armed")}', '${T("confirm-code")}'].map(shown),
     kept: [shown('${T("switch-on")}'), shown('${T("cb-on")}'), shown('${T("choice-on")}')],
-    valueGroups: [shown('${T("print-filter-dd")}'), shown('${T("print-sort-ctl")}')],
-    exact: [['${T("cb-on")}'], ['${T("cb-on")}', '::before'], ['${T("radio-on")}', '::before'], ['${T("switch-on")}', '::after']].map(([sel, pseudo]) => { const c = __c.cs(sel, pseudo); return c.printColorAdjust || c.webkitPrintColorAdjust; }) }; })()`);
+    valueGroups: [shown('${T("print-filter-dd")}'), shown('${T("print-sort-ctl")}'), shown('${T("seg-text")}'), shown('${T("seg-icons")}')],
+    exact: [['${T("cb-on")}'], ['${T("cb-on")}', '::before'], ['${T("radio-on")}', '::before'], ['${T("switch-on")}', '::after'],
+      ['${T("seg-text")} > [aria-pressed="true"]'], ['${T("seg-icons")} > [data-icon]', '::before']].map(([sel, pseudo]) => { const c = __c.cs(sel, pseudo); return c.printColorAdjust || c.webkitPrintColorAdjust; }) }; })()`);
 check("print removes the controls that only act", s.gone.every((d) => d === "none"), s.gone);
 check("...keeps the ones that carry a value", s.kept.every((d) => d !== "none"), s.kept);
-check("...keeps a .btn-group that is a filter dropdown or a sort control, so the printed list says how it was narrowed", s.valueGroups.every((d) => d !== "none"), s.valueGroups);
-check("...and keeps their fills on paper (print-color-adjust: exact), or a checked box prints empty", s.exact.every((v) => v === "exact"), s.exact);
+check("...keeps a .btn-group that is a filter dropdown or a sort control, and a .segmented: the printed page says how it was narrowed, ordered and ranged",
+  s.valueGroups.every((d) => d !== "none"), s.valueGroups);
+check("...and keeps their fills on paper (print-color-adjust: exact), the chosen segment's and an icon segment's glyph among them, or a checked box prints empty",
+  s.exact.every((v) => v === "exact"), s.exact);
 await send("Emulation.setEmulatedMedia", { media: "" });
 await evaluate(`for (const g of document.querySelectorAll('[data-t^="print-"]')) g.remove(); null`);
 
@@ -935,6 +998,10 @@ const paint = async () => {
   const regions = await evaluate(REGIONS);
   const shots = [];
   for (const r of regions) {
+    // The clip is the region's box in PAGE coordinates, and that only lands on the region because the
+    // browser runs with --hide-scrollbars (the launch, above). With a scrollbar, the capture is offset
+    // from the page by its width and reads the pixels beside the glyph, which is how X1's first captures
+    // missed. Do not drop the flag.
     const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: r.x, y: r.y, width: Math.max(1, r.w), height: Math.max(1, r.h), scale: 1 }, captureBeyondViewport: true });
     shots.push(data);
   }
@@ -966,9 +1033,13 @@ const forcedCells = async (engine) => {
       check(`forced colours (${cell}): every state pair differs and every glyph, mark, knob and word on a state reaches its ratio`, bad.length === 0, bad.map((row) => `${row.name}: ${row.got}`).join("\n        "));
       const unpainted = (await paint()).filter((row) => !row.ok);
       check(`forced colours (${cell}): PIXELS: each word on a redrawn state sits on its fill, not a Canvas backplate, and each glyph is painted`, unpainted.length === 0, unpainted.map((row) => `${row.name}: ${row.got}`).join("\n        "));
-      s = await withForced(`${T("seg-text")} > [aria-pressed="true"]`, ["focus", "focus-visible"], `(() => { const { cs, resolve, same } = __c; const b = cs('${T("seg-text")} > [aria-pressed="true"]');
-        return [b.outlineStyle, same(b.outlineColor, resolve('Highlight'))]; })()`);
-      check(`forced colours (${cell}): a pressed segment, opted out of forcing, still rings in the system's Highlight`, s.join() === "solid,true", s);
+      const rings = [];
+      for (const sel of [`${T("seg-text")} > [aria-pressed="true"]`, T("choice-on")]) {
+        rings.push(await withForced(sel, ["focus", "focus-visible"], `(() => { const { cs, resolve, same } = __c; const b = cs('${sel}');
+          return b.outlineStyle + ' ' + (same(b.outlineColor, resolve('Highlight')) ? 'Highlight' : b.outlineColor); })()`));
+      }
+      check(`forced colours (${cell}): a pressed segment and a chosen card, opted out of forcing, still ring in the system's Highlight`,
+        rings.every((r) => r === "solid Highlight"), rings);
     }
   }
   await send("Emulation.setEmulatedMedia", { features: [] });
@@ -988,6 +1059,42 @@ s = await evaluate(`(async () => { const link = document.querySelector('link[hre
 check("precondition: the fallback pass swapped both @supports conditions, and the swapped one is false", s[0] === 2 && s[1] === false, s);
 await forcedCells("fallback (no preserve-parent-color)");
 await evaluate(`(() => { document.getElementById('fallback-engine').remove(); document.querySelector('link[href$="controls.css"]').disabled = false; })(); null`);
+
+/* ── hidden hides every control (X3), measured by behaviour on a page of its own ─ */
+
+// Every class here sets its own display, and an author display beats the browser's [hidden] rule, so
+// `hidden` hid NOTHING until tokens.css carried the one rule that answers it for the whole system.
+// Asked of the files, not of a spelling: a page with tokens.css and controls.css and nothing else,
+// 23 controls, groups and rows with `hidden`. While tokens.css does not hide them itself (WP1 not
+// merged), WP1's rule is stood in on that page, and the NOTE says the result proves only that no
+// control defeats the rule; DD_FORBID_STANDINS=1 fails instead.
+const hiddenCases = async (standin) => {
+  await send("Page.navigate", { url: `${ORIGIN}/__harness/hidden.html${standin ? "?standin" : ""}` });
+  for (let i = 0; i < 50; i += 1) {
+    await sleep(50);
+    try { if (await evaluate("document.readyState === 'complete' && document.styleSheets.length >= 2")) break; } catch {}
+  }
+  return evaluate(`(() => ({ shown: getComputedStyle(document.getElementById('shown')).display,
+    sheets: [...document.styleSheets].map((s) => (s.href || s.ownerNode.id).split('/').pop()),
+    leaks: [...document.querySelectorAll('[data-case]')].filter((n) => { const r = n.getBoundingClientRect(); return getComputedStyle(n).display !== 'none' || r.width * r.height > 0; })
+      .map((n) => n.dataset.case + ' -> ' + getComputedStyle(n).display),
+    cases: document.querySelectorAll('[data-case]').length }))()`);
+};
+let hidden = await hiddenCases(false);
+check("precondition: the X3 page loads tokens.css and controls.css only, and a control without `hidden` is displayed",
+  hidden.sheets.join() === "tokens.css,controls.css" && hidden.shown === "inline-grid" && hidden.cases === 23, hidden);
+if (hidden.leaks.length === 0) {
+  check("hidden: tokens.css and controls.css alone hide every control, group and row (23 cases)", true);
+} else {
+  console.log(`NOTE  X3 STAND-IN in force: tokens.css does not hide them yet (${hidden.leaks.length} of 23 still displayed, e.g. ${hidden.leaks[0]}).`);
+  console.log("      WP1's rule is stood in on the X3 page, so what follows proves only that no control defeats it.");
+  if (process.env.DD_FORBID_STANDINS === "1") {
+    check("DD_FORBID_STANDINS=1: tokens.css hides every control itself, with no [hidden] stand-in", false, hidden.leaks);
+  }
+  hidden = await hiddenCases(true);
+  check("hidden: beside WP1's [hidden] rule (stood in), every control, group and row is display: none and draws no box (23 cases)",
+    hidden.sheets.includes("x3-standin") && hidden.leaks.length === 0, hidden.leaks);
+}
 
 /* ── a coarse pointer: 44px, and revealed actions always visible ──────────────── */
 

@@ -557,6 +557,8 @@ try {
   await check("remove answers \"remove\"", () => evaluate(`__o.$("dlg-confirm").returnValue === "remove"`));
   await clickT("open-confirm");
   await key("Escape");
+  // Current Chromium empties returnValue on an Escape close by itself, so this one passes without
+  // the reset too; the backdrop close below does not, and is the one that catches a missing reset.
   await check("the same confirm dismissed with Escape answers \"\", not the last open's \"remove\"",
     () => evaluate(`__o.$("dlg-confirm").returnValue === ""`));
   await clickT("open-confirm");
@@ -586,6 +588,15 @@ try {
   await check("the page closes it when the write returns, answering \"discard\", focus back on the opener",
     () => evaluate(`!__o.$("dlg-discard").open && __o.$("dlg-discard").returnValue === "discard" && document.activeElement === __o.$("open-discard")`));
   await evaluate("window.discardMs = 1000; null");
+  await reset();
+  await clickT("open-default");
+  await evaluate(`${T("default-join")}.setAttribute("aria-busy", "true"); null`);
+  await clickT("default-x");
+  const xWhileBusy = await evaluate(`__o.$("dlg-default").open`);
+  await evaluate(`${T("default-join")}.removeAttribute("aria-busy"); null`);
+  await clickT("default-x");
+  await check("the X of a dialog whose footer is committing does nothing either — and closes once it is done",
+    xWhileBusy && await evaluate(`!__o.$("dlg-default").open`), { xWhileBusy });
 
   await reset();
   await clickT("open-alert");

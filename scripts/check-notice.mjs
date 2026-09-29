@@ -20,7 +20,7 @@
  * button), not `.click()` — the claim is that the keyboard needs nothing extra, and only the browser's
  * own activation behaviour can prove that.
  *
- * The SHIPPED modules are read off the filesystem (notice.js inlined, select.js served), so the
+ * The SHIPPED modules are read off the filesystem (notice.js inlined, runtime/*.js served), so the
  * fixture cannot drift from the thing asserted. Headless chromium as in check-tabletools.mjs; it
  * SKIPS loudly without one (DD_REQUIRE_BROWSER=1 makes that a failure), and lets the browser pick
  * its DevTools port.
@@ -60,7 +60,6 @@ if (!CHROME) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const RUNTIME = readFileSync(join(root, "runtime/notice.js"), "utf8").replace(/^export /gm, "");
-const SELECT = readFileSync(join(root, "runtime/select.js"), "utf8");
 // components.css's two rules for an enhanced select: the native one stays in the box, transparent and
 // unclickable, under the trigger the reader sees — so it HAS client rects, exactly as on a real page.
 const HARNESS = `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -91,10 +90,18 @@ window.gone = (id) => !document.getElementById(id);
 window.focused = () => document.activeElement && (document.activeElement.id || document.activeElement.tagName);
 <\/script></body></html>`;
 
+// Every runtime module, not just select.js: a module imports its siblings ("./popup.js"), and one
+// the harness cannot serve kills the page before a single check runs.
 const server = createServer((req, res) => {
-  const script = req.url === "/select.js";
-  res.writeHead(200, { "content-type": script ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8" });
-  res.end(script ? SELECT : HARNESS);
+  if (req.url === "/") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(HARNESS);
+    return;
+  }
+  let body = null;
+  if (/^\/[\w.-]+\.js$/.test(req.url)) { try { body = readFileSync(join(root, "runtime", req.url.slice(1))); } catch {} }
+  res.writeHead(body ? 200 : 404, { "content-type": "text/javascript; charset=utf-8" });
+  res.end(body || "");
 }).listen(0, "127.0.0.1");
 await new Promise((ok) => server.on("listening", ok));
 

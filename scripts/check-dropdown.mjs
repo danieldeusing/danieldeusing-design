@@ -80,6 +80,9 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8"><style>
 <button id="after">after</button>
 <details class="dropdown" id="dd2"><summary id="s2">second</summary>
   <ul class="dropdown-panel"><li><button type="button" class="dropdown-item" id="i2">only</button></li></ul></details>
+<details class="dropdown" id="dda"><summary id="sa">links</summary>
+  <ul class="dropdown-panel"><li><a class="dropdown-item" id="a-ok" href="#a-ok-followed">open</a></li>
+    <li><a class="dropdown-item" id="a-off" href="#a-off-followed" aria-disabled="true">unavailable</a></li></ul></details>
 <details class="dropdown" id="ddx"><summary id="sx">filter</summary>
   <div class="dropdown-panel"><input type="search" id="fx" aria-label="filter"></div></details>
 <details class="dropdown" id="dth"><summary id="sth">theme <span data-theme-label></span></summary>
@@ -243,6 +246,22 @@ await section("a panel of rows is a menu; a panel holding a field is not", async
     roles.items.every((r) => r === "menuitem/-1"), roles.items);
   check("...and the summary says it opens a menu, and that it is shut", roles.haspopup === "menu" && roles.expanded === "false", roles);
 
+  // A .dropdown-label is a heading for the eye: inside role=menu its words would be loose text.
+  await send("Accessibility.enable");
+  await evaluate("document.getElementById('dd1').open = true; null"); // a closed <details> has no tree
+  await sleep(40);
+  const { nodes } = await send("Accessibility.getFullAXTree", {});
+  await evaluate("document.getElementById('dd1').open = false; null");
+  const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+  const menu = nodes.find((n) => n.role?.value === "menu" && n.name?.value === "actions");
+  const loose = [];
+  const walk = (n) => { if (!n) return; if (!n.ignored && /text/i.test(n.role?.value || "") && /file/.test(n.name?.value || "")) loose.push(n.name.value);
+    for (const c of n.childIds || []) walk(byId.get(c)); };
+  walk(menu);
+  check("a .dropdown-label is out of the accessibility tree — no loose text in the menu, which keeps its summary's name",
+    !!menu && loose.length === 0 && (await evaluate(`document.querySelector("#dd1 .dropdown-label").getAttribute("aria-hidden")`)) === "true",
+    { menu: menu?.name?.value, loose });
+
   const disclosure = await evaluate(`({ role: document.querySelector("#ddx .dropdown-panel").getAttribute("role"),
     haspopup: document.getElementById("sx").getAttribute("aria-haspopup"),
     tabindex: document.getElementById("fx").getAttribute("tabindex") })`);
@@ -327,6 +346,21 @@ await section("leaving and activating", async () => {
   await reset(); await click("s1"); await click("i-dis");
   check("an aria-disabled item does NOT close the menu when pressed", await isOpen("dd1"));
 
+  await evaluate("history.replaceState(null, '', location.pathname); null");
+  await reset(); await focusOn("sa"); await press("ArrowDown"); await press("ArrowDown");
+  const onOff = await focused();
+  await press("Enter");
+  check("Enter on an aria-disabled LINK item does not follow it, and the menu stays open",
+    onOff === "a-off" && (await evaluate("location.hash")) === "" && (await isOpen("dda")),
+    { focus: onOff, hash: await evaluate("location.hash"), open: await isOpen("dda") });
+  await reset(); await click("sa"); await click("a-off");
+  check("...and neither does a click on it",
+    (await evaluate("location.hash")) === "" && (await isOpen("dda")), { hash: await evaluate("location.hash"), open: await isOpen("dda") });
+  await reset(); await focusOn("sa"); await press("ArrowDown"); await press("Enter");
+  check("...while Enter on an available link item still follows it (so the check can fail)",
+    (await evaluate("location.hash")) === "#a-ok-followed", await evaluate("location.hash"));
+  await evaluate("history.replaceState(null, '', location.pathname); null");
+
   await reset(); await click("s1"); await click("i-focus");
   check("an action that moves focus on purpose keeps it — the summary does not steal it back",
     !(await isOpen("dd1")) && (await focused()) === "field", await focused());
@@ -402,6 +436,11 @@ await section("attachMenuKeys: a menu the page builds itself", async () => {
     document.getElementById("pm1").focus();
   })()`);
   check("attachMenuKeys takes the items out of the tab order", (await attr("pm2", "tabindex")) === "-1");
+  await evaluate(`(() => { const li = document.createElement("li"); li.setAttribute("role", "none");
+    li.innerHTML = '<button type="button" role="menuitem" id="pm3">added later</button>'; document.getElementById("pm").append(li); })()`);
+  await sleep(20);
+  check("...and an item the page adds AFTER the call as well", (await attr("pm3", "tabindex")) === "-1", await attr("pm3", "tabindex"));
+  await evaluate("document.getElementById('pm3').closest('li').remove(); null");
   await press("ArrowDown");
   check("...ArrowDown moves through the page's menu", (await focused()) === "pm2", await focused());
   await press("Escape");

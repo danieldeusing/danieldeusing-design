@@ -25,8 +25,10 @@
  *   · a panel of rows — `.dropdown-item`, `.dropdown-sep`, `.dropdown-label`, bare or one per <li>
  *     — is a MENU. It gets `role="menu"`, its <li>s `role="none"`, its items `role="menuitem"`
  *     (an item that already says `menuitemradio` / `menuitemcheckbox` keeps it: the theme items
- *     do), its separators `role="separator"`, and the summary `aria-haspopup="menu"` with an
- *     `aria-expanded` kept in step. Items are `tabindex="-1"`: the arrows reach them, Tab does not.
+ *     do), its separators `role="separator"`, its labels `aria-hidden` (a heading for the eye —
+ *     inside a menu its words would be loose text; the menu is named by its summary), and the
+ *     summary `aria-haspopup="menu"` with an `aria-expanded` kept in step. Items are
+ *     `tabindex="-1"`: the arrows reach them, Tab does not.
  *   · a panel holding anything else — the table filter's text box, a form — is a DISCLOSURE and is
  *     left exactly as the platform made it: no menu roles, and Tab walks through it. Announcing a
  *     text field as a menu would be a lie the reader acts on.
@@ -92,6 +94,9 @@ function mark(details) {
   }
   for (const row of rows) {
     if (row.matches(".dropdown-sep")) row.setAttribute("role", "separator");
+    // A heading for the eye. Inside role="menu" its words would be loose text between the items; the
+    // menu keeps the name its summary gives it.
+    else if (row.matches(".dropdown-label")) row.setAttribute("aria-hidden", "true");
     else if (row.matches(".dropdown-item")) {
       if (!CHOICE_ROLES.includes(row.getAttribute("role"))) row.setAttribute("role", "menuitem");
       row.tabIndex = -1;
@@ -181,6 +186,15 @@ function menuKeydown(panel, event, close) {
   }
 }
 
+/* An aria-disabled item does nothing when activated, by pointer or key, and the menu stays open. The
+   page ignores the press; an <a> item would still follow its link, so its default is cancelled
+   here — Enter on a link arrives as this same click. */
+function unavailable(item, event) {
+  if (item.getAttribute("aria-disabled") !== "true") return false;
+  event.preventDefault();
+  return true;
+}
+
 /* Focus still on the menu — or dropped on <body> by the menu's removal — goes back to the opener.
    Focus the action moved ON PURPOSE (into a dialog it opened, say) is left where it is. */
 const focusIsStranded = (container) =>
@@ -198,7 +212,13 @@ const focusIsStranded = (container) =>
  * @returns {() => void} detach — removes the listeners.
  */
 export function attachMenuKeys(panel, { onClose, returnFocusTo } = {}) {
-  for (const item of panel.querySelectorAll(ITEM)) item.tabIndex = -1;
+  // Out of the tab order — and so is an item the page adds while the menu is attached.
+  const quiet = () => {
+    for (const item of panel.querySelectorAll(ITEM)) item.tabIndex = -1;
+  };
+  quiet();
+  const observer = new MutationObserver(quiet);
+  observer.observe(panel, { childList: true, subtree: true });
   const close = () => {
     onClose?.();
     if (returnFocusTo?.isConnected) returnFocusTo.focus();
@@ -206,7 +226,8 @@ export function attachMenuKeys(panel, { onClose, returnFocusTo } = {}) {
   const onKeydown = (event) => menuKeydown(panel, event, close);
   const onClick = (event) => {
     const item = event.target instanceof Element ? event.target.closest(ITEM) : null;
-    if (!item || !panel.contains(item) || item.getAttribute("aria-disabled") === "true") return;
+    if (!item || !panel.contains(item)) return;
+    if (unavailable(item, event)) return;
     const stranded = focusIsStranded(panel);
     onClose?.();
     if (stranded && returnFocusTo?.isConnected) returnFocusTo.focus();
@@ -214,6 +235,7 @@ export function attachMenuKeys(panel, { onClose, returnFocusTo } = {}) {
   panel.addEventListener("keydown", onKeydown);
   panel.addEventListener("click", onClick);
   return () => {
+    observer.disconnect();
     panel.removeEventListener("keydown", onKeydown);
     panel.removeEventListener("click", onClick);
   };
@@ -322,7 +344,8 @@ function onClick(event) {
   }
   const panel = panelOf(details);
   const item = target.closest(`.dropdown-item, ${ITEM}`);
-  if (!item || !panel?.contains(item) || item.getAttribute("aria-disabled") === "true") return;
+  if (!item || !panel?.contains(item)) return;
+  if (unavailable(item, event)) return;
   // Activation closes, and hands focus back to the summary unless the action moved it on purpose.
   const stranded = focusIsStranded(details);
   setOpen(details, false);

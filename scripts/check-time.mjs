@@ -76,7 +76,7 @@ const garbage = inZone("UTC", `({
   none: [null, undefined, ""].map((v) => [t.formatStamp(v), t.formatAgo(v), t.whenHtml(v), JSON.stringify(t.stampParts(v))]),
   junk: ["2026-13-45 junk", "not a date", "yesterday", "2026-02-30T25:00:00Z"].map((v) => [v, t.formatStamp(v), t.stampParts(v).utc, t.formatAgo(v)]),
   html: t.whenHtml('<b onmouseover="x">'),
-  types: [t.formatStamp(true), t.formatStamp({}), t.formatStamp(new Date("nope"))],
+  types: [t.formatStamp(true), t.formatStamp({}), t.formatStamp(new Date("nope")), t.formatAgo(new Date("nope")), t.whenHtml(new Date("nope"))],
   impossible: ["2026-02-30T10:00:00Z", "2026-02-29", "2026-04-31 12:00:00", "2026-09-28T23:60:00Z"].map((v) => [v, t.formatStamp(v), t.parseInstant(v)]),
   leap: t.formatStamp("2028-02-29T10:00:00Z"),
 })`);
@@ -93,9 +93,16 @@ await check("a day that does not exist is not an instant, though V8 would roll \
   JSON.stringify([garbage.impossible, garbage.leap]));
 await check("an echoed value is escaped in the markup, and is a bare .when-exact with no age to tick",
   () => garbage.html === '<span class="when-exact">&lt;b onmouseover=&quot;x&quot;&gt;</span>', garbage.html);
-await check("a boolean, an object and an invalid Date are not instants either",
-  () => garbage.types[0] === "true" && garbage.types[1] === "[object Object]" && garbage.types[2] === "Invalid Date",
+await check("a boolean and an object are not instants either, and are echoed; an invalid Date renders nothing, never \"Invalid Date\"",
+  () => garbage.types[0] === "true" && garbage.types[1] === "[object Object]" && garbage.types[2] === "" && garbage.types[3] === "" &&
+    garbage.types[4] === "",
   JSON.stringify(garbage.types));
+{
+  // A calendar date is not an instant: read as UTC midnight it printed the day BEFORE west of Greenwich.
+  const day = inZone("America/Sao_Paulo", `[t.formatStamp("2026-09-28"), t.parseInstant("2026-09-28"), t.formatAgo("2026-09-28"), t.whenHtml("2026-09-28")]`);
+  await check("a date alone is a calendar date: in São Paulo it reads 2026-09-28 — no time, no zone shift, no age",
+    () => day[0] === "2026-09-28" && day[1] === null && day[2] === "" && !day[3].includes("2026-09-27"), JSON.stringify(day));
+}
 
 /* ── the unit edges ───────────────────────────────────────────────────────────────────────────── */
 

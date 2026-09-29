@@ -84,10 +84,12 @@ function formatter(kind) {
   return formatters.get(kind);
 }
 
-// The ISO-8601 shape every store in the estate writes: a date, or a date and time with an optional
-// fraction and an optional `Z` / `±HH:MM`. A space may stand for the `T` — the system's own stamp
-// shape reads back as local time.
-const ISO_INSTANT = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+// The ISO-8601 shape every store in the estate writes for an instant: a date AND a time, with an
+// optional fraction and an optional `Z` / `±HH:MM`. A space may stand for the `T` — the system's own
+// stamp shape reads back as local time. A date alone ("2026-09-28") is a calendar date, not an
+// instant: engines read it as UTC midnight, which printed the day before in São Paulo. It is echoed
+// as written, with no time and no zone.
+const ISO_INSTANT = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/;
 
 // The right shape can still name a day that does not exist, and V8 ROLLS it over: "2026-02-30" is the
 // 2nd of March to Chrome and nothing to Firefox. So the fields are checked before any engine sees them.
@@ -138,11 +140,13 @@ const escapeHtml = (text) =>
  *
  * @param {Date|number|string|null|undefined} value
  * @returns {{date: string, time: string, zone: string, utc: string, text: string}}
- *   `text` is `YYYY-MM-DD HH:MM:SS`; `utc` the ISO string; `zone` `Z` or `±HH:MM`. Nullish or ""
- *   gives every part ""; an unparseable value is echoed in `date`, `utc` and `text`.
+ *   `text` is `YYYY-MM-DD HH:MM:SS`; `utc` the ISO string; `zone` `Z` or `±HH:MM`. Nullish, "" or an
+ *   invalid Date gives every part ""; an unparseable value (a date alone included) is echoed in
+ *   `date`, `utc` and `text`.
  */
 export function stampParts(value) {
-  if (value == null || value === "") return { date: "", time: "", zone: "", utc: "", text: "" };
+  // An invalid Date has no input left to echo — String() of it is "Invalid Date" — so it is nothing.
+  if (value == null || value === "" || (value instanceof Date && Number.isNaN(value.getTime()))) return { date: "", time: "", zone: "", utc: "", text: "" };
   const time = parseInstant(value);
   if (time === null) {
     const raw = String(value);

@@ -36,7 +36,7 @@ formatDuration(48_000);                // "48s"; { style: "long" } → "48 secon
 
 | export | returns |
 | --- | --- |
-| `formatStamp(value)` | `YYYY-MM-DD HH:MM:SS` in the viewer's zone; `""` for nullish or `""`; an unparseable value echoed as it came |
+| `formatStamp(value)` | `YYYY-MM-DD HH:MM:SS` in the viewer's zone; `""` for nullish, `""` or an invalid `Date`; an unparseable value echoed as it came |
 | `stampParts(value)` | `{ date, time, zone, utc, text }` — `zone` is the offset (`+02:00`, `Z` at UTC), `utc` the ISO instant for a `data-tip` |
 | `formatAgo(value, { style = "long", now })` | `"3 minutes ago"` / `"3m ago"`; `"just now"` under 5 s **and for a future stamp**; `""` when unreadable |
 | `formatDuration(ms, { style = "short" })` | a span, floored into the largest unit that gives at least 1: `s m h d w mo y` / `second … year`; `"0s"` for a negative or non-finite span |
@@ -60,7 +60,9 @@ and a year 365: a relative label is an approximation by nature.
 however date-like: V8 reads `"2026-13-45 junk"` as the 13th of June and rolls `"2026-02-30"` into
 March while Firefox refuses both, and a stored value that means a date in one browser and nothing in
 another is the estate disagreeing with itself. A space may stand for the `T`; it is then local time,
-like the system's own stamp.
+like the system's own stamp. An instant names a date AND a time: a date alone (`"2026-09-28"`) is a
+calendar date, which engines read as UTC midnight and São Paulo then printed as the day before, so it
+is echoed as written — no time, no zone, no age.
 
 **Data stays UTC.** Stored values, comparison keys, filename stamps and ISO sorts never go through
 these functions — only what a person reads converts. A calendar DATE (a publication day, "last

@@ -816,7 +816,8 @@ const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.cap
 // and with ONLY the thing being measured hidden. The pixels that change are that thing's ink and
 // nothing else's — a neighbour's border or fill is identical in both shots and counts for nothing —
 // and the ratio is read from them alone: each changed pixel as drawn against the same pixel without
-// it. Fewer than 3 changed pixels means the clip does not hold the target at all.
+// it. Fewer than 3 changed pixels means the target paints nothing visible (ink the colour of its
+// ground: mono's glyph on a light palette did exactly that) or the clip does not hold it.
 const inkDiff = (drawn, bare) => {
   let changed = 0, ratio = 1;
   for (let i = 0; i < drawn.px.length; i += drawn.bpp) {
@@ -911,7 +912,7 @@ const painted = async () => {
     const { changed, ratio } = inkDiff(drawn, bare);
     paintedYield.captures += 1;
     paintedYield[kind] = Math.min(paintedYield[kind], ratio);
-    if (changed < 3) { problems.push(`${sel} (${kind}): hiding it changes ${changed} pixel(s) in the clip — the clip does not hold it`); continue; }
+    if (changed < 3) { problems.push(`${sel} (${kind}): hiding it changes ${changed} pixel(s) in the clip — it paints nothing visible there, or the clip does not hold it`); continue; }
     paintedYield.owned += 1;
     if (!(ratio >= min)) problems.push(`${sel} (${kind}): its own ink reaches ${ratio.toFixed(2)}:1 over ${changed} changed pixels, wants ${min}`);
   }

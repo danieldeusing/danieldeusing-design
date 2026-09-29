@@ -11,8 +11,10 @@
  *     font-size — a control that loses `font: inherit` renders in Arial at 13.33px (X2).
  *   · A FOCUS RING THAT CANNOT FAIL. base.css draws a global ring, so a tab "having its ring" proves
  *     nothing with it loaded. The ring is asserted in `?bare`, where only data.css can supply it (X2).
- *   · FORCED COLOURS. A state drawn by a fill or a tint disappears under a forced palette; each one
- *     this file draws is asserted to compute DIFFERENT colours for its two states there (X1).
+ *   · FORCED COLOURS. A state drawn by a fill or a tint disappears under a forced palette. Each one
+ *     this file draws is MEASURED there, in both of Chromium's palettes: its two states must differ by
+ *     3:1 and its text reach 4.5:1 — and the selected tab's label is read in pixels, because the Canvas
+ *     backplate that hid it shows in no computed style (X1).
  *   · `hidden`. An author `display` beats the UA's `[hidden]`; every component must still hide, through
  *     tokens.css's one rule and no guard of its own (X3).
  *   · THE PICK CELL. Under a coarse pointer the bare checkbox stays small and the CELL is the 44px
@@ -47,8 +49,13 @@ const SURFACES = ["--background", "--card", "--muted"];
 // Chromium's 8-bit canvas blend lands one unit darker per channel, which moved paper's --warning on its
 // --muted tint from 4.53 to 4.48 — enough to flip a verdict at the threshold. `contrast` is WCAG 2.x.
 const INSTRUMENT = `window.M = {
-  tok(expr) { const p = document.createElement("span"); document.body.append(p); p.style.color = expr;
-    const v = getComputedStyle(p).color; p.remove(); return v; },
+  // The probe opts out of forced colours, or under them every colour it resolves would come back as
+  // CanvasText; a system colour keyword still resolves to the forced palette's value.
+  // A value that is not a colour ("none", a stroke that was never set) throws: resolved silently, it
+  // would come back as the inherited text colour and measure as a plausible ratio.
+  tok(expr) { const p = document.createElement("span"); p.style.forcedColorAdjust = "none"; p.style.color = expr;
+    if (!p.style.color) throw new Error("not a colour: " + expr);
+    document.body.append(p); const v = getComputedStyle(p).color; p.remove(); return v; },
   rgba(expr) {
     const v = M.tok(expr);
     let m = v.match(/^rgba?\\((\\S+), (\\S+), ([^,)]+)(?:, ([^)]+))?\\)$/);
@@ -337,43 +344,97 @@ const shownWhenHidden = await evaluate(`${JSON.stringify(HIDE)}.filter((sel) => 
 await check(`X3 — \`hidden\` hides each of ${HIDE.length} components whatever display it sets (tokens.css's rule; a marked stand-in until WP1 lands)`,
   () => shownWhenHidden.length === 0, JSON.stringify(shownWhenHidden));
 
-/* ── X1 · forced colours ──────────────────────────────────────────────────────────────────────── */
+/* ── X1 · forced colours, in both of Chromium's palettes ─────────────────────────────────────────
+   The check measures CONTRAST of what is painted, not inequality (X1 as corrected, 2026-09-29): an
+   earlier version of this section asserted "the selected tab's fill is Highlight" and passed while its
+   label was invisible. Chromium paints a Canvas BACKPLATE behind forced text, which no computed style
+   shows — so that one is measured in pixels: the label must reach the screen as glyph strokes against
+   the fill, not as a solid block. Everything else is computed from the used colours. */
 
-await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }] });
-await until("matchMedia('(forced-colors: active)').matches", "forced colours");
-await settle();
-const canvas = await tok("Canvas");
-const pairs = await evaluate(`(() => {
-  const s = (sel, p, pseudo) => M.cs(sel, pseudo)[p];
-  return {
-    tab: [s("#tab-activity", "backgroundColor"), s("#tab-queue", "backgroundColor"), s("#tab-activity", "color"), s("#tab-queue", "color")],
-    disabledTab: [s("#tab-modes", "color"), s("#tab-queue", "color"), s("#tab-syntax", "color")],
-    pin: [s("#row-pinned > td:first-child", "borderLeftWidth"), s("#row-pinned > td:first-child", "borderLeftColor"),
-      s("${row2} > td:first-child", "borderLeftWidth")],
-    disabledRow: [s("#row-disabled > td:nth-child(3)", "color"), s("${row2} > td:nth-child(3)", "color")],
-    dots: [s("#trend .chart-dot:not(.chart-dot--hollow)", "fill"), s("#trend .chart-dot--hollow", "fill"), s("#trend .chart-dot--hollow", "stroke")],
-    series: [s('#flow g[data-series="income"] rect', "fill"), s('#flow g[data-series="expenses"] rect', "fill"), s('#flow g[data-series="expenses"] rect', "stroke")],
-    text: s("#trend text", "fill"), line: s("#trend .chart-line", "stroke"),
-    swatches: [s(".chart-key li:nth-child(1)", "backgroundColor", "::before"), s(".chart-key li:nth-child(2)", "backgroundColor", "::before"),
-      s(".chart-key li:nth-child(2)", "borderTopColor", "::before"), s(".chart-key li:nth-child(2)", "borderTopWidth", "::before")],
-  };
-})()`);
-const sys = { highlight: await tok("Highlight"), text: await tok("CanvasText"), gray: await tok("GrayText") };
-await check("X1 — the selected tab stays distinguishable: Highlight / HighlightText, where the others are Canvas / CanvasText",
-  () => pairs.tab[0] === sys.highlight && pairs.tab[0] !== pairs.tab[1] && pairs.tab[2] !== pairs.tab[3], JSON.stringify(pairs.tab));
-await check("X1 — a disabled tab (disabled or aria-disabled) is GrayText", () => pairs.disabledTab[0] === sys.gray && pairs.disabledTab[2] === sys.gray &&
-  pairs.disabledTab[0] !== pairs.disabledTab[1], JSON.stringify(pairs.disabledTab));
-await check("X1 — the pinned row keeps its bar as a 3px CanvasText border (the tint and the inset shadow are both dropped)",
-  () => pairs.pin[0] === "3px" && pairs.pin[1] === sys.text && pairs.pin[2] === "0px", JSON.stringify(pairs.pin));
-await check("X1 — a disabled row is GrayText, an enabled one is not", () => pairs.disabledRow[0] === sys.gray && pairs.disabledRow[0] !== pairs.disabledRow[1], JSON.stringify(pairs.disabledRow));
-await check("X1 — a solid and a hollow dot differ: CanvasText against Canvas inside a CanvasText ring",
-  () => pairs.dots[0] === sys.text && pairs.dots[1] === canvas && pairs.dots[2] === sys.text, JSON.stringify(pairs.dots));
-await check("X1 — two series differ: the second is outlined, not filled",
-  () => pairs.series[0] === sys.text && pairs.series[1] === canvas && pairs.series[2] === sys.text, JSON.stringify(pairs.series));
-await check("X1 — chart text and lines are CanvasText, not the theme colour the SVG would otherwise keep",
-  () => pairs.text === sys.text && pairs.line === sys.text, JSON.stringify([pairs.text, pairs.line]));
-await check("X1 — the key's swatches are drawn (not the Canvas colour a forced background becomes), the second outlined like its series",
-  () => pairs.swatches[0] === sys.text && pairs.swatches[1] === canvas && pairs.swatches[2] === sys.text && pairs.swatches[3] === "1px", JSON.stringify(pairs.swatches));
+// Glyph strokes across the middle rows of an element's screenshot: a row of text crosses from the fill
+// to the ink and back once per stroke; a solid block (text drawn on a backplate of its own colour)
+// crosses once. `ink` is the colour the text should paint.
+const strokes = async (sel, ink) => {
+  await evaluate(`document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: "center", behavior: "instant" }); null`);
+  const r = await evaluate(`(() => { const q = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();
+    return { x: q.left + scrollX, y: q.top + scrollY, width: q.width, height: q.height, scale: 1 }; })()`);
+  const { data } = await send("Page.captureScreenshot", { format: "png", clip: r });
+  return evaluate(`(async () => {
+    const img = await createImageBitmap(await (await fetch("data:image/png;base64,${data}")).blob());
+    const c = new OffscreenCanvas(img.width, img.height), x = c.getContext("2d");
+    x.drawImage(img, 0, 0);
+    const px = x.getImageData(0, 0, img.width, img.height).data;
+    const at = (col, row) => { const i = (row * img.width + col) * 4; return M.lum([px[i], px[i + 1], px[i + 2]]); };
+    const mid = Math.floor(img.height / 2), fill = at(2, mid), half = Math.abs(M.lum(M.over(["Canvas", ${JSON.stringify(ink)}])) - fill) / 2;
+    let most = 0;
+    for (let row = mid - 3; row <= mid + 3; row += 1) {
+      let inked = false, n = 0;
+      for (let col = 0; col < img.width; col += 1) {
+        const now = Math.abs(at(col, row) - fill) > half;
+        if (now && !inked) n += 1;
+        inked = now;
+      }
+      most = Math.max(most, n);
+    }
+    return most;
+  })()`);
+};
+
+for (const scheme of ["light", "dark"]) {
+  await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
+  await until("matchMedia('(forced-colors: active)').matches", "forced colours");
+  await settle();
+  // Under forced colours the page is Canvas, so everything is measured over Canvas.
+  const fc = JSON.parse(await evaluate(`(() => {
+    const s = (sel, p, pseudo) => M.cs(sel, pseudo)[p];
+    const on = (fg, ...under) => M.ratio(M.over(["Canvas", ...under, fg]), M.over(["Canvas", ...under]));
+    const sel = M.cs("#tab-activity"), off = M.cs("#tab-queue");
+    return JSON.stringify({
+      palette: ["Canvas", "CanvasText", "Highlight", "HighlightText", "GrayText"].map(M.tok).join(" / "),
+      tabAdjust: sel.forcedColorAdjust,
+      tabLabel: on(sel.color, sel.backgroundColor),
+      tabFills: M.ratio(M.over(["Canvas", sel.backgroundColor]), M.over(["Canvas", off.backgroundColor])),
+      tabOff: on(off.color, off.backgroundColor),
+      disabled: ["#tab-modes", "#tab-syntax"].map((q) => [s(q, "color") === M.tok("GrayText"), s(q, "opacity"), on(s(q, "color"))]),
+      disabledVsEnabled: s("#tab-modes", "color") !== off.color,
+      pin: [s("#row-pinned > td:first-child", "borderLeftWidth"), on(s("#row-pinned > td:first-child", "borderLeftColor")),
+        s("${row2} > td:first-child", "borderLeftWidth")],
+      row: [on(s("#row-disabled > td:nth-child(3)", "color")), s("#row-disabled > td:nth-child(3)", "color") !== s("${row2} > td:nth-child(3)", "color")],
+      text: on(s("#trend text", "fill")),
+      line: on(s("#trend .chart-line", "stroke")),
+      grid: on(s("#balance .chart-grid", "stroke")),
+      dot: [on(s("#trend .chart-dot:not(.chart-dot--hollow)", "fill")), on(s("#trend .chart-dot--hollow", "stroke")),
+        M.ratio(M.over(["Canvas", s("#trend .chart-dot:not(.chart-dot--hollow)", "fill")]), M.over(["Canvas", s("#trend .chart-dot--hollow", "fill")]))],
+      series: [on(s('#flow g[data-series="income"] rect', "fill")), on(s('#flow g[data-series="expenses"] rect', "stroke")),
+        M.ratio(M.over(["Canvas", s('#flow g[data-series="income"] rect', "fill")]), M.over(["Canvas", s('#flow g[data-series="expenses"] rect', "fill")]))],
+      swatch: [on(s(".chart-key li:nth-child(1)", "backgroundColor", "::before")), on(s(".chart-key li:nth-child(2)", "borderTopColor", "::before")),
+        s(".chart-key li:nth-child(2)", "borderTopWidth", "::before"),
+        M.ratio(M.over(["Canvas", s(".chart-key li:nth-child(1)", "backgroundColor", "::before")]), M.over(["Canvas", s(".chart-key li:nth-child(2)", "backgroundColor", "::before")]))],
+    });
+  })()`));
+  const label = await strokes("#tab-activity", "HighlightText");
+  const r2 = (n) => (typeof n === "number" ? n.toFixed(2) : n);
+  const detail = (v) => () => JSON.stringify(v, (k, n) => r2(n));
+  console.log(`forced colours, ${scheme} palette (Canvas / CanvasText / Highlight / HighlightText / GrayText): ${fc.palette}`);
+  await check(`X1 ${scheme} — the selected tab's label reaches the screen: glyph strokes on the Highlight fill, not a Canvas backplate (${label} crossings)`,
+    () => label >= 4, () => `crossings ${label}, forced-color-adjust ${fc.tabAdjust}`);
+  await check(`X1 ${scheme} — ...and measures ${r2(fc.tabLabel)}:1 on it (HighlightText on Highlight), its fill ${r2(fc.tabFills)}:1 against an unselected tab's`,
+    () => fc.tabLabel >= 4.5 && fc.tabFills >= 3 && fc.tabOff >= 4.5, detail([fc.tabLabel, fc.tabFills, fc.tabOff]));
+  await check(`X1 ${scheme} — a disabled tab (disabled and aria-disabled) is GrayText at full strength, ${r2(fc.disabled[0][2])}:1, not the enabled tabs' ink`,
+    () => fc.disabled.every(([gray, opacity, ratio]) => gray && opacity === "1" && ratio >= 4.5) && fc.disabledVsEnabled, detail(fc.disabled));
+  await check(`X1 ${scheme} — the pinned row's bar is a 3px border at ${r2(fc.pin[1])}:1; an ordinary row has none`,
+    () => fc.pin[0] === "3px" && fc.pin[1] >= 3 && fc.pin[2] === "0px", detail(fc.pin));
+  await check(`X1 ${scheme} — a disabled row is GrayText at ${r2(fc.row[0])}:1, and not an enabled row's ink`,
+    () => fc.row[0] >= 4.5 && fc.row[1], detail(fc.row));
+  await check(`X1 ${scheme} — chart text ${r2(fc.text)}:1 and its line ${r2(fc.line)}:1, not the theme colours SVG would keep`,
+    () => fc.text >= 4.5 && fc.line >= 3, detail([fc.text, fc.line, fc.grid]));
+  await check(`X1 ${scheme} — a solid dot (${r2(fc.dot[0])}:1) and a hollow one (its ring ${r2(fc.dot[1])}:1) differ by ${r2(fc.dot[2])}:1 of fill`,
+    () => fc.dot[0] >= 3 && fc.dot[1] >= 3 && fc.dot[2] >= 3, detail(fc.dot));
+  await check(`X1 ${scheme} — two series differ: the first filled (${r2(fc.series[0])}:1), the second outlined (${r2(fc.series[1])}:1)`,
+    () => fc.series[0] >= 3 && fc.series[1] >= 3 && fc.series[2] >= 3, detail(fc.series));
+  await check(`X1 ${scheme} — the key's swatches are drawn like their series: filled ${r2(fc.swatch[0])}:1, outlined ${r2(fc.swatch[1])}:1`,
+    () => fc.swatch[0] >= 3 && fc.swatch[1] >= 3 && fc.swatch[2] === "1px" && fc.swatch[3] >= 3, detail(fc.swatch));
+}
 await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 900, deviceScaleFactor: 1, mobile: false });
 await sleep(100);
 await check("X1 — stacked, the pinned card carries the bar on its edge", async () => (await css("#row-pinned", "borderLeftWidth")) === "3px" &&
@@ -389,7 +450,7 @@ const PIN = "color-mix(in srgb, var(--warning) 5%, transparent)";
 const HOVER = "color-mix(in srgb, var(--primary) 10%, transparent)";
 const STALE = "color-mix(in srgb, var(--destructive) 8%, transparent)";
 const PAIRS = [
-  ["pinned row: --foreground on the 6% --warning tint", "var(--foreground)", [PIN], 4.5],
+  ["pinned row: --foreground on the 5% --warning tint", "var(--foreground)", [PIN], 4.5],
   // --muted is a menu item's hover fill (components.css), never a table's surface; on warm, muted text
   // there is 4.67 BEFORE any tint, so no tint step can hold it — it is reported, and data.css says so.
   ["pinned row: --muted-foreground (the stamp) on the tint", "var(--muted-foreground)", [PIN], 4.5, ["--background", "--card"]],

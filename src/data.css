@@ -134,8 +134,9 @@ table.dense :is(th, td).pick:has(> input:disabled) { cursor: default; }
    `when` column's stamp is --muted-foreground, and at 6% it measured 4.47 on warm's --card, under AA.
    At 5% it measures 4.53 there and --warning text 4.59 or better on every theme and surface; 5% is the
    house step the fence already uses for a --warning band. (On warm's --muted SURFACE the stamp is
-   4.38 at any useful tint — --muted is a menu item's hover fill, and no table sits on it.) The bar is
-   an inset shadow so it moves no content; the first cell's .45rem inset above is what it paints into.
+   4.38 at 5%, and 4.67 with no tint at all — --muted is a menu item's hover fill, and no table sits
+   on it.) The bar is an inset shadow so it moves no content; the first cell's .45rem inset above is
+   what it paints into.
 
    Dense only: a pinned row is the dense table's idea (cockpit's pinFirst), and the base table's first
    cell has no inset for the bar to paint into — it would land on the first glyph again. */
@@ -484,7 +485,7 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
 /* A STATE SUFFIX on a tab — a failed worker stays visible while another tab is being read. In the
    tone's colour on an unselected tab; on the selected one it inherits the fill's text colour, because
    a tone on the --primary fill measures 1.02-3.41 — and under the pointer too, because a tone on the
-   10% hover tint measures 3.87 (paper's --warning). The word is the meaning, so nothing is lost. */
+   10% hover tint measures 3.91 (paper's --warning). The word is the meaning, so nothing is lost. */
 .tab-status { color: var(--tone, var(--muted-foreground)); }
 .tab:is([aria-selected="true"], :hover) .tab-status { color: inherit; }
 /* A TAB ROW HAS TWO HALVES. On the left the tabs you go to in order to DO something; on the right
@@ -538,9 +539,17 @@ section.doc.tab-panel { margin-top: 1.35rem; }
    this file's states: the selected tab becomes Canvas on CanvasText like every other tab (bold is all
    that is left), the pinned row loses its tint AND its inset bar, a disabled row is the same ink as an
    enabled one, and the key's swatches — backgrounds — vanish. So each is redrawn in SYSTEM colours,
-   which a forced palette keeps: the selected tab is Highlight with HighlightText, a disabled tab or row
-   is GrayText, and the pin bar becomes a real border in CanvasText (a shape, because no system colour
-   means "waiting" — Mark is a text background and measured yellow on a white Canvas).
+   which a forced palette keeps: a disabled tab or row is GrayText, and the pin bar becomes a real
+   border in CanvasText (a shape, because no system colour means "waiting" — Mark is a text background
+   and measured yellow on a white Canvas).
+
+   THE SELECTED TAB CARRIES TEXT, SO IT TAKES `none` AND A WHOLE SYSTEM PAIR. Chromium also paints a
+   Canvas BACKPLATE behind forced text. With only `color: HighlightText; background: Highlight` the
+   word sat on that backplate in its own colour — white on white in the light palette, black on black
+   in the dark one: the fill was right and the label was gone, and a check that compared computed
+   colours passed it. `forced-color-adjust: none` stops the forcing and the backplate, so the pair is
+   declared in full. The disabled tab drops its .45 there: GrayText is already the palette's own word
+   for unavailable, and faded to .45 it measured 2.93:1 (light palette) and 3.25:1 (dark).
 
    CHARTS ARE THE OTHER WAY ROUND. SVG is `preserve-parent-color` by default, so nothing is forced: a
    chart keeps its THEME colours over whatever Canvas the reader's palette has, and warm's --primary on
@@ -548,15 +557,20 @@ section.doc.tab-panel { margin-top: 1.35rem; }
    two states that were colour — a solid dot against a hollow one, one series against the next — become
    fill against no fill: a hollow dot is Canvas inside a CanvasText ring, and every second series (and
    its swatch in the key) is outlined instead of filled. The key's words and the table beside the chart
-   carry the rest, as they already must. */
+   carry the rest, as they already must. The swatch is `none` with its system colours DECLARED, so there
+   is no author colour left for `none` to keep. */
 @media (forced-colors: active) {
   .tab[aria-selected="true"] {
+    forced-color-adjust: none;
     color: HighlightText;
     background: Highlight;
   }
   .tab[aria-selected="true"]:focus-visible { outline-color: HighlightText; }
   .tab:disabled,
-  .tab[aria-disabled="true"] { color: GrayText; }
+  .tab[aria-disabled="true"] {
+    color: GrayText;
+    opacity: 1;
+  }
   table.dense tr[data-pin] > :first-child { border-inline-start: 3px solid CanvasText; }
   tr[aria-disabled="true"] > :not(:first-child) { color: GrayText; }
   .chart text { fill: CanvasText; }

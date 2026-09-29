@@ -40,7 +40,7 @@
  *   node scripts/check-icons.mjs ../other-checkout …      and the words other checkouts use
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize, relative, resolve } from "node:path";
@@ -373,14 +373,17 @@ const server = createServer((req, res) => {
 await new Promise((ok) => server.on("listening", ok));
 const origin = `http://127.0.0.1:${server.address().port}`;
 
-// Port 0: the browser picks a free port and prints it, so a parallel check cannot collide.
+// Port 0: the browser picks a free port and prints it, so a parallel check cannot collide. The
+// profile is removed at exit.
+const profile = mkdtempSync(join(tmpdir(), "dd-icons-"));
 const chrome = spawn(CHROME, [
   "--remote-debugging-port=0", "--remote-allow-origins=*", "--headless=new",
   "--no-first-run", "--no-default-browser-check", "--disable-gpu",
-  `--user-data-dir=${mkdtempSync(join(tmpdir(), "dd-icons-"))}`, "about:blank",
+  `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: ["ignore", "ignore", "pipe"] });
 let socket;
-process.on("exit", () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); });
+process.on("exit", () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close();
+  rmSync(profile, { recursive: true, force: true }); });
 const browserWs = await new Promise((ok, bad) => {
   let seen = "";
   const timer = setTimeout(() => bad(new Error("headless chromium did not print its DevTools url")), 20000);

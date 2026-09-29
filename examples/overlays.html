@@ -102,11 +102,15 @@
         background-position: calc(100% - 2px) 50%;
       }
       .switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-      /* forced colours, as wp5-controls 7720f24 ships them: the glyph opts out and paints the system
-         colour its button is given */
+      /* forced colours, as wp5-controls 3c021dc ships them: the glyph takes its button's forced colour */
       @media (forced-colors: active) {
-        .btn-icon:is([data-icon], [aria-busy="true"])::before { forced-color-adjust: none; }
-        .btn-icon { color: ButtonText; }
+        @supports (forced-color-adjust: preserve-parent-color) {
+          .btn-icon:is([data-icon], [aria-busy="true"])::before { forced-color-adjust: preserve-parent-color; background: currentColor; }
+        }
+        @supports not (forced-color-adjust: preserve-parent-color) {
+          .btn-icon:is([data-icon], [aria-busy="true"])::before { forced-color-adjust: none; background: CanvasText; }
+          .btn-icon:is(:disabled, [aria-disabled="true"]):not([aria-busy="true"])::before { background: currentColor; }
+        }
         .btn-icon:is(:disabled, [aria-disabled="true"]):not([aria-busy="true"]) { color: GrayText; border-color: GrayText; }
       }
     </style>

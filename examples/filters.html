@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>danieldeusing-design — filters</title>
+    <meta name="theme-color" content="#f5efe2" />
+
+    <!-- Pre-paint: the stored theme, before first paint. -->
+    <script>
+      (() => {
+        const backgrounds = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
+        let theme = "warm";
+        try {
+          const stored = localStorage.getItem("theme");
+          if (stored && stored in backgrounds) theme = stored;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", backgrounds[theme]);
+      })();
+    </script>
+
+    <!-- ══ PENDING WP1 (foundations) — DELETE WHEN wp1-foundations MERGES ══════════════════════
+         The tokens this package reads, declared BEFORE tokens.css so that tokens.css wins the
+         moment it declares them. Values are SPEC.md F1 and a subset of the lucide icon masks. -->
+    <style id="pending-wp1-tokens">
+      :root {
+        --control-h: 1.75rem;
+        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
+        --icon-sm: 0.75rem;
+        --icon-size: 0.875rem;
+        --elev-float: 0 0 20px var(--glow-soft);
+        --ico-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+        --ico-filter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 3H2l8 9.46V19l4 2v-8.54z'/%3E%3C/svg%3E");
+        --ico-x: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E");
+        --ico-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+        --ico-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 7-7 7 7M12 19V5'/%3E%3C/svg%3E");
+        --ico-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M19 12l-7 7-7-7'/%3E%3C/svg%3E");
+        --ico-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z'/%3E%3C/svg%3E");
+        --ico-file: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5'/%3E%3C/svg%3E");
+        --ico-folder: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
+      }
+      /* X3 · the ONE [hidden] rule, which WP1 adds to tokens.css. Until then this page carries it. */
+      [hidden]:not([hidden="until-found"]) { display: none !important; }
+    </style>
+
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" />
+    <link rel="stylesheet" href="../src/components.css" />
+    <link rel="stylesheet" href="../src/chrome.css" />
+    <link rel="stylesheet" href="../src/filters.css" />
+
+    <!-- ══ PREVIEW OF OTHER PACKAGES — DELETE EACH BLOCK WHEN ITS PACKAGE MERGES ═══════════════
+         What the demo borrows from packages still in flight, so the page shows the intended look.
+         Written from SPEC.md; the packages' own CSS is the truth once merged. -->
+    <style id="preview-wp2-m0-c8">
+      /* WP2 · M0 one popup look + C8 trigger + C9 error line: a ✓ column on every row, no position
+         in CSS, the trigger at --control-h on the --control-edge, the error in --destructive. */
+      .select-panel { position: static; box-sizing: border-box; padding: 0.25rem 0; border-color: var(--control-edge); box-shadow: var(--elev-float); }
+      .select-option { gap: 0.5rem; padding: 0.3rem 0.9rem 0.3rem 0.5rem; border-inline-start: 0; }
+      .select-option::before { content: ""; flex: none; inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+      .select-option[aria-selected="true"] { color: inherit; font-weight: 400; }
+      .select-option[aria-selected="true"]::before { background: var(--primary); -webkit-mask: var(--ico-check) center / contain no-repeat; mask: var(--ico-check) center / contain no-repeat; }
+      .select-trigger { box-sizing: border-box; min-block-size: var(--control-h); padding-block: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2); border-color: var(--control-edge); gap: 0.4rem; }
+      .select-trigger[aria-invalid="true"] { border-color: var(--destructive); }
+      .field-error { flex-basis: 100%; margin: 0; color: var(--destructive); }
+    </style>
+    <style id="preview-wp4-ico">
+      /* WP4 · I1 the .ico glyph span */
+      .ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+      .ico[data-icon="star"] { --ico: var(--ico-star); }
+      .ico[data-icon="file"] { --ico: var(--ico-file); }
+      .ico[data-icon="folder"] { --ico: var(--ico-folder); }
+    </style>
+    <style id="preview-wp3-doclink">
+      /* WP3 · C16 a text action on a <button> */
+      button.doc-link { padding: 0; font: inherit; background: none; border: 0; cursor: pointer; text-align: inherit; }
+    </style>
+    <style id="preview-wp7-tag">
+      /* WP7 · T1 the tag, base look only */
+      .tag { --tag-c: var(--tag-color, var(--tone, var(--muted-foreground))); display: inline-flex; align-items: center; gap: 0.25rem; min-block-size: 1.25rem; padding: 0 0.375rem; font-weight: 600; line-height: 1; white-space: nowrap; color: var(--tag-c); border: 1px solid color-mix(in srgb, var(--tag-c) 50%, transparent); }
+      [data-tone="info"] { --tone: var(--info); }
+      [data-tone="success"] { --tone: var(--success); }
+    </style>
+
+    <style>
+      /* Page-only layout. The design system ships the controls; a page brings its own layout. */
+      .wrap { padding-block: 1.5rem 6rem; }
+      section.demo { margin-top: var(--space-section); }
+      .lede { color: var(--muted-foreground); max-width: 70ch; margin: 0.25rem 0 1rem; }
+      .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; }
+      .state { display: grid; gap: 0.35rem; justify-items: start; }
+      .state > .label { color: var(--muted-foreground); }
+      .demo-list { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr)); }
+      .demo-card { position: relative; display: grid; gap: 0.4rem; }
+      .demo-card h3 { font-size: var(--fs-base); margin: 0; }
+      .demo-card .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted-foreground); }
+      .theme-bar { display: flex; align-items: center; gap: 0.75rem; }
+      .sticky-demo { max-block-size: 14rem; overflow: auto; padding: 0 0.75rem; border: 1px solid var(--border); }
+      .sticky-rows { list-style: none; margin: 0; padding: 0 0 0.75rem; display: grid; gap: 0.35rem; color: var(--muted-foreground); }
+    </style>
+  </head>
+
+  <body>
+    <header class="bar">
+      <span class="brand glow">filters</span>
+      <div class="theme-bar">
+        <select id="theme" aria-label="theme">
+          <option value="warm">warm</option><option value="green">green</option>
+          <option value="mono">mono</option><option value="paper">paper</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="wrap" id="top">
+      <p class="prompt">cat filters.md</p>
+      <h1>Filters, search and sort</h1>
+      <p class="lede">
+        seedr's and configr's filter controls on the system's tokens: <code>src/filters.css</code> with
+        <code>runtime/search.js</code>, <code>select.js</code>, <code>sort.js</code> and <code>popup.js</code>.
+        Every list that drops down on this page is the system's list.
+      </p>
+
+      <!-- ── M7 the composition, live ───────────────────────────────────────────── -->
+      <section class="demo" id="browse">
+        <p class="prompt">ls ~/skills</p>
+        <p class="lede">The whole bar, in its order — search → spacer → filters → sort → separator → actions — driving a list. Type to see the pending line; pick a filter, click a tag on a card, remove a chip.</p>
+        <search class="filter-bar" aria-label="skills">
+          <div class="search-field" id="q-field">
+            <input type="search" id="q" aria-label="search skills" placeholder="search…"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore />
+            <button type="button" class="search-clear" aria-label="clear search" hidden></button>
+          </div>
+          <span class="filter-bar-spacer"></span>
+          <select data-filter aria-label="type" id="f-type">
+            <option value="">all</option><option value="skill">skill</option><option value="agent">agent</option>
+            <option value="command">command</option><option value="hook">hook</option><option value="mcp">mcp</option>
+          </select>
+          <select data-filter aria-label="source" id="f-source">
+            <option value="">all</option><option value="seedr" selected>seedr</option><option value="skills.sh">skills.sh</option>
+            <option value="aitmpl">aitmpl</option><option value="official">official</option>
+          </select>
+          <select data-filter aria-label="label" id="f-label"></select>
+          <div class="sort-ctl btn-group" role="group" aria-label="sort" id="sort">
+            <button type="button" class="sort-dir" data-dir="asc" aria-label="sort descending"></button>
+            <select data-sort aria-label="sort by" id="sort-by">
+              <option value="name">name</option><option value="updated">updated</option>
+            </select>
+          </div>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="refresh">refresh</button>
+        </search>
+        <div class="filter-chips" id="in-force" role="group" aria-label="filters in force"></div>
+        <p class="result-count" role="status" id="count"></p>
+        <ul class="demo-list" id="list"></ul>
+        <p class="load-more" id="more"></p>
+      </section>
+
+      <!-- ── M7 --sticky: the bar stays while the list scrolls ───────────────────── -->
+      <section class="demo">
+        <p class="prompt">man filter-bar --sticky</p>
+        <p class="lede"><code>.filter-bar--sticky</code> pins the bar at <code>--sticky-top</code> on an opaque <code>--background</code>. Scroll the box: the rows pass under the bar, never through it.</p>
+        <div class="sticky-demo" tabindex="0" role="region" aria-label="hosts, under a sticky filter bar">
+          <search class="filter-bar filter-bar--sticky" aria-label="hosts">
+            <div class="search-field">
+              <input type="search" aria-label="search hosts" placeholder="search…" autocomplete="off" spellcheck="false" data-1p-ignore />
+              <button type="button" class="search-clear" aria-label="clear search" hidden></button>
+            </div>
+            <span class="filter-bar-spacer"></span>
+            <select data-filter aria-label="role"><option value="">all</option><option value="edge">edge</option><option value="compute">compute</option></select>
+          </search>
+          <ul class="sticky-rows" id="sticky-rows"></ul>
+        </div>
+      </section>
+
+      <!-- ── M4 search field states ─────────────────────────────────────────────── -->
+      <section class="demo">
+        <p class="prompt">man search-field</p>
+        <div class="row">
+          <div class="state"><span class="label">empty</span>
+            <div class="search-field"><input type="search" aria-label="search, empty" placeholder="search…" /><button type="button" class="search-clear" aria-label="clear search" hidden></button></div></div>
+          <div class="state"><span class="label">holding a query</span>
+            <div class="search-field"><input type="search" aria-label="search, filled" value="review" /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
+          <div class="state"><span class="label">pending (debounced)</span>
+            <div class="search-field" data-pending style="--pending-ms: 600000ms"><input type="search" aria-label="search, pending" value="revi" /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
+          <div class="state"><span class="label">disabled</span>
+            <div class="search-field"><input type="search" aria-label="search, disabled" placeholder="search…" disabled /><button type="button" class="search-clear" aria-label="clear search" hidden></button></div></div>
+          <div class="state"><span class="label">disabled, holding a query</span>
+            <div class="search-field"><input type="search" aria-label="search, disabled with a query" value="review" disabled /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
+          <div class="state"><span class="label">with a match count</span>
+            <div class="row" style="gap: 0.5rem"><div class="search-field"><input type="search" aria-label="search logs" value="error" /><button type="button" class="search-clear" aria-label="clear search"></button></div><span class="match-count" role="status">3/17</span></div></div>
+        </div>
+      </section>
+
+      <!-- ── M5 filter dropdown states (+ C8) ───────────────────────────────────── -->
+      <section class="demo">
+        <p class="prompt">man filter-dropdown</p>
+        <div class="row">
+          <div class="state"><span class="label">at rest: names the facet</span>
+            <select data-filter aria-label="scope"><option value="">all</option><option value="user">user</option><option value="project">project</option></select></div>
+          <div class="state"><span class="label">filtering: names the value</span>
+            <select data-filter aria-label="agent"><option value="">all</option><option value="claude" selected>claude</option><option value="codex">codex</option></select></div>
+          <div class="state"><span class="label">required picker: no "all", no clear</span>
+            <select data-filter aria-label="repository"><option value="vu3">poi/vu3</option><option value="infra">dd/infra</option></select></div>
+          <div class="state"><span class="label">disabled</span>
+            <select data-filter aria-label="host" disabled><option value="">all</option><option value="ddmini" selected>ddmini</option></select></div>
+          <div class="state"><span class="label">long list: a search row</span>
+            <select data-filter aria-label="model" id="f-model"></select></div>
+          <div class="state"><span class="label">option icons · invalid (C8)</span>
+            <select aria-label="kind" aria-invalid="true" aria-describedby="kind-err"><option data-icon="file">skill</option><option data-icon="folder">plugin</option><option data-icon="star">favourite</option></select>
+            <p class="field-error" id="kind-err">pick a kind this list can show</p></div>
+        </div>
+      </section>
+
+      <!-- ── M6 sort ─────────────────────────────────────────────────────────────── -->
+      <section class="demo">
+        <p class="prompt">man sort-ctl</p>
+        <div class="row">
+          <div class="state"><span class="label">ascending</span>
+            <div class="sort-ctl btn-group" role="group" aria-label="sort"><button type="button" class="sort-dir" data-dir="asc" aria-label="sort descending"></button><select data-sort aria-label="sort by"><option>name</option><option>updated</option></select></div></div>
+          <div class="state"><span class="label">descending</span>
+            <div class="sort-ctl btn-group" role="group" aria-label="sort"><button type="button" class="sort-dir" data-dir="desc" aria-label="sort ascending"></button><select data-sort aria-label="sort by"><option>updated</option><option>name</option></select></div></div>
+          <div class="state"><span class="label">disabled arrow</span>
+            <div class="sort-ctl btn-group" role="group" aria-label="sort"><button type="button" class="sort-dir" data-dir="asc" aria-label="sort descending" disabled></button><select data-sort aria-label="sort by" disabled><option>name</option></select></div></div>
+        </div>
+      </section>
+
+      <!-- ── M8 chips ────────────────────────────────────────────────────────────── -->
+      <section class="demo">
+        <p class="prompt">man chip</p>
+        <p class="lede">A multi-select filter: each chip toggles, <code>all</code> clears the set and is pressed when none is.</p>
+        <div class="chip-set" role="group" aria-label="tags" id="tags">
+          <button type="button" class="chip" aria-pressed="true">all</button>
+          <button type="button" class="chip" aria-pressed="false">#agents <span class="chip-count">12</span></button>
+          <button type="button" class="chip" aria-pressed="false">#design <span class="chip-count">7</span></button>
+          <button type="button" class="chip" aria-pressed="false">#infra <span class="chip-count">31</span></button>
+        </div>
+        <div class="row" style="margin-top: 0.75rem">
+          <div class="state"><span class="label">identity (--chip-accent)</span>
+            <div class="chip-set" role="group" aria-label="hosts">
+              <button type="button" class="chip" aria-pressed="true" style="--chip-accent: var(--info)">ddmini</button>
+              <button type="button" class="chip" aria-pressed="false" style="--chip-accent: var(--pending)">ddstudio</button>
+            </div></div>
+          <div class="state"><span class="label">a link chip (current page)</span>
+            <div class="chip-set"><a class="chip" href="#top" aria-current="page">#agents</a><a class="chip" href="#top">#design</a></div></div>
+          <div class="state"><span class="label">disabled</span>
+            <div class="chip-set"><button type="button" class="chip" aria-pressed="false" disabled>#archived</button></div></div>
+        </div>
+      </section>
+
+      <!-- ── M9 / M10 / M11 / M12 ────────────────────────────────────────────────── -->
+      <section class="demo">
+        <p class="prompt">man filter-chips</p>
+        <div class="filter-chips" role="group" aria-label="filters in force">
+          <button type="button" class="chip chip--remove" aria-label="remove filter source: seedr"><span class="chip-key">source:</span> seedr</button>
+          <button type="button" class="chip chip--remove" aria-label="remove filter type: agent"><span class="chip-key">type:</span> agent</button>
+          <button type="button" class="doc-link doc-link--forward">reset filters</button>
+        </div>
+        <p class="prompt">man value-filter</p>
+        <div class="row">
+          <button type="button" class="value-filter" aria-label="filter by source: official"><span class="tag" data-tone="info">official</span></button>
+          <button type="button" class="value-filter" aria-label="filter by type: agent"><span class="tag">agent</span></button>
+          <button type="button" class="value-filter" aria-label="filter by author: daniel">daniel</button>
+        </div>
+        <p class="result-count" role="status">7 of 55 skills — 3 hidden by the filters</p>
+        <p class="load-more">showing 48 of 312 · <button type="button" class="doc-link doc-link--forward">show more</button></p>
+      </section>
+
+      <!-- ── M13 autocomplete ────────────────────────────────────────────────────── -->
+      <section class="demo">
+        <p class="prompt">man autocomplete</p>
+        <p class="lede">The contract, wired by page code: a combobox field and a <code>.select-panel</code> listbox placed with <code>positionPopup()</code>. Type <code>/</code>.</p>
+        <div class="search-field" style="max-inline-size: 24rem">
+          <input type="search" id="cmd" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cmd-list"
+                 aria-label="command" placeholder="type / for commands" autocomplete="off" spellcheck="false" data-1p-ignore />
+          <button type="button" class="search-clear" aria-label="clear command" hidden></button>
+        </div>
+      </section>
+
+      <!-- ── 1.1 item 1: a table's search is a .filter-bar + .search-field ──────── -->
+      <section class="demo">
+        <p class="prompt">man table-tools</p>
+        <table data-table-tools data-table-id="filters-demo" aria-label="hosts">
+          <thead><tr><th data-col="name">name</th><th data-col="role" data-filter="pick">role</th><th data-col="load" data-sort-type="num">load</th></tr></thead>
+          <tbody>
+            <tr><td>ddmini</td><td>edge</td><td>0.42</td></tr>
+            <tr><td>ddstudio</td><td>compute</td><td>2.10</td></tr>
+            <tr><td>ddyase</td><td>customer sites</td><td>0.18</td></tr>
+            <tr><td>ddair</td><td>workstation</td><td>0.77</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="module">
+      import { applyTheme } from "../runtime/theme.js";
+      import { initSelects } from "../runtime/select.js";
+      import { initSearchFields, markPending } from "../runtime/search.js";
+      import { initSortControls } from "../runtime/sort.js";
+      import { positionPopup } from "../runtime/popup.js";
+      import { initDropdowns } from "../runtime/dropdown.js";
+      import { initTableTools } from "../runtime/tabletools.js";
+
+      const $ = (selector) => document.querySelector(selector);
+
+      /* option lists too long to write out */
+      const LABELS = ["agents", "automation", "browser", "ci", "cloudflare", "code-review", "data", "debugging",
+        "design", "docs", "git", "infra", "jira", "k8s", "llm", "mcp", "memory", "python", "release", "rust",
+        "security", "sql", "testing", "writing"];
+      $("#f-label").innerHTML = '<option value="">all</option>' + LABELS.map((l) => `<option value="${l}">${l}</option>`).join("");
+      $("#f-model").innerHTML = '<option value="">all</option>' +
+        Array.from({ length: 24 }, (_, i) => `<option value="m${i}">model-${String(i + 1).padStart(2, "0")}</option>`).join("");
+      $("#sticky-rows").innerHTML = Array.from({ length: 16 }, (_, i) =>
+        `<li>host-${String(i + 1).padStart(2, "0")} · ${i % 3 ? "compute" : "edge"}</li>`).join("");
+
+      const theme = $("#theme");
+      theme.value = document.documentElement.dataset.theme || "warm";
+      theme.addEventListener("change", () => {
+        applyTheme(theme.value);
+        try { localStorage.setItem("theme", theme.value); } catch {}
+      });
+
+      initSelects();
+      initSearchFields();
+      initSortControls();
+      initDropdowns();
+      initTableTools();
+
+      /* ── the live list: the page owns the query, the runtime owns the controls ── */
+      const TYPES = ["skill", "agent", "command", "hook", "mcp"];
+      const SOURCES = ["seedr", "skills.sh", "aitmpl", "official"];
+      const NAMES = ["review", "deploy", "grep-logs", "release-notes", "triage", "refactor", "migrate", "audit",
+        "bisect", "profile", "lint", "format", "changelog", "rollback", "seed", "sync", "trace", "snapshot",
+        "backup", "restore", "tail", "diff", "plan", "summarise", "translate", "explain", "scaffold", "pin",
+        "bump", "verify"];
+      const ITEMS = NAMES.map((name, i) => ({
+        name, type: TYPES[i % 5], source: SOURCES[(i * 3) % 4], label: LABELS[(i * 7) % LABELS.length],
+        updated: `2026-09-${String(1 + ((i * 11) % 28)).padStart(2, "0")}`,
+      }));
+      const STEP = 8;
+      let shown = STEP;
+      let applied = "";
+      let debounce;
+
+      const q = $("#q");
+      const filters = { type: $("#f-type"), source: $("#f-source"), label: $("#f-label") };
+      const sortBy = $("#sort-by");
+      const dir = () => $("#sort .sort-dir").dataset.dir;
+
+      function render({ focusChip } = {}) {
+        const query = applied.toLowerCase();
+        const hits = ITEMS.filter((item) =>
+          (!query || item.name.includes(query) || item.label.includes(query)) &&
+          Object.entries(filters).every(([key, select]) => !select.value || item[key] === select.value));
+        const field = sortBy.value;
+        hits.sort((a, b) => a[field].localeCompare(b[field]) * (dir() === "desc" ? -1 : 1));
+
+        const filtered = hits.length !== ITEMS.length;
+        $("#count").textContent = filtered ? `${hits.length} of ${ITEMS.length} skills` : `${ITEMS.length} skills`;
+
+        $("#list").innerHTML = hits.slice(0, shown).map((item) => `
+          <li class="card-terminal demo-card">
+            <h3 tabindex="-1">${item.name}</h3>
+            <div class="meta">
+              <button type="button" class="value-filter" data-key="type" data-value="${item.type}" aria-label="filter by type: ${item.type}"><span class="tag">${item.type}</span></button>
+              <button type="button" class="value-filter" data-key="source" data-value="${item.source}" aria-label="filter by source: ${item.source}">${item.source}</button>
+              <span>#${item.label}</span><span>${item.updated}</span>
+            </div>
+          </li>`).join("");
+        $("#more").hidden = hits.length <= shown;
+        $("#more").innerHTML = `showing ${Math.min(shown, hits.length)} of ${hits.length} · <button type="button" class="doc-link doc-link--forward" id="show-more">show more</button>`;
+
+        const chips = [];
+        if (applied) chips.push(["search", applied]);
+        for (const [key, select] of Object.entries(filters)) {
+          if (select.value) chips.push([key, select.selectedOptions[0].textContent]);
+        }
+        const bar = $("#in-force");
+        bar.hidden = chips.length === 0;
+        bar.innerHTML = chips.map(([key, value]) =>
+          `<button type="button" class="chip chip--remove" data-key="${key}" aria-label="remove filter ${key}: ${value}"><span class="chip-key">${key}:</span> ${value}</button>`
+        ).join("") + (chips.length ? '<button type="button" class="doc-link doc-link--forward" id="reset">reset filters</button>' : "");
+        if (focusChip !== undefined) (bar.querySelectorAll(".chip")[focusChip] || q).focus();
+      }
+
+      const setFilter = (key, value) => {
+        const select = filters[key];
+        select.value = value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+
+      q.addEventListener("input", () => {
+        markPending(q, 300);
+        clearTimeout(debounce);
+        debounce = setTimeout(() => { applied = q.value.trim(); shown = STEP; render(); }, q.value ? 300 : 0);
+      });
+      for (const select of Object.values(filters)) select.addEventListener("change", () => { shown = STEP; render(); });
+      let sortField = sortBy.value;
+      $("#sort").addEventListener("sortchange", (event) => {
+        // configr's convention: switching to a field that is a time opens it newest first. Writing
+        // data-dir is all it takes — sort.js keeps the button's name in step.
+        if (event.detail.field !== sortField && event.detail.field === "updated") $("#sort .sort-dir").dataset.dir = "desc";
+        sortField = event.detail.field;
+        render();
+      });
+      document.addEventListener("click", (event) => {
+        const valueFilter = event.target.closest(".demo-card .value-filter");
+        if (valueFilter) setFilter(valueFilter.dataset.key, valueFilter.dataset.value);
+        const chip = event.target.closest("#in-force .chip--remove");
+        if (chip) {
+          const index = [...$("#in-force").querySelectorAll(".chip")].indexOf(chip);
+          if (chip.dataset.key === "search") {
+            q.value = "";
+            q.dispatchEvent(new Event("input", { bubbles: true }));
+            applied = "";
+          } else {
+            setFilter(chip.dataset.key, "");
+          }
+          // After a removal focus moves to the chip now in its place, or to the search box.
+          render({ focusChip: index });
+        }
+        if (event.target.closest("#reset")) {
+          q.value = ""; q.dispatchEvent(new Event("input", { bubbles: true })); applied = "";
+          for (const key of Object.keys(filters)) filters[key].value = "";
+          for (const select of Object.values(filters)) select.dispatchEvent(new Event("change", { bubbles: true }));
+          q.focus();
+        }
+        if (event.target.closest("#show-more")) {
+          const first = shown;
+          shown += STEP;
+          render();
+          $("#list").children[first]?.querySelector("h3").focus();
+        }
+      });
+      render();
+
+      /* ── chips: OR within the set, "all" clears it ── */
+      $("#tags").addEventListener("click", (event) => {
+        const chip = event.target.closest(".chip");
+        if (!chip) return;
+        const chips = [...$("#tags").querySelectorAll(".chip")];
+        if (chip === chips[0]) chips.forEach((c, i) => c.setAttribute("aria-pressed", String(i === 0)));
+        else {
+          chip.setAttribute("aria-pressed", String(chip.getAttribute("aria-pressed") !== "true"));
+          const any = chips.slice(1).some((c) => c.getAttribute("aria-pressed") === "true");
+          chips[0].setAttribute("aria-pressed", String(!any));
+        }
+      });
+
+      /* ── autocomplete: the APG combobox the page implements, the list the system draws ── */
+      const COMMANDS = [["/review", "review the current diff", "user"], ["/release", "cut a release from main", "project"],
+        ["/refactor", "restructure without changing behaviour", "user"], ["/explain", "explain the selection", "user"],
+        ["/deploy", "deploy the current branch", "project"]];
+      const cmd = $("#cmd");
+      const list = document.createElement("ul");
+      list.className = "select-panel";
+      list.id = "cmd-list";
+      list.setAttribute("role", "listbox");
+      list.setAttribute("aria-label", "commands");
+      list.hidden = true;
+      document.body.append(list);
+      let active = -1;
+      const options = () => [...list.children];
+      const highlight = (index) => {
+        // "true", never an empty attribute: the system's highlight reads [data-active="true"].
+        options().forEach((row, i) => (i === index ? row.setAttribute("data-active", "true") : row.removeAttribute("data-active")));
+        active = index;
+        if (index >= 0) cmd.setAttribute("aria-activedescendant", options()[index].id);
+        else cmd.removeAttribute("aria-activedescendant");
+      };
+      const dismiss = () => { list.hidden = true; cmd.setAttribute("aria-expanded", "false"); highlight(-1); };
+      const accept = () => {
+        const row = options()[active];
+        if (row) { cmd.value = row.dataset.value + " "; cmd.dispatchEvent(new Event("input", { bubbles: true })); }
+        dismiss();
+      };
+      cmd.addEventListener("input", () => {
+        const text = cmd.value;
+        const hits = text.startsWith("/") && !text.includes(" ") ? COMMANDS.filter(([name]) => name.startsWith(text)) : [];
+        list.innerHTML = hits.map(([name, desc, scope], i) =>
+          `<li class="select-option" role="option" id="cmd-${i}" data-value="${name}">${name} <span class="option-desc">${desc}</span><span class="tag">${scope}</span></li>`).join("");
+        if (!hits.length) { dismiss(); return; }
+        list.hidden = false;
+        cmd.setAttribute("aria-expanded", "true");
+        positionPopup(list, cmd, { minWidth: 280 });
+        highlight(0);
+      });
+      cmd.addEventListener("keydown", (event) => {
+        if (list.hidden) return;
+        const n = options().length;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          highlight((active + (event.key === "ArrowDown" ? 1 : -1) + n) % n);
+        } else if (event.key === "Enter" || event.key === "Tab") {
+          if (event.key === "Enter") event.preventDefault();
+          accept();
+        } else if (event.key === "Escape") {
+          event.preventDefault();   // keep the typed text: Escape dismisses the list first
+          event.stopPropagation();
+          dismiss();
+        }
+      });
+      list.addEventListener("mousedown", (event) => event.preventDefault());
+      list.addEventListener("click", (event) => {
+        const row = event.target.closest(".select-option");
+        if (row) { highlight(options().indexOf(row)); accept(); }
+      });
+      cmd.addEventListener("blur", dismiss);
+    </script>
+  </body>
+</html>

@@ -42,12 +42,58 @@
  * should be. Unknown keys are dropped, and a direction only survives WITH the
  * column it sorted — applying a remembered direction to a different column hands
  * back a view the reader never chose.
+ *
+ * ── THE SEARCH BOXES ARE THE SYSTEM'S (0.60.0) ───────────────────────────────
+ *
+ * The box above the table and the text box inside a column's filter are both a
+ * `.search-field` — magnifier, a named clear button, Escape to clear — in a
+ * `<search class="filter-bar">`. They used to be `.tbl-search` and
+ * `.tbl-filter-input`: two more bespoke boxes on a `--border` edge that missed
+ * WCAG's 3:1 for a control, with no clear button, beside the page's own search
+ * boxes that had one. search.js owns the clear and Escape; this file only keeps
+ * the clear's `hidden` in step when IT writes a value (a restored view, a reset),
+ * because a value set from code fires no `input` for search.js to hear.
  */
+
+import { initSearchFields } from "./search.js";
 
 const STORE_PREFIX = "table-view:";
 const instances = new WeakMap();
 
 const textOf = (el) => (el ? (el.textContent || "").trim() : "");
+
+/* A `.search-field`: the markup search.js wires. `data-1p-ignore` because cockpit
+   learned the expensive way that a password manager otherwise offers to fill
+   every filter box on the page. */
+function searchField(name, placeholder, clearName) {
+  const field = document.createElement("div");
+  field.className = "search-field";
+  const input = document.createElement("input");
+  input.type = "search";
+  input.placeholder = placeholder;
+  input.setAttribute("aria-label", name);
+  input.setAttribute("autocomplete", "off");
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("spellcheck", "false");
+  input.setAttribute("data-1p-ignore", "");
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "search-clear";
+  clear.setAttribute("aria-label", clearName);
+  clear.hidden = true;
+  field.append(input, clear);
+  return { field, input };
+}
+
+/* A value written from code fires no `input`, so the clear would keep the state
+   of the last keystroke — shown over an empty box after a reset, hidden over a
+   restored query. */
+function setSearchValue(input, value) {
+  input.value = value;
+  const clear = input.parentElement && input.parentElement.querySelector(":scope > .search-clear");
+  if (clear) clear.hidden = !value;
+}
 
 /* A header cell's own words, without the controls injected into it. */
 const labelOf = (th) => {
@@ -337,7 +383,7 @@ function paintHeaderBadges(inst) {
       badge.addEventListener("click", (event) => {
         event.stopPropagation();
         inst.view.filters[col.key] = "";
-        if (col.filterInput) col.filterInput.value = "";
+        if (col.filterInput) setSearchValue(col.filterInput, "");
         save(inst); applyTableView(inst.table);
       });
       col.th.appendChild(badge);
@@ -426,20 +472,14 @@ function buildHeaderControls(inst) {
         panel.appendChild(b);
       }
     } else {
-      const input = document.createElement("input");
-      input.type = "search";
-      input.className = "tbl-filter-input";
-      input.placeholder = col.label + " contains…";
-      input.setAttribute("aria-label", "filter " + col.label);
-      // cockpit learned this one the expensive way: without it a password
-      // manager offers to fill every filter box on the page.
-      input.setAttribute("data-1p-ignore", "");
+      const { field, input } = searchField(
+        "filter " + col.label, col.label + " contains…", "clear the " + col.label + " filter");
       input.addEventListener("input", () => {
         inst.view.filters[col.key] = input.value.trim().toLowerCase();
         save(inst); applyTableView(inst.table);
       });
       col.filterInput = input;
-      panel.appendChild(input);
+      panel.appendChild(field);
     }
 
     wrap.appendChild(panel);
@@ -583,21 +623,20 @@ function enhance(table) {
    */
   const wantsSearch = table.getAttribute("data-table-search") !== "off";
 
-  const toolbar = document.createElement("div");
-  toolbar.className = "tbl-toolbar";
-  const search = document.createElement("input");
-  search.type = "search";
-  search.className = "tbl-search";
-  search.placeholder = "search this table…";
-  search.setAttribute("aria-label", "search this table");
-  search.setAttribute("data-1p-ignore", "");
-  search.value = inst.view.search || "";
+  // A `<search>` landmark, named after the table when the table has a name: a
+  // page with three tables would otherwise offer three identical landmarks.
+  const toolbar = document.createElement("search");
+  toolbar.className = "filter-bar";
+  const tableName = table.getAttribute("aria-label") || textOf(table.caption);
+  if (tableName) toolbar.setAttribute("aria-label", "search " + tableName);
+  const { field, input: search } = searchField("search this table", "search this table…", "clear table search");
+  setSearchValue(search, inst.view.search || "");
   search.addEventListener("input", () => {
     inst.view.search = search.value.trim().toLowerCase();
     save(inst); applyTableView(table);
   });
   if (wantsSearch) {
-    toolbar.appendChild(search);
+    toolbar.appendChild(field);
     inst.searchInput = search;
   } else {
     inst.view.search = "";       // a restored search with no box is invisible in force
@@ -612,7 +651,7 @@ function enhance(table) {
   // "(any)".
   snapshot(inst);
   for (const col of inst.columns) {
-    if (col.filterInput) col.filterInput.value = inst.view.filters[col.key] || "";
+    if (col.filterInput) setSearchValue(col.filterInput, inst.view.filters[col.key] || "");
   }
   applyTableView(table);
 
@@ -712,8 +751,8 @@ export function resetTableView(table) {
     inst.lastWritten.every((row, i) => body.rows[i] === row);
   if (!stillOurs) snapshot(inst);
   inst.view = defaults(inst);
-  if (inst.searchInput) inst.searchInput.value = "";
-  for (const col of inst.columns) if (col.filterInput) col.filterInput.value = "";
+  if (inst.searchInput) setSearchValue(inst.searchInput, "");
+  for (const col of inst.columns) if (col.filterInput) setSearchValue(col.filterInput, "");
   save(inst);
   applyTableView(table);
 }
@@ -730,5 +769,9 @@ export function resetTableView(table) {
  * @param {ParentNode} [root=document]
  */
 export function initTableTools(root = document) {
+  // The search boxes built here are `.search-field`s, and a clear button that
+  // does nothing because the page never called initSearchFields() would be a
+  // control that lies. So the table asks for it itself; the call is idempotent.
+  initSearchFields(root);
   for (const table of root.querySelectorAll("table[data-table-tools]")) enhance(table);
 }

@@ -28,6 +28,12 @@
  *     misplaced panel. Parking off-screen has to still measure the panel unconstrained and still
  *     place it below its anchor, and only a real browser can say so.
  *
+ * AND INSIDE A MODAL DIALOG (0.60.0). show() now moves the panel into the open <dialog> its anchor
+ * sits in, because on <body> it renders beneath the top layer. That move is a DOM write during a
+ * hover — the kind of write this file exists to police — so the click is asserted again for a
+ * tipped control INSIDE a modal dialog, and the panel is asserted to be actually on top there: the
+ * hit test at its centre (with its pointer-events briefly on) must find the panel, not the dialog.
+ *
  * AND WHAT IS DELIBERATELY NOT HERE. A click assertion on a control INSIDE the scrolled wrapper —
  * the configuration the bug was found in — was written first and then removed, because in headless
  * such a control is not hit-testable at its own centre AT ALL: `elementFromPoint` returns the
@@ -49,6 +55,7 @@ const CHROME = process.env.DD_CHROME
   ? (existsSync(process.env.DD_CHROME) ? process.env.DD_CHROME : null)
   : [
     `${process.env.HOME}/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
+    `${process.env.HOME}/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
     `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1234/chrome-mac/Chromium.app/Contents/MacOS/Chromium`,
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/usr/bin/google-chrome",
@@ -68,23 +75,27 @@ if (!CHROME) {
   process.exit(0);
 }
 
-const PORT = 19224;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// PORT 0, READ BACK. A fixed 19224 was shared with the other suites, and two of them running at
+// once (two worktrees, two agents) drove one browser: each opened tabs in the other's, and the first
+// to finish killed the second mid-run. The browser picks a free port and writes it to its profile.
+const profile = mkdtempSync(join(tmpdir(), "dd-tooltipclick-"));
 const chrome = spawn(CHROME, [
-  `--remote-debugging-port=${PORT}`, "--remote-allow-origins=*", "--headless=new",
+  "--remote-debugging-port=0", "--remote-allow-origins=*", "--headless=new",
   "--no-first-run", "--no-default-browser-check", "--disable-gpu",
-  `--user-data-dir=${mkdtempSync(join(tmpdir(), "dd-tooltipclick-"))}`, "about:blank",
+  `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 
 let socket;
 const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); };
 process.on("exit", shutdown);
 
-for (let i = 0; ; i += 1) {
-  try { await fetch(`http://127.0.0.1:${PORT}/json/version`); break; } catch {}
-  if (i > 60) { shutdown(); throw new Error("headless chromium did not come up"); }
-  await sleep(250);
+let PORT = 0;
+for (let i = 0; !PORT; i += 1) {
+  try { PORT = Number(readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]); } catch {}
+  if (!PORT && i > 60) { shutdown(); throw new Error("headless chromium did not come up"); }
+  if (!PORT) await sleep(250);
 }
 
 const target = await (await fetch(`http://127.0.0.1:${PORT}/json/new`, { method: "PUT" })).json();
@@ -132,6 +143,10 @@ const HARNESS = `<!doctype html><html><head><style>
   <button id="outside" type="button">outside, no tip</button>
   <button id="outsidetip" type="button" data-tip="An explanation long enough to need the full panel width, so the measurement matters.">outside, tipped</button>
 </p>
+<dialog id="dlg" style="padding: 24px; border: 1px solid #666">
+  <p>inside a modal dialog</p>
+  <button id="indialog" type="button" data-tip="A tip for a control inside the dialog: it has to render in the top layer.">in the dialog, tipped</button>
+</dialog>
 <script type="module">
 ${RUNTIME}
 initTooltips();
@@ -279,6 +294,29 @@ check("...and is placed below its anchor, inside the viewport",
   placement.tipT >= placement.anchorBottom && placement.tipL >= 0
     && placement.tipL + placement.tipW <= placement.viewportW, placement);
 
+// INSIDE A MODAL DIALOG: the panel moves into the dialog on hover, and the control still clicks.
+await evaluate(`(() => { document.getElementById("ddtip").style.display = "none"; document.getElementById("dlg").showModal(); })()`);
+const inDialog = await clickById("indialog");
+check("a TOOLTIPPED control inside a modal dialog clicks — the move into the dialog is not a write that costs the click",
+  saw(inDialog.hits, "click:indialog"), inDialog.hits);
+await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: inDialog.box.x + 1, y: inDialog.box.y });
+await evaluate(`document.getElementById("indialog").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }))`);
+const layer = await evaluate(`(() => {
+  const tip = document.getElementById("ddtip"), dlg = document.getElementById("dlg");
+  // hover it fresh: leave, then enter, so show() runs for this anchor
+  document.getElementById("outside").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  document.getElementById("indialog").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  tip.style.pointerEvents = "auto";
+  const r = tip.getBoundingClientRect();
+  const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  tip.style.pointerEvents = "";
+  return { inDialog: tip.parentElement === dlg, shown: getComputedStyle(tip).display !== "none" && r.width > 0,
+           onTop: !!hit && (hit === tip || tip.contains(hit)), hit: hit && (hit.id || hit.nodeName) };
+})()`);
+check("...its tip is appended to the dialog and is really on top (the hit test finds the panel, not the dialog)",
+  layer.inDialog && layer.shown && layer.onTop, layer);
+await evaluate(`document.getElementById("dlg").close()`);
+
 // THE SPECIFIC REGRESSION, on the source as well as in the browser. Comments stripped first: this
 // file explains the defect at length and every explanation contains the words being matched.
 const source = readFileSync(join(root, "runtime/tooltip.js"), "utf8")
@@ -286,10 +324,29 @@ const source = readFileSync(join(root, "runtime/tooltip.js"), "utf8")
 check("pointerdown hides the PANEL and does not touch the anchor's aria",
   /addEventListener\("pointerdown",\s*hidePanel\s*,\s*true\)/.test(source),
   source.match(/addEventListener\("pointerdown"[^\n]*/g));
-check("...and the aria association is written only when it would change",
-  /!== "ddtip"\)\s*el\.setAttribute/.test(source));
-check("...and removed only when it is actually set",
-  /=== "ddtip"\)\s*el\.removeAttribute/.test(source));
+// The other half is behaviour, counted: every aria-describedby write on the anchor, across a hover
+// the browser re-fires five times (as it does on a live-refreshing table), a leave, and further
+// hovers elsewhere. (It was a regex over the source until 0.60.0, when the attribute became a token
+// list and the one-liners it matched were rewritten.)
+const writes = await evaluate(`(async () => {
+  const el = document.getElementById("outsidetip"), other = document.getElementById("outside");
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  await sleep(30);
+  const count = { set: 0, remove: 0 };
+  const set = el.setAttribute, remove = el.removeAttribute;
+  el.setAttribute = function (name, value) { if (name === "aria-describedby") count.set += 1; return set.call(this, name, value); };
+  el.removeAttribute = function (name) { if (name === "aria-describedby") count.remove += 1; return remove.call(this, name); };
+  for (let i = 0; i < 5; i += 1) { el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); await sleep(10); }
+  const whileHovered = { ...count };
+  for (let i = 0; i < 3; i += 1) { other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); await sleep(10); }
+  delete el.setAttribute; delete el.removeAttribute;
+  return { whileHovered, total: count };
+})()`);
+check("...and the aria association is written only when it would change (one write across five re-fired hovers)",
+  writes.whileHovered.set === 1 && writes.whileHovered.remove === 0, writes);
+check("...and removed only when it is actually set (one removal across three leaves)",
+  writes.total.set === 1 && writes.total.remove === 1, writes);
 
 console.log(failures
   ? `\n\x1b[31m-- check-tooltip-click: ${failures} FAILED --\x1b[0m`

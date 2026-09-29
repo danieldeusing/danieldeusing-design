@@ -1,0 +1,379 @@
+/*
+ * danieldeusing-design — overlays.
+ *
+ * What floats over the page: the modal dialog (`dialog.dialog`) and its confirm, alert and drawer
+ * variants, the context menu's box, and the zoom view a diagram or an image opens into. The
+ * tooltip lives in tooltip.css, which a tokens-only app loads on its own.
+ *
+ * SELF-SUFFICIENT ON PURPOSE. Every rule here works on a page that loads tokens.css and this file
+ * and nothing else: configr and seedr studio load tokens alone, and netmon loads tokens + chrome.
+ * So the dialog states its own box, font, colours and edge, even where base.css or a Tailwind
+ * preflight would have supplied one — and it states EVERY box property the user agent gives a
+ * <dialog> (padding, margin, border, sizes, colours), because otherwise the UA's `1em` padding
+ * and `max-width: calc(100% - 6px - 2em)` decide half of the look on a page that forgot one.
+ *
+ * WHAT IT COMPOSES WITH, and does not redeclare: the X and the back arrow are `.btn-icon`, the
+ * footer is `.form-actions` (both controls.css); the zoom view's bar is `.btn-terminal` (components
+ * .css); the context menu's rows are the one popup look, `.dropdown-item` in a `.select-panel`
+ * (components.css); the zoom OPENER, `.dgm-zoomable` with its corner hint and focus ring, is
+ * components.css's too — it sits in the page's content, and only the view it opens floats. A class
+ * is declared once, in the file that owns it.
+ *
+ * WHAT IT READS FROM tokens.css:
+ *   --card / --foreground / --border        the dialog's surface, ink and inner rules
+ *   --control-edge                           the edge of every popup and dialog (see below)
+ *   --elev-modal / --elev-float              the glow: dialogs / popups (never a black shadow)
+ *   --backdrop                               the modal scrim, per theme
+ *   --fs-base / --fs-xl / --lh-*             the one text size, and the title's heading step
+ *   --muted-foreground                       a context-menu row that states something
+ *
+ * `hidden` IS NOT REPEATED HERE. Several rules below set `display` (flex, grid, contents), and an
+ * author `display` beats the UA's `[hidden] { display: none }`; the system answers that once, in
+ * tokens.css (`[hidden]:not([hidden="until-found"])`), so no class here carries a guard of its own.
+ *
+ * The runtime is runtime/dialog.js (initDialogs, openDialog, closeDialog) and
+ * runtime/diagramzoom.js. The context menu has no module of its own: see references/overlays.md.
+ */
+
+/* ── dialog.dialog — THE MODAL DIALOG ───────────────────────────────────────────────────────────────
+   configr's layout, cockpit's mechanism. configr has the most dialogs in the estate and the most
+   settled anatomy — a head (back, title, actions, X), a body, a footer that commits — so its layout
+   is the one taken. Cockpit's native <dialog> + showModal() is the mechanism, because it brings the
+   top layer, the inert page and Escape to a build-free page for free; configr rebuilt all three in
+   React. Daniel, 2026-08-30, on cockpit: "All dialogs in the whole cockpit should have: close button
+   top right with just an X and border as button. No Text. Action buttons bottom right."
+
+   THE EDGE IS --control-edge, NOT --border, and on the dark themes it is the thing that separates
+   the box. The scrim DIMS the page; on green and mono it cannot SEPARATE a near-black card from a
+   near-black page — measured, --card against the scrimmed page is 1.04-1.08:1 whatever the alpha —
+   and there the edge does it, 4.76:1 at worst. On warm and paper it is the other way round: the
+   edge all but disappears into the scrim (1.07-1.19:1) and the card's own fill separates the box
+   (3.60:1 at worst). Every theme has one of the two, on every surface the dialog opens over; the
+   table is in scripts/check-overlays.mjs's output.
+
+   ONE SURFACE: --card. So a table's sticky header and a scroller's fade, which are painted in
+   --background by default, are told the truth here — the custom properties below, which
+   chrome.css's `.tablewrap thead th` paints the header with too. Cockpit painted both --background inside a --card dialog (C64), which reads
+   as a stripe of page showing through the box.
+
+   `display` ONLY ON [open]. The UA hides a closed dialog with `dialog:not([open]) { display: none }`;
+   a `display: flex` on the base rule would outrank it and paint every closed dialog in the flow.
+   Cockpit had to write `!important` to get out of exactly that. */
+dialog.dialog {
+  box-sizing: border-box;
+  inline-size: min(28rem, calc(100vw - 2rem));
+  max-inline-size: calc(100vw - 2rem);
+  max-block-size: 90dvh;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--control-edge);
+  box-shadow: var(--elev-modal);
+  --tablewrap-fade: var(--card);
+  --clamp-fade: var(--card);
+}
+dialog.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+/* The dialog takes focus only so a screen reader starts at its title (dialog.js); it is not a
+   control, and the first Tab lands on one that shows its own ring. Without this base.css's
+   :focus-visible would draw the ring around the whole box the moment a keyboard opened it. */
+dialog.dialog:focus {
+  outline: none;
+}
+/* No blur. configr blurred the page 8px behind its modals; the edge separates and the scrim dims,
+   and text read through frosted glass is not something this estate does (the filter bar dropped
+   configr's blur for the same reason). */
+dialog.dialog::backdrop {
+  background: var(--backdrop);
+}
+
+/* A <form> directly inside the dialog is transparent to the layout, so `<form method="dialog">`
+   can wrap the body and the footer — its submit button's `value` becomes the dialog's returnValue,
+   the platform's own answer mechanism — and the head, body and foot still stack as they would
+   without it. */
+dialog.dialog > form {
+  display: contents;
+}
+
+/* SIZES — configr's scale, and every one stops at the viewport (seedr studio's rule: a dialog that
+   is wider than the screen has an X nobody can reach). The default is 28rem. `--fit` is cockpit's
+   content-sized overlay and stats dialogs: as wide as what is in it, never wider than 90vw. */
+dialog.dialog--sm { inline-size: 24rem; }
+dialog.dialog--lg { inline-size: 42rem; }
+dialog.dialog--xl { inline-size: 56rem; }
+dialog.dialog--full { inline-size: min(80vw, 90rem); block-size: 90dvh; }
+dialog.dialog--fit { inline-size: max-content; max-inline-size: 90vw; }
+
+/* ── the parts: head, toolbar, body, foot ───────────────────────────────────────────────────────────
+   THE HEAD SITS OUTSIDE THE BODY, and that is cockpit's lesson rather than a taste. Eight cockpit
+   call sites re-render an open dialog's content with cockpitPatch() as it arrives — a plan being
+   fetched, a join being built. With the X inside the patched markup every one of them had to
+   remember to re-emit it, and the one that forgot produced a dialog with no way out but Escape. A
+   page patches `.dialog-body`; the title and the X are never in what it replaces.
+
+   The head is [back] title [actions] [X]. The title takes the free space and truncates rather than
+   pushing the X off the edge; configr's 18px title is the --fs-xl heading step (cockpit's --fs-lg
+   and its UA-sized h3s move up to it). */
+.dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: none;
+  padding: 1rem 1.5rem;
+  border-block-end: 1px solid var(--border);
+}
+.dialog-title {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* THE X AND THE BACK ARROW ARE THE SYSTEM'S ICON BUTTON — bordered, 28px, "just an X and border as
+   button". In the foreground ink rather than the icon button's --primary: they are the dialog's
+   furniture, not an action it offers, and the one primary action lives in the footer.
+   THE CUSTOM PROPERTY, NEVER `color`. The icon button reads its ink from --btn-icon-color, as its own
+   tone and bare variants do; a `color` here would tie with `.btn-icon { color }` on specificity and
+   leave the X's ink to the order of two stylesheets. Under forced colours the glyph takes its
+   button's forced colour (controls.css, preserve-parent-color), so nothing here may opt it out: a
+   glyph switched to `forced-color-adjust: none` painted this author ink instead, 1.27-1.78:1 on the
+   forced Canvas in four of the eight theme x palette cells. */
+.dialog-close,
+.dialog-back {
+  --btn-icon-color: var(--foreground);
+}
+
+/* Controls between the head and the body — a search, a switch, a count — that must stay put while
+   the body scrolls under them (the logs drawer's toolbar is the reason it exists). */
+.dialog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  padding: 0.5rem 1.5rem;
+  border-block-end: 1px solid var(--border);
+}
+
+/* The body is the one part that scrolls: the head and the foot stay on screen however long the
+   content gets, so the X and the commit button are always one press away. `min-block-size: 0` is
+   what lets a flex item shrink below its content — without it the body grows past the dialog's
+   90dvh and the footer is cut off instead of the body scrolling. */
+.dialog-body {
+  flex: 1;
+  min-block-size: 0;
+  overflow: auto;
+  padding: 1rem 1.5rem;
+}
+/* A --full dialog handing its whole area to a .split, a .console or a card grid. */
+.dialog-body.dialog-body--flush {
+  padding: 0;
+}
+
+/* THE FOOTER ONLY COMMITS. It is C4's .form-actions — status first, cancel, the one primary action
+   last — pinned under the body. Dismissing is the X's job (configr's lint rule: a dialog footer
+   never carries a dismiss), except in a confirm, whose footer IS the answer pair.
+   Two classes deep so it outranks `.form-actions` and `.form-actions--ruled` whichever file loads
+   last: the footer's own margin and rule would otherwise depend on the order of two stylesheets. */
+.dialog .dialog-foot {
+  flex: none;
+  margin: 0;
+  padding: 0.75rem 1.5rem;
+  border-block-start: 1px solid var(--border);
+}
+
+/* A new part of the dialog: cockpit's `.dlg-lead--gap`, the gap Daniel asked for three times. The
+   other `.dlg-*` primitives are already the system's — `.dlg-label` is the eyebrow, `.dlg-field` a
+   `.field-row--stacked`, `.dlg-hint` a `.field-desc`. */
+.dialog-section + .dialog-section {
+  margin-block-start: 1.5rem;
+}
+
+/* THE SCROLL LOCK IS CSS. The page behind a modal is inert to the pointer, but the wheel still
+   scrolled it — the backdrop belongs to the dialog, and the dialog's scroll chain is the viewport.
+   configr locked <body> from script, which is one more thing to undo on every exit path. Keyed on
+   ANY modal dialog, so the zoom view (a <dialog> too) is covered by the same line. Screen only: an
+   `overflow: hidden` root can cut a printout to its first page. */
+@media screen {
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
+}
+
+/* ON A PHONE the dialog takes the width, less a quarter-rem each side, and the parts give back a
+   third of their inset. Declared after the sizes at the same specificity, so it wins over every one
+   of them; the drawer, one class deeper, keeps its own geometry. */
+@media (max-width: 40rem) {
+  dialog.dialog {
+    inline-size: calc(100vw - 1rem);
+    max-inline-size: calc(100vw - 1rem);
+    max-block-size: calc(100dvh - 1rem);
+  }
+  .dialog-head,
+  .dialog-toolbar,
+  .dialog-body:not(.dialog-body--flush),
+  .dialog .dialog-foot {
+    padding-inline: 1rem;
+  }
+}
+
+/* ── .dialog--drawer — THE SAME DIALOG, AGAINST THE RIGHT EDGE ─────────────────────────────────────
+   Cockpit's logs drawer was an `aside` with a separate `.backdrop` div: no focus moved in, none
+   trapped, none handed back, and a hand-rolled `rgba(0,0,0,.45)` scrim. It is a dialog now, with
+   everything above — the parts, the runtime, the name — and only its geometry differs: full height,
+   up to 50rem wide, and the edge on the content side only, where the page is. No slide-in: cockpit
+   never had one, and a drawer that animates is a drawer that is late. */
+dialog.dialog.dialog--drawer {
+  inset-block: 0;
+  margin: 0 0 0 auto;
+  inline-size: min(50rem, 100vw);
+  max-inline-size: 100vw;
+  block-size: 100dvh;
+  max-block-size: none;
+  border-width: 0 0 0 1px;
+}
+
+/* ── .context-menu — the box of a menu opened at the pointer ──────────────────────────────────────
+   The rows are the one popup look (`.select-panel` + `.dropdown-item`, components.css); this is
+   only what a menu with no trigger needs on top: it is placed at a point, so it is fixed and above
+   the page's own popups.
+
+   ITS WIDTH IS CARRIED BY ITS ROWS, NOT BY THE PANEL, and that is measured. positionPopup() writes
+   `min-inline-size` and `max-inline-size` INLINE on the panel it places — the anchor's width, which
+   for a pointer is 0, and the viewport's room — and an inline style beats any selector. On the panel,
+   12rem and 20rem were overwritten on every open. On the rows nothing writes, and a box's width is
+   what its rows contribute: never under 12rem, never over 20rem, whoever placed it.
+
+   A ROW THAT STATES SOMETHING wraps (configr's context menu): an `aria-disabled` row says why a
+   section is empty or an action unavailable, in a sentence, and truncating it cuts off the half
+   that explains. It is --muted-foreground rather than the 65% disabled ink of a listbox: it is meant
+   to be READ, and 65% measures 3.75:1 at worst; muted clears 4.5:1 on the popover. */
+.context-menu {
+  position: fixed;
+  z-index: 60;
+}
+.context-menu > * {
+  min-inline-size: 12rem;
+  max-inline-size: 20rem;
+}
+.context-menu .dropdown-item[aria-disabled="true"] {
+  white-space: normal;
+  color: var(--muted-foreground);
+}
+/* FORCED COLOURS, and why this row needs its own. The muted ink above is an author colour, and it
+   outranks components.css's rows by a class. There a forced palette draws a disabled row in GrayText,
+   and a HIGHLIGHTED row opts out of forcing altogether (`forced-color-adjust: none`, so the Canvas
+   backplate cannot swallow its text). So without this rule the stated row read exactly like an
+   action at rest (the same ink in all eight theme x palette cells), and under the arrow keys —
+   opted out, holding the author ink — it painted the theme's muted colour on the forced Canvas,
+   3.00-3.52:1 in four of them. GrayText is what a forced palette says "not available" with, and a
+   system colour stays what it is whether the row is forced or opted out.
+   ITS FOCUS RING is components.css's, not this file's: a focused row that is disabled or states
+   something is ringed CanvasText there (M0; the lead's ruling), because the HighlightText ring of a
+   highlighted row IS the Canvas colour and measured 1:1 on a row with no fill. Only the ink needs
+   this file, since only the ink is outranked by the muted colour above. */
+@media (forced-colors: active) {
+  .context-menu .dropdown-item[aria-disabled="true"] {
+    color: GrayText;
+  }
+}
+
+/* ── the zoom view — initDiagramZoom() ────────────────────────────────────────────────────────────
+   An architecture diagram authored for a text column is unreadable at exactly the moment someone
+   needs it, and a screenshot in an article is the same problem. initDiagramZoom() makes every
+   element it is given a real button (`.dgm-zoomable`: the opener, its corner hint and its focus ring
+   are components.css's, because the opener is part of the page) and opens it here: full-screen,
+   fitted to the viewport, then zoomable and pannable.
+
+   THE VIEW IS A <dialog>, opened with showModal(). It was a `div[role=dialog][aria-modal]` on
+   <body>, which PROMISED a modal and delivered none of it: Tab walked straight out into the page
+   behind, and the page scrolled under it. As a modal dialog the page is inert and Tab stays in the
+   view, which is what `aria-modal` had been claiming; the scroll lock above covers it. It covers the
+   viewport itself, so its backdrop has nothing to paint. */
+dialog.dgm-overlay {
+  box-sizing: border-box;
+  inline-size: 100vw;
+  max-inline-size: none;
+  block-size: 100dvh;
+  max-block-size: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--background) 96%, transparent);
+  border: 0;
+}
+dialog.dgm-overlay[open] {
+  display: flex;
+  flex-direction: column;
+}
+dialog.dgm-overlay:focus {
+  outline: none;
+}
+dialog.dgm-overlay::backdrop {
+  background: transparent;
+}
+/* Zoom out, fit, zoom in — the system's compact ghost buttons — then the dialog's own X. */
+.dgm-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--card);
+  border-block-end: 1px solid var(--border);
+}
+/* A finger's target. The compact buttons are sized by their text, and "−" and "+" are one
+   character wide: under a coarse pointer they measured 32px across, beside a 44px X. */
+@media (pointer: coarse) {
+  .dgm-bar > button {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+  }
+}
+/* The stage clips; the artwork inside it is what moves. Transforming a wrapper rather than the svg
+   keeps mermaid's own geometry untouched. `touch-action: none` because the view does its own
+   pinch and pan (diagramzoom.js): the browser's pinch would zoom the page behind a modal view. */
+.dgm-stage {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.dgm-stage.is-grabbing {
+  cursor: grabbing;
+}
+.dgm-art {
+  transform-origin: center center;
+  will-change: transform;
+}
+.dgm-art > :is(svg, img, canvas) {
+  display: block;
+  max-inline-size: none;
+  max-block-size: none;
+}
+
+/* The page prints, not what floats over it. (The opener's hint is components.css's to hide.) */
+@media print {
+  dialog.dialog,
+  dialog.dgm-overlay,
+  .context-menu {
+    display: none !important;
+  }
+}

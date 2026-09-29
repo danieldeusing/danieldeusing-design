@@ -94,7 +94,10 @@ learned to keep them apart first (C56), and configr's catalog filter had to lear
 ## `.notice` — an outcome, reported where it happened (S2)
 
 ```html
-<div class="notice" data-tone="success" role="status"><p>installed review into ~/.claude/skills.</p></div>
+<div role="status" id="install-result"></div>        <!-- rendered empty, with the view -->
+<!-- …then, when the install finishes, put the notice INTO it (no role of its own): -->
+<div class="notice" data-tone="success"><p>installed review into ~/.claude/skills.</p></div>
+
 <div class="notice" data-tone="warning" role="alert">
   <span class="notice-label">warning:</span><p>two sources publish this skill; the newer one wins.</p>
   <button type="button" class="btn-icon btn-icon--bare btn-icon--sm notice-dismiss" data-icon="x"
@@ -115,10 +118,17 @@ would only repeat the colour. No `data-tone` is a neutral notice.
 - **The contract is a label, ONE body element, and an optional dismiss.** The body takes the free
   width and wraps under itself, so the label hangs at the start of the first line. More than one
   paragraph goes inside one `<div>`.
-- **`role="status"` for a success, `role="alert"` for everything else**, mounted together with its
-  text. A region that exists empty and is filled later is announced unreliably, while a node that
-  arrives with its words is announced every time. Every unsuccessful outcome interrupts, because a
-  reader who misses it acts on an install that never ran.
+- **`role="alert"` only for `warning` and `destructive`. Every other tone, and no tone, is
+  `role="status"`.** An info, pending or primary notice that interrupts is noise; a warning or a
+  failure the reader misses gets acted on as if the install had run.
+- **The two roles are announced differently, so they are mounted differently.**
+  - An `alert` may arrive with its words: mount the notice, text and all, with `role="alert"` on
+    it, and it is read out at once.
+  - A `status` is polite, and a polite live region is only announced reliably when it was ALREADY
+    in the page before its content changed. So render an empty `<div role="status">` with the view
+    and put the notice into it when there is something to say. The region carries the role; the
+    notice inside it carries none. A notice that is in the page from the first render may carry
+    `role="status"` itself, since there is nothing to announce yet.
 - **One dismiss, the bare ×, named "dismiss".** `.notice-dismiss` only places it (end of the first
   line). The button itself is `.btn-icon.btn-icon--bare.btn-icon--sm` from controls.css. configr had
   three spellings of this one act; there is one now.
@@ -139,7 +149,10 @@ click it:
    way instead.
 2. moves focus to the next focusable element after the notice, or to the one before it, but only if
    focus was inside the notice. Otherwise focus would fall to `<body>` and send a keyboard user back
-   to the top of the page.
+   to the top of the page. "Focusable" means somewhere the reader could Tab to: never a negative
+   `tabindex` (select.js's hidden `<select>`, an inactive tab), nothing inside `aria-hidden="true"`
+   or `inert`, nothing disabled or unrendered. If a focus does not take (`visibility: hidden`), the
+   next candidate is tried.
 3. removes the notice.
 
 ## `.callout` — an annotation where it stands (S3)
@@ -175,7 +188,10 @@ both jobs 186 times, which is why a form result and a standing explanation looke
   <p class="banner-title">2 alerts</p>
   <ul class="banner-list"><li>netmon: adguard unreachable <a href="/netmon/">fix →</a></li>…</ul>
 </div>
-<div class="banner banner--sticky bleed-rail" role="status">…control is frozen…</div>
+<div class="bar-stack">                               <!-- chrome.css: the sticky layer -->
+  <div class="banner" role="alert"><p class="banner-title">control is frozen</p>…</div>
+  <header class="bar">…</header>
+</div>
 ```
 
 **For a fact about everything under it, not about one section:** an alert list, a frozen control
@@ -185,8 +201,10 @@ and add `.bleed-rail` so it spans the `ls -l` rail's reserved gutter like the he
 - `--destructive` by default, since a banner is usually a stop. Any other tone takes `data-tone`.
 - Items in a `.banner-list` are divided by a faint rule in the banner's own colour, because three
   wrapped alerts separated by space alone read as one paragraph. Links are underlined and never wrap.
-- `--sticky` keeps it at the top above the header, for the one banner that must not scroll away (a
-  frozen cockpit). There is only ever one sticky strip; two would fill a third of a phone screen.
+- **A banner that must stay in view goes first inside `.bar-stack`, the header's sticky layer
+  (chrome.md, WP3). Never two siblings sticking at top 0**: they do not stack, they overlap, and the
+  header disappears under the banner the moment the page scrolls. The stack is the sticky element
+  and it bleeds past the rail itself, so a banner inside it takes no `.bleed-rail` of its own.
 - `role="alert"` for an alarm, `role="status"` for information. **Render it only when there is
   something to say.** An empty banner is still a red strip.
 
@@ -224,6 +242,8 @@ only in hue. In a cell it never wraps. As a `<p>` it is an inline error line tha
 **A spinner is never the message.** `html.anim-off` and `prefers-reduced-motion` stop it and leave
 the arc standing, so the words have to say everything on their own. `.loading` is the row it lives
 in: muted, `role="status"`. The region being filled carries `aria-busy="true"` until it settles.
+A spinner inside a busy BUTTON is the control's own state (controls.md): `aria-busy="true"` with
+`aria-disabled="true"`, never `disabled`, which throws keyboard focus to `<body>` mid-action.
 `.spinner` is the text's glyph size and takes its line's colour, and `--lg` is for a whole-page
 load. It is one glyph, lucide's loader-circle, where configr had four sizes in three colours.
 
@@ -257,7 +277,7 @@ labelled at **both** ends. Where it starts and where it stops are then never a j
 
 ```html
 <span class="dot dot--pulse" data-tone="success" aria-hidden="true"></span> live
-<button type="button" class="btn-icon" data-icon="bell" aria-label="alerts — 1 unread">
+<button type="button" class="btn-icon" data-icon="mail" aria-label="messages — 1 unread">
   <span class="dot dot--overlay" data-tone="destructive" aria-hidden="true"></span></button>
 ```
 
@@ -285,25 +305,28 @@ both settled on this (R81). A filled chip in every row of a twenty-row table is 
 | modifier | means | reach for it when |
 |---|---|---|
 | (none) | a state (`data-tone`) or an identity (`--tag-color`) | almost always |
-| `--dashed` | happened, and it does not count | not the proof, skipped, superseded |
-| `--dotted` | nothing happened | not run |
-| `--off` | excluded, disabled, not actionable — muted and dotted | it would once have been `opacity: .6` |
+| `--dashed` | it does not count | not the proof, skipped, superseded, not actionable |
+| `--off` | off — muted and dotted, the only dotted edge | excluded, disabled; it would once have been `opacity: .6` |
 | `--strong` | must not be missed — full edge, bold | a verdict: PASS / FAIL |
 | `--struck` | retired | history, not an error |
 | `--solid` | the widest blast radius — the page colour on a fill of the tone | **one per view at most**: `global` vs `repo`, `public` vs `internal` |
 | `--icon` | icon only, a square with a 12% tint | `role="img"` and an `aria-label` are mandatory |
 | `--bracket` | the terminal's own `[ live ]`, no box | pagr's status; add `.glow` to light it |
 
-- **Modifiers compose**, and the border style is a second axis a reader can use in grey:
-  `tag--dashed tag--strong` in `--pending` is "timed out". An explicit `--dashed` or `--dotted` wins
-  over `--off`'s dots.
-- **`--off` replaces opacity** (R85). Opacity dims the word below AA and makes the tag look broken
-  rather than off.
+- **Modifiers compose**, and the border style is a second axis a reader can use in grey (D10):
+  dashed means it does not count, dotted means off. `tag--dashed tag--strong` in `--pending` is
+  "timed out". There is no `--dotted`: dotted means off, `--off` is the only thing that draws it,
+  and an off tag stays dotted whatever else it carries.
+- **Opacity is never an axis.** `--off` replaced it (R85): opacity dims the word below AA and makes
+  the tag look broken rather than off. The one thing here below full opacity is a disabled
+  `button.tag`, which is a control's state, not a tag's meaning.
 - **An icon** is `data-icon` on the tag or a `.ico` child, drawn at the small glyph size. The word
   stays the meaning.
 - **Never type the brackets** of `--bracket`, because the stylesheet draws them with empty alt text.
   A screen reader hears "live".
-- **A tip is `data-tip`, with no marker and no cursor change** (R86). You find it by hovering.
+- **A tip is `data-tip`, with no marker and no cursor change** (R86). You find it by hovering. It
+  never repeats the accessible name: `tooltip.js` sets `aria-describedby`, so the same words would be
+  read twice. Say something the name does not, or leave the tip off.
 - **`button.tag`** is a tag that *does* something, such as opening the forge's settings. It keeps the
   tag's look, its edge firms up under the pointer, it has a focus ring, it is .45 when disabled, and
   it grows to 44px under a coarse pointer. **A tag that filters by its own value** is
@@ -335,16 +358,25 @@ skills <span class="count">12</span>
 - **Both files need `tokens.css` and nothing else.** They set their own font size, line height and
   inner margins, so a surface that loads only tokens + chrome (netmon) can load them beside it and
   get the same box. `scripts/check-feedback.mjs` proves this on every run by rendering the demo with
-  and without base, components, chrome and the reset and comparing every computed property.
+  and without base, components, chrome and the reset and comparing 45 listed computed properties
+  of every fixture, font family and size among them.
 - **They never set a component's outer margin.** How far a notice stands from the paragraph above
   it is your page's layout, and your reset decides it for every element alike. The fence is the one
   exception, because a `<figure>` arrives with 40px side margins.
-- **Print:** the dismiss disappears, a sticky banner stops sticking, a fence does not split, a dot
-  keeps its fill, and `--solid` tags and overlay counts print outlined. The page colour on a fill
-  would otherwise print white on white once the browser drops background colours.
+- **Print:** the dismiss disappears, a fence does not split, a dot keeps its fill, and `--solid`
+  tags and overlay counts print outlined. The page colour on a fill would otherwise print white on
+  white once the browser drops background colours.
+- **Forced colours** (Windows high contrast): every glyph here is a background shown through a mask,
+  which a forced palette would paint over with the page colour. Each one opts out and takes the
+  forced text colour of its line, so it stays drawn. `--solid` tags and overlay counts are redrawn
+  as the palette's own pair, inverted, so loud still differs from quiet. Words, `.state` glyphs,
+  dashed and dotted edges, weight and strike survive on their own.
+- **`hidden` hides every one of these**, including those that set their own `display`: tokens.css
+  carries the one `[hidden]` rule for the whole system. Do not add a per-class guard.
 - **Framework apps** (seedr, configr, pagr islands) render this markup and never run
   `initNotices()` over nodes they own. Removing a node React rendered desynchronises React. Render
   the notice from state, remove it in your own click handler, and move focus as the runtime does:
-  to the next focusable element after the notice, else the one before it.
+  to the next element after the notice that the reader could Tab to, else the one before it, and
+  check that the focus took.
 - The demo, with every element in every state, is `examples/feedback.html`. Add `?bare` for the
   tokens-only rendering.

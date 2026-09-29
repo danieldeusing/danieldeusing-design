@@ -13,7 +13,14 @@
  *      glyph under 3:1 FAILS; an `info` row is a decorative edge, reported and not gated.
  *   3. Do the two files stand alone? A surface that loads only tokens.css and these files (netmon)
  *      must get the same box. The demo page is rendered twice — with base, components and chrome,
- *      and with `?bare` — and every computed property of every fixture must agree between the two.
+ *      and with `?bare` — and the 45 properties listed in SNAP_PROPS must agree on every fixture
+ *      between the two. A focus ring is asserted in `?bare` only, where base.css's global ring
+ *      cannot stand in for a component's own (X2).
+ *
+ * And the modes a reader can switch on: forced colours (every glyph still drawn, every state pair
+ * still two colours — X1), `hidden` (every component gone — X3), print, reduced motion, a coarse
+ * pointer. DD_FORBID_STANDINS=1 fails the run while any demo stand-in is still in force, for the
+ * integration build, where every one of them must have been replaced by the real thing.
  *
  * WHAT IT READS. examples/feedback.html is the environment: its stylesheets, and stand-ins for the
  * tokens and classes other packages of 0.60.0 own. Those switch themselves off once the real ones
@@ -236,14 +243,28 @@ const setTheme = async (theme) => {
 
 /* ── fixtures ─────────────────────────────────────────────────────────────────────────────────── */
 const STATES = ["ok", "bad", "warn", "info", "running", "pending", "skip", "none"];
+const LONG = "the installer exited 1 — permission denied writing ~/.claude/settings.json. Nothing was changed; " +
+  "fix the permission and install again, or install into this project only, which needs no write outside the repository.";
+// X3: one hidden element per class that sets its own `display` (and the three that do not).
+const HIDDEN = [
+  ["empty", '<div class="empty" hidden><p>x</p></div>'], ["empty-inline", '<div class="empty empty--inline" hidden>x</div>'],
+  ["notice", '<div class="notice" hidden><p>x</p></div>'], ["callout", '<p class="callout" hidden>x</p>'],
+  ["banner", '<div class="banner" hidden><p>x</p></div>'], ["state", '<span class="state" data-state="ok" hidden>x</span>'],
+  ["state-p", '<p class="state" data-state="bad" hidden>x</p>'], ["spinner", '<span class="spinner" hidden></span>'],
+  ["loading", '<p class="loading" hidden>x</p>'], ["fence", '<figure class="fence" hidden><div class="fence-body">x</div></figure>'],
+  ["dot", '<span class="dot" hidden></span>'], ["tag", '<span class="tag" hidden>x</span>'],
+  ["tag-button", '<button type="button" class="tag" hidden>x</button>'], ["tag-bracket", '<span class="tag tag--bracket" hidden>x</span>'],
+  ["count", '<span class="count" hidden>1</span>'], ["count-overlay", '<span class="count count--overlay" hidden>1</span>'],
+];
 const FIXTURE = `
 <div id="fx" data-surface="background" style="position: relative; padding: 8px; background: var(--background); color: var(--foreground)">
-  <div class="empty" id="fx-empty" data-icon="inbox"><p id="fx-empty-p">no skills yet.</p></div>
+  <div class="empty" id="fx-empty" data-icon="folder-open"><p id="fx-empty-p">no skills yet.</p></div>
   <div class="empty" id="fx-empty-fail" data-tone="warning" data-icon="triangle-alert"><p>could not load.</p></div>
   <div class="empty" id="fx-empty-plain"><p>nothing.</p></div>
   <div class="empty empty--inline" id="fx-empty-inline"><p>a</p><p id="fx-empty-inline-2">b</p></div>
   <div class="empty empty--inline" id="fx-empty-inline-icon" data-tone="warning" data-icon="triangle-alert">could not read the folder.</div>
   <div class="notice" id="fx-notice" data-tone="warning"><span class="notice-label" id="fx-notice-label">warning:</span><p id="fx-notice-body">two sources publish this skill.</p><button type="button" class="btn-icon btn-icon--bare btn-icon--sm notice-dismiss" id="fx-notice-dismiss" data-icon="x" aria-label="dismiss"></button></div>
+  <div style="inline-size: 24rem"><div class="notice" id="fx-notice-long" data-tone="destructive"><span class="notice-label">failed:</span><p id="fx-notice-long-body">${LONG}</p><button type="button" class="btn-icon btn-icon--bare btn-icon--sm notice-dismiss" id="fx-notice-long-dismiss" data-icon="x" aria-label="dismiss"></button></div></div>
   <div class="notice" id="fx-notice-neutral"><span class="notice-label" id="fx-notice-neutral-label">note:</span><p>neutral.</p></div>
   <div class="notice notice--lg" id="fx-notice-lg" data-tone="success" data-icon="circle-check"><div><p id="fx-notice-lg-p1">you are on the latest version.</p><p id="fx-notice-lg-p2">version 0.60.0</p></div></div>
   <aside class="callout" id="fx-callout"><p class="callout-title" id="fx-callout-title">note</p><p id="fx-callout-body">the pin moves.</p></aside>
@@ -251,7 +272,6 @@ const FIXTURE = `
   <p class="callout" id="fx-callout-icon" data-tone="info" data-icon="info"><strong class="callout-title">note</strong> one line of text.</p>
   <p class="callout" id="fx-callout-empty"></p>
   <div class="banner" id="fx-banner"><p class="banner-title" id="fx-banner-title">2 alerts</p><ul class="banner-list" id="fx-banner-list"><li>a</li><li id="fx-banner-li2">b <a id="fx-banner-link" href="#fx">fix →</a></li></ul></div>
-  <div class="banner banner--sticky" id="fx-banner-sticky" data-tone="info"><p>frozen</p></div>
   ${STATES.map((s) => `<span class="state" id="fx-state-${s}" data-state="${s}">${s}</span>`).join("")}
   <p class="state" id="fx-state-p" data-state="bad">could not read the file.</p>
   <span class="spinner" id="fx-spinner"></span><span class="spinner spinner--lg" id="fx-spinner-lg"></span>
@@ -261,21 +281,20 @@ const FIXTURE = `
   <span class="dot" id="fx-dot" data-tone="success"></span>
   <span class="state" data-state="bad"><span class="dot" id="fx-dot-plain"></span>down</span>
   <span class="dot dot--pulse" id="fx-dot-pulse" data-tone="success"></span>
-  <button type="button" class="btn-icon" id="fx-host" data-icon="bell" aria-label="alerts"><span class="dot dot--overlay" id="fx-dot-overlay" data-tone="destructive"></span></button>
-<p>a line of text <span class="tag" id="fx-tl-glyph" data-tone="info" data-icon="package">glyph</span> <span class="tag" id="fx-tl-word">word</span> <span class="tag tag--icon" id="fx-tl-icon" data-icon="lock" role="img" aria-label="private"></span></p>
+  <button type="button" class="btn-icon" id="fx-host" data-icon="mail" aria-label="messages"><span class="dot dot--overlay" id="fx-dot-overlay" data-tone="destructive"></span></button>
+<p>a line of text <span class="tag" id="fx-tl-glyph" data-tone="info" data-icon="package">glyph</span> <span class="tag" id="fx-tl-word">word</span> <span class="tag tag--icon" id="fx-tl-icon" data-icon="eye-off" role="img" aria-label="private"></span></p>
     <span class="tag" id="fx-tag">untoned</span>
   <span class="tag" id="fx-tag-success" data-tone="success">installed</span>
   <span class="tag" id="fx-tag-cat" style="--tag-color: var(--cat-teal)"><span class="ico" id="fx-tag-ico" data-icon="package"></span>mcp</span>
   <span class="tag" id="fx-tag-dataicon" data-tone="info" data-icon="package">glyph</span>
   <span class="tag tag--dashed" id="fx-tag-dashed">dashed</span>
-  <span class="tag tag--dotted" id="fx-tag-dotted">dotted</span>
   <span class="tag tag--off" id="fx-tag-off" data-tone="success">off</span>
   <span class="tag tag--off tag--dashed" id="fx-tag-off-dashed">off</span>
   <span class="tag tag--strong" id="fx-tag-strong" data-tone="destructive">FAIL</span>
   <span class="tag tag--struck" id="fx-tag-struck">retired</span>
   <span class="tag tag--solid" id="fx-tag-solid" data-tone="primary">global</span>
   <span class="tag tag--solid" id="fx-tag-solid-cat" style="--tag-color: var(--cat-violet)">public</span>
-  <span class="tag tag--icon" id="fx-tag-icon" data-tone="info" data-icon="lock" role="img" aria-label="private"></span>
+  <span class="tag tag--icon" id="fx-tag-icon" data-tone="info" data-icon="eye-off" role="img" aria-label="private"></span>
   <span class="tag tag--bracket" id="fx-tag-bracket">beta</span>
   <span class="tag tag--bracket glow" id="fx-tag-glow">live</span>
   <button type="button" class="tag" id="fx-tag-button" data-tone="info">github.com</button>
@@ -288,8 +307,11 @@ const FIXTURE = `
     <div class="notice" id="fx-leak-notice"><span class="notice-label" id="fx-leak-notice-label">note:</span><p>n</p></div>
     <aside class="callout" id="fx-leak-callout"><p>c</p></aside>
     <div class="banner" id="fx-leak-banner"><p>b</p></div>
-    <div class="empty" id="fx-leak-empty" data-icon="inbox"><p>e</p></div>
+    <div class="empty" id="fx-leak-empty" data-icon="folder-open"><p>e</p></div>
   </div>
+  <span class="tag tag--dotted" id="fx-gone-dotted">removed</span>
+  <div class="banner banner--sticky" id="fx-gone-sticky"><p>removed</p></div>
+  <div id="fx-hidden">${HIDDEN.map(([id, html]) => html.replace(/ hidden>/, ` id="fx-h-${id}" hidden>`)).join("")}</div>
 </div>`;
 const inject = () => evaluate(`document.querySelector("main").insertAdjacentHTML("afterbegin", ${JSON.stringify(FIXTURE)}); null`);
 
@@ -312,7 +334,7 @@ const EXPECT = [
   ]],
   ["S1 .empty[data-icon] — glyph at --icon-xl, shape from data-icon, colour from data-tone or the text", [
     ["#fx-empty", "::before", "width", "var(--icon-xl)"], ["#fx-empty", "::before", "height", "var(--icon-xl)"],
-    ["#fx-empty", "::before", "background-color", "var(--muted-foreground)"], ["#fx-empty", "::before", "mask-image", "var(--ico-inbox)"],
+    ["#fx-empty", "::before", "background-color", "var(--muted-foreground)"], ["#fx-empty", "::before", "mask-image", "var(--ico-folder-open)"],
     ["#fx-empty-fail", "::before", "background-color", "var(--warning)"], ["#fx-empty-fail", "::before", "mask-image", "var(--ico-triangle-alert)"],
     ["#fx-empty-plain", "::before", "content", { is: "none" }],
   ]],
@@ -369,8 +391,6 @@ const EXPECT = [
     ...edge("#fx-banner-li2", "top", "1px", "solid", mix("--destructive", 22)),
     ["#fx-banner-link", "", "color", "var(--destructive)"], ["#fx-banner-link", "", "text-decoration-line", { is: "underline" }],
     ["#fx-banner-link", "", "white-space", { is: "nowrap" }],
-    ["#fx-banner-sticky", "", "position", { is: "sticky" }], ["#fx-banner-sticky", "", "top", "0px"], ["#fx-banner-sticky", "", "z-index", { is: "60" }],
-    ["#fx-banner-sticky", "", "color", "var(--info)"],
   ]],
   ["S5 .state — the word takes its glyph's colour; the glyph has empty alt text", [
     ["#fx-state-ok", "", "display", { is: "inline-flex" }], ["#fx-state-ok", "", "align-items", { is: "baseline" }],
@@ -390,13 +410,15 @@ const EXPECT = [
     ["#fx-loading", "", "display", { is: "flex" }], ["#fx-loading", "", "align-items", { is: "center" }], ["#fx-loading", "", "column-gap", "0.5rem"],
     ["#fx-loading", "", "padding-top", "0.75rem"], ["#fx-loading", "", "color", "var(--muted-foreground)"],
   ]],
-  ["S7 .fence — 2px dashed --warning on a 5% tint, eyebrow labels at both ends, '(empty)'", [
+  ["S7 .fence — 2px dashed --warning on a 5% tint, P2's eyebrow labels at both ends, '(empty)'", [
     ["#fx-fence", "", "margin-left", "0px"], ["#fx-fence", "", "padding-top", "0.75rem"],
     ...edge("#fx-fence", "top", "2px", "dashed", "var(--warning)"), ...edge("#fx-fence", "left", "2px", "dashed", "var(--warning)"),
     ["#fx-fence", "", "background-color", mix("--warning", 5, "var(--background)")],
     ["#fx-fence-label", "", "color", "var(--warning)"], ["#fx-fence-label", "", "font-weight", { is: "700" }],
     ["#fx-fence-label", "", "font-style", { is: "normal" }], ["#fx-fence-label", "", "text-transform", { is: "uppercase" }],
-    ["#fx-fence-label", "", "letter-spacing", "0.72px"], ...edge("#fx-fence-label", "bottom", "1px", "dashed", mix("--warning", 55)),
+    // P2 .eyebrow, restated: .05em and --lh-tight. ONE eyebrow look in the system (the lead's ruling).
+    ["#fx-fence-label", "", "letter-spacing", "0.05em"], ["#fx-fence-label", "", "line-height", "var(--lh-tight)"],
+    ["#fx-fence-end", "", "letter-spacing", "0.05em"], ["#fx-fence-end", "", "line-height", "var(--lh-tight)"], ...edge("#fx-fence-label", "bottom", "1px", "dashed", mix("--warning", 55)),
     ["#fx-fence-end", "", "color", "var(--warning)"], ...edge("#fx-fence-end", "top", "1px", "dashed", mix("--warning", 55)),
     ["#fx-fence-body", "", "white-space", { is: "pre-wrap" }], ["#fx-fence-body", "", "overflow-wrap", { is: "anywhere" }],
     ["#fx-fence-empty", "::before", "content", { is: '"(empty)"' }], ["#fx-fence-empty", "::before", "font-style", { is: "italic" }],
@@ -425,17 +447,18 @@ const EXPECT = [
     ["#fx-tag-dataicon", "::before", "width", "var(--icon-sm)"], ["#fx-tag-dataicon", "::before", "background-color", "var(--info)"],
     ["#fx-tag-dataicon", "::before", "mask-image", "var(--ico-package)"],
   ]],
-  ["T1 .tag modifiers — dashed, dotted, off, strong, struck, solid, icon, bracket, glow", [
-    ["#fx-tag-dashed", "", "border-top-style", { is: "dashed" }], ["#fx-tag-dotted", "", "border-top-style", { is: "dotted" }],
+  ["T1 .tag modifiers — dashed, off (dotted, and the only dotted edge), strong, struck, solid, icon, bracket, glow", [
+    ["#fx-tag-dashed", "", "border-top-style", { is: "dashed" }],
     ["#fx-tag-off", "", "color", "var(--muted-foreground)"], ["#fx-tag-off", "", "border-top-style", { is: "dotted" }],
-    ["#fx-tag-off", "", "border-top-color", mix("--muted-foreground", 50)], ["#fx-tag-off-dashed", "", "border-top-style", { is: "dashed" }],
+    // D10: dotted means off. An off tag that is also --dashed stays dotted, or "off" would have two looks.
+    ["#fx-tag-off", "", "border-top-color", mix("--muted-foreground", 50)], ["#fx-tag-off-dashed", "", "border-top-style", { is: "dotted" }],
     ["#fx-tag-strong", "", "border-top-color", "var(--destructive)"], ["#fx-tag-strong", "", "font-weight", { is: "700" }],
     ["#fx-tag-struck", "", "text-decoration-line", { is: "line-through" }],
     ["#fx-tag-solid", "", "color", "var(--background)"], ["#fx-tag-solid", "", "background-color", "var(--primary)"],
     ["#fx-tag-solid", "", "border-top-color", "var(--primary)"], ["#fx-tag-solid", "", "font-weight", { is: "700" }],
     ["#fx-tag-solid-cat", "", "background-color", "var(--cat-violet)"], ["#fx-tag-solid-cat", "", "color", "var(--background)"],
     ["#fx-tag-icon", "", "width", "1.25rem"], ["#fx-tag-icon", "", "padding-left", "0px"], ["#fx-tag-icon", "", "justify-content", { is: "center" }],
-    ["#fx-tag-icon", "", "background-color", mix("--info", 12)], ["#fx-tag-icon", "::before", "mask-image", "var(--ico-lock)"],
+    ["#fx-tag-icon", "", "background-color", mix("--info", 12)], ["#fx-tag-icon", "::before", "mask-image", "var(--ico-eye-off)"],
     ["#fx-tag-bracket", "", "border-top-width", { is: "0px" }], ["#fx-tag-bracket", "", "padding-left", "0px"], ["#fx-tag-bracket", "", "column-gap", "0px"],
     ["#fx-tag-bracket", "::before", "content", { is: '"[ " / ""' }], ["#fx-tag-bracket", "::after", "content", { is: '" ]" / ""' }],
     ["#fx-tag-bracket", "::before", "white-space", { is: "pre" }], ["#fx-tag-glow", "", "color", "var(--primary)"],
@@ -457,6 +480,9 @@ const EXPECT = [
     ["#fx-count-overlay", "", "position", { is: "absolute" }], ["#fx-count-overlay", "", "top", "-0.375rem"], ["#fx-count-overlay", "", "right", "-0.375rem"],
     ["#fx-count-overlay", "", "color", "var(--background)"], ["#fx-count-overlay", "", "background-color", "var(--primary)"],
     ["#fx-count-overlay", "", "border-top-color", "var(--background)"],
+  ]],
+  ["removed by the review: .tag--dotted draws nothing (only --off is dotted), .banner--sticky does not stick (.bar-stack does)", [
+    ["#fx-gone-dotted", "", "border-top-style", { is: "solid" }], ["#fx-gone-sticky", "", "position", { is: "static" }],
   ]],
   ["a tone never leaks: untoned elements inside a data-tone=\"info\" container keep their own default", [
     ["#fx-leak-tag", "", "color", "var(--muted-foreground)"], ["#fx-leak-count", "", "color", "var(--muted-foreground)"],
@@ -504,13 +530,26 @@ const THEMES = ["warm", "green", "mono", "paper"];
 await load();
 const standins = await evaluate("document.documentElement.dataset.standins");
 console.log(`stand-ins in force (tokens and classes other 0.60.0 packages own): ${standins}`);
+// The integration build sets this: there, a stand-in still in force means a package the demo relies
+// on did not land, and the run below would be measuring the demo's copy instead of the real thing.
+if (process.env.DD_FORBID_STANDINS === "1") {
+  await check("DD_FORBID_STANDINS=1: no demo stand-in is in force", () => (standins === "none" ? [] : [`in force: ${standins}`]));
+}
 
 /* The YIELD, as numbers. Everything below compares this file's output with a token resolved on a
-   probe, and an unresolved token resolves to nothing on BOTH sides: a missing --ico-inbox makes
-   "mask-image: var(--ico-inbox)" equal "none" equal "none", and a missing --cat-teal measures the
+   probe, and an unresolved token resolves to nothing on BOTH sides: a missing --ico-mail makes
+   "mask-image: var(--ico-mail)" equal "none" equal "none", and a missing --cat-teal measures the
    muted fallback's contrast under the teal row's name. So what the run depends on is counted first,
    and a short count fails — a check that measured the wrong thing must not read as a pass. */
-const ICONS = ["loader-circle", "triangle-alert", "x", "inbox", "circle-check", "info", "package", "download", "bell", "lock"];
+const ICONS = ["loader-circle", "triangle-alert", "x", "folder-open", "circle-check", "info", "package", "download", "mail", "eye-off"];
+/* X6: I1's set (SPEC-part3 §2.10 I1, "The set"). A name outside it has no mask once the demo's
+   stand-in is gone, and whoever copies the markup gets an empty box. */
+const I1 = ["check", "search", "filter", "arrow-up", "arrow-down", "trash-2", "pencil", "minus", "loader-circle", "star-filled", "x",
+  "chevron-down", "chevron-left", "download", "history", "home", "image-plus", "package", "refresh-cw", "star", "triangle-alert",
+  "circle-check", "circle-alert", "circle-x", "info", "copy", "clock", "arrow-up-down", "external-link", "github", "mail",
+  "plus", "eye", "eye-off", "power", "upload", "send", "arrow-left", "arrow-right", "circle-fading-arrow-up", "chevron-right",
+  "chevrons-up-down", "chevrons-down-up", "folder-tree", "folder-open", "file-code", "panel-left-open", "maximize-2", "folder",
+  "file", "panel-left-close"];
 const CAT_NAMES = ["red", "orange", "amber", "lime", "green", "teal", "cyan", "blue", "indigo", "violet", "purple", "pink"];
 const TONE_NAMES = ["primary", "success", "warning", "destructive", "info", "pending", "muted"];
 const SIZE_TOKENS = ["--icon-sm", "--icon-size", "--icon-xl", "--dot-size"];
@@ -546,14 +585,43 @@ await check("the demo page shows every element and state the spec names", () => 
    ".notice[data-tone='success'][role='status']", ".notice .notice-label", ".notice .notice-dismiss", ".notice--lg[data-icon]",
    ...["primary", "success", "warning", "destructive", "info", "pending", "muted"].map((t) => ".notice[data-tone='" + t + "']"),
    ".callout:not([data-tone])", ".callout[data-tone]", "p.callout > strong.callout-title", ".callout[data-icon]", ".callout:empty",
-   ".banner:not([data-tone]) .banner-list", ".banner[data-tone='warning']", ".banner[role='status']", ".banner--sticky",
+   ".banner:not([data-tone]) .banner-list", ".banner[data-tone='warning']", ".banner[role='status']",
    ...${JSON.stringify(STATES)}.map((s) => ".state[data-state='" + s + "']"), "p.state", ".spinner", ".spinner--lg", ".loading[role='status']",
    "[aria-busy='true'] .loading", ".fence .fence-label", ".fence .fence-end", ".fence-body:empty", ".dot", ".dot--pulse", ".dot--overlay",
    ...["primary", "success", "warning", "destructive", "info", "pending", "muted"].map((t) => ".tag[data-tone='" + t + "']"),
-   ".tag:not([data-tone]):not([style])", ".tag[style*='--cat-']", ".tag--dashed", ".tag--dotted", ".tag--off", ".tag--strong",
+   ".tag:not([data-tone]):not([style])", ".tag[style*='--cat-']", ".tag--dashed", ".tag--off", ".tag--strong",
    ".tag--struck", ".tag--solid", ".tag--icon[role='img'][aria-label]", ".tag--bracket", ".tag--bracket.glow", ".tag > .ico",
    ".tag[data-icon]", "button.tag", "button.tag:disabled", ".count", ".count[data-tone]", ".count--overlay"]
   .filter((sel) => !document.querySelector(sel)).map((sel) => "missing on the demo page: " + sel)`));
+
+await check("every icon the demo names is in I1's set (X6)", () => evaluate(`
+  [...new Set([...document.querySelectorAll("[data-icon]")].map((el) => el.dataset.icon))]
+    .filter((name) => !${JSON.stringify(I1)}.includes(name)).map((name) => "data-icon=\\"" + name + "\\" is not in I1")`));
+
+/* The lead's ruling: role="alert" only for warning and destructive. Every other tone, and no tone, is a
+   status — on the notice itself when it is in the page from the start, or on the region it is put in. */
+await check("demo notices: alert only for warning and destructive, status for every other tone", () => evaluate(`
+  [...document.querySelectorAll(".notice")].flatMap((n) => {
+    const loud = ["warning", "destructive"].includes(n.dataset.tone), role = n.getAttribute("role");
+    const where = (n.dataset.tone || "untoned") + " notice '" + n.textContent.trim().slice(0, 40) + "'";
+    if (loud) return role === "alert" ? [] : [where + " has role=" + role + ", wants alert"];
+    if (role === "status" || (role === null && n.parentElement.closest("[role='status']"))) return [];
+    return [where + " has role=" + role + ", wants status (or none inside a status region)"];
+  })`));
+await check("the demo shows a status notice put into a role=status region that was already in the page", () => evaluate(`(async () => {
+  const button = document.getElementById("install-demo"), region = document.getElementById("install-status");
+  if (!button || !region) return ["no #install-demo button / #install-status region on the demo page"];
+  const problems = [];
+  if (region.getAttribute("role") !== "status") problems.push("the region is not role=status");
+  if (region.children.length) problems.push("the region is not empty before anything happened");
+  button.click();
+  await new Promise((r) => setTimeout(r, 50));
+  const n = region.querySelector(".notice");
+  if (!n) problems.push("the button put no .notice into the region");
+  else if (n.hasAttribute("role")) problems.push("the notice inside the region carries role=" + n.getAttribute("role") + " — the region carries it");
+  region.replaceChildren();
+  return problems;
+})()`));
 
 await inject();
 await check("every glyph a fixture asks for is actually drawn (a mask, not 'none')", () => evaluate(`
@@ -568,6 +636,19 @@ for (const theme of THEMES) {
   full[theme] = await snapshot();
 }
 await noRadius();
+
+// D10: opacity is never an axis. It dims the word below AA and reads as broken rather than off; the
+// one element allowed below 1 is a disabled button.tag, which is a control's state, not a meaning.
+const opaque = () => check("every .tag and .count computes opacity 1 (button.tag:disabled alone is .45)", () => evaluate(`
+  [...document.querySelectorAll(".tag, .count")].filter((el) => !el.matches("button.tag:disabled") && el.getClientRects().length)
+    .filter((el) => getComputedStyle(el).opacity !== "1").map((el) => (el.id || el.className) + " opacity " + getComputedStyle(el).opacity)`));
+await opaque();
+// X3: tokens.css hides [hidden] for every surface (WP1; the demo's stand-in until then). An author
+// `display` beats the UA's rule, so every class here that sets one would otherwise show.
+const hides = (mode) => check(`X3: hidden hides every component (${mode})`, () => evaluate(`
+  ${JSON.stringify(HIDDEN.map(([id]) => id))}.map((id) => document.getElementById("fx-h-" + id))
+    .filter((el) => getComputedStyle(el).display !== "none").map((el) => el.id + " is display: " + getComputedStyle(el).display)`));
+await hides("full");
 
 /* ── 2. states: hover, keyboard focus, disabled, motion off, print, a coarse pointer ─────────── */
 await setTheme("warm");
@@ -598,10 +679,8 @@ const ring = (sel) => evaluate(`(() => { const el = document.querySelector(${JSO
   return [window.__wp7.expect(${JSON.stringify(sel)}, "", "outline-style", { is: "solid" }), window.__wp7.expect(${JSON.stringify(sel)}, "", "outline-width", "2px"),
     window.__wp7.expect(${JSON.stringify(sel)}, "", "outline-color", "var(--ring)"), window.__wp7.expect(${JSON.stringify(sel)}, "", "outline-offset", "2px"),
     el.matches(":focus-visible") ? null : "not :focus-visible"].filter(Boolean); })()`);
-await tabTo("#fx-tag-button");
-await check("button.tag reached by Tab shows the 2px --ring, offset 2px", () => ring("#fx-tag-button"));
-await tabTo("#fx-banner-link");
-await check("a link inside a banner shows the same ring (the banner declares it; base.css is not assumed)", () => ring("#fx-banner-link"));
+// The rings themselves are asserted in ?bare (section 3): with base.css loaded its global
+// :focus-visible ring would pass them even with the components' own rules deleted (X2).
 
 await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
 await check("prefers-reduced-motion stops the spinner and the pulse, and the glyph stays", async () => (await evaluate(`[
@@ -614,8 +693,8 @@ await check("html.anim-off stops them too", async () => (await evaluate(`[
 await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
 
 await send("Emulation.setEmulatedMedia", { media: "print" });
-await check("print: no dismiss, no sticky strip, the fence does not split, and a fill-only mark is outlined or forced", async () => (await evaluate(`[
-  window.__wp7.expect("#fx-notice-dismiss", "", "display", { is: "none" }), window.__wp7.expect("#fx-banner-sticky", "", "position", { is: "static" }),
+await check("print: no dismiss, the fence does not split, and a fill-only mark is outlined or forced", async () => (await evaluate(`[
+  window.__wp7.expect("#fx-notice-dismiss", "", "display", { is: "none" }), window.__wp7.expect("#fx-notice-long-dismiss", "", "display", { is: "none" }),
   window.__wp7.expect("#fx-fence", "", "break-inside", { is: "avoid" }), window.__wp7.expect("#fx-dot", "", "print-color-adjust", { is: "exact" }),
   window.__wp7.expect("#fx-tag-solid", "", "background-color", "transparent"), window.__wp7.expect("#fx-tag-solid", "", "color", "var(--primary)"),
   window.__wp7.expect("#fx-count-overlay", "", "background-color", "transparent"), window.__wp7.expect("#fx-count-overlay", "", "color", "var(--primary)")]`)).filter(Boolean));
@@ -639,10 +718,24 @@ await check("a tag with a glyph, a word-only tag and an icon-only tag sit on one
   const [a, b, c] = ["fx-tl-glyph", "fx-tl-word", "fx-tl-icon"].map(mid);
   return Math.max(Math.abs(a - b), Math.abs(b - c)) < 0.6 ? [] : ["centres " + a + " / " + b + " / " + c];
 })()`));
-await check("the dismiss sits at the end of the notice's first line, whatever the sentence's length", () => evaluate(`(() => {
-  const n = document.getElementById("fx-notice").getBoundingClientRect(), d = document.getElementById("fx-notice-dismiss").getBoundingClientRect();
-  const pad = parseFloat(getComputedStyle(document.getElementById("fx-notice")).paddingRight);
-  return Math.abs(n.right - 1 - pad - d.right) < 0.6 ? [] : ["dismiss right edge " + d.right + ", notice content edge " + (n.right - 1 - pad)];
+// A one-line notice and one whose sentence wraps (the fixture asserts that it does): the × stays at
+// the end of the FIRST line, centred on it, and never drops to the last line or the middle.
+await check("the dismiss sits at the end of the notice's first line, centred on it — one line or several", () => evaluate(`(() => {
+  const out = [];
+  for (const [id, lines] of [["fx-notice", 1], ["fx-notice-long", 3]]) {
+    const notice = document.getElementById(id), cs = getComputedStyle(notice), body = notice.querySelector("p");
+    const d = notice.querySelector(".notice-dismiss").getBoundingClientRect();
+    const edge = notice.getBoundingClientRect().right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+    if (Math.abs(edge - d.right) > 0.6) out.push(id + ": dismiss right edge " + d.right + ", content edge " + edge);
+    const range = document.createRange();
+    range.setStart(body.firstChild, 0);
+    range.setEnd(body.firstChild, 1);
+    const first = range.getClientRects()[0], line = first.top + first.height / 2, mid = d.top + d.height / 2;
+    if (Math.abs(line - mid) > 1) out.push(id + ": dismiss centred at y " + mid + ", the first line at " + line);
+    const got = Math.round(body.getBoundingClientRect().height / parseFloat(getComputedStyle(body).lineHeight));
+    if (got < lines) out.push(id + ": the sentence is " + got + " line(s), the fixture needs " + lines + " or it tests nothing");
+  }
+  return out;
 })()`));
 
 /* ── 3. the same page with tokens.css + feedback.css + tags.css only ─────────────────────────── */
@@ -655,10 +748,68 @@ for (const theme of THEMES) {
   await setTheme(theme);
   await runExpect(`tokens only, ${theme}`);
   const bare = await snapshot();
-  await check(`tokens-only renders every fixture exactly as the full stack does (${theme})`, () => Object.keys(full[theme])
+  await check(`tokens-only renders every fixture exactly as the full stack does (${theme}, ${SNAP_PROPS.length} properties)`, () => Object.keys(full[theme])
     .filter((key) => full[theme][key] !== bare[key])
     .map((key) => `${key}: full '${full[theme][key]}', tokens-only '${bare[key]}'`));
 }
+await hides("tokens only");
+await setTheme("warm");
+await tabTo("#fx-tag-button");
+await check("button.tag reached by Tab shows the 2px --ring, offset 2px (?bare: only tags.css can draw it)", () => ring("#fx-tag-button"));
+await tabTo("#fx-banner-link");
+await check("a link inside a banner shows the same ring (?bare: only feedback.css can draw it)", () => ring("#fx-banner-link"));
+
+/* ── X1: forced colours, in ?bare so nothing but these two files can pass it ────────────────────
+   Chromium's forced colours replace every background-color with Canvas. A glyph drawn as a
+   background through a mask then vanishes, and a state drawn only by a fill collapses into its
+   neighbour. Text survives on its own: the .state glyphs are text, and are in the list for the
+   record, not because they need a rule. */
+const GLYPHS = [["#fx-empty", "::before", "background-color"], ["#fx-empty-fail", "::before", "background-color"],
+  ["#fx-empty-inline-icon", "::before", "background-color"], ["#fx-notice-lg", "::before", "background-color"],
+  ["#fx-callout-icon", "::before", "background-color"], ["#fx-spinner", "", "background-color"],
+  ["#fx-dot", "", "background-color"], ["#fx-dot-plain", "", "background-color"], ["#fx-dot-overlay", "", "background-color"],
+  ["#fx-tag-dataicon", "::before", "background-color"], ["#fx-tag-icon", "::before", "background-color"], ["#fx-tag-ico", "", "background-color"],
+  ...STATES.filter((s) => s !== "none").map((s) => [`#fx-state-${s}`, "::before", "color"])];
+// [element, property, element, property, what must tell them apart]
+const PAIRS = [["#fx-tag", "background-color", "#fx-tag-solid", "background-color", "--solid against a plain tag"],
+  ["#fx-tag-solid", "color", "#fx-tag-solid", "background-color", "--solid's word against its own fill"],
+  ["#fx-count", "background-color", "#fx-count-overlay", "background-color", "an overlay count against a plain one"],
+  ["#fx-count-overlay", "color", "#fx-count-overlay", "background-color", "the overlay's number against its own fill"],
+  ["#fx-tag-button", "color", "#fx-tag-disabled", "color", "button.tag against a disabled one"],
+  ["#fx-tag", "border-top-style", "#fx-tag-off", "border-top-style", "--off (dotted) against a plain tag"],
+  ["#fx-tag", "border-top-style", "#fx-tag-dashed", "border-top-style", "--dashed against a plain tag"],
+  ["#fx-tag", "font-weight", "#fx-tag-strong", "font-weight", "--strong against a plain tag"],
+  ["#fx-tag", "text-decoration-line", "#fx-tag-struck", "text-decoration-line", "--struck against a plain tag"]];
+await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }] });
+await sleep(100);
+const FORCED = String.raw`(() => {
+  const W = window.__wp7, probe = document.createElement("div");
+  probe.style.cssText = "forced-color-adjust: none; background: Canvas";
+  document.body.append(probe);
+  const canvas = W.parse(getComputedStyle(probe).backgroundColor);
+  probe.remove();
+  // what a colour looks like on the forced page: composited over Canvas
+  const seen = (value) => { const c = W.over(W.parse(value), canvas); return [c.r, c.g, c.b].map((v) => Math.round(v * 255)).join(","); };
+  const isColour = (prop) => /color$/.test(prop);
+  return { seen, isColour };
+})()`;
+await check("X1 forced colours are really on (the emulation took)", () => evaluate(`matchMedia("(forced-colors: active)").matches ? [] : ["forced-colors did not emulate — the two checks below proved nothing"]`));
+await check("X1 forced colours: every glyph is still drawn — none in the Canvas colour", () => evaluate(`(() => {
+  const F = ${FORCED}, canvas = F.seen("rgba(0, 0, 0, 0)"); // nothing, over Canvas: Canvas itself
+  return ${JSON.stringify(GLYPHS)}.flatMap(([sel, pseudo, prop]) => {
+    const value = getComputedStyle(document.querySelector(sel), pseudo || null).getPropertyValue(prop);
+    return F.seen(value) === canvas ? [sel + pseudo + " " + prop + " " + value + " is the Canvas colour — the glyph is gone"] : [];
+  });
+})()`));
+await check("X1 forced colours: every state pair still differs on the part that shows it", () => evaluate(`(() => {
+  const F = ${FORCED};
+  return ${JSON.stringify(PAIRS)}.flatMap(([a, pa, b, pb, what]) => {
+    let va = getComputedStyle(document.querySelector(a)).getPropertyValue(pa), vb = getComputedStyle(document.querySelector(b)).getPropertyValue(pb);
+    if (F.isColour(pa)) { va = F.seen(va); vb = F.seen(vb); }
+    return va === vb ? [what + ": both " + va] : [];
+  });
+})()`));
+await send("Emulation.setEmulatedMedia", { features: [] });
 
 /* ── 4. contrast, every new pairing, four themes × three surfaces ────────────────────────────── */
 await load();
@@ -690,7 +841,7 @@ const SAMPLES = [
   ]),
   ...STATES.map((s) => ({ name: `state · ${s}`, html: `<span class="state" data-state="${s}" data-m>${s}</span>`, kind: "text" })),
   { name: "empty text", html: `<div class="empty"><p data-m>no skills yet.</p></div>`, kind: "text" },
-  { name: "empty glyph · untoned", html: `<div class="empty" data-icon="inbox" data-m><p>x</p></div>`, kind: "glyph", pseudo: "::before", fg: "background-color" },
+  { name: "empty glyph · untoned", html: `<div class="empty" data-icon="folder-open" data-m><p>x</p></div>`, kind: "glyph", pseudo: "::before", fg: "background-color" },
   { name: "empty glyph · warning (failure)", html: `<div class="empty" data-tone="warning" data-icon="triangle-alert" data-m><p>x</p></div>`, kind: "glyph", pseudo: "::before", fg: "background-color" },
   { name: "loading text", html: `<p class="loading" data-m><span class="spinner"></span>loading…</p>`, kind: "text" },
   { name: "spinner (in a loading row)", html: `<p class="loading"><span class="spinner" data-m></span>loading…</p>`, kind: "glyph", fg: "background-color", against: "outside" },
@@ -704,7 +855,7 @@ const SAMPLES = [
     { name: `tag · ${t || "untoned"}`, html: `<span class="tag"${toneAttr(t)} data-m>x</span>`, kind: "text" },
     { name: `tag edge · ${t || "untoned"}`, html: `<span class="tag"${toneAttr(t)} data-m>x</span>`, kind: "info", fg: "border-top-color", against: "outside" },
     { name: `tag--solid · ${t || "untoned"}`, html: `<span class="tag tag--solid"${toneAttr(t)} data-m>x</span>`, kind: "text" },
-    { name: `tag--icon glyph · ${t || "untoned"}`, html: `<span class="tag tag--icon" data-icon="lock"${toneAttr(t)} data-m></span>`, kind: "glyph", pseudo: "::before", fg: "background-color" },
+    { name: `tag--icon glyph · ${t || "untoned"}`, html: `<span class="tag tag--icon" data-icon="eye-off"${toneAttr(t)} data-m></span>`, kind: "glyph", pseudo: "::before", fg: "background-color" },
     { name: `button.tag edge at rest · ${t || "untoned"}`, html: `<button type="button" class="tag"${toneAttr(t)} data-m>x</button>`, kind: "info", fg: "border-top-color", against: "outside" },
     { name: `count · ${t || "untoned"}`, html: `<span class="count"${toneAttr(t)} data-m>3</span>`, kind: "text" },
     { name: `count--overlay · ${t || "default (primary)"}`, html: `<span class="count count--overlay" style="position: static"${toneAttr(t)} data-m>3</span>`, kind: "text" },

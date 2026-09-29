@@ -18,8 +18,8 @@
  * edge and the solid fill read, so the three cannot disagree. An untoned tag is muted.
  *
  * The meaning is always the WORD. Colour speeds the scan, the border style is a second axis a
- * reader can use in grey (dashed = not the proof, dotted = off), and a tooltip is `data-tip` with
- * no marker and no cursor change (R86).
+ * reader can use in grey (D10: dashed = it does not count, dotted = off), opacity is never an axis,
+ * and a tooltip is `data-tip` with no marker and no cursor change (R86).
  */
 
 /* A tone never leaks into a child: see the same rule in feedback.css. A neutral tag inside a
@@ -67,27 +67,28 @@
   mask: var(--ico) center / contain no-repeat;
 }
 
-/* THE AXES A READER USES IN GREY. Cockpit's execution pages read state by border style as much as
-   by colour, and the vocabulary is kept exactly:
-     --dashed   not the proof, skipped, superseded — it happened, and it does not count
-     --dotted   the weakest mark: nothing happened here
-     --off      excluded, disabled, not actionable. Muted, dotted. It replaces the opacity .55-.75
-                cockpit used (R85): opacity dims the word below AA and makes the tag look broken
-                rather than off. It re-points `--tag-c`, not only `color`, so the edge recedes with
-                the word — a green edge around grey text is half an "off".
-   `--off` sits ABOVE `--dashed` / `--dotted` so an explicit border style still wins on a tag that
-   is both off and, say, not the proof. */
-.tag--off { --tag-c: var(--muted-foreground); border-style: dotted; }
+/* THE AXES A READER USES IN GREY (D10). Cockpit's execution pages read state by border style as
+   much as by colour, and each style means ONE thing:
+     --dashed   it does not count: not the proof, skipped, superseded, not actionable
+     --off      off: excluded, disabled. Muted and DOTTED, and the only thing that draws a dotted
+                edge — there is no `--dotted`, because a toned dotted tag would say "off" and
+                "success" at once. It replaces the opacity .55-.75 cockpit used (R85): opacity dims
+                the word below AA and makes the tag look broken rather than off, and it is never an
+                axis here. It re-points `--tag-c`, not only `color`, so the edge recedes with the
+                word — a green edge around grey text is half an "off".
+   `--off` comes AFTER `--dashed`, so an off tag is dotted whatever else it carries. */
 .tag--dashed { border-style: dashed; }
-.tag--dotted { border-style: dotted; }
+.tag--off { --tag-c: var(--muted-foreground); border-style: dotted; }
 /* Must not be missed — a verdict. The full-strength edge and the weight, not a louder colour. */
 .tag--strong { border-color: var(--tag-c); font-weight: 700; }
 /* Retired. Still readable: it is history, not an error. */
 .tag--struck { text-decoration: line-through; }
 /* THE WIDEST BLAST RADIUS ONLY — `global` against `repo`, `public` against `internal`. The page
    background as the text on the tone as the fill: the same pair as the tone on the page, reversed,
-   so it clears AA wherever the tone does (measured >= 5.39:1 for every tone and --cat-* hue). One per
-   view at most; a column of solid tags is how a loud badge stops meaning anything. */
+   so it clears AA wherever the tone does. Measured by check-feedback.mjs on four themes × three
+   surfaces: 5.20:1 at worst — muted on warm, which is also what an untoned solid tag is; 5.39 for
+   the weakest other tone (warning on paper); 6.24 for the weakest --cat-* hue (teal on warm). One
+   per view at most; a column of solid tags is how a loud badge stops meaning anything. */
 .tag--solid {
   color: var(--background);
   background: var(--tag-c);
@@ -156,6 +157,31 @@ button.tag:disabled { opacity: 0.45; cursor: default; }
   color: var(--background);
   background: var(--tone, var(--primary));
   border-color: var(--background);
+}
+
+/* ── FORCED COLOURS ─────────────────────────────────────────────────────────────────────────────
+   A forced palette replaces every background colour with Canvas. A glyph on a tag is a background
+   shown through a mask, so it would vanish: opted out, it takes `currentColor`, which is forced to
+   the word's own colour. And the two fills that MEAN something — a `--solid` tag against a plain
+   one, an overlay count against a plain one — would collapse into their neighbours, so they are
+   redrawn in the palette's own pair, inverted: CanvasText fill, Canvas word. Every other axis is a
+   border style, a weight or a strike, and those survive untouched (a disabled button.tag is
+   GrayText from the browser's own forced-colours sheet). */
+@media (forced-colors: active) {
+  .tag[data-icon]::before,
+  .tag > .ico {
+    forced-color-adjust: none;
+    background: currentColor;
+  }
+  .tag--solid,
+  .count--overlay {
+    forced-color-adjust: none;
+    color: Canvas;
+    background: CanvasText;
+  }
+  .tag--solid { border-color: CanvasText; }
+  /* The overlay keeps its ring in the page colour: it is what cuts the count out of its host's edge. */
+  .count--overlay { border-color: Canvas; }
 }
 
 @media print {

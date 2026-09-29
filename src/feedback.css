@@ -80,10 +80,10 @@
 .empty--inline > * + * { margin-block-start: 0.5rem; }
 
 /* THE GLYPH SAYS WHICH KIND OF EMPTY before the words do — a warning triangle over a failure, an
-   inbox over a store with nothing in it. Shape from `data-icon`, colour from `data-tone`; a failure
-   is `data-tone="warning" data-icon="triangle-alert"`. Without `data-icon` there is no glyph: an
-   empty state does not need a picture to be understood, and most of them should not have one.
-   Decorative — `content: ""` has no text, and the sentence is what is read out. */
+   open folder over a store with nothing in it. Shape from `data-icon`, colour from `data-tone`; a
+   failure is `data-tone="warning" data-icon="triangle-alert"`. Without `data-icon` there is no
+   glyph: an empty state does not need a picture to be understood, and most of them should not have
+   one. Decorative — `content: ""` has no text, and the sentence is what is read out. */
 .empty[data-icon]::before {
   content: "";
   inline-size: var(--icon-xl);
@@ -106,8 +106,10 @@
 
 /* ── NOTICE: an outcome or a state, reported where it happened ────────────────────────── (S2)
    "installed", "refused: this agent cannot read that scope", "two sources publish this skill".
-   configr's StatusMessage is the model: one tone, a word that tells the tones apart WITHOUT colour,
-   and a live role that follows the tone (success `status`, everything else `alert`).
+   configr's StatusMessage is the model: one tone, and a word that tells the tones apart WITHOUT
+   colour. The live role follows the tone too, and it is the page's to write (the lead's ruling):
+   `alert` for warning and destructive only, `status` for every other tone and for no tone — a
+   status notice going into a `role="status"` region the page already has (references/feedback.md).
 
    THE LABEL IS THE MEANING; the colour only speeds the scan. "warning:", "refused:", "failed:" —
    lower case, bold, in the tone — so a reader who cannot tell amber from red still reads the word.
@@ -148,8 +150,12 @@
 .notice p { margin: 0; }
 .notice > :not(.notice-label, .notice-dismiss) { flex: 1 1 auto; min-inline-size: 0; }
 .notice-label { flex: none; color: var(--tone-c); font-weight: 700; }
-/* On the FIRST line, and without making a one-line notice taller than one with no ×: the button is
-   a 1.5rem square on a 1.125rem line, so it gives back half the difference above and below.
+/* On the FIRST line, and without making a one-line notice taller than one with no × — for a FINE
+   pointer: the button is a 1.5rem square on a 1.125rem line, so it gives back half the difference
+   above and below. The 1.5rem mirrors `.btn-icon--sm` in controls.css, which declares it as a
+   literal and exposes no variable to read. Under a COARSE pointer controls.css grows every
+   `.btn-icon` to 44px, and a one-line notice then grows from 36px to 56px: a thumb-sized target is
+   worth the height, and the × stays centred on the first line either way.
    Two classes deep on purpose: the button is also a `.btn-icon`, and a one-class rule here would
    tie with that file's and lose or win on nothing but the order the bundle imports them in. */
 .notice > .notice-dismiss {
@@ -231,8 +237,13 @@
    broken across two lines is two meaningless fragments.
 
    6% of the tone mixed into --background, not over transparent: a banner sits on the page itself
-   and must stay opaque when `--sticky` slides it over scrolled content. Cockpit's 12% is 6%, for
-   the same measured reason as the notice. Rendered only when there is something to say. */
+   and must stay opaque when it rides in `.bar-stack` (chrome.css) over scrolled content. Cockpit's
+   12% is 6%, for the same measured reason as the notice. Rendered only when there is something to
+   say.
+
+   A BANNER THAT MUST STAY IN VIEW goes first inside `.bar-stack`, the header's sticky layer — never
+   a sticky banner of its own. Two siblings sticking at `top: 0` do not stack, they overlap, and the
+   header vanished under the banner the moment the page scrolled (the lead's ruling on the review). */
 .banner {
   --tone-c: var(--tone, var(--destructive));
   padding-block: 0.5rem;
@@ -253,9 +264,6 @@
 }
 .banner a { color: inherit; text-decoration: underline; white-space: nowrap; }
 .banner a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-/* Above the header (30), the footer and dropdowns (50): it states a property of the whole app,
-   and a frozen cockpit must not scroll the one line that says so out of view. */
-.banner--sticky { position: sticky; top: 0; z-index: 60; }
 
 /* ── STATE: a status word, and the glyph that lets it be scanned ─────────────────────── (S5)
    `passed`, `failed`, `running`, `skipped` in a table cell. Cockpit's CI page drew these with a
@@ -341,10 +349,11 @@ p.state { display: flex; white-space: normal; }
    it. The page writes the body with `textContent` — never markdown, never links: rendered markup
    would let the stranger decide what the fence looks like from the inside.
 
-   The labels are eyebrow type — capitals and open tracking, so they read as a frame rather than
-   as part of the text — and they set `font-style: normal` because a `<figcaption>` is italic in
-   the base element defaults. `--warning` on its own 5% tint clears 4.5:1 on every theme (measured
-   by check-feedback.mjs, with the body text and the "(empty)" line beside it). */
+   The labels are P2's eyebrow, restated — capitals, .05em of tracking and the tight line height, so
+   they read as a frame rather than as part of the text. ONE eyebrow look in the system; the fence
+   only takes it in --warning and bold. They set `font-style: normal` because a `<figcaption>` is
+   italic in the base element defaults. `--warning` on its own 5% tint clears 4.5:1 on every theme
+   (measured by check-feedback.mjs, with the body text and the "(empty)" line beside it). */
 .fence {
   margin: 0;
   padding: 0.75rem;
@@ -358,8 +367,9 @@ p.state { display: flex; white-space: normal; }
   margin: 0;
   font-style: normal;
   font-weight: 700;
+  line-height: var(--lh-tight);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--warning);
 }
 .fence-label {
@@ -417,10 +427,30 @@ p.state { display: flex; white-space: normal; }
   .dot--pulse { animation: none; }
 }
 
+/* ── FORCED COLOURS ─────────────────────────────────────────────────────────────────────────────
+   A forced palette replaces every background colour with Canvas, and every glyph here is a
+   background shown through a mask — the dot is nothing but its fill. Left alone they vanish,
+   white on white. Opted out of the palette, each takes `currentColor`, which IS forced — the text
+   colour of the line it sits on — so the glyph shows in exactly the colour of its words. The ring
+   that cuts an overlay dot out of its host takes the forced page colour, Canvas.
+   What is left alone survives on its own: every word (a notice's label is the meaning, the colour
+   only sped the scan), the `.state` glyphs, which are text, the fence's dashed frame and a
+   callout's rule, which are borders. */
+@media (forced-colors: active) {
+  .empty[data-icon]::before,
+  .notice--lg[data-icon]::before,
+  .callout[data-icon]::before,
+  .spinner,
+  .dot {
+    forced-color-adjust: none;
+    background: currentColor;
+  }
+  .dot--overlay { box-shadow: 0 0 0 1px Canvas; }
+}
+
 @media print {
-  /* Paper cannot be dismissed, and a sticky strip would repeat nowhere useful. */
+  /* Paper cannot be dismissed. */
   .notice > .notice-dismiss { display: none; }
-  .banner--sticky { position: static; }
   .fence { break-inside: avoid; }
   .spinner,
   .dot--pulse { animation: none; }

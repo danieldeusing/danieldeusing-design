@@ -1,0 +1,472 @@
+/*
+ * danieldeusing-design — feedback: what a page says about its own state.
+ *
+ * An empty list, an outcome, an annotation, an estate-wide alarm, a status word, a load in
+ * progress, a block of text a stranger wrote, a live dot. Every surface grew its own of each:
+ * seedr and configr both carry an empty state, a status message and a spinner; cockpit carries a
+ * `.note` callout 186 times, a state box in five tints, an alert banner, a fence around third-party
+ * text and a live dot — and no two of them agreed on a padding, a tint or which colour means what.
+ * This file is the one answer (0.60.0). Tags and counts are its sibling, tags.css.
+ *
+ * IT NEEDS tokens.css AND NOTHING ELSE. Not base.css, not components.css, not the reset: a surface
+ * that loads only tokens + chrome (netmon) must be able to load this beside them and get the same
+ * box. That is why every block below states its own font size and line height and zeroes its own
+ * children's margins, instead of trusting a reset to have run first. scripts/check-feedback.mjs
+ * renders the demo page a second time with only tokens.css + this file + tags.css and compares.
+ *
+ * WHAT IT DOES NOT SET is a component's OUTER margin. Where a notice sits and how far it stands from
+ * the paragraph above is the page's layout, and the page's reset decides it for every element alike.
+ * The one exception is the fence, because a `<figure>`'s default 40px side margins break it.
+ *
+ * ONE COLOUR MECHANISM. `data-tone` (tokens.css) sets `--tone` on the element that carries it, and
+ * every rule here reads `var(--tone, <its own default>)` — so one attribute colours a notice, a
+ * callout, a banner, an empty state's glyph and a dot alike, and no class name encodes a colour.
+ *
+ * THE TINTS ARE MEASURED, NOT CHOSEN. A background that carries tone-coloured text is 6% of the
+ * tone (the fence 5%), and it is mixed INTO --background, never over `transparent`. Over
+ * `transparent` the tint composites onto whatever surface the box lands on, and the dimmest text
+ * that sits on one — --muted-foreground, a neutral notice's label and the fence's "(empty)" — is
+ * only 4.66:1 on warm's --muted before any tint at all: measured, the translucent 6% put it at 4.34
+ * there and just under 4.5 on --card, the 5% fence at 4.38. Mixed into --background the box is its own
+ * surface, the same on a page, a card or a muted panel, and every label in it clears 4.5:1 on
+ * every theme. The banner was specified that way already; the notice and the fence now agree.
+ * Nothing here invents a colour — a new one is a token in tokens.css, declared four times with its
+ * measured ratio beside it.
+ */
+
+/* ── A TONE NEVER LEAKS INTO A CHILD ───────────────────────────────────────────────────────────
+   `--tone` is a custom property, and custom properties INHERIT. A neutral notice inside a
+   `data-tone="success"` card would read the card's tone and turn green without anybody asking for
+   it; an untoned dot inside a warning banner would stop following the word beside it. So an
+   element here that carries no `data-tone` of its own resets `--tone` to the guaranteed-invalid
+   value, and its `var(--tone, …)` falls back to its own default. The attribute on the element is
+   the only thing that colours it — which is also the only thing a reader of the markup can see. */
+:is(.empty, .notice, .callout, .banner, .dot):not([data-tone]) { --tone: initial; }
+
+/* ── EMPTY: a list with nothing in it says WHICH nothing ──────────────────────────────── (S1)
+   Three states look identical as a blank panel and are three different facts. The estate rendered
+   all of them as one "nothing here" until cockpit's table engine kept them apart (C56), and
+   configr's catalog filter had to learn the same thing again (I12):
+
+     an empty store   "no skills yet"                  nothing exists — say so
+     no match         "no skills match these filters"  something exists — name the cause, offer the reset
+     a failure        "could not load the registry"    nothing is known — say it failed, offer a retry
+
+   The wording is the page's. This block gives the three ONE shape, so the difference is in the
+   words and nowhere else.
+
+   Centred, muted, with air above and below: the panel is empty and the message is the only thing
+   in it, so it sits where the eye lands. `--inline` is the same message start-aligned and compact,
+   for a narrow pane where a centred block with 2rem of air would push everything else off screen.
+
+   NO DASHED EDGE. family's empty state had one, and it is not adopted: dashed is the fence's mark
+   (S7) — "this text came from outside" — and lending it to "this list is empty" would teach the
+   reader that a dash means nothing in particular. */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding-block: 2rem;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  text-align: center;
+  color: var(--muted-foreground);
+}
+.empty > * { margin: 0; }
+/* BLOCK, not the centred grid: in a grid a line of text and the `reset` button after it become
+   two stacked items, and in a narrow pane they should flow as one sentence. Block children still
+   get the grid's gap, so a prompt and its message do not run together. */
+.empty--inline { display: block; padding-block: 0.75rem; text-align: start; }
+.empty--inline > * + * { margin-block-start: 0.5rem; }
+
+/* THE GLYPH SAYS WHICH KIND OF EMPTY before the words do — a warning triangle over a failure, an
+   open folder over a store with nothing in it. Shape from `data-icon`, colour from `data-tone`; a
+   failure is `data-tone="warning" data-icon="triangle-alert"`. Without `data-icon` there is no
+   glyph: an empty state does not need a picture to be understood, and most of them should not have
+   one. Decorative — `content: ""` has no text, and the sentence is what is read out. */
+.empty[data-icon]::before {
+  content: "";
+  inline-size: var(--icon-xl);
+  block-size: var(--icon-xl);
+  background: var(--tone, currentColor);
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+/* Inline, the glyph hangs at the start of the FIRST line at the text's own glyph size — a 1.5rem
+   triangle beside one line of 12px text in a sidebar is a picture with a caption, not a message.
+   Positioned rather than a grid column, so a message that is bare text still flows as one line. */
+.empty--inline[data-icon] { position: relative; padding-inline-start: calc(var(--icon-size) + 0.5rem); }
+.empty--inline[data-icon]::before {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: calc(0.75rem + (1lh - var(--icon-size)) / 2);
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+}
+
+/* ── NOTICE: an outcome or a state, reported where it happened ────────────────────────── (S2)
+   "installed", "refused: this agent cannot read that scope", "two sources publish this skill".
+   configr's StatusMessage is the model: one tone, and a word that tells the tones apart WITHOUT
+   colour. The live role follows the tone too, and it is the page's to write (the lead's ruling):
+   `alert` for warning and destructive only, `status` for every other tone and for no tone — a
+   status notice going into a `role="status"` region the page already has (references/feedback.md).
+
+   THE LABEL IS THE MEANING; the colour only speeds the scan. "warning:", "refused:", "failed:" —
+   lower case, bold, in the tone — so a reader who cannot tell amber from red still reads the word.
+   A success has none: it confirms what was expected, and a label would only repeat the colour.
+
+   THE SENTENCE IS --foreground, never the tone. A paragraph set in amber is hard to read and
+   shouts every word equally. The label carries the tone; the sentence carries the content.
+
+   6%, NOT 10%, AND INTO --background. configr's banners and cockpit's state boxes were 10-12%
+   tints laid over the surface, and under tone-coloured text that fails AA — over the surface 8%
+   already measures 4.48 on warm and 4.41 on paper (R70). At 6% mixed into the page colour (the head
+   of this file says why not `transparent`) the worst label is 4.82:1, the neutral one on warm, so
+   there is room — and the room is not an invitation: 6% is the house step for a fill that carries
+   tone text, and check-feedback.mjs pins it as well as measuring every label on every run. The 30%
+   edge is what separates the box from the surface around it; the tint only says which tone it is.
+
+   ONE DISMISS, and it is the bare ×. configr grew three spellings of one act ("Dismiss" text, an ×,
+   a close button). `.notice-dismiss` only PLACES it: the control is `.btn-icon.btn-icon--bare.
+   btn-icon--sm` (controls.css), named "dismiss", and runtime/notice.js wires it on a build-free page.
+
+   The body is ONE element after the label (a `<p>`, or a `<div>` holding several): it takes the
+   free width and wraps under itself, so the label keeps hanging at the start of the first line. */
+.notice {
+  --tone-c: var(--tone, var(--muted-foreground));
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--tone-c) 6%, var(--background));
+  border: 1px solid color-mix(in srgb, var(--tone-c) 30%, transparent);
+}
+/* The paragraphs of a `<div>` body too: a result block's detail line is the second `<p>` in one, and
+   without a reset its 1em margin would push the first line a whole line below the glyph beside it. */
+.notice > *,
+.notice p { margin: 0; }
+.notice > :not(.notice-label, .notice-dismiss) { flex: 1 1 auto; min-inline-size: 0; }
+.notice-label { flex: none; color: var(--tone-c); font-weight: 700; }
+/* On the FIRST line, and without making a one-line notice taller than one with no × — for a FINE
+   pointer: the button is a 1.5rem square on a 1.125rem line, so it gives back half the difference
+   above and below. The 1.5rem mirrors `.btn-icon--sm` in controls.css, which declares it as a
+   literal and exposes no variable to read. Under a COARSE pointer controls.css grows every
+   `.btn-icon` to 44px, and a one-line notice then grows from 36px to 56px: a thumb-sized target is
+   worth the height, and the × stays centred on the first line either way.
+   Two classes deep on purpose: the button is also a `.btn-icon`, and a one-class rule here would
+   tie with that file's and lose or win on nothing but the order the bundle imports them in. */
+.notice > .notice-dismiss {
+  flex: none;
+  align-self: flex-start;
+  margin-inline-start: auto;
+  margin-block: calc((var(--lh-base) * var(--fs-base) - 1.5rem) / 2);
+}
+/* A RESULT, not a remark — configr's update dialog ("you are on the latest version", with the
+   version under it). More room, and a leading glyph at the display size in the tone. */
+.notice--lg { gap: 0.75rem; padding: 0.75rem 1rem; }
+.notice--lg[data-icon]::before {
+  content: "";
+  flex: none;
+  align-self: flex-start;
+  inline-size: var(--icon-xl);
+  block-size: var(--icon-xl);
+  background: var(--tone-c);
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+
+/* ── CALLOUT: an annotation where it stands ─────────────────────────────────────────── (S3)
+   "outside the default folder", "note — the pin moves with the release". A notice REPORTS (an
+   outcome, a state); a callout ANNOTATES the content it sits in. Cockpit's `.note` did both jobs
+   186 times, which is why a form result and a permanent explanation looked identical there.
+
+   seedr's studio and configr's settings box drew it the same way independently — a 2px rule, a
+   short inset, a tone title over a muted body, no fill — and two surfaces arriving at one shape is
+   the canonical look (R69). Cockpit's 3px rule on a `--muted` fill is not adopted: a filled box
+   reads as a panel, and a page with twenty of them reads as a page of panels.
+
+   `.callout-title` is a `<p>` over the body, or a `<strong>` lead word inside one line — the
+   rule is the same either way. `.eli5` stays as the one MARKED callout (components.css).
+
+   EMPTY MEANS ABSENT. Every cockpit form parks its result in an empty callout and fills it on
+   submit; empty, it was still an accent rule pointing at nothing — a control that looks like it is
+   telling me something and is not. It disappears until it has words. */
+.callout {
+  padding-block: 0.25rem;
+  padding-inline: 0.625rem 0;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--muted-foreground);
+  border-inline-start: 2px solid var(--tone, var(--primary));
+}
+.callout > * { margin: 0; }
+.callout > * + * { margin-block-start: 0.25rem; }
+.callout:empty { display: none; }
+.callout-title { color: var(--tone, var(--primary)); font-weight: 700; }
+/* A glyph in the tone, hanging at the start of the first line (configr's settings box). Positioned
+   rather than the grid column the spec sketched, because the lead-word form is ONE line of text:
+   in a grid its `<strong>` and the words after it become two stacked items. */
+.callout[data-icon] {
+  position: relative;
+  padding-inline-start: calc(0.625rem + var(--icon-size) + 0.5rem);
+}
+.callout[data-icon]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.625rem;
+  inset-block-start: calc(0.25rem + (1lh - var(--icon-size)) / 2);
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  background: var(--tone, var(--primary));
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+
+/* ── BANNER: a property of the whole app, full bleed ───────────────────────────────────── (S4)
+   "2 alerts", "control is frozen". Not about a section — about everything under it — so it spans
+   the viewport above the content, and `.bleed-rail` (chrome.css) carries it past the rail's reserved
+   gutter. Cockpit's alert banner and control-freeze strip were the same shape declared twice; this
+   is that shape once, in any tone (destructive by default: a banner is usually a stop).
+
+   A RULE BETWEEN ITEMS, not just space. Three alerts each run to three wrapped lines, so a margin
+   smaller than the line height makes the block one long paragraph; a faint rule in the banner's own
+   colour is the only thing that says where one ends. Links are underlined and never wrap — `fix →`
+   broken across two lines is two meaningless fragments.
+
+   6% of the tone mixed into --background, not over transparent: a banner sits on the page itself
+   and must stay opaque when it rides in `.bar-stack` (chrome.css) over scrolled content. Cockpit's
+   12% is 6%, for the same measured reason as the notice. Rendered only when there is something to
+   say.
+
+   A BANNER THAT MUST STAY IN VIEW goes first inside `.bar-stack`, the header's sticky layer — never
+   a sticky banner of its own. Two siblings sticking at `top: 0` do not stack, they overlap, and the
+   header vanished under the banner the moment the page scrolled (the lead's ruling on the review). */
+.banner {
+  --tone-c: var(--tone, var(--destructive));
+  padding-block: 0.5rem;
+  padding-inline: 1.25rem;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--tone-c);
+  background: color-mix(in srgb, var(--tone-c) 6%, var(--background));
+  border-block-end: 1px solid var(--tone-c);
+}
+.banner > * { margin: 0; }
+.banner-title { font-weight: 700; }
+.banner-list { margin-block: 0.25rem 0; padding: 0; list-style: none; }
+.banner-list > li + li {
+  margin-block-start: 0.55rem;
+  padding-block-start: 0.55rem;
+  border-block-start: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
+.banner a { color: inherit; text-decoration: underline; white-space: nowrap; }
+.banner a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* ── STATE: a status word, and the glyph that lets it be scanned ─────────────────────── (S5)
+   `passed`, `failed`, `running`, `skipped` in a table cell. Cockpit's CI page drew these with a
+   glyph (C21) and its other pages with colour alone (C20); seedr and configr with colour alone.
+   The glyph is what makes a column of them scannable in grey — ✓ and ✗ differ in shape, not hue.
+
+   THE WORD CARRIES THE MEANING; THE GLYPH IS HIDDEN. `content: "✓" / ""` gives the glyph empty
+   alternative text, so a screen reader hears "passed", not "check mark passed" — cockpit's glyphs
+   were read aloud, which put the same fact in the reader's ear twice. The first `content` is the
+   fallback for an engine without the alt syntax. The glyphs are escapes, so a stylesheet served
+   under the wrong charset still draws them (a comment is never rendered, so its ✓ costs nothing).
+
+     ok       ✓  --success           bad      ✗  --destructive, bold — the one not to miss
+     warn     ●  --warning           info, running  ●  --info
+     pending  ○  --pending (hollow: no verdict yet)
+     skip     –  --muted-foreground  none     no glyph, muted, regular weight
+
+   The word takes its glyph's colour. On a `<p>` it is an inline error line and wraps; everywhere
+   else it is a table-cell word and never breaks. */
+.state {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.state::before { flex: none; }
+p.state { display: flex; white-space: normal; }
+.state[data-state="ok"] { color: var(--success); }
+.state[data-state="ok"]::before { content: "\2713"; content: "\2713" / ""; }
+.state[data-state="bad"] { color: var(--destructive); font-weight: 700; }
+.state[data-state="bad"]::before { content: "\2717"; content: "\2717" / ""; }
+.state[data-state="warn"] { color: var(--warning); }
+.state[data-state="warn"]::before { content: "\25CF"; content: "\25CF" / ""; }
+.state:is([data-state="info"], [data-state="running"]) { color: var(--info); }
+.state:is([data-state="info"], [data-state="running"])::before { content: "\25CF"; content: "\25CF" / ""; }
+.state[data-state="pending"] { color: var(--pending); }
+.state[data-state="pending"]::before { content: "\25CB"; content: "\25CB" / ""; }
+.state[data-state="skip"] { color: var(--muted-foreground); }
+.state[data-state="skip"]::before { content: "\2013"; content: "\2013" / ""; }
+.state[data-state="none"] { color: var(--muted-foreground); font-weight: 400; }
+
+/* ── SPINNER and LOADING: work in progress, always in words ──────────────────────────── (S6)
+   configr had spinners at 14, 16, 24 and 32px in three colours; cockpit two rings at 0.7s and 0.8s.
+   One glyph now — lucide's loader-circle, a mask in `currentColor`, so it takes whatever colour its
+   line has on all four themes — at the text's glyph size, and `--lg` for a whole-page load.
+
+   THE ANIMATION IS DECORATION, NEVER THE MESSAGE. `html.anim-off` (tokens.css) and reduced motion
+   stop the turn and the glyph stays, so what is left is an arc beside "loading skills…" — which
+   still says everything. A spinner without words says nothing to a screen reader and nothing to a
+   reader whose motion is off, so `.loading` is the row it lives in, a status with the words. Its
+   role follows the notice's rule (the lead's ruling): a row in the page from the first render may
+   carry `role="status"` itself; one mounted later goes into a `role="status"` region the page
+   already has and carries none. The region being FILLED carries `aria-busy="true"` until it
+   settles (references/feedback.md). */
+.spinner {
+  display: inline-block;
+  flex: none;
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  background: currentColor;
+  -webkit-mask: var(--ico-loader-circle) center / contain no-repeat;
+  mask: var(--ico-loader-circle) center / contain no-repeat;
+  animation: dd-spin 1s linear infinite;
+}
+.spinner--lg { inline-size: var(--icon-xl); block-size: var(--icon-xl); }
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-block: 0.75rem;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--muted-foreground);
+}
+
+/* ── FENCE: text a stranger wrote ───────────────────────────────────────────────────────── (S7)
+   A pull-request description, a ticket body, a commit message — bytes a third party chose, shown
+   inside a page that also shows the reader's own words. Summarising while reading is where an
+   injection gets laundered into something that looks like the reader's own note, so third-party
+   text is never blended in: it is fenced, verbatim, and labelled at BOTH ends, so where it starts
+   and where it stops are never a judgement call (cockpit C81, the approvals page).
+
+   Dashed and --warning because that is what the dash means in this estate and nothing else uses
+   it. The page writes the body with `textContent` — never markdown, never links: rendered markup
+   would let the stranger decide what the fence looks like from the inside.
+
+   The labels are P2's eyebrow, restated — capitals, .05em of tracking and the tight line height, so
+   they read as a frame rather than as part of the text. ONE eyebrow look in the system; the fence
+   only takes it in --warning and bold. They set `font-style: normal` because a `<figcaption>` is
+   italic in the base element defaults. `--warning` on its own 5% tint clears 4.5:1 on every theme
+   (measured by check-feedback.mjs, with the body text and the "(empty)" line beside it). */
+.fence {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  border: 2px dashed var(--warning);
+  background: color-mix(in srgb, var(--warning) 5%, var(--background));
+}
+.fence-label,
+.fence-end {
+  margin: 0;
+  font-style: normal;
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--warning);
+}
+.fence-label {
+  padding-block-end: 0.4rem;
+  border-block-end: 1px dashed color-mix(in srgb, var(--warning) 55%, transparent);
+}
+.fence-end {
+  padding-block-start: 0.4rem;
+  border-block-start: 1px dashed color-mix(in srgb, var(--warning) 55%, transparent);
+}
+/* No max-height: a fence prints, and one that scrolls inside a box prints truncated. A long URL
+   in the stranger's text must wrap rather than push the fence past the column. */
+.fence-body {
+  margin-block: 0.6rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: var(--lh-base);
+}
+/* An empty body SAYS it is empty — a blank gap between two labels reads as text that failed to
+   load. Real content, so it is read out: that the stranger wrote nothing is information. */
+.fence-body:empty::before { content: "(empty)"; font-style: italic; color: var(--muted-foreground); }
+
+/* ── DOT: a state you glance at, never the state itself ─────────────────────────────────── (S8)
+   `● live` beside a connection, a dot on the corner of an icon. Cockpit, netmon and configr drew
+   three of them at three sizes. One size (--dot-size), one colour rule — the tone, or the colour
+   of the words beside it — and `50%` is the one radius the estate allows because it is a CIRCLE,
+   not a rounded corner.
+
+   DECORATIVE, ALWAYS. `aria-hidden="true"`; the word beside it is the state, and a connection
+   label that changes is `role="status"`. `--pulse` is for LIVE only — a pulsing dead dot is the bug
+   wearing the fix — and stops under `html.anim-off` and reduced motion like every animation here.
+   `.dd-dot` is a different thing and stays: it is the theme indicator. */
+.dot {
+  display: inline-block;
+  flex: none;
+  inline-size: var(--dot-size);
+  block-size: var(--dot-size);
+  border-radius: 50%;
+  background: var(--tone, currentColor);
+}
+.dot--pulse { animation: dd-pulse 2s ease-in-out infinite; }
+/* On the corner of its host (which is `position: relative` — `.btn-icon` already is). The ring in
+   the page colour cuts it out of the host's edge so the two never read as one shape. */
+.dot--overlay {
+  position: absolute;
+  inset-block-end: -1px;
+  inset-inline-end: -1px;
+  inline-size: 0.375rem;
+  block-size: 0.375rem;
+  box-shadow: 0 0 0 1px var(--background);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner,
+  .dot--pulse { animation: none; }
+}
+
+/* ── FORCED COLOURS ─────────────────────────────────────────────────────────────────────────────
+   A forced palette replaces every background colour with Canvas, and every glyph here is a
+   background shown through a mask — the dot is nothing but its fill. Left alone they vanish, white
+   on white. `preserve-parent-color` is the opt-out that KEEPS the palette: `currentColor` becomes
+   the forced colour of the words the glyph sits with (CanvasText in text, ButtonText in a button,
+   GrayText when disabled), on a light palette and a dark one alike. `none` is not that: measured in
+   Chromium, it hands `currentColor` the page's own unforced colour — warm's dark brown, 1.78:1 on a
+   dark palette's black Canvas. An engine without the value gets the palette's text colour by name.
+   The ring that cuts an overlay dot out of its host takes the forced page colour.
+   What is left alone survives on its own: every word (a notice's label is the meaning, the colour
+   only sped the scan), the `.state` glyphs, which are text, the fence's dashed frame and a
+   callout's rule, which are borders. */
+@media (forced-colors: active) {
+  .empty[data-icon]::before,
+  .notice--lg[data-icon]::before,
+  .callout[data-icon]::before,
+  .spinner,
+  .dot {
+    forced-color-adjust: preserve-parent-color;
+    background: currentColor;
+  }
+  .dot--overlay { box-shadow: 0 0 0 1px Canvas; }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .empty[data-icon]::before,
+    .notice--lg[data-icon]::before,
+    .callout[data-icon]::before,
+    .spinner,
+    .dot { background: CanvasText; }
+  }
+}
+
+@media print {
+  /* Paper cannot be dismissed. */
+  .notice > .notice-dismiss { display: none; }
+  .fence { break-inside: avoid; }
+  .spinner,
+  .dot--pulse { animation: none; }
+  /* A dot IS its fill, and print drops background colours by default — it would print as nothing. */
+  .dot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

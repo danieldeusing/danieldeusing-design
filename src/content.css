@@ -1,0 +1,682 @@
+/*
+ * danieldeusing-design — content layer (0.60.0).
+ *
+ * What a page SAYS, as opposed to what it lets you do: the page title and its lede, labels and
+ * section heads, rendered markdown and the lists around it, code, commands and their copy button,
+ * the meta line and the boot log. Every surface already had each of these,
+ * built by hand and a little differently: seedr and configr each carry a `MARKDOWN_CLASSES`
+ * constant, cockpit an `.ov-md`, danieldeusing.de the typography plugin with an 18-variable palette
+ * mapping; four surfaces drew four title sizes and three eyebrow letter-spacings. This file is the
+ * one answer, so the next page inherits it instead of inventing a fifth.
+ *
+ * WORKS ON tokens.css ALONE. A surface that loads only the tokens and this file (configr and seedr's
+ * studio load the tokens and their own styles; netmon loads tokens + chrome) gets every class here
+ * as specified: each rule states its own margins, font and colours rather than leaning on base.css
+ * or the reset. Two things are deliberately NOT restated, because they belong to the element and
+ * base.css owns them: inline `code` and `kbd` (F5), and the plain `pre`, `blockquote`, `figure` and
+ * table rules a markdown body contains. `.code-block` IS restated — it is the class a `div`, a
+ * tokens-only app or a `pre` that must look like code with no base.css behind it reaches for.
+ *
+ * Classes from other files appear in the markup this file expects (`.prompt`, `.cursor-block`,
+ * `.card-terminal`, `.doc-link--forward`, `.btn-icon`, `.ico`). They are used, never redeclared.
+ */
+
+
+/* ── PAGE TITLE AND LEDE (P1) ─────────────────────────────────────────────────────────────────
+   <p class="prompt">cat ~/about.txt</p>
+   <h1 class="page-title">about<span class="cursor-block" aria-hidden="true"></span></h1>
+   <p class="lede">…</p>
+
+   ONE TITLE, LIT. seedr and danieldeusing.de draw the page title in --primary with the large glow;
+   cockpit's `h1.title` was unlit and configr's was --foreground. The lit one wins because it is the
+   estate's idiom: the title is the one line on the page the CRT is "on" for. --primary measures
+   5.59:1 at worst (warm, over --muted), so the glow is decoration on top of a legible title, not a
+   substitute for one.
+
+   TWO SIZES, AND WHICH ONE IS NOT A MATTER OF TASTE (lead ruling, 2026-09-28). An app surface —
+   cockpit, configr, seedr's registry — titles its views at --fs-2xl (24px) at every width: a view
+   title sits above a table or a form, and a larger one only pushes the content down. A PUBLIC SITE's
+   page title is `--display`, --fs-display: 30px, 36px from 40rem. danieldeusing.de is a source of
+   truth and titles its pages that way; the spec had ruled it down to 24px, and the ruling was
+   overturned because the site is the reference, not the thing being corrected. The display step
+   lives in tokens.css so the breakpoint is decided once; this file only reads it. The display title
+   is set at 1.2, pagr's `leading-tight`-at-display value (36px on 43.2px): --lh-tight's 1.3 opens a
+   two-line display title into two separate lines. `--lh-display` if tokens.css names it, else 1.2.
+
+   THE GAPS COME FROM THE SOURCES. 1.5rem under the prompt is seedr's and pagr's `mt-6`. The lede
+   sits .5rem under the title — the DS template's own gap; pagr's 1rem and configr's .25rem disagree
+   and neither is a majority. Stated as sibling rules, so a title with nothing above it or nothing
+   below it carries no stray margin.
+
+   `overflow-wrap: anywhere`: a title can be a path or a package name, and at 36px on a phone one
+   long token is wider than the screen. The letter-spacing is Tailwind's `tracking-tight`, which both
+   sources used; it closes up a monospace face that otherwise reads gappy at display size. */
+.page-title {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.025em;
+  color: var(--primary);
+  text-shadow: 0 0 12px var(--glow);
+  overflow-wrap: anywhere;
+}
+.page-title--display {
+  font-size: var(--fs-display);
+  line-height: var(--lh-display, 1.2);
+}
+.prompt + .page-title {
+  margin-block-start: 1.5rem;
+}
+/* A leading glyph (configr titles a project with its kind) is the block-heading step, 24px. It is a
+   mask, so it takes the title's colour; `vertical-align` sits it on the text rather than the
+   baseline, where a 24px square hangs visibly low beside 24px caps. */
+.page-title > .ico {
+  inline-size: var(--icon-xl);
+  block-size: var(--icon-xl);
+  margin-inline-end: 0.5rem;
+  vertical-align: -0.2em;
+}
+.lede {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.page-title + .lede {
+  margin-block-start: 0.5rem;
+}
+
+
+/* ── EYEBROW (P2) ─────────────────────────────────────────────────────────────────────────────
+   <h3 class="eyebrow">install</h3>   ·   <p class="eyebrow" data-tone="warning">untrusted</p>
+
+   The small upper-case label over a block. configr, seedr and pagr agree on everything about it —
+   body size, 500, upper case, .05em, muted — and cockpit spread nine labels over five spacings
+   from .05 to .1em. One value, the one three sources share.
+
+   It is still ONE TEXT SIZE: the label is set apart by case, spacing and colour, never by a
+   smaller font. pagr's 11px is corrected to the body size.
+
+   IT SETS NO MARGIN. The block it heads spaces it — a card's gap, a list's own margin — because
+   an eyebrow sits in too many containers (a card, a dialog, a stat tile, a fence) for one margin
+   to be right in all of them. `data-tone` colours it (the tone map is in tokens.css); with no tone
+   it is --muted-foreground, 4.67:1 at worst.
+
+   `--tone` INHERITS (F7), so an untoned eyebrow inside a toned container — a destructive dialog, a
+   warning fence — would take the container's tone and say something it was not asked to. An eyebrow
+   without its own `data-tone` resets it at its root and is muted wherever it lands.
+
+   Write the words in lower case. CSS upper case is a rendering; a screen reader reads the source,
+   and an upper-case SOURCE is spelled out letter by letter by some of them. */
+.eyebrow {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  line-height: var(--lh-tight);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tone, var(--muted-foreground));
+}
+.eyebrow:not([data-tone]) {
+  --tone: initial;
+}
+
+
+/* ── SECTION HEAD AND SUB-HEADING (P3) ────────────────────────────────────────────────────────
+   <div class="section-head">
+     <h2 class="prompt">whoami</h2>
+     <a class="doc-link doc-link--forward" href="/about">man daniel →</a>
+   </div>
+
+   A section's name on the left and ONE thing on the right: a forward link, a muted date, or an
+   icon button. danieldeusing.de's home page has it three times, seedr's detail page puts an icon
+   toggle there.
+
+   THE RIGHT-HAND ITEM NEVER WRAPS, and that is the reason for the rule. pagr typed ` →` after a
+   quiet link, and in a narrow column the arrow broke onto a line of its own. The trailing item is
+   one atom: it does not shrink, it does not break, and when the row runs out of room the whole item
+   drops under the heading (the row wraps) instead. The forward link is `.doc-link--forward` for the
+   same reason — it carries the accent at rest and is nowrap by construction.
+
+   BASELINE, EXCEPT FOR A BUTTON. Text beside text aligns on the baseline. An icon button has no
+   text and therefore no baseline of its own — aligned on it, a 28px box hangs below the heading —
+   so a row that ends in a button centres instead.
+
+   `> * { margin: 0 }` is for the tokens-only surface: without a reset, the heading brings the user
+   agent's .83em margins into a flex row, where they do not collapse and the row grows by a line. */
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-block-end: 1rem;
+}
+.section-head > * {
+  margin: 0;
+}
+.section-head > :last-child:not(:first-child) {
+  flex: none;
+  white-space: nowrap;
+}
+.section-head > time {
+  color: var(--muted-foreground);
+}
+.section-head:has(> :last-child:is(button, .btn-icon)) {
+  align-items: center;
+}
+/* A heading one level down, inside a section: body size in bold. 1.4rem above and .3rem below is
+   what /automation/review and the four execution pages use for 37 of cockpit's 40 sub-heads; the
+   other three move to it. The first one in its container starts flush — the container already
+   spaced it. */
+.subhead {
+  margin: 1.4rem 0 0.3rem;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+}
+.subhead:first-child {
+  margin-block-start: 0;
+}
+
+
+/* ── MARKDOWN (P4) ────────────────────────────────────────────────────────────────────────────
+   <div class="markdown">…rendered html…</div>
+
+   Rendered text someone else wrote — a README, an article, a skill's description. seedr and
+   configr each built this as a `MARKDOWN_CLASSES` string, cockpit as `.ov-md`, danieldeusing.de on
+   `@tailwindcss/typography`. It is `.markdown` and not `.prose` on purpose: `.prose` is the
+   typography plugin's own class, and on a surface that still loads the plugin the two would merge
+   into a third look nobody wrote.
+
+   THE CONTAINER DECIDES THE BODY COLOUR. An article inherits --foreground. A document embedded in
+   a detail view (seedr, configr) is quieter: the container adds `.text-muted-foreground`, and the
+   headings and `strong` return to --foreground inside it, which is exactly the contrast those two
+   views already drew by hand.
+
+   HEADINGS ARE NEVER LOUDER THAN THE PAGE. A markdown `#` is h1 inside the document and would be
+   24px against the page's own 24px title; h1 and h2 are both --fs-xl here, so the document's first
+   heading can never outrank the page it sits on. They are --foreground, not --primary (seedr,
+   configr): the page title is the lit line, and a document full of lit headings has none.
+
+   THE RHYTHM IS seedr's AND configr's: 1.625 line height, .5rem between blocks, .75rem above a
+   heading. pagr's 1.75 and its 1.25em gaps are corrected — an `em` gap compounds with every
+   heading size it sits under.
+
+   A link is underlined AT REST, so it is not told apart by colour alone. The markers are
+   --muted-foreground (4.67:1 at worst): quieter than the text, still readable.
+
+   Not restated here — `pre`, `code`, `kbd`, `blockquote`, `figure`, `table` and `.eli5` look inside
+   markdown exactly as they look anywhere else, from base.css and components.css. A second copy for
+   markdown is how cockpit's JSON and its markdown ended up with two different code boxes. */
+.markdown {
+  line-height: 1.625;
+  overflow-wrap: break-word;
+}
+/* Every block gets its gap from the one above it, AT ANY DEPTH, and nothing from the user agent:
+   two paragraphs in a list item or a blockquote are spaced like two paragraphs in the body.
+   Direct children only (the first cut) left a nested paragraph with the user agent's 1em on a
+   tokens-only surface and flush on a full one, so the rhythm depended on where the text landed.
+   The block list is `:where()` so the reset stays at (0,1,0); `.markdown > *` keeps any direct child
+   the list does not name (a `div.code-block`, an `.eli5`) in the same rhythm.
+
+   THE GAP GOES ONLY WHERE TEXT FLOWS: the body itself, and the four containers markdown nests blocks
+   in — `li`, `blockquote`, `details`, `dd`. A sibling selector at any depth also matched the second
+   item of a flex row or a grid inside the body and sat it 8px below the first (measured); a row and
+   a grid lay their own items out, so the rhythm stays out of them. A nested `hr` takes the same .5rem
+   each side, as any block does there. */
+.markdown :where(p, ul, ol, dl, pre, blockquote, figure, table, hr, details, h1, h2, h3, h4, h5, h6),
+.markdown > * {
+  margin-block: 0;
+}
+.markdown > * + *,
+.markdown :where(li, blockquote, details, dd) > * + * {
+  margin-block-start: 0.5rem;
+}
+.markdown > * + :is(h1, h2, h3, h4, h5, h6),
+.markdown :where(li, blockquote, details, dd) > * + :is(h1, h2, h3, h4, h5, h6) {
+  margin-block-start: 0.75rem;
+}
+.markdown :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  color: var(--foreground);
+}
+.markdown :is(h1, h2) { font-size: var(--fs-xl); }
+.markdown h3 { font-size: var(--fs-lg); }
+.markdown :is(h4, h5, h6) { font-size: var(--fs-base); }
+.markdown strong {
+  color: var(--foreground);
+}
+.markdown :is(ul, ol) {
+  padding-inline-start: 1rem;
+}
+.markdown ul { list-style: disc; }
+.markdown ol { list-style: decimal; }
+.markdown li + li,
+.markdown li > :is(ul, ol) {
+  margin-block-start: 0.25rem;
+}
+.markdown li::marker {
+  color: var(--muted-foreground);
+}
+.markdown a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.markdown a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.markdown :is(img, video) {
+  max-inline-size: 100%;
+  block-size: auto;
+  border: 1px solid var(--border);
+}
+/* The line-through is the browser's; the colour says the same thing a second way. */
+.markdown del {
+  color: var(--muted-foreground);
+}
+/* base.css draws the rule; a document's section break is a little tighter than a page's. */
+.markdown > hr {
+  margin-block: 1rem;
+}
+
+
+/* ── LISTS OUTSIDE MARKDOWN (P4) ──────────────────────────────────────────────────────────────
+   Three list shapes a hand-written page uses, promoted out of the templates and pages that each
+   carried a copy. Declared AFTER the markdown rules on purpose: they tie with `.markdown ul` on
+   specificity, so a `ul.plain` inside a markdown body is still a plain list. Their `margin: 0`
+   (0,1,1) outranks the markdown gap (0,1,0), so the gap is restated for them at the end of this
+   section — a plain list after a paragraph in a body is spaced like any other block, not flush.
+
+   `ol.steps` — numbered steps, the number in --primary in a 1.5rem gutter. cockpit's and the DS
+   template's rule, unchanged. */
+ol.steps {
+  counter-reset: step;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+ol.steps > li {
+  position: relative;
+  padding-inline-start: 2.25rem;
+  margin-block-start: 0.6rem;
+  counter-increment: step;
+}
+ol.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0;
+  inline-size: 1.5rem;
+  text-align: end;
+  font-weight: 700;
+  color: var(--primary);
+}
+/* `ul.plain` — an indented list with no marker, for items that are already their own labels. */
+ul.plain {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+  list-style: none;
+}
+ul.plain > li + li {
+  margin-block-start: 0.35rem;
+}
+/* `ul.dash` — the terminal's bullet: a `-` in --primary, the text hanging clear of it (the CV).
+
+   THE DASH IS DRAWN, NOT TYPED. pagr wrote it as a `<span>-</span>`, so a screen reader read
+   "dash" before every item; generated content with empty alt text is seen and not heard.
+
+   A HANGING INDENT, NOT A FLEX ROW — changed from the spec's `display: flex`, same geometry. A flex
+   item is every child: an item holding `<code>`, `<strong>` or a link would split into separate
+   flex items with a gap between each, which is how `.legend` once rendered one sentence as four
+   columns. The text starts 1ch + .5rem in (the dash is one mono cell, plus pagr's `gap-2`), and a
+   wrapped line stays under the text, not under the dash. .375rem between items is pagr's
+   `space-y-1.5`. */
+ul.dash {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+ul.dash > li {
+  position: relative;
+  padding-inline-start: calc(1ch + 0.5rem);
+}
+ul.dash > li + li {
+  margin-block-start: 0.375rem;
+}
+.markdown > * + :is(ul.plain, ol.steps, ul.dash),
+.markdown :where(li, blockquote, details, dd) > * + :is(ul.plain, ol.steps, ul.dash) {
+  margin-block-start: 0.5rem;
+}
+ul.dash > li::before {
+  content: "-";
+  content: "-" / "";
+  position: absolute;
+  inset-inline-start: 0;
+  color: var(--primary);
+}
+
+
+/* ── CODE (P5) ────────────────────────────────────────────────────────────────────────────────
+   Inline code and `kbd` are base.css's (F5) and take no class. This is the BLOCK:
+
+   <pre class="code-block" tabindex="0">…</pre>
+
+   The look is F5's `pre` — --muted box, --border hairline, the one text size — restated here
+   because a `div`, a tokens-only app, or a block that must look like code before base.css has
+   loaded reaches for a class. The two must agree, and they are written to: same padding, same
+   line height, same tab stop.
+
+   `--wrap` breaks long lines instead of scrolling them: a log or a crash trace is read, not
+   compared column by column. `--scroll` caps the height (40vh unless the page sets --code-max-h) and
+   scrolls. It deliberately does NOT set `overscroll-behavior: contain` — a contained scroller swallows
+   the wheel at its ends and the page under the pointer stops scrolling, the lesson .tablewrap paid
+   for in 0.10.0. A block that can scroll takes `tabindex="0"` in the markup, or a keyboard reader
+   cannot reach its hidden half; the focus ring is drawn here. */
+.code-block {
+  display: block;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  font: inherit;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  white-space: pre;
+  tab-size: 2;
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+}
+.code-block:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.code-block--wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.code-block--scroll {
+  max-block-size: var(--code-max-h, 40vh);
+  overflow-y: auto;
+}
+
+/* A FILE VIEW WITH LINE NUMBERS — seedr's preview gutter.
+
+   <pre class="code-block code-view" style="--code-gutter: 3ch" tabindex="0" role="region" aria-label="SKILL.md"><code><span class="line">…
+   </span><span class="line">…
+   </span></code></pre>
+
+   THE NUMBERS ARE A COUNTER, NOT TEXT. Generated content is not part of the selection or of
+   textContent, so a reader who selects the file and copies it gets the file — not the file with a
+   number glued to the front of every line, which is what a gutter of real text produces. The
+   `user-select: none` is belt and braces for the engines that let a selection touch generated
+   content anyway. Each `.line` ends with its own newline and nothing sits between two lines, so a
+   copied selection keeps its line breaks.
+
+   A HANGING GUTTER. The number sits in the line's own start padding, pulled back into it with a
+   negative margin, so a line long enough to wrap continues under the TEXT, never under the number —
+   the view wraps (`pre-wrap`) rather than scrolling, because a file preview is read. Set
+   --code-gutter to the digit count plus one: `3ch` up to 99 lines, `4ch` to 999. */
+.code-view {
+  counter-reset: line;
+  white-space: pre-wrap;
+}
+.code-view .line {
+  display: block;
+  padding-inline-start: calc(var(--code-gutter, 3ch) + 0.75rem);
+  overflow-wrap: anywhere;
+}
+.code-view .line::before {
+  counter-increment: line;
+  content: counter(line);
+  content: counter(line) / "";
+  display: inline-block;
+  inline-size: var(--code-gutter, 3ch);
+  margin-inline: calc(-1 * (var(--code-gutter, 3ch) + 0.75rem)) 0.75rem;
+  text-align: end;
+  color: var(--muted-foreground);
+  user-select: none;
+}
+
+/* SYNTAX COLOURS COME FROM THE CATEGORICAL PALETTE, NEVER FROM THE STATUS TOKENS. cockpit's JSON
+   view painted strings --success and numbers --warning; a string is not a success and a number is
+   not a warning, and on a page whose badges use those tokens to mean exactly that, the code block
+   started saying things it did not mean. A syntax colour names a KIND of token, which is what the
+   categorical hues are for (tokens.css).
+
+   Measured on the block's own --muted, the only surface code sits on: --cat-green and --cat-amber
+   clear 5.62:1 and 5.88:1 on warm, the lowest theme. A comment and a true/false/null literal are
+   quiet (muted, italic); punctuation is muted; keywords and keys take the accent. */
+.tok-comment,
+.tok-literal {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.tok-string { color: var(--cat-green); }
+.tok-number { color: var(--cat-amber); }
+.tok-keyword,
+.tok-key { color: var(--primary); }
+.tok-punct { color: var(--muted-foreground); }
+.tok-heading {
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+/* DIFF LINES, inside a `.code-block`. Here the status tokens ARE right: an added line is a gain and
+   a removed one a loss. The colour is the second signal — the `+` and `-` the diff already starts
+   each line with are the first, so nothing is carried by colour alone. A context line inherits the
+   text colour: cockpit drew it at .6 opacity, which put it under AA to say "unchanged", and
+   unchanged is not less legible. */
+.diff-add { color: var(--success); }
+.diff-del { color: var(--destructive); }
+.diff-hunk { color: var(--primary); }
+.diff-meta { color: var(--muted-foreground); }
+
+
+/* ── COMMAND BLOCK (P6) ───────────────────────────────────────────────────────────────────────
+   <div class="cmd">
+     <code class="cmd-text">npm install -g @danieldeusing/seedr</code>
+     <button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy
+             aria-label="copy install command"></button>
+   </div>
+
+   A command someone is meant to run, with its copy button. It is the code look — --muted and
+   --border — so a command and a code block are visibly one family.
+
+   WHAT IS SHOWN IS WHAT IS COPIED. No `$ ` prefix, no prompt: a reader who selects the text by hand
+   must get the same thing the button gives them.
+
+   IT WRAPS, IT DOES NOT SCROLL (seedr, configr). cockpit's `.cmdblock` scrolled one long line under
+   an absolutely placed button, and needed a 2.6rem gutter so the text would stop before the button
+   it slid beneath. As a flex row the text simply ends where the button starts: `min-inline-size: 0`
+   lets it shrink below its longest word and `overflow-wrap: anywhere` breaks that word, so a package
+   path never pushes the button out of the box.
+
+   `.cmd-text` cancels base.css's inline-code box — the command is IN a box already, and a box in a
+   box is the nested-card look nobody wants. A multi-line command is `<pre class="cmd-text">`, and the
+   button then sits at the top instead of the middle. With the 28px icon button the row is 44px
+   tall, as configr's is. */
+.cmd {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: var(--fs-base);
+  background: var(--muted);
+  border: 1px solid var(--border);
+}
+.cmd:has(> pre.cmd-text) {
+  align-items: flex-start;
+}
+.cmd-text {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--foreground);
+  background: none;
+  border: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cmd > :not(.cmd-text) {
+  flex: none;
+}
+
+
+/* ── COPY BUTTON STATES (P7) ──────────────────────────────────────────────────────────────────
+   `data-copy` adds a BEHAVIOUR to a button that already has a look — the icon button (C2) or the
+   ghost text button (C1). There is no copy-button look to keep in step. runtime/copy.js sets
+   `data-state` for 2000ms after a press; this is what the two states draw.
+
+   THE GLYPH CHANGES SHAPE, not only colour: copy becomes a check, or an x. A colour change alone
+   is invisible to a reader who cannot tell --success from --primary, and on the two dark themes the
+   green check and the green-tinted copy glyph are close. `--ico` swaps the mask the icon button
+   paints; `--btn-icon-color` keeps its hover and pressed rules on the state's colour; `color` does
+   the same for a text button. (0,2,0) on purpose — it outranks the icon button's own colour rules,
+   so a hovered button that has just copied stays green.
+
+   A copy button is never the FILLED primary: --success text on a --primary fill has nothing to
+   stand on. It is the ghost or the bare icon button.
+
+   FORCED COLOURS take both state colours away, and the SHAPE still tells the three apart. The
+   colour is set on the BUTTON, never on its glyph: the glyph is `preserve-parent-color` (tokens.css
+   gives every [data-icon]::before that default), so it paints the colour the button was forced to.
+   Under `forced-color-adjust: none` it would inherit --success itself — 1.74:1 on a light palette,
+   measured — which is why no rule here may give the glyph a colour of its own. */
+[data-copy][data-state="copied"] {
+  --ico: var(--ico-check);
+  --btn-icon-color: var(--success);
+  color: var(--success);
+}
+[data-copy][data-state="failed"] {
+  --ico: var(--ico-x);
+  --btn-icon-color: var(--destructive);
+  color: var(--destructive);
+}
+
+
+/* ── META LINE (P8) ───────────────────────────────────────────────────────────────────────────
+   <p class="meta"><time datetime="2026-09-02">02 Sep 2026</time><span class="meta-sep" aria-hidden="true">·</span>…</p>
+
+   The line under a title or in a card's foot: a date, an author, a read time, a count. Muted, and
+   laid out as items that wrap with their separators rather than as one sentence that breaks
+   mid-date. The separator is a `.meta-sep` span hidden from assistive technology — "02 Sep 2026
+   dot by Daniel dot" is what a typed `·` sounds like. A link inside is `.doc-link` (muted, then
+   --primary under the pointer); a value that must read louder than its key is `.meta-val`.
+
+   THERE IS NO TEXT STEP BELOW --muted-foreground, and this is where the estate kept inventing one.
+   pagr's /80 … /40 steps measure 3.22 down to 1.69:1 — every one under AA, and /50 was the colour
+   of the unselected options a reader was meant to pick from. configr had a tertiary neutral-600.
+   Both become --muted-foreground (4.67:1 at worst). Only decoration that carries no information may
+   sit lower — the `# ` of `.comment`, `.ls-perm` — and never an option or a control.
+
+   `.meta-stat` is a glyph and a number (seedr's type counts, configr's stat counters). Its glyph is
+   the 12px step whatever class the author gave it, sized here so no call site has to remember it;
+   the colour of a TYPE glyph is the surface's categorical choice. Tabular figures, so a column of
+   counts does not jitter. */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.meta-val {
+  color: var(--foreground);
+}
+.meta-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.meta-stat > :is(.ico, svg) {
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+}
+
+
+/* ── BOOT LOG (P10) ───────────────────────────────────────────────────────────────────────────
+   <div class="boot-log card-terminal">
+     <p class="boot-note">Last login: <time datetime="2026-09-28">today</time> · from a browser near you</p>
+     <p class="boot-line"><span class="boot-step">init timezone</span><span class="boot-val">America/Sao_Paulo</span></p>
+     <p class="boot-note">welcome, visitor.</p>
+   </div>
+
+   danieldeusing.de's home hero, a login banner that reads like a machine starting up. A SYSTEM
+   ELEMENT by the lead's ruling (the spec's other part had dropped it as a one-page hero): it
+   shipped from the design gallery beside the man-page card, and any surface can reuse the idiom.
+
+   `[ ok ]` IS DECORATION. It says every line succeeded because this is a banner, not a log. A
+   surface with a REAL per-step status uses `.state` in the value column — a second marker that
+   could say "ok" over a step that failed is exactly the green-when-broken this estate keeps
+   finding. Drawn with empty alt text, so a screen reader hears the step and its value.
+
+   Two columns from 40rem (`width < 40rem` is one column, so 640px is already two, like the display
+   title's step) — the step at --boot-step-w (14rem, pagr's `sm:w-56`) and the value — and
+   one below it, where 14rem is most of a phone. A control may stand in the value's place (the rail
+   toggle, the animation toggle, a theme picker); it keeps its own class. The notes above and below
+   are muted — pagr's faint first line at /70 is corrected (P8). */
+.boot-log {
+  display: grid;
+  gap: 0.375rem;
+  color: var(--muted-foreground);
+}
+.boot-line {
+  display: grid;
+  grid-template-columns: var(--boot-step-w, 14rem) minmax(0, 1fr);
+  column-gap: 0.5rem;
+  align-items: baseline;
+  margin: 0;
+}
+.boot-note {
+  margin: 0;
+}
+.boot-step {
+  white-space: nowrap;
+}
+.boot-step::before {
+  content: "[ ok ]";
+  content: "[ ok ]" / "";
+  margin-inline-end: 1ch;
+  font-weight: 700;
+  color: var(--primary);
+}
+.boot-val {
+  min-inline-size: 0;
+  color: var(--foreground);
+}
+@media (width < 40rem) {
+  .boot-line {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.125rem;
+  }
+}
+
+
+/* ── PRINT ────────────────────────────────────────────────────────────────────────────────────
+   A copy button copies nothing from paper. A block that scrolls on screen has no scrollbar in
+   print, so whatever sat past its edge would simply be gone: code and commands wrap and lose their
+   height cap. The title prints without its glow, which is a screen's phosphor, not ink.
+   `!important` on the button because its display belongs to the button's own class, which may load
+   after this file. */
+@media print {
+  [data-copy] {
+    display: none !important;
+  }
+  .code-block,
+  .cmd-text {
+    max-block-size: none;
+    overflow: visible;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .page-title {
+    text-shadow: none;
+  }
+}

@@ -144,8 +144,8 @@ async function load(query = "", { width = 1440, height = 900, coarse = false, fo
 }
 // Observers (Intersection, Resize, Mutation) deliver after a frame, not synchronously.
 const frames = (n = 2) => evaluate(`new Promise((ok) => { let i = ${n}; const f = () => (--i ? requestAnimationFrame(f) : setTimeout(ok, 30)); requestAnimationFrame(f); })`);
-const press = async (selector) => {
-  const at = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.scrollIntoView({ block: "center", behavior: "instant" });
+const press = async (selector, { scroll = true } = {}) => {
+  const at = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (${scroll}) el.scrollIntoView({ block: "center", behavior: "instant" });
     const b = el.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
   await frames(1);
   for (const type of ["mousePressed", "mouseReleased"]) {
@@ -247,10 +247,15 @@ await check("…the rail starts under BOTH (--ls-nav-top is the stack's bottom e
 await check("…the page toolbar parks under both", () => near(stack.toolbar.top, stack.top), { toolbar: stack.toolbar.top, top: stack.top });
 await check("…and the table of contents parks under the toolbar, at --sticky-top",
   () => near(stack.sticky, stack.top + stack.toolbar.height, 1) && near(stack.toc.top, stack.sticky), { sticky: stack.sticky, toc: stack.toc.top });
-await press("#banner-dismiss");
+// At the top of the page, and pressed where it stands: no scroll event and no resize can happen,
+// so only the stack's own size change can tell the runtime (scrolled, the browser's scroll
+// anchoring would fire a scroll event and hide a missing observer).
+await load();
+const before = await page(`({ top: parseFloat(T.inline("--ls-nav-top")), header: T.rect("header.bar").bottom })`);
+await press("#banner-dismiss", { scroll: false });
 const dismissed = await page(`({ header: T.rect("header.bar"), top: parseFloat(T.inline("--ls-nav-top")), scrolled: scrollY })`);
 await check("dismissing the banner re-measures with no scroll and no resize: the rail follows the header up",
-  () => near(dismissed.top, dismissed.header.bottom - 1), dismissed);
+  () => dismissed.scrolled === 0 && before.top > dismissed.top + 20 && near(dismissed.top, dismissed.header.bottom - 1), { before, after: dismissed });
 
 /* ═══ 3. the rail: measured chrome, toggles in step ══════════════════════════════════════════════ */
 await load("nobanner");

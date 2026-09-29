@@ -415,44 +415,64 @@ check(`--ico-star-filled is the star with its fill closed (${filled} solid pixel
 
 // Forced colours (Windows High Contrast) swap every author background for Canvas, keeping its
 // alpha, and force text to the palette. So the mark's tint fades to about 1.04:1 on the page, and a
-// mask glyph — which IS a background — paints Canvas on Canvas. Measured as X1 says: in every theme
-// × palette cell, from the PAINTED colours, a glyph reaches 3:1 on what it sits on and text 4.5:1
-// on its ground. "Not Canvas" is not the test: a glyph under `forced-color-adjust: none` keeps its
-// author colour, which is never Canvas and can still be 1.1:1 against the palette.
-// The mark must also BE the palette's Mark. Its text stays readable on the faded tint (the forced
-// text colour on near-white), so contrast alone cannot see that the highlight itself vanished, and
-// in this mode the only colour that is the reader's highlight is the one their palette names.
+// mask glyph — which IS a background — paints Canvas on Canvas. Measured as X1 says: a LIGHT and a
+// DARK forced palette on every theme, contrast rather than "not Canvas", and from PAINTED pixels.
+// Computed colours cannot see what the screen shows: a glyph under `forced-color-adjust: none`
+// keeps its author colour, which is never Canvas, and a Canvas backplate behind text is in no
+// computed style at all.
+//
+// `pixels` screenshots one element's box plus `pad` pixels around it and decodes it in the page:
+// the colour behind it (the clip's corner), how many pixels inside stand out from that by 1.5:1 and
+// the strongest of them, the commonest colour inside and its share, the strongest contrast against
+// THAT colour (text on a fill), and the best-inked row at the box's top edge (a border).
+await evaluate(`Object.assign(window.M, {
+  shot(sel) { const e = document.querySelector(sel); e.scrollIntoView({ block: "center", behavior: "instant" });
+    const r = e.getBoundingClientRect(); return { x: r.x + scrollX, y: r.y + scrollY, w: r.width, h: r.height }; },
+  async pixels(png, pad) { const img = new Image(); img.src = "data:image/png;base64," + png; await img.decode();
+    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d");
+    g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height).data;
+    const at = (i, y) => { const o = (y * c.width + i) * 4; return [d[o], d[o + 1], d[o + 2]]; };
+    const back = at(0, 0), counts = new Map(); let ink = 0, strongest = 1;
+    for (let y = pad; y < c.height - pad; y += 1) for (let i = pad; i < c.width - pad; i += 1) {
+      const px = at(i, y), r = M.ratio(px, back); if (r >= 1.5) ink += 1; if (r > strongest) strongest = r;
+      const k = px.join(","); counts.set(k, (counts.get(k) || 0) + 1); }
+    const [top, n] = [...counts].sort((a, b) => b[1] - a[1])[0], fill = top.split(",").map(Number);
+    let onFill = 1, edge = 0;
+    for (let y = pad; y < c.height - pad; y += 1) for (let i = pad; i < c.width - pad; i += 1) onFill = Math.max(onFill, M.ratio(at(i, y), fill));
+    for (let y = pad - 1; y <= pad + 1; y += 1) { let row = 0;
+      for (let i = pad; i < c.width - pad; i += 1) if (M.ratio(at(i, y), back) >= 3) row += 1;
+      edge = Math.max(edge, row / (c.width - 2 * pad)); }
+    return { back, ink, strongest, fill, share: n / ((c.width - 2 * pad) * (c.height - 2 * pad)), onFill, edge }; },
+}); null`);
+const pixelsOf = async (selector, pad = 3) => {
+  const box = await evaluate(`M.shot(${JSON.stringify(selector)})`);
+  const { data } = await send("Page.captureScreenshot", { format: "png",
+    clip: { x: box.x - pad, y: box.y - pad, width: box.w + 2 * pad, height: box.h + 2 * pad, scale: 1 } });
+  return evaluate(`M.pixels(${JSON.stringify(data)}, ${pad})`);
+};
 const FORCED_GLYPHS = [["the --icon-size glyph", "#ico-md"], ["an icon-list glyph", "#icon-list .demo-ico"], ["the spinner", "#spin"]];
 for (const theme of ["warm", "green", "mono", "paper"]) for (const palette of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { media: "", features: [
     { name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: palette }] });
-  await sleep(50);
-  const cell = await evaluate(`(() => { M.theme(${JSON.stringify(theme)});
-    const sys = (name) => { const p = M.probe(); p.style.cssText = "forced-color-adjust: none; background-color: " + name;
-      const v = getComputedStyle(p).backgroundColor; p.remove(); return v; };
-    const clear = (c) => c === "transparent" || /^rgba\\(.*, 0\\)$/.test(c);
-    // What an element sits on: the nearest ancestor that paints a background, as rgb.
-    const ground = (el) => { let b = el.parentElement; while (b && clear(getComputedStyle(b).backgroundColor)) b = b.parentElement;
-      return M.px(b ? getComputedStyle(b).backgroundColor : "#fff"); };
-    // A colour as it paints over a ground, and its contrast with that ground.
-    const on = (colour, under) => M.ratio(M.px(colour, "rgb(" + under + ")"), under);
-    const mark = document.getElementById("el-mark"), ms = getComputedStyle(mark);
-    return { forced: matchMedia("(forced-colors: active)").matches, mark: ms.backgroundColor, markSys: sys("Mark"),
-      markText: on(ms.color, M.px(ms.backgroundColor, "rgb(" + ground(mark) + ")")),
-      glyphs: ${JSON.stringify(FORCED_GLYPHS)}.map(([name, sel]) => { const el = document.querySelector(sel);
-        return [name, on(getComputedStyle(el).backgroundColor, ground(el))]; }),
-      edges: [["inline <code>", "el-code"], ["<pre>", "el-pre"]].map(([name, id]) => { const el = document.getElementById(id);
-        return [name, getComputedStyle(el).borderTopWidth, on(getComputedStyle(el).borderTopColor, ground(el))]; }) }; })()`);
+  const [forced, markColour] = await evaluate(`(() => { M.theme(${JSON.stringify(theme)});
+    const p = M.probe(); p.style.cssText = "forced-color-adjust: none; background-color: Mark";
+    const v = getComputedStyle(p).backgroundColor; p.remove(); return [matchMedia("(forced-colors: active)").matches, M.px(v)]; })()`);
+  await sleep(100);
   const where = `forced colours, ${theme}, ${palette} palette`;
-  check(`${where}: precondition — the mode is on`, cell.forced);
-  check(`${where}: <mark> is the palette's own Mark, opaque, its text ${r2(cell.markText)}:1 on it`,
-    cell.mark === cell.markSys && cell.markText >= 4.5, `${cell.mark} vs Mark ${cell.markSys}, text ${r2(cell.markText)}:1`);
-  const faint = cell.glyphs.filter(([, ratio]) => !(ratio >= 3));
-  check(`${where}: every glyph the recipe draws reaches 3:1 on what it sits on (${cell.glyphs.map(([, ratio]) => r2(ratio)).join(", ")})`,
-    faint.length === 0, faint.map(([name, ratio]) => `${name} ${r2(ratio)}:1`).join("; "));
-  const lost = cell.edges.filter(([, width, ratio]) => width !== "1px" || !(ratio >= 3));
-  check(`${where}: inline code and the code block keep a 3:1 edge where their fill is gone`,
-    lost.length === 0, lost.map(([name, width, ratio]) => `${name} ${width} ${r2(ratio)}:1`).join("; "));
+  check(`${where}: precondition — the mode is on`, forced);
+  const mark = await pixelsOf("#el-mark");
+  check(`${where}: <mark> paints the palette's own Mark (rgb ${markColour}) over ${Math.round(100 * mark.share)}% of its box, its text ${r2(mark.onFill)}:1 on it`,
+    String(mark.fill) === String(markColour) && mark.share >= 0.5 && mark.onFill >= 4.5,
+    `painted rgb(${mark.fill}) over ${Math.round(100 * mark.share)}%, text ${r2(mark.onFill)}:1`);
+  const glyphs = [];
+  for (const [name, selector] of FORCED_GLYPHS) glyphs.push([name, await pixelsOf(selector)]);
+  const faint = glyphs.filter(([, g]) => !(g.ink > 20 && g.strongest >= 3));
+  check(`${where}: every glyph the recipe draws paints at 3:1 or better on what it sits on (${glyphs.map(([, g]) => r2(g.strongest)).join(", ")})`,
+    faint.length === 0, faint.map(([name, g]) => `${name}: ${g.ink}px, ${r2(g.strongest)}:1 on rgb(${g.back})`).join("; "));
+  const edges = [["inline <code>", "#el-code"], ["the <pre> block", "#el-pre"]];
+  const lost = [];
+  for (const [name, selector] of edges) { const e = await pixelsOf(selector); if (e.edge < 0.9) lost.push(`${name}: top edge ${Math.round(100 * e.edge)}% at 3:1`); }
+  check(`${where}: inline code and the code block keep a painted 3:1 edge where their fill is gone`, lost.length === 0, lost.join("; "));
 }
 await send("Emulation.setEmulatedMedia", { media: "", features: [] });
 await evaluate('M.theme("warm"); null');

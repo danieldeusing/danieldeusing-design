@@ -613,30 +613,50 @@ await check("every icon the demo names is in I1's set (X6)", () => evaluate(`
   [...new Set([...document.querySelectorAll("[data-icon]")].map((el) => el.dataset.icon))]
     .filter((name) => !${JSON.stringify(I1)}.includes(name)).map((name) => "data-icon=\\"" + name + "\\" is not in I1")`));
 
-/* The lead's rulings on live roles, for a notice and a loading row alike: role="alert" only for warning and
-   destructive. Everything else is a status, carried by the element itself only when it is in the page
-   from the first render, and otherwise by a role="status" region that was there first, the element
-   carrying none: a status inside a status is two live regions for one message. A --lg notice is a
-   RESULT, which arrives after an action by definition, so it always goes into a region. */
-const ROLES = String.raw`((root) => [...root.querySelectorAll(".notice, .loading")].flatMap((n) => {
-  const role = n.getAttribute("role"), region = n.parentElement && n.parentElement.closest("[role='status']");
-  const loud = n.matches(".notice") && ["warning", "destructive"].includes(n.dataset.tone);
-  const what = (n.matches(".loading") ? "loading row" : (n.dataset.tone || "untoned") + (n.matches(".notice--lg") ? " --lg" : "") + " notice") +
+/* The lead's rulings on live roles, for a notice and a loading row alike:
+   - NO LIVE ROLE INSIDE ANY LIVE REGION, status or alert: two live regions for one message, and the
+     polite one can swallow the urgent one. This goes for every element with a live role on the page.
+   - role="alert" only for warning and destructive, on the element itself, so a failed result is
+     mounted BESIDE its status slot, never inside it.
+   - Everything else is a status: carried by the element itself only when it is in the page from the
+     first render, and otherwise by a role="status" region that was there first.
+   - A --lg notice is a RESULT, which arrives after an action by definition, so a status one always goes
+     into a region. */
+const ROLES = String.raw`((root) => {
+  const live = "[role='status'], [role='alert']";
+  const name = (n) => (n.matches(".loading") ? "loading row" : n.matches(".notice") ? (n.dataset.tone || "untoned") +
+    (n.matches(".notice--lg") ? " --lg" : "") + " notice" : n.tagName.toLowerCase() + "." + [...n.classList].join(".")) +
     " '" + n.textContent.trim().replace(/\s+/g, " ").slice(0, 40) + "'";
-  if (loud) return role === "alert" ? [] : [what + " has role=" + role + ", wants alert"];
-  if (region) return role ? [what + " carries role=" + role + " inside a status region, which already carries it"] : [];
-  if (n.matches(".notice--lg")) return [what + " is a result: it goes into a role=status region already in the page"];
-  return role === "status" ? [] : [what + " has role=" + role + " and no status region around it"];
-}))`;
-await check("demo: alert only for warning and destructive; a status on the element itself or on the region it sits in, never both", () =>
+  const nested = [...root.querySelectorAll(live)].filter((n) => n.parentElement && n.parentElement.closest(live)).map((n) =>
+    name(n) + " carries role=" + n.getAttribute("role") + " inside a role=" + n.parentElement.closest(live).getAttribute("role") +
+    " region: no live role sits inside a live region");
+  const own = [...root.querySelectorAll(".notice, .loading")].flatMap((n) => {
+    const role = n.getAttribute("role"), region = n.parentElement && n.parentElement.closest(live);
+    const loud = n.matches(".notice") && ["warning", "destructive"].includes(n.dataset.tone);
+    if (role && region) return []; // reported above
+    if (loud) return role === "alert" ? [] : [name(n) + " has role=" + role + ", wants alert on itself, beside any status slot"];
+    if (region) return region.getAttribute("role") === "status" ? [] : [name(n) + " sits in a role=alert region: a status goes into a status region"];
+    if (n.matches(".notice--lg")) return [name(n) + " is a result: it goes into a role=status region already in the page"];
+    return role === "status" ? [] : [name(n) + " has role=" + role + " and no status region around it"];
+  });
+  return [...nested, ...own];
+})`;
+await check("demo: no live role inside a live region; alert only for warning and destructive; a status on the element or on its region", () =>
   evaluate(`${ROLES}(document)`));
-await check("feedback.md's examples follow the same rule, and its frozen banner is a status (S4)", () => evaluate(`(async () => {
+/* The reference is what gets copied, so it answers to the same rule — and it must SHOW the one placement
+   that is easiest to get wrong: a failed result beside its status slot. The frozen banner is found by
+   its word "frozen": S4 names that one example, and markup cannot say whether a banner is an alarm or
+   information, so this is a pin on the example, accepted as a documented limit (WP7 review, round 3). */
+await check("feedback.md's examples follow the same rule, show a failed result beside its slot, and keep the frozen banner a status (S4)", () => evaluate(`(async () => {
   const md = await (await fetch("/.claude/skills/danieldeusing-design/references/feedback.md")).text();
   const blocks = [...md.matchAll(/\x60\x60\x60html\\n([\\s\\S]*?)\x60\x60\x60/g)].map((m) => m[1]);
   const docs = blocks.map((html) => new DOMParser().parseFromString(html, "text/html"));
   const problems = docs.flatMap((doc) => ${ROLES}(doc));
   for (const b of docs.flatMap((doc) => [...doc.querySelectorAll(".banner")]))
     if (/frozen/.test(b.textContent) && b.getAttribute("role") !== "status") problems.push("the frozen banner has role=" + b.getAttribute("role") + ", wants status");
+  const failedResult = docs.some((doc) => [...doc.querySelectorAll(".notice--lg[role='alert']")]
+    .some((n) => !n.parentElement.closest("[role='status'], [role='alert']")));
+  if (!failedResult) problems.push("no failed result (a --lg notice with role=alert) is shown beside its status slot");
   const seen = docs.reduce((n, doc) => n + doc.querySelectorAll(".notice, .loading").length, 0);
   return seen ? problems : ["read " + blocks.length + " html examples and found no notice or loading row in them: the check measured nothing"];
 })()`));
@@ -877,14 +897,18 @@ const measure = async (sel, kind) => { if (kind === "ring") await tabTo(sel); re
    none with it taken away (hidden, its word made transparent, or its focus removed). A clip that lands
    on a neighbour's ink fails here instead of passing everywhere below. */
 const HIDE = { glyph: "el.style.visibility = 'hidden'", text: "el.style.color = 'transparent'", ring: "el.blur()" };
-const owned = async () => {
+/* Under forced colours the page paints ink it did not paint before (a forced border, a Highlight ring),
+   so ownership is proven there too, on each palette: whatever ink the clip holds must go when the
+   element goes. Whether there IS ink is the painted check's question in that mode, not this one's. */
+const owned = (needInk) => async () => {
   const problems = [];
   for (const [sel, kind] of PAINTED) {
     const on = await measure(sel, kind);
     await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); ${HIDE[kind]}; })(); null`);
     const off = await shoot(sel, kind);
     await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.style.visibility = ""; el.style.color = ""; })(); null`);
-    if (!(on >= 1.5 && off < 1.2)) problems.push(`${sel} (${kind}): ${on.toFixed(2)}:1 with it, ${off.toFixed(2)}:1 without it — the clip is not reading this ${kind}`);
+    if (!(off < 1.2)) problems.push(`${sel} (${kind}): ${off.toFixed(2)}:1 with it taken away — the ink in this clip is not this ${kind}'s`);
+    else if (needInk && !(on >= 1.5)) problems.push(`${sel} (${kind}): ${on.toFixed(2)}:1 with it there — the clip holds none of its ink`);
   }
   return problems;
 };
@@ -915,7 +939,7 @@ const FORCED = String.raw`(() => {
    sits with (its host's, or its parent's for a glyph that is an element), on both palettes. */
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
 await evaluate(`document.documentElement.classList.add("anim-off"); null`);
-await check("X1 painted: every clip reads its own element (ink with it, none without it), before any forced ratio is trusted", owned);
+await check("X1 painted: every clip reads its own element (ink with it, none without it), before any forced ratio is trusted", owned(true));
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   await sleep(100);
@@ -937,6 +961,7 @@ for (const scheme of ["light", "dark"]) {
       return va === vb ? [what + ": both " + va] : [];
     });
   })()`));
+  await check(`X1 forced colours, ${scheme} palette: whatever ink each clip holds is its element's (none with it taken away)`, owned(false));
   // Every theme: a forced palette overrides the glyphs and the words, but a ring under `none` keeps
   // the THEME's --ring, which is dark on warm and paper and light on green and mono.
   for (const theme of THEMES) {

@@ -111,6 +111,10 @@ learned to keep them apart first (C56), and configr's catalog filter had to lear
     <div><p>you are on the latest version.</p><p class="text-muted-foreground">version 0.60.0</p></div>
   </div>
 </div>
+<!-- a FAILED result is an alert: it is mounted BESIDE the slot, with its words, never inside it -->
+<div class="notice notice--lg" data-tone="warning" data-icon="triangle-alert" role="alert">
+  <div><p>the update could not be downloaded.</p><p class="text-muted-foreground">github answered 502.</p></div>
+</div>
 ```
 
 **The label is the meaning; the colour only speeds the scan.** Write a lower-case word and a colon,
@@ -134,13 +138,15 @@ would only repeat the colour. No `data-tone` is a neutral notice.
     and put the notice into it when there is something to say. The region carries the role; the
     notice inside it carries none. A notice that is in the page from the first render may carry
     `role="status"` itself, since there is nothing to announce yet.
+  - **No live role ever sits inside a live region**, status or alert, so a failed result is mounted
+    beside the status slot, never inside it.
 - **One dismiss, the bare ×, named "dismiss".** `.notice-dismiss` only places it (end of the first
   line). The button itself is `.btn-icon.btn-icon--bare.btn-icon--sm` from controls.css. configr had
   three spellings of this one act; there is one now.
-- `--lg` is a **result**, not a remark: the "update finished / update failed" block of a dialog. A
-  result arrives after an action, so a status `--lg` always goes into the dialog's status region, never
-  carries the role itself.
-  It has more room and a leading `data-icon` glyph at the display size, in the tone.
+- `--lg` is a **result**, not a remark: the "update finished / update failed" block of a dialog. It
+  has more room and a leading `data-icon` glyph at the display size, in the tone. A result arrives
+  after an action: a finished one goes INTO the dialog's status slot and carries no role itself; a
+  failed one is an alert, mounted beside the slot.
 - **The tint is 6% of the tone mixed into `--background`.** Do not raise it and do not change it to
   sit over `transparent`. Over `transparent` the box takes on the colour of whatever surface it sits
   on, and on warm's `--muted` the neutral label then measures 4.34:1. Mixed into the page colour it

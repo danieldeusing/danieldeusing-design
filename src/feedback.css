@@ -315,8 +315,11 @@ p.state { display: flex; white-space: normal; }
    THE ANIMATION IS DECORATION, NEVER THE MESSAGE. `html.anim-off` (tokens.css) and reduced motion
    stop the turn and the glyph stays, so what is left is an arc beside "loading skills…" — which
    still says everything. A spinner without words says nothing to a screen reader and nothing to a
-   reader whose motion is off, so `.loading` is the row it lives in: `role="status"` with the words,
-   and the region being filled carries `aria-busy="true"` until it settles. */
+   reader whose motion is off, so `.loading` is the row it lives in, a status with the words. Its
+   role follows the notice's rule (the lead's ruling): a row in the page from the first render may
+   carry `role="status"` itself; one mounted later goes into a `role="status"` region the page
+   already has and carries none. The region being FILLED carries `aria-busy="true"` until it
+   settles (references/feedback.md). */
 .spinner {
   display: inline-block;
   flex: none;

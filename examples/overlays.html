@@ -102,25 +102,46 @@
         background-position: calc(100% - 2px) 50%;
       }
       .switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+      /* forced colours, as wp5-controls 7720f24 ships them: the glyph opts out and paints the system
+         colour its button is given */
+      @media (forced-colors: active) {
+        .btn-icon:is([data-icon], [aria-busy="true"])::before { forced-color-adjust: none; }
+        .btn-icon { color: ButtonText; }
+        .btn-icon:is(:disabled, [aria-disabled="true"]):not([aria-busy="true"]) { color: GrayText; border-color: GrayText; }
+      }
     </style>
-    <!-- WP2 · M0 one popup look (the rows of a .select-panel), C1 --danger -->
+    <!-- WP2 · M0 one popup look (the rows of a .select-panel), C1 --danger — the selectors and the
+         forced-colours rules as wp2-components 14ba3ca ships them, so the context menu's own rules are
+         measured against the weights they will actually meet -->
     <style id="standin-wp2" media="not all">
-      .select-panel { box-sizing: border-box; margin: 0; padding: 0.25rem 0; list-style: none; color: var(--popover-foreground); background: var(--popover); border: 1px solid var(--control-edge); box-shadow: var(--elev-float); overflow-y: auto; }
-      .select-panel .dropdown-item {
+      .select-panel {
+        box-sizing: border-box; margin: 0; padding: 0.25rem 0; list-style: none; font-size: var(--fs-base);
+        line-height: var(--lh-tight); color: var(--popover-foreground); background: var(--popover);
+        border: 1px solid var(--control-edge); box-shadow: var(--elev-float); overflow-y: auto; overscroll-behavior: contain;
+      }
+      .select-panel { z-index: 60; }
+      .dropdown-item {
         display: flex; align-items: center; gap: 0.5rem; inline-size: 100%; box-sizing: border-box;
-        padding: 0.3rem 0.9rem 0.3rem 0.5rem; font: inherit; line-height: var(--lh-tight); text-align: start;
+        padding: 0.3rem 0.9rem 0.3rem 0.5rem; font: inherit; text-align: start; text-decoration: none;
         color: var(--popover-foreground); background: none; border: 0; white-space: nowrap; cursor: pointer;
       }
+      .dropdown-item:hover, .dropdown-item:focus-visible, .dropdown-item[data-active="true"], .dropdown-item[data-highlighted] { background: var(--muted); }
+      .dropdown-item:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
       .select-panel .dropdown-item::before { content: ""; flex: none; inline-size: var(--icon-sm); block-size: var(--icon-sm); }
-      .select-panel .dropdown-item:hover, .select-panel .dropdown-item:focus-visible { background: var(--muted); }
-      .select-panel .dropdown-item:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-      .select-panel .dropdown-item--danger { color: var(--destructive); }
-      .select-panel .dropdown-item[aria-disabled="true"] { cursor: default; }
-      .select-panel .dropdown-item[aria-disabled="true"]:hover { background: none; }
-      .dropdown-sep { block-size: 1px; margin: 0.25rem 0; background: var(--border); }
-      .dropdown-label { padding: 0.35rem 0.9rem 0.15rem 0.5rem; color: var(--muted-foreground); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+      :is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled) { color: color-mix(in srgb, var(--popover-foreground) 65%, var(--popover)); cursor: default; }
+      :is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled):hover { background: none; }
+      .dropdown-item--danger { color: var(--destructive); }
+      .dropdown-sep { block-size: 1px; margin: 0.25rem 0; padding: 0; background: var(--border); }
+      .dropdown-label { padding: 0.35rem 0.9rem 0.15rem 0.5rem; color: var(--muted-foreground); font-size: var(--fs-base); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
       .btn-terminal--danger { color: var(--destructive); border-color: color-mix(in srgb, var(--destructive) 60%, var(--border)); }
       .btn-terminal--danger:hover { border-color: currentColor; background: color-mix(in srgb, currentColor 10%, transparent); }
+      @media (forced-colors: active) {
+        .dropdown-item { color: CanvasText; }
+        .dropdown-item:is(:hover, :focus-visible, [data-active="true"], [data-highlighted]) {
+          forced-color-adjust: none; background: Highlight; color: HighlightText; outline-color: HighlightText;
+        }
+        :is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled) { background: none; color: GrayText; }
+      }
     </style>
     <!-- WP6 · M4 .search-field and .match-count, in the drawer's toolbar -->
     <style id="standin-wp6" media="not all">
@@ -265,7 +286,11 @@
           css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
             " vertical-align: -0.125em; background: var(--tone, currentColor);" +
             " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
-            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }";
+            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }" +
+            // forced colours as wp4-icons a2cdd25 ships them: the glyph takes its parent's forced colour
+            "@media (forced-colors: active) { .ico, .ico[data-tone] { forced-color-adjust: none; background: CanvasText; }" +
+            " @supports (forced-color-adjust: preserve-parent-color) { .ico, .ico[data-tone] {" +
+            " forced-color-adjust: preserve-parent-color; background: currentColor; } } }";
           glyphs.push(".ico");
         }
         if (css) {

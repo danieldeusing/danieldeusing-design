@@ -111,11 +111,10 @@ function onCancel(event) {
 
 /*
  * ESCAPE ON AN ALERT (or a committing dialog), CANCELLED AT THE KEY. Measured on HeadlessChrome 151:
- * an alert whose `cancel`
- * is prevented survives the FIRST Escape (`cancel`, cancelable) and closes on the SECOND — the
- * close-watcher rule makes a cancel cancelable only once per user activation, and Escape is not
- * an activation. A cancelled `keydown` raises no close request at all, so the alert holds on the
- * third press as on the first.
+ * an alert whose `cancel` is prevented survives the FIRST Escape (`cancel`, cancelable) and closes
+ * on the SECOND — the close-watcher rule makes a cancel cancelable only once per user activation,
+ * and Escape is not an activation. A cancelled `keydown` raises no close request at all, so the
+ * alert holds on the third press as on the first.
  *
  * On `window`, in the BUBBLE phase, and only if nobody took the key first: window's listeners run
  * after every document-level one, so a menu or a listbox open inside the alert still gets its own

@@ -13,15 +13,17 @@
  * backdrop, Shift+F10) are exactly what a synthetic call skips.
  *
  * WHAT IT COVERS, in order:
- *   · the dialog's box, parts, sizes, phone rule, drawer, print, `hidden` and forced colours;
+ *   · the dialog's box, parts, sizes, phone rule, drawer, print and `hidden`;
+ *   · forced colours on BOTH palettes and all four themes: every glyph the overlays show stands 3:1
+ *     and every text 4.5:1 off what it is painted on — contrast, never "not the Canvas colour";
  *   · dialog.js: focus in and back, Tab stays inside, Escape, the backdrop, the answer
  *     (`returnValue`, reset on every open), a stack of two, [autofocus], naming, the alert, and a
  *     committing footer that nothing may dismiss;
  *   · the tooltip: the panel, the top layer, Escape, suppression, and a tip that repeats the name;
  *   · the context menu's keyboard, placement, width and outside press;
  *   · the zoom view: a named opener, a modal view, keys, a pan that does not close it, a canvas;
- *   · the files on a TOKENS-ONLY page (`?bare`): the same box, and the focus ring can only come
- *     from this package's own rule there (a check that base.css could satisfy proves nothing);
+ *   · the files on a TOKENS-ONLY page (`?bare`): the same box and the same face as with every
+ *     stylesheet loaded, and their own face on a host page whose body says otherwise;
  *   · the dialog footer against controls.css loaded AFTER overlays.css;
  *   · contrast for every new pairing, four themes x three surfaces.
  *
@@ -40,6 +42,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateSync } from "node:zlib";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHROME = process.env.DD_CHROME
@@ -213,6 +216,67 @@ const withForced = async (selector, states, expression) => {
   await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: states });
   try { return await evaluate(expression); } finally { await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: [] }); }
 };
+/* The same, held while `body` runs — a screenshot of the forced state has to be taken inside it. */
+const whileForced = async (selector, states, body) => {
+  const { root: doc } = await send("DOM.getDocument", { depth: 0 });
+  const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector });
+  if (!nodeId) throw new Error(`no node to force ${states} on: ${selector}`);
+  await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: states });
+  try { return await body(); } finally { await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: [] }); }
+};
+
+/*
+ * PAINTED PIXELS. Forced colours are applied when the page is PAINTED, and two of their effects never
+ * reach getComputedStyle: the Canvas backplate the mode lays behind text, and the author colour an
+ * opted-out glyph inherits. So the X1 pass reads what reached the screen: a viewport screenshot,
+ * decoded here (8-bit RGB/RGBA, not interlaced — what Page.captureScreenshot writes), cropped to a box
+ * in CSS px. In the crop the most frequent colour is what the thing is painted ON, and the INK is the
+ * pixel that stands furthest off it; the ratio between the two is the contrast a reader gets. That is
+ * also what a backplate cannot hide from: a slab behind a word becomes the dominant colour, and the
+ * word is measured against the slab it is actually on.
+ */
+const decodePng = (png) => {
+  let pos = 8, width = 0, height = 0, bpp = 4;
+  const idat = [];
+  while (pos < png.length) {
+    const length = png.readUInt32BE(pos), type = png.toString("ascii", pos + 4, pos + 8), data = png.subarray(pos + 8, pos + 8 + length);
+    if (type === "IHDR") { width = data.readUInt32BE(0); height = data.readUInt32BE(4); bpp = data[9] === 6 ? 4 : 3; }
+    if (type === "IDAT") idat.push(data);
+    pos += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(idat)), stride = width * bpp, px = Buffer.alloc(height * stride);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)], line = y * (stride + 1) + 1;
+    for (let x = 0; x < stride; x += 1) {
+      const a = x >= bpp ? px[y * stride + x - bpp] : 0, b = y ? px[(y - 1) * stride + x] : 0;
+      const c = x >= bpp && y ? px[(y - 1) * stride + x - bpp] : 0, p = a + b - c;
+      const paeth = Math.abs(p - a) <= Math.abs(p - b) && Math.abs(p - a) <= Math.abs(p - c) ? a : Math.abs(p - b) <= Math.abs(p - c) ? b : c;
+      px[y * stride + x] = (raw[line + x] + [0, a, b, (a + b) >> 1, paeth][filter]) & 255;
+    }
+  }
+  return { width, height, bpp, px };
+};
+const DPR = 2; // the X1 pass renders at 2x, so a 1px stroke has pixels it covers fully
+const luminance = (rgb) => rgb.map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+  .reduce((sum, v, k) => sum + v * [0.2126, 0.7152, 0.0722][k], 0);
+const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const inkIn = ({ width, bpp, px }, box) => {
+  const counts = new Map();
+  for (let y = Math.ceil(box.y * DPR); y < Math.floor((box.y + box.h) * DPR); y += 1) {
+    for (let x = Math.ceil(box.x * DPR); x < Math.floor((box.x + box.w) * DPR); x += 1) {
+      const i = (y * width + x) * bpp, key = (px[i] << 16) | (px[i + 1] << 8) | px[i + 2];
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+  if (!counts.size) throw new Error(`an empty crop: ${JSON.stringify(box)}`);
+  const rgb = (key) => [(key >> 16) & 255, (key >> 8) & 255, key & 255];
+  const on = rgb([...counts].sort((p, q) => q[1] - p[1])[0][0]);
+  let ink = on, ratio = 1;
+  for (const key of counts.keys()) { const r = contrast(rgb(key), on); if (r > ratio) { ratio = r; ink = rgb(key); } }
+  return { ratio: Math.round(ratio * 100) / 100, ink: ink.join(","), on: on.join(",") };
+};
+const screenshot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
+
 const axOf = async (selector) => {
   const { root: doc } = await send("DOM.getDocument", { depth: 0 });
   const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector });
@@ -259,7 +323,14 @@ window.__o = (() => {
   const active = () => { const a = document.activeElement; return a ? (a.dataset?.t || a.id || (a.textContent || "").trim().slice(0, 40) || a.tagName) : null; };
   const open = () => [...document.querySelectorAll("dialog[open]")].map((d) => d.dataset.t || d.id || d.className);
   const closeAll = () => { document.querySelector(".context-menu")?.remove(); document.querySelectorAll("dialog[open]").forEach((d) => d.close()); };
-  return { $, el, cs, rect, parse, over, ratio, resolve, same, tip, tipShown, menu, active, open, closeAll };
+  // Viewport boxes in CSS px for a crop: a control's box inside its border (where only its glyph is
+  // drawn), and the box of an element's own text (where a backplate would sit).
+  const inner = (x) => { const n = el(x), b = n.getBoundingClientRect(), s = getComputedStyle(n), w = (p) => parseFloat(s.getPropertyValue(p));
+    return { x: b.left + w("border-left-width"), y: b.top + w("border-top-width"),
+      w: b.width - w("border-left-width") - w("border-right-width"), h: b.height - w("border-top-width") - w("border-bottom-width") }; };
+  const textBox = (x) => { const range = document.createRange(); range.selectNodeContents(el(x)); const b = range.getBoundingClientRect();
+    return { x: b.left, y: b.top, w: b.width, h: b.height }; };
+  return { $, el, cs, rect, parse, over, ratio, resolve, same, tip, tipShown, menu, active, open, closeAll, inner, textBox };
 })();
 null`;
 
@@ -272,7 +343,7 @@ const load = async (query = "") => {
   await evaluate(HELPERS);
   // base.css scrolls smoothly; a gesture aimed at a rect measured mid-scroll lands somewhere else.
   // And a colour read mid-transition is the colour it is leaving: html.anim-off (F6) stops every
-  // transition, so a state is read at its end. (The hint's .15s colour change read as "no hover".)
+  // transition, so a state is read at its end. (A .15s colour change once read as "no hover".)
   await evaluate("document.documentElement.style.scrollBehavior = 'auto'; document.documentElement.classList.add('anim-off'); null");
 };
 const reset = async () => {
@@ -446,12 +517,13 @@ try {
   const printed = await evaluate(`(() => {
     const d = __o.$("dlg-default"); d.showModal();
     const menu = document.createElement("ul"); menu.className = "select-panel context-menu"; document.body.append(menu);
-    const out = { dialog: getComputedStyle(d).display, menu: getComputedStyle(menu).display, hint: __o.cs("dgm-background", "::after").display,
+    const view = document.createElement("dialog"); view.className = "dgm-overlay"; document.body.append(view); view.showModal();
+    const out = { dialog: getComputedStyle(d).display, menu: getComputedStyle(menu).display, view: getComputedStyle(view).display,
       tip: getComputedStyle(__o.tip()).display };
-    menu.remove(); d.close(); return out; })()`);
+    view.close(); view.remove(); menu.remove(); d.close(); return out; })()`);
   await send("Emulation.setEmulatedMedia", { media: "" });
-  await check("print: the page prints, not what floats over it (dialog, context menu, tip, zoom hint)",
-    printed.dialog === "none" && printed.menu === "none" && printed.hint === "none" && printed.tip === "none", printed);
+  await check("print: the page prints, not what floats over it (dialog, context menu, zoom view, tip)",
+    printed.dialog === "none" && printed.menu === "none" && printed.view === "none" && printed.tip === "none", printed);
 
   /* ── hidden (X3) ── */
   section("hidden — every class here that sets display still hides (tokens.css answers it, X3)");
@@ -468,20 +540,78 @@ try {
   await check("hidden hides .dialog-head, -toolbar, -body, -foot, an open dialog, a form in it, a context menu",
     Object.values(hidden).every((v) => v === "none") && Object.keys(hidden).length === 7, hidden);
 
-  /* ── forced colours (X1) ── */
-  section("forced colours — the zoom hint is a mask, and a mask is a background (X1)");
-  await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }] });
-  await sleep(100);
-  await check("the emulation is in force (a check under no forcing would pass by default)",
-    () => evaluate(`matchMedia("(forced-colors: active)").matches`));
-  const forced = await evaluate(`(() => {
-    const canvas = document.createElement("i"); canvas.style.cssText = "forced-color-adjust: none; background-color: Canvas"; document.body.append(canvas);
-    const c = getComputedStyle(canvas).backgroundColor; canvas.remove();
-    return { canvas: c, hint: __o.cs("dgm-background", "::after").backgroundColor }; })()`);
-  const forcedHover = await withForced('[data-t="dgm-background"]', ["hover"], `__o.cs("dgm-background", "::after").backgroundColor`);
+  /* ── forced colours (X1) ──────────────────────────────────────────────────────────────────────
+     Windows High Contrast and every forced palette paint each background Canvas and lay a Canvas
+     backplate behind text. A glyph is a mask over a background, so it shows only when it is opted
+     out of the forcing — and an opted-out glyph paints whatever colour it INHERITS, which is the
+     author's unless its host was handed a system colour. Whether that shows depends on the palette
+     and the theme (a dark ink vanishes on a dark palette's black Canvas, a light one on white), so
+     this runs on a LIGHT and a DARK forced palette and all four themes, and it reads PAINTED PIXELS:
+     a computed-colour check reads 21:1 for a word its backplate has hidden.
+     This package draws none of these glyphs — the icon button's is controls.css's, .ico is
+     icons.css's. What it can get wrong is handing them an author colour (hence the X's ink is a
+     custom property, never `color`) and the one row whose colour it sets, the stated row. */
+  section("forced colours — painted pixels on a light and a dark forced palette, four themes (X1)");
+  const FORCED_THEMES = ["warm", "green", "mono", "paper"];
+  const forcedCells = new Map(); // measurement -> { floor, cells: { "light/warm": {ratio, ink, on} } }
+  const record = (name, floor, cell, m) => {
+    const entry = forcedCells.get(name) || { floor, cells: {} };
+    entry.cells[cell] = m;
+    forcedCells.set(name, entry);
+  };
+  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: DPR, mobile: false });
+  for (const scheme of ["light", "dark"]) {
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
+    await sleep(100);
+    await check(`forced colours really are on, ${scheme} palette (a check under no forcing would pass by default)`,
+      () => evaluate(`matchMedia("(forced-colors: active)").matches && matchMedia("(prefers-color-scheme: ${scheme})").matches`));
+    for (const theme of FORCED_THEMES) {
+      const cell = `${scheme}/${theme}`;
+      await reset();
+      await evaluate(`document.documentElement.dataset.theme = "${theme}"; null`);
+      for (const [name, dlg, t] of [["the X", "dlg-default", "default-x"], ["the back arrow", "dlg-rich", "rich-back"], ["the alert glyph", "dlg-alert", "alert-glyph"]]) {
+        const box = await evaluate(`(() => { const d = __o.$("${dlg}"); d.showModal(); document.activeElement?.blur?.(); return __o.inner("${t}"); })()`);
+        await sleep(40);
+        record(`${name} (glyph)`, 3, cell, inkIn(await screenshot(), box));
+        await evaluate(`__o.$("${dlg}").close(); null`);
+      }
+      await reset();
+      await centre("row-app");
+      await evaluate(`${T("row-app")}.focus(); null`);
+      await key("F10", { shift: true });
+      const boxes = await evaluate(`(() => { const m = __o.menu(); return { stated: __o.textBox(m.querySelector('[aria-disabled="true"]')),
+        plain: __o.textBox(m.querySelectorAll(".dropdown-item")[1]), lit: __o.textBox(document.activeElement) }; })()`);
+      await sleep(40);
+      const menuShot = await screenshot();
+      record("a context-menu row under the keys (text on its highlight)", 4.5, cell, inkIn(menuShot, boxes.lit));
+      record("the stated row at rest (text)", 4.5, cell, inkIn(menuShot, boxes.stated));
+      record("an action row at rest (text) — the stated row's pair", 4.5, cell, inkIn(menuShot, boxes.plain));
+      await whileForced('.context-menu [aria-disabled="true"]', ["focus-visible"], async () => {
+        await sleep(40);
+        record("the stated row under the keys (text)", 4.5, cell, inkIn(await screenshot(), boxes.stated));
+      });
+      await key("Escape");
+    }
+  }
   await send("Emulation.setEmulatedMedia", { features: [] });
-  await check("forced colours: the hint is not painted in Canvas (it would vanish)", forced.hint !== forced.canvas && forced.hint !== "rgba(0, 0, 0, 0)", forced);
-  await check("forced colours: hover still differs from rest", forcedHover !== forced.hint, { rest: forced.hint, hover: forcedHover });
+  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  await evaluate(`document.documentElement.dataset.theme = "warm"; null`);
+  await reset();
+  for (const [name, { floor, cells }] of forcedCells) {
+    const low = Object.entries(cells).filter(([, m]) => m.ratio < floor).map(([c, m]) => `${c} ${m.ratio} (ink ${m.ink} on ${m.on})`);
+    await check(`forced colours, both palettes x four themes: ${name} reaches ${floor}:1 on what it is painted on`, low.length === 0, low.join("; "));
+  }
+  const statedInk = forcedCells.get("the stated row at rest (text)")?.cells ?? {};
+  const actionInk = forcedCells.get("an action row at rest (text) — the stated row's pair")?.cells ?? {};
+  const alike = Object.keys(statedInk).filter((c) => statedInk[c].ink === actionInk[c]?.ink);
+  await check("forced colours: the stated row still reads differently from an action (its own ink, GrayText), in every cell",
+    Object.keys(statedInk).length === 8 && alike.length === 0, alike.map((c) => `${c}: both ${statedInk[c].ink}`).join("; "));
+  console.log("\n| painted under forced colours — contrast on what it sits on | floor | light: warm / green / mono / paper | dark: warm / green / mono / paper |\n|---|---:|---|---|");
+  for (const [name, { floor, cells }] of forcedCells) {
+    const row = (scheme) => FORCED_THEMES.map((t) => cells[`${scheme}/${t}`]?.ratio.toFixed(2) ?? "—").join(" / ");
+    console.log(`| ${name} | ${floor} | ${row("light")} | ${row("dark")} |`);
+  }
+  console.log("");
 
   /* ── the dialog runtime ────────────────────────────────────────────────────────────────────── */
   section("dialog.js — focus, Tab, Escape, the answer");
@@ -818,12 +948,6 @@ try {
     return [n.getAttribute("role"), n.tabIndex, n.classList.contains("dgm-zoomable"), n.getAttribute("aria-label")].join("|"); })`);
   await check("every opener is a button named by what it opens",
     openers.join(" ; ") === "button|0|true|zoom diagram ; button|0|true|zoom: network map ; button|0|true|zoom diagram", openers);
-  const hint = await evaluate(`(() => { const s = __o.cs("dgm-background", "::after");
-    return { w: s.width, h: s.height, mask: /M15 3h6v6/.test(decodeURIComponent(s.maskImage || s.webkitMaskImage)), ink: __o.same(s.backgroundColor, __o.resolve("var(--muted-foreground)")), opacity: s.opacity }; })()`);
-  await check("the hint is the maximize-2 mask at --icon-sm, --muted-foreground at full strength",
-    hint.w === "12px" && hint.h === "12px" && hint.mask && hint.ink && hint.opacity === "1", hint);
-  await check("...and --primary under the pointer",
-    () => withForced('[data-t="dgm-background"]', ["hover"], `__o.same(__o.cs("dgm-background", "::after").backgroundColor, __o.resolve("var(--primary)"))`));
   await centre("dgm-figure");
   await evaluate(`${T("dgm-figure")}.focus(); null`);
   await key("Enter");
@@ -875,7 +999,7 @@ try {
   await key("Escape");
 
   /* ── a tokens-only page ────────────────────────────────────────────────────────────────────── */
-  section("tokens + overlays.css + tooltip.css alone (?bare): the same box, and rings only from here (X2)");
+  section("tokens + overlays.css + tooltip.css alone (?bare): the same box and face as with everything loaded (X2)");
   const snapshot = `(async () => {
     const pick = (s, props) => props.map((p) => p + "=" + s.getPropertyValue(p)).join("; ");
     const out = {};
@@ -913,12 +1037,6 @@ try {
     ownFont.dialog && ownFont.title && ownFont.tip, ownFont);
   await check("the page really is bare (no base.css, no components.css)",
     () => evaluate(`![...document.styleSheets].some((s) => /\\/(base|components|chrome)\\.css$/.test(s.href || ""))`));
-  await evaluate(`${T("dgm-background")}.focus(); null`);
-  await key("Tab", { shift: true });
-  await key("Tab");
-  const ring = await evaluate(`(() => { const s = __o.cs("dgm-background"); return { focus: document.activeElement === __o.$("dgm-background"),
-    ring: s.outlineStyle + " " + s.outlineWidth + " " + s.outlineOffset, colour: __o.same(s.outlineColor, __o.resolve("var(--ring)")) }; })()`);
-  await check("the zoom opener's focus ring is 2px --ring, offset 2px — from overlays.css alone", ring.focus && ring.ring === "solid 2px 2px" && ring.colour, ring);
 
   /* ── the footer against controls.css loaded AFTER overlays.css ── */
   section("the dialog footer against controls.css loaded after overlays.css");
@@ -956,9 +1074,6 @@ try {
       ["text", "tooltip aside and key column: --muted-foreground on --popover", flat(r(tok("--muted-foreground"), popover))],
       ["edge", "tooltip and context-menu edge against the page", each((s) => ratio(over(edge, popover), s))],
       ["text", "context-menu stated row: --muted-foreground on --popover", flat(r(tok("--muted-foreground"), popover))],
-      ["edge", "zoom hint at rest: --muted-foreground on the page", each((s) => ratio(tok("--muted-foreground"), s))],
-      ["edge", "zoom hint on hover / focus: --primary on the page", each((s) => ratio(tok("--primary"), s))],
-      ["edge", "zoom opener focus ring: --ring on the page", each((s) => ratio(tok("--ring"), s))],
       ["info", "(its --card fill alone against the scrimmed page)", each((s) => ratio(card, over(backdrop, s)))],
     ];
   })()`;

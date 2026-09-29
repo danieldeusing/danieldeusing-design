@@ -15,7 +15,9 @@
  * WHAT IT COMPOSES WITH, and does not redeclare: the X and the back arrow are `.btn-icon`, the
  * footer is `.form-actions` (both controls.css); the zoom view's bar is `.btn-terminal` (components
  * .css); the context menu's rows are the one popup look, `.dropdown-item` in a `.select-panel`
- * (components.css). A class is declared once, in the file that owns it.
+ * (components.css); the zoom OPENER, `.dgm-zoomable` with its corner hint and focus ring, is
+ * components.css's too — it sits in the page's content, and only the view it opens floats. A class
+ * is declared once, in the file that owns it.
  *
  * WHAT IT READS FROM tokens.css:
  *   --card / --foreground / --border        the dialog's surface, ink and inner rules
@@ -23,8 +25,7 @@
  *   --elev-modal / --elev-float              the glow: dialogs / popups (never a black shadow)
  *   --backdrop                               the modal scrim, per theme
  *   --fs-base / --fs-xl / --lh-*             the one text size, and the title's heading step
- *   --icon-sm, --ico-maximize-2              the zoom hint
- *   --ring                                   the focus ring
+ *   --muted-foreground                       a context-menu row that states something
  *
  * `hidden` IS NOT REPEATED HERE. Several rules below set `display` (flex, grid, contents), and an
  * author `display` beats the UA's `[hidden] { display: none }`; the system answers that once, in
@@ -42,12 +43,13 @@
    React. Daniel, 2026-08-30, on cockpit: "All dialogs in the whole cockpit should have: close button
    top right with just an X and border as button. No Text. Action buttons bottom right."
 
-   THE EDGE IS --control-edge, NOT --border, and it is the thing that separates the box. The scrim
-   DIMS the page; on green and mono it cannot SEPARATE a near-black card from a near-black page —
-   measured, --card against the scrimmed page is 1.04-1.08:1 whatever the alpha. The edge against
-   the scrimmed page is what a reader actually sees there, and it clears 3:1 on every theme and
-   every surface the dialog can open over (the table is in references/overlays.md). On warm and
-   paper the card itself separates as well (3.6:1).
+   THE EDGE IS --control-edge, NOT --border, and on the dark themes it is the thing that separates
+   the box. The scrim DIMS the page; on green and mono it cannot SEPARATE a near-black card from a
+   near-black page — measured, --card against the scrimmed page is 1.04-1.08:1 whatever the alpha —
+   and there the edge does it, 4.76:1 at worst. On warm and paper it is the other way round: the
+   edge all but disappears into the scrim (1.07-1.19:1) and the card's own fill separates the box
+   (3.60:1 at worst). Every theme has one of the two, on every surface the dialog opens over; the
+   table is in scripts/check-overlays.mjs's output.
 
    ONE SURFACE: --card. So a table's sticky header and a scroller's fade, which are painted in
    --background by default, are told the truth here — the custom properties below and the thead
@@ -140,7 +142,11 @@ dialog.dialog--fit { inline-size: max-content; max-inline-size: 90vw; }
 }
 /* THE X AND THE BACK ARROW ARE THE SYSTEM'S ICON BUTTON — bordered, 28px, "just an X and border as
    button". In the foreground ink rather than the icon button's --primary: they are the dialog's
-   furniture, not an action it offers, and the one primary action lives in the footer. */
+   furniture, not an action it offers, and the one primary action lives in the footer.
+   THE CUSTOM PROPERTY, NEVER `color`. Under forced colours controls.css hands the icon button a
+   system colour and its glyph paints that. A `color` here — as deep as controls.css's forced rule
+   and later in the bundle — would win over it, and the glyph, opted out of forcing so that it shows
+   at all, would paint this author ink on the forced Canvas instead. */
 .dialog-close,
 .dialog-back {
   --btn-icon-color: var(--foreground);
@@ -268,61 +274,27 @@ dialog.dialog.dialog--drawer {
   white-space: normal;
   color: var(--muted-foreground);
 }
+/* FORCED COLOURS, and why this row needs its own. The muted ink above is an author colour, and it
+   outranks components.css's rows by a class. There a forced palette draws a disabled row in GrayText,
+   and a HIGHLIGHTED row opts out of forcing altogether (`forced-color-adjust: none`, so the Canvas
+   backplate cannot swallow its text). So without this rule the stated row read exactly like an
+   action at rest, and under the arrow keys — opted out, holding the author ink — it painted the
+   theme's muted colour on the forced Canvas. GrayText is what a forced palette says "not available"
+   with, and a system colour stays what it is whether the row is forced or opted out. */
+@media (forced-colors: active) {
+  .context-menu .dropdown-item[aria-disabled="true"] {
+    color: GrayText;
+  }
+}
 
 /* ── the zoom view — initDiagramZoom() ────────────────────────────────────────────────────────────
    An architecture diagram authored for a text column is unreadable at exactly the moment someone
-   needs it, and a screenshot in an article is the same problem. Every element initDiagramZoom()
-   marks becomes a real button that opens full-screen, fitted to the viewport, then zoomable and
-   pannable.
+   needs it, and a screenshot in an article is the same problem. initDiagramZoom() makes every
+   element it is given a real button (`.dgm-zoomable`: the opener, its corner hint and its focus ring
+   are components.css's, because the opener is part of the page) and opens it here: full-screen,
+   fitted to the viewport, then zoomable and pannable.
 
-   THE HINT IS ALWAYS DRAWN — this portal is read from a phone, where there is no hover to reveal
-   it — and it is a mask at --icon-sm (house rule 6), where the old one was a `⤢` character sized by
-   font-size, with no alt text, dimmed to 45%. It is the only visual sign that the figure is a
-   control, so it is held to the 3:1 of any control's graphic: --muted-foreground at full strength,
-   --primary under the pointer and the keyboard. */
-.dgm-zoomable {
-  position: relative;
-  cursor: zoom-in;
-}
-.dgm-zoomable::after {
-  content: "";
-  position: absolute;
-  inset-block-start: 0.4rem;
-  inset-inline-end: 0.5rem;
-  inline-size: var(--icon-sm);
-  block-size: var(--icon-sm);
-  color: var(--muted-foreground);
-  background: currentColor;
-  -webkit-mask: var(--ico-maximize-2) center / contain no-repeat;
-  mask: var(--ico-maximize-2) center / contain no-repeat;
-  opacity: 1;
-  pointer-events: none;
-  transition: color 0.15s ease;
-}
-.dgm-zoomable:hover::after,
-.dgm-zoomable:focus-visible::after {
-  color: var(--primary);
-}
-.dgm-zoomable:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-/* FORCED COLOURS (Windows high contrast). Chromium repaints every background there in Canvas, and a
-   mask glyph IS a background, so the hint vanished — Canvas on Canvas — on the one graphic that says
-   the figure opens. Opted out of the forcing and inked in the system's own text colour it shows
-   again, and hover and focus keep their difference as Highlight. */
-@media (forced-colors: active) {
-  .dgm-zoomable::after {
-    forced-color-adjust: none;
-    color: CanvasText;
-  }
-  .dgm-zoomable:hover::after,
-  .dgm-zoomable:focus-visible::after {
-    color: Highlight;
-  }
-}
-
-/* THE VIEW IS A <dialog>, opened with showModal(). It was a `div[role=dialog][aria-modal]` on
+   THE VIEW IS A <dialog>, opened with showModal(). It was a `div[role=dialog][aria-modal]` on
    <body>, which PROMISED a modal and delivered none of it: Tab walked straight out into the page
    behind, and the page scrolled under it. As a modal dialog the page is inert and Tab stays in the
    view, which is what `aria-modal` had been claiming; the scroll lock above covers it. It covers the
@@ -386,12 +358,11 @@ dialog.dgm-overlay::backdrop {
   max-block-size: none;
 }
 
-/* The page prints, not what floats over it. */
+/* The page prints, not what floats over it. (The opener's hint is components.css's to hide.) */
 @media print {
   dialog.dialog,
   dialog.dgm-overlay,
-  .context-menu,
-  .dgm-zoomable::after {
+  .context-menu {
     display: none !important;
   }
 }

@@ -1,0 +1,597 @@
+/*
+ * danieldeusing-design — data: the dense table and its cells, key/value, the when cell, charts and
+ * the tab bar.
+ *
+ * WORKS ON tokens.css ALONE. A surface with its own layout — netmon, read during an outage, or a
+ * framework app that brings its own base — loads tokens.css plus this file and gets every rule here
+ * whole. Nothing below leans on base.css or components.css: where the element default from base.css
+ * matters (a table cell's box, the last row's rule) it is restated for the classes this file owns,
+ * with the same values, so the two renderings cannot differ. That is also why the tab bar lives here
+ * and not in components.css: configr had to TRANSPLANT `.tabs` into its own stylesheet as
+ * `.estate-tab`, because taking components.css for one component drags in everything else.
+ *
+ * Cockpit is the source of truth for all of it — its activity tables, its `when` column, its trend
+ * and bar charts and its five tab engines are where these were worked out. Where seedr, configr or
+ * the family pages had a variant, the entry below says which parts were taken and why.
+ *
+ * Contents:
+ *   D1  table.dense, the cell vocabulary (.num, .actions, .pick), row states, .stackable
+ *   D3  table.kv, dl.kv
+ *   D4  .when
+ *   D6  .chart, the line chart's marks        D7  the bars and .chart-key
+ *   D8  .tabs, .tab, --compact, --strip
+ *   print
+ */
+
+/* ── THE DENSE TABLE — cockpit's activity table, one class instead of four copies ─────────── (D1)
+   `table.act` was declared FOUR times in cockpit (review, cicd, docs, execution.css), each copy a
+   little different — the first-cell inset lived only in one, the column floors only in portal.css —
+   so the same table looked different on each page. It is `table.dense` now, beside the base table:
+   the base serves documents (a sentence per cell, generous padding), dense serves the tables that
+   are scanned column by column, twenty rows at a time.
+
+   SYMMETRIC .35rem, not .7rem on one side: the gap between two columns is still cockpit's .7rem, and
+   a right-aligned number no longer needs `.act-num`'s extra 1.1rem to stand clear of its neighbour.
+   ONE ROW RULE for every table, the base table's `--border` at 55%: `table.act` drew
+   `currentColor 12%` and the kv tables full `--border`. Measured against --background the three are
+   1.18-1.35 apart, so nothing visible is lost — and `currentColor` is not a token.
+
+   THE FIRST CELL ALWAYS KEEPS ROOM FOR THE PIN BAR (.45rem). The bar is an inset shadow and paints
+   INSIDE the cell; cockpit's cells had no left padding, so a pinned row rendered as `|5494a0`, the
+   bar eating the first glyph. Reserved on every row, header included — give it only to the pinned
+   row and the whole column jumps sideways the moment a row pins.
+
+   A COLUMN HAS A FLOOR (3.5rem), so a narrow window scrolls the table rather than crushing it (Daniel,
+   2026-08-21). Without one the layout keeps compressing, and a repo path or a model name ends up
+   broken over four lines — the same content in a taller box, not a fit. The floor sits at or below
+   what the data measured, so it costs nothing at a normal width.
+
+   The cell selectors are wrapped in `:where()` so each weighs one class and one element (0,1,1). The
+   cell vocabulary below is declared AFTER at equal or higher weight, so `.num` and `.pick` win over
+   these defaults on source order — and `.stackable` (0,1,2) wins over them on a phone. No cell sets a
+   font-family: `ui-monospace` swapped JetBrains Mono out of cockpit's `when` column. */
+table.dense {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+}
+table.dense :where(th, td) {
+  padding: 0.3rem 0.35rem;
+  text-align: start;
+  vertical-align: top;
+  min-inline-size: 3.5rem;
+  border-block-end: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+table.dense :where(tr > :first-child) { padding-inline-start: 0.45rem; }
+table.dense :where(tr > :last-child) { padding-inline-end: 0; }
+/* The header is the one row that is chrome: muted, 600, and the rule under it at full --border. */
+table.dense thead th {
+  color: var(--muted-foreground);
+  font-weight: 600;
+  border-block-end-color: var(--border);
+}
+/* A rule under the last row draws a line with nothing beneath it, which reads as a cut-off table. */
+table.dense tbody tr:last-child > * { border-block-end: 0; }
+
+/* ── THE CELL VOCABULARY ─────────────────────────────────────────────────────────────────────
+   `.num` and `.actions` hold in ANY table, dense or not: a number column and a row's actions are the
+   same thing in a document table as in a dashboard.
+
+   A NUMBER ALIGNS ON ITS LAST DIGIT, in tabular figures, so a column of counts reads as a column —
+   with proportional digits a 1 is narrower than an 8 and the units stop lining up. */
+:is(th, td).num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+/* ONE ROW ACTION PER LINE, AND EVERY ACTION OF A ROW IN ONE CELL (Daniel, 2026-09-12: "always one link
+   in one line (all tables)"). Actions sharing a line wrap wherever the cell runs out, which put an
+   arrow alone on the next line — `patch → join → log →` on /automation/implement was the screenshot
+   that settled it. It lived on one cockpit page first, which is how the next table quietly did not
+   get it. `fit-content`, because a bare block would stretch each link, and its hover underline, to
+   the full cell. CSS cannot stack actions that sit in SEPARATE columns — separate cells are side by
+   side by construction — so a row with more than one action puts them in one `td.actions`. */
+td.actions > * {
+  display: block;
+  inline-size: fit-content;
+}
+/* A label that wraps inside a cell doubles the row height for one word. */
+table.dense .btn-terminal { white-space: nowrap; }
+/* THE PICK COLUMN — a checkbox that selects the row for a bulk action. Narrow and centred, so the box
+   reads as a control and not as a first column of data; no floor, it is never crushed.
+
+   THE CELL IS THE TARGET, NOT THE BOX (the lead, 2026-09-28). A bare checkbox in a table has no
+   `.check` label to grow through, and growing the box itself to 44px under a thumb would put a 44px
+   square in every row. So the box stays 14px and the CELL becomes the 44px target under a coarse
+   pointer: `initPickCells()` (runtime/pick.js) turns a press anywhere in a pick cell into a click on
+   its checkbox. A framework app wires the same press itself. */
+table.dense :is(th, td).pick {
+  min-inline-size: 0;
+  inline-size: 2.2rem;
+  text-align: center;
+  cursor: pointer;
+}
+table.dense :is(th, td).pick > input { margin: 0; }
+table.dense :is(th, td).pick:has(> input:disabled) { cursor: default; }
+@media (pointer: coarse) {
+  table.dense :is(th, td).pick {
+    box-sizing: border-box;
+    inline-size: 2.75rem;
+    block-size: 2.75rem;
+  }
+}
+
+/* A PINNED ROW — waiting on a decision, sorted to the top of the record. Tint AND a bar down the left
+   edge, because a tint is the first thing a monochrome rendering loses, and the two near-black themes
+   and a printout both have to carry "this one is waiting". --warning, the colour the row's own state
+   tag already wears, so the row and its badge cannot disagree.
+
+   6%, NOT COCKPIT'S 12%. The row's text sits on the tint, and 6% is the step at which tone-coloured
+   text still clears AA on every theme and surface (§0.1): --warning on it measures 4.97-10.31, and at
+   12% paper's falls to 4.58. The bar is an inset shadow so it moves no content; the first cell's
+   .45rem inset above is what it paints into.
+
+   Dense only: a pinned row is the dense table's idea (cockpit's pinFirst), and the base table's first
+   cell has no inset for the bar to paint into — it would land on the first glyph again. */
+table.dense tr[data-pin] > * { background: color-mix(in srgb, var(--warning) 6%, transparent); }
+table.dense tr[data-pin] > :first-child { box-shadow: inset 3px 0 0 var(--warning); }
+/* A ROW THAT CANNOT BE ACTED ON is muted text, not opacity. Cockpit's .72 dimmed the whole row
+   below AA on warm and made it look broken rather than off. The first cell — usually what the row
+   IS — keeps its ink, so the reader still sees which row is disabled. */
+tr[aria-disabled="true"] > :not(:first-child) { color: var(--muted-foreground); }
+/* ROWS OF CONTROLS — a roster of agents with a model select and an effort select per row. A control
+   is taller than a line of text, so top-aligned text beside it sits visibly high; a form row centres.
+   Under a thumb the row is 44px, so each control in it can be. */
+table.dense--form :where(th, td) { vertical-align: middle; }
+@media (pointer: coarse) {
+  table.dense--form tr { block-size: 2.75rem; }
+}
+
+/* ── STACKING: A TABLE ON A PHONE ─────────────────────────────────────────────────────────────
+   Below 40rem a `.stackable` table stops being a grid and becomes a card per row, each cell a
+   `label value` line. Cockpit's `kv--stack` made the card but hid the column names, so a stacked row
+   was a column of values with nothing saying which was which; the family finance page had the
+   labels (`data-label` on each cell, "if it earns its place it belongs upstream") without the card.
+   This is both. The label comes from `data-label` on the cell rather than from a copy of the header,
+   so a column's name is written in one place and the two cannot drift.
+
+   A row the pager or a filter has hidden stays hidden when every row is made a block, and not because
+   of anything here: an author `display` beats the UA's `[hidden]`, which is exactly how a restacked
+   table once put every hidden row back on screen, on phones only — so tokens.css answers it once for
+   every element (`[hidden] { display: none !important }`) and no component guards its own. A row
+   after a VISIBLE row takes the gap, so a page whose first rows are paged away does not open with
+   one. An empty cell is dropped: stacked, it would be a whole line saying "cost —". */
+@media (max-width: 40rem) {
+  table.stackable,
+  table.stackable > tbody,
+  table.stackable tr,
+  table.stackable :is(th, td) { display: block; }
+  table.stackable > thead { display: none; }
+  table.stackable tr {
+    padding: 0.6rem 0.8rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+  table.stackable tr:not([hidden]) ~ tr { margin-block-start: 0.8rem; }
+  table.stackable :is(th, td) {
+    padding: 0.15rem 0;
+    border: 0;
+    min-inline-size: 0;
+  }
+  table.stackable td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    text-align: end;
+  }
+  table.stackable td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--muted-foreground);
+  }
+  /* The actions keep one per line when stacked: the label on the first line, the actions down the
+     value edge. As flex items they would spread across the line instead. */
+  table.stackable td.actions[data-label] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: end;
+    gap: 0.15rem 1rem;
+  }
+  table.stackable td.actions[data-label]::before {
+    grid-area: 1 / 1;
+    justify-self: start;
+  }
+  table.stackable td.actions[data-label] > * { grid-column: 2; }
+  table.stackable td:empty { display: none; }
+  /* A pinned row is one card now: the tint and the bar move from its first cell to the whole card. */
+  table.stackable.dense tr[data-pin] {
+    background: color-mix(in srgb, var(--warning) 6%, var(--card));
+    box-shadow: inset 3px 0 0 var(--warning);
+  }
+  table.stackable.dense tr[data-pin] > * {
+    background: none;
+    box-shadow: none;
+  }
+}
+
+/* ── KEY/VALUE — a table of pairs and a list of pairs look the same ──────────────────────── (D3)
+   The label is --primary 700 (cockpit, danieldeusing.de and seedr's studio agree) and the VALUE is
+   --foreground, the text a reader came for. danieldeusing.de and studio muted the value, which made
+   the one thing on the line that mattered the quietest thing on it. The label column is
+   `--field-label-w`, the system's one label width, so a key/value table lines up with a `.field-row`
+   form beside it; the 140px, 220px and 9rem that danieldeusing.de chose per page go.
+
+   `table.kv` restates the base cell box (padding, first/last inset 0, the 55% rule, top-aligned) so it
+   renders the same on a tokens-only surface. A long URL or path in a value breaks anywhere rather
+   than pushing the table wide: it is a payload, and truncating it would lie. */
+table.kv {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+}
+table.kv :where(th, td) {
+  padding: 0.45rem 0.85rem;
+  text-align: start;
+  vertical-align: top;
+  border-block-end: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+table.kv :where(tr > :first-child) { padding-inline-start: 0; }
+table.kv :where(tr > :last-child) { padding-inline-end: 0; }
+table.kv tbody tr:last-child > * { border-block-end: 0; }
+table.kv th {
+  color: var(--primary);
+  font-weight: 700;
+  white-space: nowrap;
+}
+table.kv td { overflow-wrap: anywhere; }
+/* An aligned label column for a stacked run of definitions; cockpit widens it on the table itself
+   (`style="--field-label-w: 15rem"`). */
+@media (min-width: 40rem) {
+  table.kv--labels :is(th, td):first-child { inline-size: var(--field-label-w); }
+}
+/* A nowrap label on a phone pushes the value off the screen. */
+@media (max-width: 40rem) {
+  table.kv th { white-space: normal; }
+}
+
+dl.kv {
+  display: grid;
+  grid-template-columns: var(--field-label-w) minmax(0, 1fr);
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+}
+dl.kv > dt {
+  color: var(--primary);
+  font-weight: 700;
+}
+dl.kv > dd {
+  margin: 0;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+/* A label may lead with a glyph (danieldeusing.de's contact list: a mail icon, a GitHub mark). */
+dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
+@media (max-width: 40rem) {
+  dl.kv { grid-template-columns: minmax(0, 1fr); }
+  dl.kv > dd + dt { margin-block-start: 0.5rem; }
+}
+
+/* ── WHEN — how long ago, over the exact stamp ──────────────────────────────────────────── (D4)
+   Daniel, 2026-08-22: "Make it 'x min ago', 'x hours ago', 'x days ago' … and a new line with the
+   date in a little font." A log is read to answer "is this recent?", and a bare wall clock makes every
+   reader do the subtraction, so the age leads and the exact stamp sits under it. `whenHtml()` in
+   runtime/time.js writes the markup and `initRelativeTimes()` keeps the age true.
+
+   THE SECOND LINE IS "LITTLE" BY COLOUR, NOT BY SIZE. It is --muted-foreground: a smaller font was
+   exactly the near-miss the estate deleted (one size of text), and cockpit's opacity .6 measured
+   3.26-3.40:1 on warm — under AA — where --muted-foreground holds 4.67 or better. `nowrap` on both
+   lines is what makes each fit on one line, and it made the column NARROWER (the review table fell
+   from 1353px to 1276px) because the stamp stopped needing two lines of its own. The 5.5rem floor is
+   the column's, carried by its content so no header needs a class for it.
+
+   No offset is rendered; the exact instant is the cell's `data-tip`. */
+.when {
+  display: inline-block;
+  min-inline-size: 5.5rem;
+}
+.when-ago,
+.when-exact {
+  display: block;
+  white-space: nowrap;
+}
+.when-exact {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+/* On a card: a clock glyph and the short age on one quiet line ("3d ago"), both stamps on the tip. */
+.when--inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-inline-size: 0;
+  color: var(--muted-foreground);
+}
+
+/* ── CHARTS ───────────────────────────────────────────────────────────────────────── (D6, D7)
+   runtime/charts.js draws the SVG at the plot's measured size, with no viewBox, so the text below is
+   `--fs-base` in real pixels at any width. Cockpit's and the family page's charts set labels at 9-11
+   units inside a scaled viewBox; a 720-unit chart shown 360px wide printed 5px text.
+
+   EVERY COLOUR IS A CLASS, and the runtime writes none: a theme switch recolours a chart without a
+   redraw, and nothing depends on a CSS variable inside an SVG presentation attribute (which silently
+   paints black). MARKS DRAW AT FULL STRENGTH in token colours — cockpit drew its path at .6, its bars
+   at .55 (2.47:1 on warm, under the 3:1 a graphic needs) and its labels at .5-.7 (a label at .5
+   measures 2.67-3.91:1). Labels are --muted-foreground, which holds AA.
+
+   A series is `--chart-color`, set on the figure for a one-series chart or by the runtime on each
+   series' group, and always a token — `var(--cat-*)` for a categorical series (the family page's
+   income, expenses and net become --cat-green, --cat-red and --cat-blue). `--chart-bg` is what a
+   hollow dot is filled with: set it to --card when the chart sits on a card. */
+.chart {
+  margin: 0.6rem 0 1.2rem;
+  font-size: var(--fs-base);
+}
+.chart-plot {
+  block-size: var(--chart-h, 12rem);
+  min-inline-size: 0;
+}
+.chart svg {
+  display: block;
+  overflow: visible;
+}
+.chart text {
+  font: inherit;
+  font-size: var(--fs-base);
+  fill: var(--muted-foreground);
+}
+.chart-axis { stroke: var(--border); }
+.chart-grid { stroke: color-mix(in srgb, var(--border) 55%, transparent); }
+.chart-line {
+  fill: none;
+  stroke: var(--chart-color, var(--primary));
+  stroke-width: 1.5;
+}
+.chart-area { fill: color-mix(in srgb, var(--chart-color, var(--primary)) 12%, transparent); }
+/* A solid dot rests on enough data; a hollow one on too little, and it breaks the line. */
+.chart-dot {
+  fill: var(--chart-color, var(--primary));
+  stroke: var(--chart-color, var(--primary));
+}
+.chart-dot--hollow { fill: var(--chart-bg, var(--background)); }
+/* Events: a dashed vertical for one kind (a model changed), a 3px tick on the floor for another
+   (rules were added). Each carries a data-tip saying which. */
+.chart-marker {
+  stroke: var(--muted-foreground);
+  stroke-dasharray: 4 3;
+}
+.chart-tick {
+  stroke: var(--muted-foreground);
+  stroke-width: 3;
+}
+/* Bars are SOLID. */
+.chart-bar { fill: var(--chart-color, var(--primary)); }
+/* The caption — what is plotted, and "peak n" — is HTML, not SVG text, so it wraps and reads like the
+   page. Restated from base.css's figcaption so a tokens-only surface draws it the same. */
+.chart > figcaption {
+  margin-top: 0.5rem;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+/* THE KEY — one item per series, a square swatch in the series colour. Square because it is a
+   swatch naming a series, not a status dot (the family page used `.dd-dot`, the theme indicator). */
+.chart-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-foreground);
+}
+.chart-key li::before {
+  content: "";
+  display: inline-block;
+  inline-size: var(--dot-size);
+  block-size: var(--dot-size);
+  margin-inline-end: 0.4rem;
+  vertical-align: middle;
+  background: var(--chart-color, var(--primary));
+}
+
+/* ── TABS ─────────────────────────────────────────────────────────────────────────────────── (D8)
+   Daniel: "I am always searching the tabs. They are not falling into my eyes directly."
+
+   They were low-contrast pills at 0.7 opacity, and the SELECTED one differed from the rest only by a
+   slightly darker border and an 8% background — so the row read as six equal chips and the eye had to
+   stop and compare them. This inverts it: the inactive tabs recede to plain muted text with no chrome
+   at all, and the active one is the only thing on the row carrying weight, colour and a fill.
+   Nothing to compare — one thing is loud.
+
+   ONE TAB, FILLED. configr's underline variant is retired: an underline plus a colour shift is still
+   one thin rule and a hue change on a row of same-weight words, which is what Daniel was hunting for.
+   Moved here from components.css (0.60.0) so a tokens-only app can load it; runtime/tabs.js wires it. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  margin: 1.35rem 0 0;
+  border-bottom: 2px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  box-sizing: border-box;
+  margin-bottom: -2px;
+  padding: 0.5rem 0.95rem;
+  font: inherit;
+  font-size: var(--fs-base);
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+/* A logo or glyph in a tab (configr's agent strip) is the default glyph size, never the label's. */
+.tab > :is(.ico, img, svg) {
+  flex: none;
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+}
+.tab:hover {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+/* FILLED, not underlined: a solid block of --primary with the page colour as its text is the
+   highest-contrast pair the theme owns (5.6:1 on warm, 6.23-20.38 across the four) and the only
+   filled thing on the page, so it is found without reading. */
+.tab[aria-selected="true"] {
+  color: var(--background);
+  background: var(--primary);
+  font-weight: 700;
+}
+/* THE RING IS INSET, AND ON THE SELECTED TAB IT IS THE PAGE COLOUR. --ring equals --primary on all
+   four themes, so a --ring outline on the --primary fill would simply vanish — a keyboard user would
+   lose focus on exactly the tab they are most likely to be on. --background on --primary measures
+   6.23-20.38. Inset so the ring never paints over the row's rule or the neighbouring tab. */
+.tab:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.tab[aria-selected="true"]:focus-visible { outline-color: var(--background); }
+/* A DISABLED TAB — a mode that is not available for this item. Quiet like a disabled button, and it
+   does not light up under the pointer: a control that reacts to hover and then does nothing is lying.
+   runtime/tabs.js skips it on the arrow keys. */
+.tab:disabled,
+.tab[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+.tab:disabled:not([aria-selected="true"]):hover,
+.tab[aria-disabled="true"]:not([aria-selected="true"]):hover {
+  color: var(--muted-foreground);
+  background: transparent;
+}
+/* A STATE SUFFIX on a tab — a failed worker stays visible while another tab is being read. In the
+   tone's colour on an unselected tab; on the selected one it inherits the fill's text colour, because
+   a tone on the --primary fill measures 1.02-3.41. The word is the meaning, so nothing is lost. */
+.tab-status { color: var(--tone, var(--muted-foreground)); }
+.tab[aria-selected="true"] .tab-status { color: inherit; }
+/* A TAB ROW HAS TWO HALVES. On the left the tabs you go to in order to DO something; on the right
+   the ones you go to in order to UNDERSTAND something — conformance, how it works. `.tab--info` on
+   the first reference tab pushes it and every sibling after it right (an auto inline-start margin in
+   a flex row absorbs the free space). Dropped on a phone, where the row wraps and an auto margin
+   would strand one tab alone on its own line. */
+.tab--info { margin-inline-start: auto; }
+@media (max-width: 40rem) {
+  .tab--info { margin-inline-start: 0; }
+}
+/* 44px under a thumb — tabs are the primary navigation of these pages. */
+@media (pointer: coarse), (max-width: 40rem) {
+  .tab {
+    padding: 0.7rem 0.8rem;
+    min-block-size: 44px;
+  }
+}
+section.doc.tab-panel { margin-top: 1.35rem; }
+
+/* A TAB ROW INSIDE A CARD OR A DIALOG — no page margin above it, and a tighter tab. rem, not the em
+   paddings cockpit's repo tabs and update tabs carried (.55em/1.1em, .45em/.9em). */
+.tabs--compact { margin-block-start: 0; }
+.tabs--compact .tab { padding: 0.35rem 0.75rem; }
+/* A ROW THAT FILLS A FIXED-HEIGHT STRIP — configr's agent tabs in its title bar. It never wraps, it
+   has no rule of its own (the strip draws one), and each tab stretches to the strip's height with
+   its label truncating instead of pushing the row wide. A truncated tab carries its full label in
+   `data-tip` — never a native `title`. */
+.tabs--strip {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  min-inline-size: 0;
+  margin: 0;
+  border-bottom: 0;
+}
+.tabs--strip .tab {
+  min-inline-size: 0;
+  margin-bottom: 0;
+  padding-block: 0;
+}
+.tab-label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── FORCED COLOURS ────────────────────────────────────────────────────────────────────────────
+   Under Windows High Contrast (and any forced palette) the browser replaces a background with Canvas
+   and a text colour with CanvasText, and drops box-shadows. Measured in Chromium, that erases four of
+   this file's states: the selected tab becomes Canvas on CanvasText like every other tab (bold is all
+   that is left), the pinned row loses its tint AND its inset bar, a disabled row is the same ink as an
+   enabled one, and the key's swatches — backgrounds — vanish. So each is redrawn in SYSTEM colours,
+   which a forced palette keeps: the selected tab is Highlight with HighlightText, a disabled tab or row
+   is GrayText, and the pin bar becomes a real border in CanvasText (a shape, because no system colour
+   means "waiting" — Mark is a text background and measured yellow on a white Canvas).
+
+   CHARTS ARE THE OTHER WAY ROUND. SVG is `preserve-parent-color` by default, so nothing is forced: a
+   chart keeps its THEME colours over whatever Canvas the reader's palette has, and warm's --primary on
+   a black Canvas is under 3:1. So every mark is repainted in CanvasText, the grid in GrayText, and the
+   two states that were colour — a solid dot against a hollow one, one series against the next — become
+   fill against no fill: a hollow dot is Canvas inside a CanvasText ring, and every second series (and
+   its swatch in the key) is outlined instead of filled. The key's words and the table beside the chart
+   carry the rest, as they already must. */
+@media (forced-colors: active) {
+  .tab[aria-selected="true"] {
+    color: HighlightText;
+    background: Highlight;
+  }
+  .tab[aria-selected="true"]:focus-visible { outline-color: HighlightText; }
+  .tab:disabled,
+  .tab[aria-disabled="true"] { color: GrayText; }
+  table.dense tr[data-pin] > :first-child { border-inline-start: 3px solid CanvasText; }
+  tr[aria-disabled="true"] > :not(:first-child) { color: GrayText; }
+  .chart text { fill: CanvasText; }
+  .chart-axis,
+  .chart-marker,
+  .chart-tick,
+  .chart-line { stroke: CanvasText; }
+  .chart-grid { stroke: GrayText; }
+  .chart-area { fill: none; }
+  .chart-dot,
+  .chart-bar { fill: CanvasText; stroke: CanvasText; }
+  .chart-dot--hollow,
+  .chart-series:nth-of-type(2n) .chart-bar { fill: Canvas; }
+  .chart-key li::before {
+    forced-color-adjust: none;
+    box-sizing: border-box;
+    background: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .chart-key li:nth-child(2n)::before { background: Canvas; }
+}
+/* Stacked, the pinned row is one card, so its bar is the card's edge rather than its first line's. */
+@media (forced-colors: active) and (max-width: 40rem) {
+  table.stackable.dense tr[data-pin] { border-inline-start: 3px solid CanvasText; }
+  table.stackable.dense tr[data-pin] > :first-child { border-inline-start: 0; }
+}
+
+/* ── PRINT ─────────────────────────────────────────────────────────────────────────────────────
+   A printout is read without the controls, so it carries EVERY tab panel and no tab row — the same
+   reason every <details> opens for print. That has to beat tokens.css's `[hidden]` rule, which is
+   `!important` too, so it outweighs it rather than relying on load order. A pinned row's bar becomes a
+   real border, because an inset shadow is dropped with the background graphics. The pin tint, the
+   chart and the key's swatches are printed exactly: a chart printed without its colours is a set of
+   axes. */
+@media print {
+  .tabs { display: none !important; }
+  [role="tabpanel"][hidden]:not([hidden="until-found"]) { display: block !important; }
+  table.dense tr[data-pin] > :first-child {
+    box-shadow: none;
+    border-inline-start: 3px solid var(--warning);
+  }
+  table.dense tr[data-pin] > *,
+  .chart,
+  .chart-key {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -275,6 +275,24 @@ const inkIn = ({ width, bpp, px }, box) => {
   for (const key of counts.keys()) { const r = contrast(rgb(key), on); if (r > ratio) { ratio = r; ink = rgb(key); } }
   return { ratio: Math.round(ratio * 100) / 100, ink: ink.join(","), on: on.join(",") };
 };
+const parseCss = (value) => {
+  let m = /color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.e-]+))?\)/.exec(value);
+  if (m) return [+m[1] * 255, +m[2] * 255, +m[3] * 255, m[4] === undefined ? 1 : +m[4]];
+  m = /rgba?\(([\d.]+),? ([\d.]+),? ([\d.]+)(?:,? \/? ?([\d.]+))?\)/.exec(value);
+  if (m) return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
+  throw new Error(`unparsed colour: ${value}`);
+};
+const holdsColour = ({ width, bpp, px }, box, paint) => {
+  const want = parseCss(paint);
+  if (want[3] < 1) throw new Error(`a translucent paint cannot be looked for as it is: ${paint}`);
+  for (let y = Math.ceil(box.y * DPR); y < Math.floor((box.y + box.h) * DPR); y += 1) {
+    for (let x = Math.ceil(box.x * DPR); x < Math.floor((box.x + box.w) * DPR); x += 1) {
+      const i = (y * width + x) * bpp;
+      if ([0, 1, 2].every((k) => Math.abs(px[i + k] - want[k]) <= 12)) return true;
+    }
+  }
+  return false;
+};
 const screenshot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
 
 const axOf = async (selector) => {
@@ -330,7 +348,12 @@ window.__o = (() => {
       w: b.width - w("border-left-width") - w("border-right-width"), h: b.height - w("border-top-width") - w("border-bottom-width") }; };
   const textBox = (x) => { const range = document.createRange(); range.selectNodeContents(el(x)); const b = range.getBoundingClientRect();
     return { x: b.left, y: b.top, w: b.width, h: b.height }; };
-  return { $, el, cs, rect, parse, over, ratio, resolve, same, tip, tipShown, menu, active, open, closeAll, inner, textBox };
+  // The left band of an element's outline, one px wider than the ring (outward for an outset ring,
+  // inward for an inset one), so the ring is the crop's majority and what it sits on is its ink.
+  const ringBand = (x) => { const n = el(x), b = n.getBoundingClientRect(), s = getComputedStyle(n);
+    const o = parseFloat(s.outlineOffset) || 0, w = s.outlineStyle === "none" ? 0 : parseFloat(s.outlineWidth) || 0;
+    return { x: b.left - o - w - (o >= 0 ? 1 : 0), y: b.top + 4, w: w + 1, h: b.height - 8 }; };
+  return { $, el, cs, rect, parse, over, ratio, resolve, same, tip, tipShown, menu, active, open, closeAll, inner, textBox, ringBand };
 })();
 null`;
 
@@ -544,67 +567,103 @@ try {
      Windows High Contrast and every forced palette paint each background Canvas and lay a Canvas
      backplate behind text. A glyph is a mask over a background, so it shows only when it is opted
      out of the forcing — and an opted-out glyph paints whatever colour it INHERITS, which is the
-     author's unless its host was handed a system colour. Whether that shows depends on the palette
-     and the theme (a dark ink vanishes on a dark palette's black Canvas, a light one on white), so
-     this runs on a LIGHT and a DARK forced palette and all four themes, and it reads PAINTED PIXELS:
-     a computed-colour check reads 21:1 for a word its backplate has hidden.
+     author's unless its host was handed a system colour. An opted-out element owns its focus ring the
+     same way: `none` stops forcing `outline-color` too. Whether any of that shows depends on the
+     palette and the theme (a dark ink vanishes on a dark palette's black Canvas, a light one on
+     white), so this runs on a LIGHT and a DARK forced palette and all four themes, and it reads
+     PAINTED PIXELS: a computed-colour check reads 21:1 for a word its backplate has hidden.
      This package draws none of these glyphs — the icon button's is controls.css's, .ico is
-     icons.css's. What it can get wrong is handing them an author colour (hence the X's ink is a
-     custom property, never `color`) and the one row whose colour it sets, the stated row. */
+     icons.css's, the popup rows are components.css's — so what it can get wrong is what it adds on
+     top: an opt-out of its own, an author colour, and the one row whose colour it sets.
+
+     CAPTURED IN THE VIEWPORT, never with captureBeyondViewport (which re-lays the page without its
+     scrollbar and moves every box measured beforehand), in a browser started with
+     --hide-scrollbars. And before any ratio is trusted, every crop is shown to hold its element: the
+     same scenes run once in normal colours, where each crop must contain the colour its element
+     itself paints there. */
   section("forced colours — painted pixels on a light and a dark forced palette, four themes (X1)");
   const FORCED_THEMES = ["warm", "green", "mono", "paper"];
-  const forcedCells = new Map(); // measurement -> { floor, cells: { "light/warm": {ratio, ink, on} } }
-  const record = (name, floor, cell, m) => {
-    const entry = forcedCells.get(name) || { floor, cells: {} };
-    entry.cells[cell] = m;
-    forcedCells.set(name, entry);
+  const STATED = `__o.menu().querySelector('[aria-disabled="true"]')`;
+  const ACTION = `__o.menu().querySelectorAll(".dropdown-item")[1]`;
+  const STATED_SEL = '.context-menu [aria-disabled="true"]';
+  // [what, floor, the dialog it is in (null: the context menu), a selector whose :focus-visible is
+  //  forced for the shot (null: none), its crop, the colour the element itself paints in that crop]
+  const SCENES = [
+    ["the X (glyph)", 3, "dlg-default", null, `__o.inner("default-x")`, `__o.cs("default-x", "::before").backgroundColor`],
+    ["the X under the keys: its focus ring", 3, "dlg-default", '[data-t="default-x"]', `__o.ringBand("default-x")`, `__o.cs("default-x").outlineColor`],
+    ["the back arrow (glyph)", 3, "dlg-rich", null, `__o.inner("rich-back")`, `__o.cs("rich-back", "::before").backgroundColor`],
+    ["the alert glyph (glyph)", 3, "dlg-alert", null, `__o.inner("alert-glyph")`, `__o.cs("alert-glyph").backgroundColor`],
+    ["a context-menu row under the keys (text on its highlight)", 4.5, null, null, `__o.textBox(document.activeElement)`, `getComputedStyle(document.activeElement).color`],
+    ["a context-menu row under the keys: its focus ring", 3, null, null, `__o.ringBand(document.activeElement)`, `getComputedStyle(document.activeElement).outlineColor`],
+    ["the stated row at rest (text)", 4.5, null, null, `__o.textBox(${STATED})`, `getComputedStyle(${STATED}).color`],
+    ["an action row at rest (text) — the stated row's pair", 4.5, null, null, `__o.textBox(${ACTION})`, `getComputedStyle(${ACTION}).color`],
+    ["the stated row under the keys (text)", 4.5, null, STATED_SEL, `__o.textBox(${STATED})`, `getComputedStyle(${STATED}).color`],
+    ["the stated row under the keys: its focus ring", 3, null, STATED_SEL, `__o.ringBand(${STATED})`, `getComputedStyle(${STATED}).outlineColor`],
+  ];
+  const measureScene = async (scene, shot, onShot) => {
+    const { box, paint } = await evaluate(`({ box: ${scene[4]}, paint: ${scene[5]} })`);
+    onShot(scene, shot, box, paint);
   };
+  // One pass over every scene: open what it needs, take the shot, hand each crop on.
+  const shootScenes = async (onShot) => {
+    for (const scene of SCENES.filter((sc) => sc[2])) {
+      const [, , dlg, force] = scene;
+      await evaluate(`(() => { __o.$("${dlg}").showModal(); document.activeElement?.blur?.(); })()`);
+      const take = async () => { await sleep(40); await measureScene(scene, await screenshot(), onShot); };
+      if (force) await whileForced(force, ["focus-visible"], take); else await take();
+      await evaluate(`__o.$("${dlg}").close(); null`);
+    }
+    await reset();
+    await centre("row-app");
+    await evaluate(`${T("row-app")}.focus(); null`);
+    await key("F10", { shift: true });
+    await sleep(40);
+    const atRest = await screenshot();
+    for (const scene of SCENES.filter((sc) => !sc[2] && !sc[3])) await measureScene(scene, atRest, onShot);
+    const forcedOnes = SCENES.filter((sc) => !sc[2] && sc[3]);
+    for (const selector of new Set(forcedOnes.map((sc) => sc[3]))) {
+      await whileForced(selector, ["focus-visible"], async () => {
+        await sleep(40);
+        const shot = await screenshot();
+        for (const scene of forcedOnes.filter((sc) => sc[3] === selector)) await measureScene(scene, shot, onShot);
+      });
+    }
+    await key("Escape");
+  };
+
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: DPR, mobile: false });
+  await reset();
+  const misses = [];
+  await shootScenes((scene, shot, box, paint) => {
+    if (!holdsColour(shot, box, paint)) misses.push(`${scene[0]}: no ${paint} in ${JSON.stringify(box)}`);
+  });
+  await check("every crop lands on its element: in normal colours each holds the colour its element paints there",
+    misses.length === 0, misses.join("; "));
+
+  const forcedCells = new Map(); // what -> { floor, cells: { "light/warm": { ratio, ink, on } } }
   for (const scheme of ["light", "dark"]) {
     await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
     await sleep(100);
     await check(`forced colours really are on, ${scheme} palette (a check under no forcing would pass by default)`,
       () => evaluate(`matchMedia("(forced-colors: active)").matches && matchMedia("(prefers-color-scheme: ${scheme})").matches`));
     for (const theme of FORCED_THEMES) {
-      const cell = `${scheme}/${theme}`;
       await reset();
       await evaluate(`document.documentElement.dataset.theme = "${theme}"; null`);
-      for (const [name, dlg, t] of [["the X", "dlg-default", "default-x"], ["the back arrow", "dlg-rich", "rich-back"], ["the alert glyph", "dlg-alert", "alert-glyph"]]) {
-        const box = await evaluate(`(() => { const d = __o.$("${dlg}"); d.showModal(); document.activeElement?.blur?.(); return __o.inner("${t}"); })()`);
-        await sleep(40);
-        record(`${name} (glyph)`, 3, cell, inkIn(await screenshot(), box));
-        await evaluate(`__o.$("${dlg}").close(); null`);
-      }
-      await reset();
-      await centre("row-app");
-      await evaluate(`${T("row-app")}.focus(); null`);
-      await key("F10", { shift: true });
-      // statedEdge: a strip down the row's left edge, inside it — where the inset focus ring is drawn
-      // and nothing else is (the row's text and its ✓ column start .5rem in).
-      const boxes = await evaluate(`(() => { const m = __o.menu(), s = m.querySelector('[aria-disabled="true"]'), r = s.getBoundingClientRect();
-        return { stated: __o.textBox(s), statedEdge: { x: r.left, y: r.top + 4, w: 3, h: r.height - 8 },
-          plain: __o.textBox(m.querySelectorAll(".dropdown-item")[1]), lit: __o.textBox(document.activeElement) }; })()`);
-      await sleep(40);
-      const menuShot = await screenshot();
-      record("a context-menu row under the keys (text on its highlight)", 4.5, cell, inkIn(menuShot, boxes.lit));
-      record("the stated row at rest (text)", 4.5, cell, inkIn(menuShot, boxes.stated));
-      record("an action row at rest (text) — the stated row's pair", 4.5, cell, inkIn(menuShot, boxes.plain));
-      await whileForced('.context-menu [aria-disabled="true"]', ["focus-visible"], async () => {
-        await sleep(40);
-        const shot = await screenshot();
-        record("the stated row under the keys (text)", 4.5, cell, inkIn(shot, boxes.stated));
-        record("the stated row under the keys: its focus ring", 3, cell, inkIn(shot, boxes.statedEdge));
+      await shootScenes(([what, floor], shot, box) => {
+        const entry = forcedCells.get(what) || { floor, cells: {} };
+        entry.cells[`${scheme}/${theme}`] = inkIn(shot, box);
+        forcedCells.set(what, entry);
       });
-      await key("Escape");
     }
   }
   await send("Emulation.setEmulatedMedia", { features: [] });
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await evaluate(`document.documentElement.dataset.theme = "warm"; null`);
   await reset();
-  for (const [name, { floor, cells }] of forcedCells) {
+  for (const [what, { floor, cells }] of forcedCells) {
     const low = Object.entries(cells).filter(([, m]) => m.ratio < floor).map(([c, m]) => `${c} ${m.ratio} (ink ${m.ink} on ${m.on})`);
-    await check(`forced colours, both palettes x four themes: ${name} reaches ${floor}:1 on what it is painted on`, low.length === 0, low.join("; "));
+    await check(`forced colours, both palettes x four themes: ${what} reaches ${floor}:1 on what it is painted on`,
+      Object.keys(cells).length === 8 && low.length === 0, low.join("; ") || `${Object.keys(cells).length} of 8 cells measured`);
   }
   const statedInk = forcedCells.get("the stated row at rest (text)")?.cells ?? {};
   const actionInk = forcedCells.get("an action row at rest (text) — the stated row's pair")?.cells ?? {};
@@ -612,9 +671,9 @@ try {
   await check("forced colours: the stated row still reads differently from an action (its own ink, GrayText), in every cell",
     Object.keys(statedInk).length === 8 && alike.length === 0, alike.map((c) => `${c}: both ${statedInk[c].ink}`).join("; "));
   console.log("\n| painted under forced colours — contrast on what it sits on | floor | light: warm / green / mono / paper | dark: warm / green / mono / paper |\n|---|---:|---|---|");
-  for (const [name, { floor, cells }] of forcedCells) {
+  for (const [what, { floor, cells }] of forcedCells) {
     const row = (scheme) => FORCED_THEMES.map((t) => cells[`${scheme}/${t}`]?.ratio.toFixed(2) ?? "—").join(" / ");
-    console.log(`| ${name} | ${floor} | ${row("light")} | ${row("dark")} |`);
+    console.log(`| ${what} | ${floor} | ${row("light")} | ${row("dark")} |`);
   }
   console.log("");
 

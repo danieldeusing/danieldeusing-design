@@ -13,6 +13,9 @@
  *     the path's subpaths must be exactly the runs of solid points.
  *   · A CHART IN A HIDDEN TAB. It measures 0 when rendered; it must draw when the panel is shown, and
  *     redraw when the plot is resized.
+ *   · A CHART IN A GRID OR A FLEX ROW. The drawn SVG is the figure's min-content, so without
+ *     `min-inline-size: 0` a `1fr` track or a `flex: 1` item never narrows below the width it was
+ *     drawn at: the plot never resizes and the chart never redraws — it overflows its column.
  *   · COLOUR BY CLASS. `fill="var(--x)"` silently paints black; so no mark may carry a colour
  *     attribute, and a theme switch must recolour the SAME nodes with no redraw.
  *
@@ -31,6 +34,9 @@ const HARNESS = `<!doctype html><html data-theme="warm"><head><meta charset="utf
 <style>
   body { margin: 0; font-family: var(--font-mono); font-size: var(--fs-base); }
   :root { --cat-l: 0.45; --cat-c: 0.075; --cat-green: oklch(var(--cat-l) var(--cat-c) 150); --cat-red: oklch(var(--cat-l) var(--cat-c) 25); }
+  .row-grid { display: grid; grid-template-columns: 1fr 1fr; width: 800px; }
+  .row-flex { display: flex; width: 800px; }
+  .row-flex > .chart { flex: 1; }
 </style></head><body>
 <div id="box" style="width: 960px"><figure class="chart"><div class="chart-plot" id="line"></div></figure></div>
 <div id="hidden-panel" hidden><figure class="chart"><div class="chart-plot" id="lazy"></div></figure></div>
@@ -39,6 +45,8 @@ const HARNESS = `<!doctype html><html data-theme="warm"><head><meta charset="utf
 <div style="width: 600px"><figure class="chart"><div class="chart-plot" id="grouped"></div></figure></div>
 <div style="width: 600px"><figure class="chart"><div class="chart-plot" id="signed"></div></figure></div>
 <div style="width: 600px"><figure class="chart"><div class="chart-plot" id="empty"></div></figure></div>
+<div class="row-grid" id="grid-row"><figure class="chart"><div class="chart-plot" id="g1"></div></figure><figure class="chart"><div class="chart-plot" id="g2"></div></figure></div>
+<div class="row-flex" id="flex-row"><figure class="chart"><div class="chart-plot" id="f1"></div></figure><figure class="chart"><div class="chart-plot" id="f2"></div></figure></div>
 <script type="module">
   import { renderLineChart, renderBarChart } from "/runtime/charts.js";
   window.renderLineChart = renderLineChart;
@@ -51,6 +59,12 @@ const HARNESS = `<!doctype html><html data-theme="warm"><head><meta charset="utf
   window.LINE = { label: "mistakes per week", x: (p) => p.x, value: (p) => p.v, solid: (p) => p.n >= 5, sub: (p) => "n " + p.n,
     tip: (p) => p.x + ": " + p.v, markers: [{ at: 2, kind: "line", tip: "model changed" }, { at: 6, kind: "tick", tip: "rules added" }] };
   window.q = (id, sel) => Array.from(document.querySelectorAll("#" + id + " " + sel));
+  // Each plot's width and its SVG's, once every SVG matches its plot or 30 frames have passed.
+  window.widths = async (ids) => {
+    const read = () => ids.map((id) => { const p = document.getElementById(id); return [p.clientWidth, +p.querySelector("svg").getAttribute("width")]; });
+    for (let i = 0; i < 30 && !read().every(([plot, svg]) => plot === svg); i += 1) await frame();
+    return read();
+  };
   window.ready = true;
 </script></body></html>`;
 
@@ -141,6 +155,18 @@ await evaluate(`document.getElementById("box").style.width = "500px"; null`);
 await until(`+document.querySelector("#line svg").getAttribute("width") === 500`, "the resize redraw");
 await check("a resized plot is redrawn at its new size, coalesced to a frame",
   () => evaluate(`+document.querySelector("#line svg").getAttribute("width") === document.getElementById("line").clientWidth`));
+
+const ROWS = ["g1", "g2", "f1", "f2"];
+await evaluate(`window.ROWS = ${JSON.stringify(ROWS)}; ROWS.forEach((id) => window.renderLineChart(document.getElementById(id), WEEKS, LINE)); null`);
+const rowsWide = await evaluate("widths(ROWS)");
+await evaluate(`document.getElementById("grid-row").style.width = "400px"; document.getElementById("flex-row").style.width = "400px"; null`);
+const rowsNarrow = await evaluate("widths(ROWS)");
+await check("two charts in a `1fr 1fr` grid, 800px then 400px: each column narrows to 200 and its chart redraws at 200",
+  () => rowsWide.slice(0, 2).every(([p, s]) => p === 400 && s === 400) && rowsNarrow.slice(0, 2).every(([p, s]) => p === 200 && s === 200),
+  JSON.stringify({ wide: rowsWide.slice(0, 2), narrow: rowsNarrow.slice(0, 2) }));
+await check("...and the same in a `flex: 1` row — the drawn SVG must not hold the item at its old width",
+  () => rowsWide.slice(2).every(([p, s]) => p === 400 && s === 400) && rowsNarrow.slice(2).every(([p, s]) => p === 200 && s === 200),
+  JSON.stringify({ wide: rowsWide.slice(2), narrow: rowsNarrow.slice(2) }));
 
 /* ── x labels thinned to fit ──────────────────────────────────────────────────────────────────── */
 

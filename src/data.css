@@ -338,9 +338,13 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
    series' group, and always a token — `var(--cat-*)` for a categorical series (the family page's
    income, expenses and net become --cat-green, --cat-red and --cat-blue). `--chart-bg` is what a
    hollow dot is filled with: set it to --card when the chart sits on a card. */
+/* `min-inline-size: 0`: the drawn SVG is the figure's min-content, so as a `1fr` grid item or a
+   `flex: 1` item the figure would hold its column at the width it was drawn at, and the plot would
+   never resize to redraw — measured: two charts in a row cut from 800px to 400px stayed at 400 each. */
 .chart {
   margin: 0.6rem 0 1.2rem;
   font-size: var(--fs-base);
+  min-inline-size: 0;
 }
 .chart-plot {
   block-size: var(--chart-h, 12rem);

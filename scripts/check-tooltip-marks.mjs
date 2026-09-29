@@ -10,91 +10,79 @@
 // tipped element in the estate still wore a marker. A rule policed on one side of a boundary is not
 // policed. Removed in 0.49.0 (Daniel: "No cursor help"); this is what stops it coming back.
 //
-// WHAT COUNTS. The BUILT bundle, not the source: a marker can arrive from any layer, and what a
-// surface renders is the compiled file. Comments are stripped first, because this package now
-// carries several paragraphs explaining why the cursor was removed and every one of them contains
-// the words this looks for — a checker satisfied (or broken) by prose reports on documentation.
+// WHAT COUNTS. EVERY stylesheet the package ships — each src/*.css file, read from the source.
+// Until 0.60.0 this read dist/danieldeusing-design.css, the built bundle, on the reasoning that a
+// marker can arrive from any layer and a surface renders the compiled file. Both halves hold for the
+// source set and it has neither blind spot the bundle had: the bundle is only rebuilt at release
+// (check-release.mjs holds it equal to src/ there), so on a branch it reported on the LAST release
+// rather than the change in front of it; and it holds only what index.css imports, so a new file not
+// yet wired in (overlays.css, before integration) was not read at all. Comments are stripped first,
+// because this package carries several paragraphs explaining why the cursor was removed and every
+// one of them contains the words this looks for — a checker satisfied (or broken) by prose reports
+// on documentation.
 //
 // It walks RULE BLOCKS rather than matching a pattern across the file. That is not fastidious: the
 // sibling check in danieldeusing-infra was first written as one regex spanning selector-to-body and
-// reported this package's own `[data-tip]::after, [data-tip][data-tip-bare]::after { content: none }`
-// — the deliberate opt-OUT — because `[^{}]*` slid across a comma into the next selector. A checker
-// whose first act is a false positive teaches people to stop running it.
+// reported this package's own opt-out rule as a marker, because `[^{}]*` slid across a comma into the
+// next selector. A checker whose first act is a false positive teaches people to stop running it.
+//
+// WHAT FAILS, since 0.60.0:
+//   · `cursor: help` on ANY selector. It IS the marker, a page may not draw one, so the package must
+//     not hand one out anywhere.
+//   · ANY rule keyed off `[data-tip]`, whatever it declares. Until 0.60.0 a `content: none` opt-out
+//     (`.minimap-bar[data-tip]::after`, `[data-tip-bare]`) was allowed; the opt-outs went with the
+//     last reason for them, so a tipped element is now styled exactly as the same element untipped,
+//     and any selector naming the attribute is a way for the two to differ.
 //
 //   node scripts/check-tooltip-marks.mjs
 //
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const BUNDLE = "dist/danieldeusing-design.css";
+const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
 let failures = 0;
 const fail = (m) => { failures++; console.log(`  FAIL  ${m}`); };
 const pass = (m) => console.log(`  PASS  ${m}`);
 
-let raw;
-try {
-  raw = readFileSync(BUNDLE, "utf8");
-} catch (error) {
-  // Not a soft skip. An unreadable bundle means this check verified nothing, and a check that
-  // silently verifies nothing is worse than an absent one — it reports green.
-  console.log(`  FAIL  cannot read ${BUNDLE} (${error.code}) — run scripts/build.mjs first`);
-  console.log(`\n\x1b[31m-- check-tooltip-marks: 1 FAILED --\x1b[0m`);
-  process.exit(1);
-}
-
-// Blank comments rather than delete them, so reported line numbers still point at the real line.
-const css = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""));
-const lineOf = (index) => css.slice(0, index).split("\n").length;
+const files = readdirSync(SRC).filter((f) => f.endsWith(".css")).sort();
 const declares = (body, prop) =>
   new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, "i").exec(body);
 
 const problems = [];
-let tipRules = 0;
-for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-  const selector = rule[1];
-  const body = rule[2];
-  const cursor = declares(body, "cursor");
-
-  // `cursor: help` is refused ANYWHERE, not only on a [data-tip]. It IS the marker, a page may not
-  // draw one, so the package must not hand one out on any selector.
-  if (cursor && /^\s*help\b/i.test(cursor[1])) {
-    problems.push([lineOf(rule.index), `\`cursor: help\` on \`${selector.trim().slice(0, 70)}\` — a marker you feel instead of see`]);
-  }
-
-  if (!selector.includes("[data-tip]")) continue;
-  tipRules++;
-
-  // Any cursor keyed off [data-tip] is the same fault wearing a different value: it makes a tipped
-  // control differ from an untipped one. `.minimap-bar[data-tip] { cursor: pointer }` was exactly
-  // that, and existed only to out-specify the `help` above — both went in 0.49.0.
-  if (cursor && !/^\s*help\b/i.test(cursor[1])) {
-    problems.push([lineOf(rule.index), `\`cursor: ${cursor[1].trim()}\` keyed off [data-tip] — whatever the value, a tipped element must not differ from an untipped one. Put the cursor on the element's own selector.`]);
-  }
-
-  // `content: none` is how a host opts OUT and must stay allowed — it is the removal, not the mark.
-  const content = declares(body, "content");
-  if (/::(?:after|before)/.test(selector) && content && !/^\s*none\b/i.test(content[1])) {
-    problems.push([lineOf(rule.index), `a ::after/::before on a [data-tip] host rendering \`${content[1].trim()}\` — the ⓘ glyph, removed in 0.45.0`]);
-  }
-
-  const underline = declares(body, "border-bottom");
-  if (underline && !/^\s*(?:none|0)\b/i.test(underline[1])) {
-    problems.push([lineOf(rule.index), `\`border-bottom: ${underline[1].trim()}\` keyed off [data-tip] — the dotted underline, dropped before the glyph was`]);
+let panelRules = 0;
+for (const file of files) {
+  // Blank comments rather than delete them, so reported line numbers still point at the real line.
+  const css = readFileSync(join(SRC, file), "utf8").replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""));
+  const lineOf = (index) => css.slice(0, index).split("\n").length;
+  for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = rule[1].trim();
+    const body = rule[2];
+    const where = `src/${file}:${lineOf(rule.index + rule[0].indexOf(rule[1].trim()))}`;
+    if (/#ddtip\b/.test(selector)) panelRules++;
+    const cursor = declares(body, "cursor");
+    if (cursor && /^\s*help\b/i.test(cursor[1])) {
+      problems.push(`${where} — \`cursor: help\` on \`${selector.slice(0, 70)}\`: a marker you feel instead of see`);
+    }
+    if (/\[data-tip\b/.test(selector)) {
+      problems.push(`${where} — a rule keyed off [data-tip] (\`${selector.slice(0, 70)}\`): a tipped element must be styled exactly as the same element untipped, and the 0.59.0 opt-outs are gone`);
+    }
   }
 }
 
-// A sweep that finds no [data-tip] rules at all has stopped checking rather than started passing:
-// the tooltip layer would have to be missing from the bundle entirely.
-if (!tipRules) {
-  fail(`${BUNDLE} contains no [data-tip] rules at all — the tooltip layer is missing from the build, so this check verified nothing`);
+// A sweep that finds no panel rules has stopped checking rather than started passing: the tooltip
+// layer (or the directory this reads) would have to be missing.
+if (!panelRules) {
+  fail(`no #ddtip rule in src/*.css (${files.length} files read) — the tooltip layer is missing, so this check verified nothing`);
 } else {
-  pass(`${tipRules} [data-tip] rule(s) in the bundle to check`);
+  pass(`${files.length} stylesheets read, ${panelRules} #ddtip rule(s) among them — the tooltip layer is there to check`);
 }
 
 if (problems.length) {
-  for (const [line, detail] of problems) fail(`${BUNDLE}:${line} — ${detail}`);
+  for (const detail of problems) fail(detail);
 } else {
-  pass("no tooltip marker in the package: no cursor: help, no cursor/::after/border-bottom keyed off [data-tip]");
+  pass("no tooltip marker in the package: no cursor: help anywhere, and no rule keyed off [data-tip]");
 }
 
 console.log();

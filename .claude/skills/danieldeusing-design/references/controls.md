@@ -6,7 +6,7 @@ cards, a file upload, actions that appear on hover, or a confirmation. Everythin
 `src/controls.css`. Buttons with words are `.btn-terminal`, in `components.md`, next to this file.
 
 **None of it has a runtime.** Every state is an attribute the page already owns (`aria-pressed`,
-`aria-checked`, `aria-busy`, `data-dragging`, `disabled`), and the stylesheet draws it. A build-free
+`aria-checked`, `aria-busy`, `aria-disabled`, `data-dragging`, `disabled`), and the stylesheet draws it. A build-free
 page flips the attribute in a click handler; seedr and configr render the same markup from their own
 components and keep their own handlers. `examples/controls.html` shows every element in every state
 and is the working reference for the handlers, and `scripts/check-controls.mjs` measures it.
@@ -29,7 +29,7 @@ Contents:
 - `.reveal`: actions that appear on hover, on focus, and always on touch
 - `.confirm-inline`: the second press, in place
 - `.confirm-code`: type it back
-- Touch, motion and paper
+- Touch, motion, paper, forced colours and `hidden`
 
 ## Which control: decide by what the press does
 
@@ -53,7 +53,7 @@ form is saved.
 ## `.btn-icon`: the icon-only button
 
 ```html
-<button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh catalog" data-tip="refresh catalog"></button>
+<button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh catalog" data-tip="last refreshed 2 minutes ago"></button>
 <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-left" aria-label="back"></button>
 <button type="button" class="btn-icon" data-icon="star" aria-pressed="false" aria-label="favourite seedr"></button>
 <button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove shot-1.png"></button>
@@ -74,15 +74,32 @@ toolbar could hold three sizes of the same button. There is one box now.
 - **The glyph is a mask**, named by `data-icon` from the icon set and painted in `currentColor`. One
   colour rule then recolours it on all four themes and in every state. An inline `<svg>` child works
   for a glyph the set does not have; it is sized for you.
-- **Hover, open and pressed are one look**: the edge takes the glyph's colour and a 12% wash of it
-  fills the box. A toggle carries `aria-pressed`, and pressed KEEPS that look without a pointer. A
-  favourite star swaps to the filled star when pressed. An expand-all carries `aria-expanded` and
-  `aria-controls`.
+- **Hover and open are one look**: the edge takes the glyph's colour and a 12% wash of it fills the
+  box. An expand-all carries `aria-expanded` and `aria-controls`, and open keeps that look without a
+  pointer.
+- **Pressed is solid**, a different look on purpose: a toggle carries `aria-pressed`, and pressed is a
+  `--primary` fill and edge with the glyph in `--primary-foreground`, bordered or `--bare`. It stays
+  solid under the pointer, so a reader pointing at a toggle can still tell whether it is on (the
+  first version drew pressed as the hover wash, and hovering an unpressed toggle looked exactly like
+  a pressed one). A toned toggle fills with its tone. A favourite star swaps to the filled star when
+  pressed.
 - **`data-tone`** (`success`, `warning`, `destructive`, `info`, `pending`, `muted`) recolours it, and
   a toned button keeps its tone under the pointer. The tone must be on the **button**: a `.btn-icon`
   inside a toned container (a notice's dismiss) keeps its own colour.
-- **Busy**: set `aria-busy="true"` **and** `disabled` while the press runs. The glyph becomes the
-  spinner; `disabled` stops a second press.
+- **Busy**: set `aria-busy="true"` **and** `aria-disabled="true"` while the press runs, never
+  `disabled`. `disabled` throws keyboard focus to `<body>` the moment the press begins, and a keyboard
+  user then has to find their place again. With `aria-disabled` focus stays on the button, the glyph
+  becomes the spinner at full strength (a busy button is working, not unavailable, so it is not
+  dimmed), and the page ignores a second press:
+
+  ```js
+  button.addEventListener("click", async () => {
+    if (button.getAttribute("aria-disabled") === "true") return;   // busy, or unavailable
+    button.setAttribute("aria-busy", "true");
+    button.setAttribute("aria-disabled", "true");
+    try { await refresh(); } finally { button.removeAttribute("aria-busy"); button.removeAttribute("aria-disabled"); }
+  });
+  ```
 - **Disabled**: `disabled` dims it to .45. It still shows its `data-tip` to the pointer (measured in
   Chromium), but it leaves the tab order, so a keyboard user cannot reach the reason. When the reason
   matters, use `aria-disabled="true"` instead: same look, still focusable, and the page must then
@@ -95,8 +112,12 @@ toolbar could hold three sizes of the same button. There is one box now.
 
 **`aria-label` is mandatory, and it names the target, not the glyph**: "refresh catalog", never
 "refresh icon", and "remove shot-1.png", never "remove". A mask is not text, so without a label the
-button is announced as "button", and a column of them as "button" a dozen times. `data-tip` may repeat
-the label for a sighted reader; the native `title` is never used.
+button is announced as "button", and a column of them as "button" a dozen times.
+
+**A `data-tip` says what the name does not, or it is left off**: when it last ran ("last refreshed 2
+minutes ago"), why it is off ("refresh runs every 5 minutes"). It never repeats the `aria-label`:
+`tooltip.js` points `aria-describedby` at the tip, so a tip equal to the name is announced twice. The
+native `title` is never used.
 
 ## `.btn-group`: controls that share an edge
 
@@ -251,14 +272,16 @@ a description, and the whole card is the target.
   4.5:1 on warm and mono whatever the tone. `data-tone` recolours the edge, the fill and the glyph.
 - **Unavailable is `disabled` plus a `data-tip` giving the reason** ("this folder is not a git
   repository").
+- **Its tone is its own.** `data-tone` on the card recolours it; a card inside a toned container
+  (a warning notice, a danger zone) does not take the container's colour, because it resets `--tone`
+  at its root like every neutral-default component.
 - `.choice-grid` fills the width with cards of at least 14rem.
 
 ## `.dropzone` and `.thumb-grid`: a file input the keyboard can reach
 
 ```html
-<label class="dropzone">
+<label class="dropzone" data-icon="image-plus">
   <input type="file" accept="image/*" multiple>
-  <span class="ico ico--xl" data-icon="image-plus"></span>
   drop screenshots or choose files
   <span class="dropzone-note">max 5 MB each</span>
 </label>
@@ -271,20 +294,25 @@ a description, and the whole card is the target.
 configr's uploader was a `div` with an `onClick`: a mouse could open the picker and a keyboard could
 not reach it at all. **The zone is a `<label>` around a real `<input type="file">`**, which fixes that
 by construction: Tab lands on the input and Space opens the picker, and a click anywhere on the zone is
-a click on the label. The zone hides its own input, so no utility class is needed.
+a click on the label. The zone hides its own input, so no utility class is needed, and it draws its
+own glyph from `data-icon` on the label (24px, above the words), so it needs no `.ico` child either:
+it renders on a page that loads `tokens.css` and `controls.css` and nothing else.
 
 - The focus ring is drawn on the **zone** while the input has keyboard focus, and not after a mouse
   click (which focuses the input too).
 - **Hover and drag light the whole zone**: `--primary` edge, text and glyph, on an 8% fill. The text
   changes colour with the fill because `--muted-foreground` on it measures under AA.
-- **The page sets `data-dragging`**, and `dragleave` fires for every child the pointer crosses, so only
-  count it when the pointer really leaves:
+- **The page sets `data-dragging`.** Enter and leave fire for every child the pointer crosses, and
+  WebKit (configr runs in WKWebView) sends `dragleave` with a null `relatedTarget`, so "did it leave
+  the zone?" cannot be asked of the event. Count instead: the drag has left when every enter has had
+  its leave.
 
   ```js
-  zone.addEventListener("dragenter", (e) => { e.preventDefault(); zone.dataset.dragging = ""; });
+  let depth = 0;
+  zone.addEventListener("dragenter", (e) => { e.preventDefault(); depth += 1; zone.dataset.dragging = ""; });
   zone.addEventListener("dragover", (e) => e.preventDefault());
-  zone.addEventListener("dragleave", (e) => { if (!zone.contains(e.relatedTarget)) delete zone.dataset.dragging; });
-  zone.addEventListener("drop", (e) => { e.preventDefault(); delete zone.dataset.dragging; add(e.dataTransfer.files); });
+  zone.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) delete zone.dataset.dragging; });
+  zone.addEventListener("drop", (e) => { e.preventDefault(); depth = 0; delete zone.dataset.dragging; add(e.dataTransfer.files); });
   input.addEventListener("change", () => add(input.files));
   ```
 
@@ -309,6 +337,10 @@ actions with `display: none`, which took them out of the tab order: until the po
 keyboard could not reach them. An invisible action here is still a tab stop, and the moment focus lands
 on it the host's `:focus-within` shows it. On a screen with no hover (a phone) the actions are simply
 visible. A `.thumb`'s remove button follows the same rule without the classes.
+
+The reveal only ever takes opacity AWAY (while the host is neither hovered nor focused). A revealed
+action therefore shows at its own opacity, so a **disabled** one stays at .45 when its row is hovered
+and on a phone, instead of lighting up at full strength and looking pressable.
 
 Do not reveal the only way to do something that matters. Hover-revealed actions are for secondary
 actions on items in a list; the item's primary action stays visible.
@@ -358,15 +390,19 @@ it, so the decision cannot be a reflex.
 - **The confirming button stays `disabled` until the typed value matches.** Compare trimmed, and in
   the code's own case rules (cockpit lower-cases a hash head).
 - **The status line is a polite live region whose tone the page sets**: `data-tone="warning"` and
-  "that is not the code shown above" on a mismatch, no tone while it works. It always reserves one
-  line, so the dialog does not jump when the message appears.
+  "that is not the code shown above" on a mismatch, no tone while it works. It reads only its OWN
+  `data-tone`, so inside a toned notice it stays muted until the page says otherwise. It always
+  reserves one line, so the dialog does not jump when the message appears.
 - **The code is read one character at a time**: it is set in the mono face and tracked, and it is
   named for assistive technology digit by digit with `role="img"` and an `aria-label`. An `aria-label`
   on a bare `<p>` is not allowed by ARIA and is ignored.
-- `inputmode` fits the code's alphabet: `numeric` for digits, `latin` for a hash head.
+- `inputmode` fits the code's alphabet: `numeric` for digits; for a hash head leave it off (or
+  `text`), since letters are part of it.
 - The input is the one text size and at most 14rem wide; only the code itself is `--fs-xl`.
+- A code that expired or an ask that was withdrawn is a `disabled` input: .45, and it does not light
+  under the pointer.
 
-## Touch, motion and paper
+## Touch, motion, paper, forced colours and `hidden`
 
 - **Under a coarse pointer every control grows to 44px** by `min-*`, so the glyph or the label stays
   where it was drawn: icon buttons both ways, segments, switches, `.check` labels, choice cards, the
@@ -376,4 +412,16 @@ it, so the decision cannot be a reflex.
 - **On paper**, the controls that only act (icon buttons, groups, segmented controls, footers, drop
   zones, revealed actions, the confirmations) are removed. Checkboxes, radios and switches carry a
   value, so they print, with their fills kept (`print-color-adjust: exact`): without it a checked box
-  would print empty.
+  would print empty. A `.btn-group` that is a filter dropdown or a sort control (`filters.md`) prints
+  too: it says how the printed list was narrowed and ordered.
+- **Forced colours** (Windows High Contrast) are answered in the file, on every theme and both
+  palettes. Glyphs take `forced-color-adjust: preserve-parent-color` and paint in the colour their
+  control was forced to (CanvasText where the engine lacks it). The drawn states are redrawn in system
+  colours: on, checked, pressed and chosen are a `Highlight` fill with a `HighlightText` knob, mark or
+  glyph; off is a `ButtonText` edge; disabled is `GrayText`. A pressed segment and a chosen card carry
+  text on that fill, so they opt out of forcing with both colours named: otherwise the browser paints
+  a Canvas backplate behind the words and they vanish. Nothing to add on a page; do not "fix" a glyph
+  here with `forced-color-adjust: none`, which keeps the author colour instead of the reader's.
+- **`hidden` hides every control.** Each class sets its own `display`, which beats the browser's own
+  `[hidden]` rule, so `tokens.css` carries the one rule that makes `hidden` win for every component.
+  Nothing here repeats it, and a page should not add a per-class `[hidden]` guard either.

@@ -20,10 +20,19 @@
  *   --ico-* and the [data-icon] -> --ico mapping    the glyph masks
  *   --tone            set by [data-tone] (primary, success, warning, destructive, info, pending, muted)
  *   dd-spin           the busy keyframes; html.anim-off stops them and every transition below
+ *   [hidden]          `[hidden]:not([hidden="until-found"]) { display: none !important }`. Every class
+ *                     here sets its own display, and an author display beats the browser's [hidden]
+ *                     rule, so without that one line `hidden` hid nothing. It lives in tokens.css,
+ *                     once, for every component; nothing here repeats it per class.
  *
  * NO RUNTIME. Every state here is an attribute the page already owns (aria-pressed, aria-checked,
- * aria-busy, data-dragging, disabled). Framework apps render the same markup from their own
- * components and keep their own handlers; build-free pages flip the attribute in a click handler.
+ * aria-busy, aria-disabled, data-dragging, disabled). Framework apps render the same markup from
+ * their own components and keep their own handlers; build-free pages flip the attribute in a click
+ * handler.
+ *
+ * FORCED COLOURS are answered at the end of the file: every glyph follows the colour its control was
+ * forced to, and every drawn state is redrawn in system colours, or a High Contrast reader sees no
+ * glyphs and cannot tell on from off.
  */
 
 /* ── .btn-icon — THE ICON-ONLY BUTTON ─────────────────────────────────────────────────────────────
@@ -47,14 +56,15 @@
    currentColor through it, so one colour rule recolours the glyph on all four themes and in every
    state. An inline <svg> child is accepted for a glyph the set does not have.
 
-   THE STATE RULES SHARE ONE SPECIFICITY, so source order is the precedence and the order below is
-   the whole story: rest, then hover / open / pressed, then --bare and its states, then a tone, then
-   disabled. :where() is what holds them level. Without it `:hover` (three classes' worth) outranks
-   `--bare` (one), and a bare button grows an edge under the pointer.
+   THE HOVER RULES SHARE ONE SPECIFICITY, so source order is the precedence among them: rest, then
+   hover / open, then --bare and its hover / open. :where() is what holds them level. Without it
+   `:hover` (three classes' worth) outranks `--bare` (one), and a bare button grows an edge under the
+   pointer. Above them, each a class and an attribute: a tone, pressed, busy and disabled.
 
    NAME THE TARGET. aria-label is mandatory: a mask is not text, so without one a column of these
    announces "button" a dozen times. It names what the press acts on ("refresh catalog"), never the
-   glyph ("refresh icon"). A data-tip may repeat it for a sighted reader. */
+   glyph ("refresh icon"). A data-tip says what the name does not (when it last ran, why it is off)
+   and never repeats it: tooltip.js points aria-describedby at the tip, so a repeat is heard twice. */
 .btn-icon {
   position: relative;   /* a .count--overlay sits on the corner */
   display: inline-grid;
@@ -83,10 +93,11 @@
 }
 .btn-icon > svg { inline-size: var(--icon-size); block-size: var(--icon-size); }
 
-/* Hover, open and pressed are one look: the edge takes the glyph's colour and a 12% wash of it
-   fills the box. Pressed KEEPS it, so a toggle that is on looks like a toggle under the pointer
-   whether or not the pointer is there. */
-.btn-icon:where(:not(:disabled, [aria-disabled="true"]):hover, [aria-expanded="true"], [aria-pressed="true"]) {
+/* Hover and open are one look: the edge takes the glyph's colour and a 12% wash of it fills the box.
+   PRESSED IS NOT THAT LOOK (the lead's ruling on the WP5 review): it is solid, below. A pressed toggle
+   that kept only the hover wash looked exactly like an unpressed one under the pointer, so a reader
+   hovering it could not tell whether it was on. */
+.btn-icon:where(:not(:disabled, [aria-disabled="true"]):hover, [aria-expanded="true"]) {
   border-color: currentColor;
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
@@ -99,7 +110,7 @@
   --btn-icon-color: var(--muted-foreground);
   border-color: transparent;
 }
-.btn-icon--bare:where(:not(:disabled, [aria-disabled="true"]):hover, [aria-expanded="true"], [aria-pressed="true"]) {
+.btn-icon--bare:where(:not(:disabled, [aria-disabled="true"]):hover, [aria-expanded="true"]) {
   --btn-icon-color: var(--primary);
   border-color: transparent;
   background: var(--muted);
@@ -111,19 +122,34 @@
    destructive remove stays destructive under the pointer. */
 .btn-icon[data-tone] { --btn-icon-color: var(--tone); }
 
+/* PRESSED IS SOLID: a --primary fill and edge with the glyph cut out in --primary-foreground, on the
+   bordered and the bare button alike, and it stays solid under the pointer (no :where()-levelled
+   hover can reach a class and an attribute). A toned toggle fills with its tone instead. Measured:
+   the glyph on its fill is 6.45:1 at worst on --primary (warm) and 5.39 at worst on a tone, and the
+   fill against every surface is 4.67 at worst, so the pressed box is itself a 3:1 edge. */
+.btn-icon[aria-pressed="true"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.btn-icon[data-tone][aria-pressed="true"] { background: var(--tone); border-color: var(--tone); }
+
 /* A favourite that is on is a FILLED star: the glyph carries the state as well as the box. */
 .btn-icon[data-icon="star"][aria-pressed="true"]:not([aria-busy="true"]) { --ico: var(--ico-star-filled); }
 
-/* BUSY: the glyph becomes the spinner, whatever it was. The page also sets `disabled`, so the press
-   cannot be repeated while it runs. An <svg> child steps aside for the spinner. */
-.btn-icon[aria-busy="true"] { --ico: var(--ico-loader-circle); }
+/* BUSY is aria-busy="true" WITH aria-disabled="true", never `disabled` (X5). `disabled` throws
+   keyboard focus to <body> in the middle of the action, so a keyboard user who pressed refresh has to
+   find their place again when it ends; aria-disabled keeps focus where it was, and the page ignores
+   the press while it is set. The glyph becomes the spinner, whatever it was, at FULL strength: the .45
+   below is for a control that is unavailable, and a busy one is working. An <svg> child steps aside. */
+.btn-icon[aria-busy="true"] { --ico: var(--ico-loader-circle); cursor: progress; }
 .btn-icon[aria-busy="true"]::before { animation: dd-spin 1s linear infinite; }
 .btn-icon[aria-busy="true"] > svg { display: none; }
 
 .btn-icon:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 /* aria-disabled keeps the button focusable, so a tip explaining WHY it is off can still be reached
    from the keyboard. The page must then ignore its clicks; CSS cannot. */
-.btn-icon:is(:disabled, [aria-disabled="true"]) { opacity: 0.45; cursor: default; }
+.btn-icon:is(:disabled, [aria-disabled="true"]):not([aria-busy="true"]) { opacity: 0.45; cursor: default; }
 
 /* ── .btn-group — CONTROLS THAT SHARE AN EDGE ──────────────────────────────────────────────────────
    A filter trigger and its clear, a sort direction and its field, a row of icon toggles: two or more
@@ -405,7 +431,12 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
    which is the point of choosing it.
 
    The edge at rest is --border. A card is a container and is identified by its title, not by its
-   outline; the chosen edge is the tone at full strength. */
+   outline; the chosen edge is the tone at full strength.
+
+   ITS TONE IS ITS OWN. --tone inherits (F7), so a card inside a toned container would take that
+   container's colour for its edge and glyph. A card with no data-tone of its own resets it at its root,
+   the rule every neutral-default component follows (.notice, .tag), and falls back to --primary. */
+.choice-card:not([data-tone]) { --tone: initial; }
 .choice-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
@@ -463,7 +494,10 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
    HOVER AND DRAG LIGHT THE WHOLE ZONE: --primary edge, --primary text and glyph, an 8% --primary fill.
    The text changes colour with the fill because it has to: --muted-foreground on that fill measures
    4.18:1 on warm and 4.49 on mono, under AA, while --primary on it is 5.00 at worst. The page sets
-   data-dragging on dragenter and removes it on dragleave and drop; there is no runtime.
+   data-dragging on dragenter and removes it when the drag has left or dropped; there is no runtime.
+
+   THE GLYPH IS THE ZONE'S OWN (data-icon on the label, drawn by ::before at --icon-xl), not an .ico
+   child: tokens.css maps the word onto --ico, so the zone draws it with tokens.css and this file alone.
 
    A dashed edge is the mark of a drop target, and nothing else in the control set uses one. */
 .dropzone {
@@ -479,6 +513,14 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
   border: 1px dashed var(--control-edge);
   cursor: pointer;
   transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.dropzone[data-icon]::before {
+  content: "";
+  inline-size: var(--icon-xl);
+  block-size: var(--icon-xl);
+  background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
 }
 .dropzone > input[type="file"] {
   position: absolute;
@@ -542,18 +584,21 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
    moment focus lands on it :focus-within shows it. Under (hover: none), a phone, where no pointer
    ever arrives, it is simply always visible.
 
+   THE RULE ONLY EVER TAKES OPACITY AWAY. It hides the action while the host is neither hovered nor
+   focused, on a device that can hover, and otherwise says nothing, so a revealed action shows at
+   whatever opacity it has of its own. The first version revealed with `opacity: 1`, which outranked
+   .btn-icon's disabled .45: a disabled remove button lit up at full strength on hover and on every
+   phone, looking pressable.
+
    A thumbnail's remove button follows the same rule without the classes: .thumb is its host. The
    transition names the colour properties too, so a revealed .btn-icon keeps its own hover fade. */
 .reveal-host .reveal,
 .thumb > .btn-icon {
-  opacity: 0;
   transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
-.reveal-host:is(:hover, :focus-within) .reveal,
-.thumb:is(:hover, :focus-within) > .btn-icon { opacity: 1; }
-@media (hover: none) {
-  .reveal-host .reveal,
-  .thumb > .btn-icon { opacity: 1; }
+@media (hover: hover) {
+  .reveal-host:not(:hover, :focus-within) .reveal,
+  .thumb:not(:hover, :focus-within) > .btn-icon { opacity: 0; }
 }
 
 /* ── .confirm-inline — THE SECOND PRESS, IN PLACE ──────────────────────────────────────────────────
@@ -586,7 +631,12 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
    `max-width: 100%` would otherwise win over the 14rem cap.
 
    The page keeps the confirming button disabled until the typed value matches, and sets the status
-   line's tone: data-tone="warning" on a mismatch, nothing while it works. */
+   line's tone: data-tone="warning" on a mismatch, nothing while it works. The line reads only its OWN
+   data-tone: an inherited --tone would turn "working…" the colour of whatever notice it sits in.
+
+   A disabled input (the code expired, the ask was withdrawn) is .45 and does not light under the
+   pointer, like every other control here. It names its own edge, because an element-level hover rule
+   (0.59.0's components.css lights every text input, disabled or not) outranks the plain box. */
 .confirm-code {
   display: grid;
   justify-items: start;
@@ -621,17 +671,19 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
   border: 1px solid var(--control-edge);
   transition: border-color 0.15s ease;
 }
-.confirm-code .confirm-code-input:hover { border-color: var(--primary); }
+.confirm-code .confirm-code-input:not(:disabled):hover { border-color: var(--primary); }
 .confirm-code .confirm-code-input:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-color: var(--primary);
 }
+.confirm-code .confirm-code-input:disabled { opacity: 0.45; cursor: default; border-color: var(--control-edge); }
 .confirm-code-status {
   min-block-size: 1lh;
   margin: 0;
-  color: var(--tone, var(--muted-foreground));
+  color: var(--muted-foreground);
 }
+.confirm-code-status[data-tone] { color: var(--tone); }
 
 /* ── 44px UNDER A THUMB ────────────────────────────────────────────────────────────────────────────
    Every control above is sized for a pointer. On a touch screen each grows to WCAG's 44px target,
@@ -652,15 +704,119 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
   .btn-icon[aria-busy="true"]::before { animation: none; }
 }
 
+/* ── FORCED COLOURS ────────────────────────────────────────────────────────────────────────────────
+   Windows High Contrast, and every other forced palette, replace each author colour with a system
+   colour and every fill with Canvas, and three kinds of drawing here do not survive that on their own.
+
+   A MASK GLYPH is a currentColor fill seen through a mask, so a forced fill is a Canvas glyph on
+   Canvas: gone. Each glyph takes `forced-color-adjust: preserve-parent-color`, which gives it the
+   colour its host was FORCED to (ButtonText in a button, CanvasText in the drop zone's label, GrayText
+   when disabled, HighlightText on a state redrawn below) and leaves its currentColor fill alone. The
+   glyph names no colour of its own. NOT `none`: forcing happens at used-value time and inheritance
+   carries computed values, so an opted-out glyph keeps the host's AUTHOR colour. Measured here on
+   warm: the icon button's glyph came out --primary brown on a black Canvas (WP4 measured 1.11 to
+   1.78:1, or nothing at all, across the themes). An engine without preserve-parent-color gets
+   CanvasText instead, and currentColor wherever this block names the host's colour, because
+   CanvasText on a Highlight fill is not a glyph anyone can see. The same default ships in tokens.css
+   for every [data-icon]::before (WP4); this file states its own, so the controls keep it on a page
+   whatever that page loads, and the busy spinner, which has no data-icon, is covered too.
+
+   A STATE DRAWN BY FILL (on, checked, pressed, chosen) collapses into its opposite once every fill is
+   Canvas. Each is redrawn in system colours, which are the one kind of author colour a forced palette
+   keeps: on is a Highlight fill with a HighlightText knob, mark, dot or glyph; off is a ButtonText
+   edge; disabled is GrayText, and a GrayText fill with a Canvas mark when it is disabled AND on, so
+   the state still shows. A checkbox's mark, a radio's dot and the switch's track belong to the state
+   they draw: they opt out and name every colour (never currentColor), and the switch has to, because
+   its knob is a gradient and forcing removes gradients outright.
+
+   A FILLED BOX THAT HOLDS TEXT opts out whole, with its colour and fill as a system pair. Chromium
+   paints a Canvas "backplate" behind every line of text in forced colours, over whatever fill the box
+   has, so a pressed segment's HighlightText on its Highlight fill was painted as HighlightText on
+   Canvas: a solid block where the word was (measured in both palettes; the computed colours were
+   right, which is why the check reads pixels for it). Opted out, the pressed segment and the chosen
+   card name every colour they draw, their focus ring included, and forced-color-adjust inherits, so a
+   card's title and description go with it. */
+@media (forced-colors: active) {
+  @supports (forced-color-adjust: preserve-parent-color) {
+    .btn-icon:is([data-icon], [aria-busy="true"])::before,
+    .segmented > button[data-icon]::before,
+    .choice-card[data-icon]::before,
+    .dropzone[data-icon]::before { forced-color-adjust: preserve-parent-color; background: currentColor; }
+  }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .btn-icon:is([data-icon], [aria-busy="true"])::before,
+    .segmented > button[data-icon]::before,
+    .choice-card[data-icon]::before,
+    .dropzone[data-icon]::before { forced-color-adjust: none; background: CanvasText; }
+    .btn-icon[aria-pressed="true"]::before,
+    .btn-icon:is(:disabled, [aria-disabled="true"]):not([aria-busy="true"])::before,
+    .segmented > button:is([aria-pressed="true"], :disabled)::before,
+    .choice-card:is([aria-pressed="true"], :disabled)::before,
+    .dropzone:not(:has(> input:disabled)):hover::before,
+    .dropzone:is([data-dragging], :has(> input:disabled))::before { background: currentColor; }
+  }
+
+  input[type="checkbox"]::before,
+  input[type="radio"]::before,
+  .switch::after,
+  .segmented > button[aria-pressed="true"],
+  .choice-card[aria-pressed="true"] { forced-color-adjust: none; }
+
+  .btn-icon[aria-pressed="true"],
+  .btn-icon[data-tone][aria-pressed="true"] { color: HighlightText; background-color: Highlight; border-color: Highlight; }
+  .btn-icon:is(:disabled, [aria-disabled="true"]):not([aria-busy="true"]) { color: GrayText; border-color: GrayText; }
+  .btn-icon:is(:disabled, [aria-disabled="true"]):not([aria-busy="true"])[aria-pressed="true"] { color: Canvas; background-color: GrayText; }
+
+  .switch::after { border-color: ButtonText; background-image: linear-gradient(ButtonText, ButtonText); }
+  .switch[aria-checked="true"]::after { background-color: Highlight; border-color: Highlight; background-image: linear-gradient(HighlightText, HighlightText); }
+  .switch:not(:disabled):hover::after { border-color: Highlight; }
+  .switch:disabled::after { border-color: GrayText; background-image: linear-gradient(GrayText, GrayText); }
+  .switch[aria-checked="true"]:disabled::after { background-color: GrayText; background-image: linear-gradient(Canvas, Canvas); }
+
+  input[type="checkbox"],
+  input[type="radio"] { border-color: ButtonText; }
+  input:is([type="checkbox"], [type="radio"]):not(:disabled):hover,
+  .check:hover > input:is([type="checkbox"], [type="radio"]):not(:disabled) { border-color: Highlight; }
+  input[type="checkbox"]:is(:checked, :indeterminate),
+  input[type="radio"]:checked { background-color: Highlight; border-color: Highlight; }
+  input[type="checkbox"]:is(:checked, :indeterminate)::before,
+  input[type="radio"]:checked::before { background-color: HighlightText; }
+  input:is([type="checkbox"], [type="radio"]):disabled { border-color: GrayText; }
+  input[type="checkbox"]:is(:checked, :indeterminate):disabled,
+  input[type="radio"]:checked:disabled { background-color: GrayText; }
+  input[type="checkbox"]:is(:checked, :indeterminate):disabled::before,
+  input[type="radio"]:checked:disabled::before { background-color: Canvas; }
+
+  .segmented > button[aria-pressed="true"]:not(:disabled) { color: HighlightText; background-color: Highlight; border-color: Highlight; }
+  .segmented > button:disabled { color: GrayText; border-color: GrayText; }
+  .segmented > button[aria-pressed="true"]:disabled { color: Canvas; background-color: GrayText; }
+
+  .choice-card[aria-pressed="true"]:not(:disabled) { color: HighlightText; background-color: Highlight; border-color: Highlight; }
+  .choice-card[aria-pressed="true"] :is(.choice-title, .choice-desc) { color: inherit; }
+  .choice-card:disabled { color: GrayText; border-color: GrayText; }
+  .choice-card[aria-pressed="true"]:disabled { color: Canvas; background-color: GrayText; }
+
+  .segmented > button[aria-pressed="true"]:focus-visible,
+  .choice-card[aria-pressed="true"]:focus-visible { outline-color: Highlight; }
+
+  .dropzone:not(:has(> input:disabled)):hover,
+  .dropzone[data-dragging] { color: Highlight; border-color: Highlight; }
+  .dropzone:has(> input:disabled) { color: GrayText; border-color: GrayText; }
+}
+
 /* ── PRINT ─────────────────────────────────────────────────────────────────────────────────────────
    Paper cannot be pressed. The controls that only ACT (icon buttons, groups, form footers, drop
    zones, revealed actions, the confirmations) are removed. The ones that carry a VALUE stay, and keep
    it: a checkbox's fill, a radio's dot and a switch's knob are backgrounds, which a browser drops on
    paper by default, so a checked box would print as an empty one. print-color-adjust keeps them,
-   against print.css's black-on-white palette. */
+   against print.css's black-on-white palette.
+
+   A group is removed only when it is a group of actions. The filter dropdown and the sort control
+   are .btn-group too (filters.css), and they carry the value a printed list was filtered and sorted
+   by: removing them would print a filtered list with nothing saying so. */
 @media print {
   .btn-icon,
-  .btn-group,
+  .btn-group:not(.filter-dd, .sort-ctl),
   .segmented,
   .form-actions,
   .btn-row,

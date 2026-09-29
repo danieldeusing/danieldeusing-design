@@ -9,18 +9,37 @@
  * twice shipped CSS that read correctly and computed otherwise (check-release.mjs #6 records one). So
  * each claim here is asserted against getComputedStyle, with :hover and :focus-visible FORCED through
  * the DevTools protocol, keys and clicks DISPATCHED rather than synthesised, and the coarse pointer,
- * reduced motion and print EMULATED.
+ * reduced motion, print and forced colours EMULATED. Where the computed style can be right while the
+ * screen is wrong (a forced-colours backplate), the screen is read.
  *
  * WHAT IT COVERS, in the order below:
- *   · each element's box, edge, colour and every state (rest, hover, focus, pressed, disabled, busy)
+ *   · each element's box, edge, colour and every state (rest, hover, pressed, disabled, busy)
+ *   · busy keeps keyboard focus on the button for the whole press, and ignores a second press
  *   · the drop zone's keyboard path: Tab reaches the hidden input and rings the ZONE; a mouse click
- *     opens the picker and draws no ring; Space opens it too
- *   · self-sufficiency: with base.css and components.css switched off, the controls compute the same
+ *     opens the picker and draws no ring; Space opens it too. Its drag state survives WebKit's null
+ *     dragleave.relatedTarget
+ *   · `hidden` hides every control (the one [hidden] rule, X3)
+ *   · BARE MODE, with base.css and components.css switched off:
+ *       - every focus ring. base.css draws the same 2px ring on every element, so with it loaded a
+ *         control whose own :focus-visible rule was deleted still passed; switched off, only the
+ *         control's own rule can draw it
+ *       - self-sufficiency: box, edge, colours, font family and size, and states compute the same
+ *         with the two files and without them
+ *       - every control that shows text follows the page's font. A button does not inherit it by
+ *         default, so one that lost `font: inherit` renders in the browser's 13.33px Arial, beside
+ *         base.css or not
  *   · no radius anywhere except the radio, which is a circle
- *   · 44px under a coarse pointer; revealed actions visible under (hover: none); reduced motion; print
+ *   · 44px under a coarse pointer; revealed actions visible under (hover: none), and a DISABLED one
+ *     still .45; reduced motion; print
+ *   · FORCED COLOURS, on 4 themes x a light and a dark forced palette, and again as an engine without
+ *     preserve-parent-color renders it: every on / off, checked / unchecked / indeterminate, pressed /
+ *     unpressed and chosen / not pair paints two different colours; every glyph, mark and knob reaches
+ *     3:1 and every word on a redrawn state 4.5:1; a part that opts out of forcing paints only system
+ *     colours; and the PIXELS are read, because a text backplate paints over a word whose computed
+ *     colours are perfect
  *   · CONTRAST: every new text and edge pairing, on warm / green / mono / paper, over --background,
  *     --card and --muted. Text >= 4.5:1, control edges and glyphs >= 3:1. The table it prints is the
- *     one in the release notes.
+ *     one in the release notes. Pressed is told from hovered on every theme.
  *
  * It reads the demo page because the demo is where every state is rendered once. If the page loses a
  * `data-t` hook, the check fails on the missing element; it never passes over an empty selection.
@@ -119,11 +138,22 @@ const evaluate = async (expression) => {
 };
 
 let failures = 0;
+let last = "(before the first check)";
 const check = (label, condition, detail) => {
+  last = label;
   if (condition) { console.log(`PASS  ${label}`); return; }
   failures += 1;
   console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${typeof detail === "string" ? detail : JSON.stringify(detail)}`}`);
 };
+// A throw (a hook the page lost, a selector that matches nothing) is a FAIL naming where the suite got
+// to, never a bare stack: a mutation that aborts the run must read as detected, and say where.
+for (const event of ["uncaughtException", "unhandledRejection"]) {
+  process.on(event, (error) => {
+    console.log(`FAIL  the suite threw after "${last}"\n        ${error?.message ?? error}`);
+    console.log("\ncheck-controls: FAILED (aborted)");
+    process.exit(1);
+  });
+}
 
 /*
  * In-page helpers. `el()` THROWS on a missing selector, so a renamed hook fails loudly instead of the
@@ -231,7 +261,7 @@ const covering = await evaluate(`(() => {
       '--control-h / --control-edge / --icon-*': ['--control-h', '--control-edge', '--icon-size'].map((p) => root.getPropertyValue(p)).join('|'),
       '[data-tone] -> --tone': getComputedStyle(c.el('${T("destructive")}')).getPropertyValue('--tone'),
       '[data-icon] -> --ico': getComputedStyle(c.el('${T("rest")}')).getPropertyValue('--ico'),
-      '.ico / .ico--xl': c.cs('${T("dropzone")} .ico').width,
+      '[hidden] (X3)': (() => { const n = c.el('${T("rest")}'); n.hidden = true; const d = getComputedStyle(n).display; n.hidden = false; return d; })(),
       'dd-spin + html.anim-off transitions': [...document.styleSheets].some((s) => { try { return [...s.cssRules].some((r) => r.name === 'dd-spin'); } catch { return false; } }) + '|' + (document.documentElement.classList.add('anim-off'), c.cs('${T("rest")}').transitionDuration),
       '.btn-terminal--danger': c.cs('${T("confirm-armed")} .btn-terminal--danger').color,
       '.filter-bar': c.cs('${T("filter-bar")}').display,
@@ -263,17 +293,27 @@ s = await withForced(T("rest"), ["hover"], `(() => { const { cs, resolve, same }
   return { edge: same(b.borderTopColor, b.color), fill: same(b.backgroundColor, resolve('color-mix(in srgb, var(--primary) 12%, transparent)')) }; })()`);
 check("hover: the edge takes the glyph's colour and a 12% wash fills the box", s.edge && s.fill, s);
 
-s = await withForced(T("rest"), ["focus", "focus-visible"], `(() => { const { cs, resolve, same } = __c; const b = cs('${T("rest")}');
-  return { w: b.outlineWidth, st: b.outlineStyle, off: b.outlineOffset, ring: same(b.outlineColor, resolve('var(--ring)')) }; })()`);
-check("focus-visible: a 2px solid --ring outline, 2px out", s.w === "2px" && s.st === "solid" && s.off === "2px" && s.ring, s);
-
-s = await evaluate(`(() => { const { cs, resolve, same } = __c;
-  const on = cs('${T("star-on")}'), exp = cs('${T("expanded")}'), wash = resolve('color-mix(in srgb, var(--primary) 12%, transparent)');
-  return { pressed: same(on.backgroundColor, wash) && same(on.borderTopColor, on.color), expanded: same(exp.backgroundColor, wash),
+// PRESSED IS SOLID (the lead's ruling): a --primary fill and edge, the glyph in --primary-foreground,
+// on the bordered and the bare button alike, and it stays that way under the pointer. Expanded keeps
+// the hover look, because an open menu is not a state the reader set.
+const PRESSED = (id) => `(() => { const { cs, resolve, same } = __c; const b = cs('${T(id)}'), g = cs('${T(id)}', '::before');
+  return { fill: same(b.backgroundColor, resolve('var(--primary)')), edge: same(b.borderTopColor, resolve('var(--primary)')),
+    ink: same(b.color, resolve('var(--primary-foreground)')) && same(g.backgroundColor, b.color), look: [b.backgroundColor, b.borderTopColor, b.color].join('|') }; })()`;
+for (const [id, name] of [["star-on", "a bordered toggle"], ["bare-on", "a --bare toggle"]]) {
+  s = await evaluate(PRESSED(id));
+  check(`pressed is SOLID on ${name}: --primary fill and edge, the glyph in --primary-foreground`, s.fill && s.edge && s.ink, s);
+  const hovered = await withForced(T(id), ["hover"], PRESSED(id));
+  check(`...and ${name} stays solid under the pointer`, hovered.look === s.look, { rest: s.look, hovered: hovered.look });
+}
+s = await evaluate(`(() => { const { cs, resolve, same } = __c; const exp = cs('${T("expanded")}');
+  return { wash: same(exp.backgroundColor, resolve('color-mix(in srgb, var(--primary) 12%, transparent)')), edge: same(exp.borderTopColor, exp.color),
     filled: cs('${T("star-on")}', '::before').maskImage === resolve('var(--ico-star-filled)', 'mask-image'),
     outline: cs('${T("star")}', '::before').maskImage === resolve('var(--ico-star)', 'mask-image') }; })()`);
-check("pressed and expanded KEEP the hover look without a pointer", s.pressed && s.expanded, s);
+check("expanded keeps the hover look without a pointer", s.wash && s.edge, s);
 check("a pressed star is the FILLED star; an unpressed one the outline", s.filled && s.outline, s);
+s = await evaluate(`(() => { const { el, cs, resolve, same } = __c; const b = cs(el('[data-surface="background"] [data-probe="tone-destructive-pressed"]'));
+  return [same(b.backgroundColor, resolve('var(--destructive)')), same(b.borderTopColor, resolve('var(--destructive)')), same(b.color, resolve('var(--primary-foreground)'))]; })()`);
+check("a TONED pressed toggle fills with its tone instead", s.every(Boolean), s);
 
 for (const id of ["disabled", "aria-disabled"]) {
   s = await withForced(T(id), ["hover"], `(() => { const { cs, resolve, same } = __c; const b = cs('${T(id)}');
@@ -281,9 +321,32 @@ for (const id of ["disabled", "aria-disabled"]) {
   check(`${id}: .45, default cursor, and no hover under a forced :hover`, s.op === "0.45" && s.cursor === "default" && s.edge && s.bg === "rgba(0, 0, 0, 0)", s);
 }
 
-s = await evaluate(`(() => { const { cs, resolve } = __c; const g = cs('${T("busy")}', '::before');
-  return { mask: g.maskImage === resolve('var(--ico-loader-circle)', 'mask-image'), anim: g.animationName, dur: g.animationDuration, n: g.animationIterationCount }; })()`);
+// BUSY is aria-busy + aria-disabled, never `disabled` (X5): the spinner at FULL strength, because a
+// busy button is working, not unavailable.
+s = await evaluate(`(() => { const { el, cs, resolve } = __c; const b = el('${T("busy")}'), g = cs(b, '::before');
+  return { mask: g.maskImage === resolve('var(--ico-loader-circle)', 'mask-image'), op: cs(b).opacity, cursor: cs(b).cursor,
+    attrs: [b.getAttribute('aria-busy'), b.getAttribute('aria-disabled'), b.disabled] }; })()`);
 check("aria-busy: the glyph becomes the loader (the animation is asserted with motion on, below)", s.mask, s);
+check("...drawn at FULL strength with a progress cursor, never the disabled .45", s.op === "1" && s.cursor === "progress", s);
+check("...and the demo marks it aria-busy + aria-disabled, never `disabled`", s.attrs.join() === "true,true,false", s.attrs);
+
+// The live cycle, with REAL keys: Enter on the focused button starts it, a second Enter while it runs
+// is ignored, and focus stays on the button the whole time. `disabled` would have thrown focus to
+// <body> the moment the press began.
+await evaluate(`__c.el('${T("busy-live")}').focus(); null`);
+await key("Enter", "Enter", 13, "\r");
+await sleep(50);
+s = await evaluate(`(() => { const b = __c.el('${T("busy-live")}'); return { busy: b.getAttribute('aria-busy'), ariaDisabled: b.getAttribute('aria-disabled'), disabled: b.disabled, focused: document.activeElement === b, op: getComputedStyle(b).opacity }; })()`);
+check("busy cycle: a press sets aria-busy and aria-disabled, not `disabled`", s.busy === "true" && s.ariaDisabled === "true" && s.disabled === false, s);
+check("...focus STAYS on the button while it is busy, and the spinner is full strength", s.focused && s.op === "1", s);
+await key("Enter", "Enter", 13, "\r");
+await sleep(50);
+s = await evaluate(`__c.el('${T("busy-live")}').dataset.demoRuns`);
+check("...a second press while busy is ignored", s === "1", s);
+await sleep(1600);
+s = await evaluate(`(() => { const b = __c.el('${T("busy-live")}'); return { busy: b.getAttribute('aria-busy'), ariaDisabled: b.getAttribute('aria-disabled'), focused: document.activeElement === b }; })()`);
+check("...and when it ends, focus is still on the button (the page never had to put it back)", s.busy === null && s.ariaDisabled === null && s.focused, s);
+await evaluate("document.activeElement.blur(); null");
 
 s = await evaluate(`(() => { const { cs, rect } = __c; const g = cs('${T("sm")}', '::before'); return { r: rect('${T("sm")}'), g: [g.width, g.height] }; })()`);
 check("--sm is 24px with a 12px glyph", s.r.w === 24 && s.r.h === 24 && s.g.join() === "12px,12px", s);
@@ -359,8 +422,6 @@ check("...hover lights the track's edge", s);
 s = await withForced(T("switch-disabled"), ["hover"], `(() => { const { cs, resolve, same } = __c; const h = cs('${T("switch-disabled")}');
   return { op: h.opacity, cursor: h.cursor, edge: same(cs('${T("switch-disabled")}', '::after').borderTopColor, resolve('var(--control-edge)')) }; })()`);
 check("...disabled: .45, default cursor, no hover", s.op === "0.45" && s.cursor === "default" && s.edge, s);
-s = await withForced(T("switch-off"), ["focus", "focus-visible"], `(() => { const b = __c.cs('${T("switch-off")}'); return [b.outlineWidth, b.outlineStyle, b.outlineOffset]; })()`);
-check("...focus-visible rings the whole button, label and track", s.join() === "2px,solid,2px", s);
 s = await evaluate(`[__c.el('${T("switch-bar")}').closest('.filter-bar') !== null, __c.rect('${T("switch-bar")}').h]`);
 check("...and it sits in a filter bar at the control height", s[0] && s[1] === 28, s);
 
@@ -378,8 +439,6 @@ s = await withForced(T("cb-off"), ["hover"], `(() => { const { cs, resolve, same
 check("...hover lights the edge", s);
 s = await withForced(`label:has(> ${T("cb-off")})`, ["hover"], `(() => { const { cs, resolve, same } = __c; return same(cs('${T("cb-off")}').borderTopColor, resolve('var(--primary)')); })()`);
 check("...and so does hovering its label's words", s);
-s = await withForced(T("cb-off"), ["focus", "focus-visible"], `(() => { const b = __c.cs('${T("cb-off")}'); return [b.outlineWidth, b.outlineStyle, b.outlineOffset]; })()`);
-check("...focus-visible: the 2px ring", s.join() === "2px,solid,2px", s);
 s = await evaluate(`(() => { const { cs } = __c; return [cs('${T("check-disabled")}').opacity, cs('${T("check-disabled")}').cursor, cs('${T("cb-disabled")}').opacity]; })()`);
 check("...a disabled one dims its whole label once (.45), the box inside it not twice", s.join() === "0.45,default,1", s);
 s = await evaluate(`(() => { const { cs, resolve, same } = __c; const r = cs('${T("radio-on")}'), dot = cs('${T("radio-on")}', '::before'), none = cs('${T("radio-unanswered")}', '::before');
@@ -410,8 +469,6 @@ s = await withForced(`${T("seg-text")} > :nth-child(2)`, ["hover"], `(() => { co
 check("...hover turns a segment --primary", s);
 s = await withForced(`${T("seg-text")} > :nth-child(3)`, ["hover"], `(() => { const { cs, resolve, same } = __c; return same(cs('${T("seg-text")} > :nth-child(3)').color, resolve('var(--muted-foreground)')); })()`);
 check("...but not an unavailable one", s);
-s = await withForced(`${T("seg-text")} > :nth-child(2)`, ["focus", "focus-visible"], `(() => { const b = __c.cs('${T("seg-text")} > :nth-child(2)'); return [b.outlineWidth, b.outlineStyle, b.outlineOffset, b.zIndex]; })()`);
-check("...focus-visible: the ring, lifted above a pressed neighbour (z 2)", s.join() === "2px,solid,2px,2", s);
 
 /* ── .choice-card ─────────────────────────────────────────────────────────────── */
 
@@ -434,8 +491,12 @@ check("...hover lights the edge", s);
 s = await withForced(T("choice-disabled"), ["hover"], `(() => { const { cs, resolve, same } = __c; const c = cs('${T("choice-disabled")}');
   return [c.opacity, c.cursor, same(c.borderTopColor, resolve('var(--border)'))]; })()`);
 check("...disabled: .45, default cursor, no hover", s.join() === "0.45,default,true", s);
-s = await withForced(T("choice-off"), ["focus", "focus-visible"], `(() => { const b = __c.cs('${T("choice-off")}'); return [b.outlineWidth, b.outlineStyle, b.outlineOffset]; })()`);
-check("...focus-visible: the ring", s.join() === "2px,solid,2px", s);
+// F7: a neutral-default component resets --tone at its root. --tone inherits, so a card inside a
+// toned container would otherwise take the container's colour for its edge and glyph.
+s = await evaluate(`(() => { const { cs, resolve, same } = __c; const c = cs('${T("choice-in-tone-on")}'), g = cs('${T("choice-in-tone-on")}', '::before');
+  return { container: getComputedStyle(__c.el('${T("choice-in-tone")}')).getPropertyValue('--tone') !== '', edge: same(c.borderTopColor, resolve('var(--primary)')), glyph: same(g.backgroundColor, resolve('var(--primary)')),
+    fill: same(c.backgroundColor, resolve('color-mix(in srgb, var(--primary) 12%, var(--card))')) }; })()`);
+check("...a card inside a toned container keeps its OWN tone: --primary edge, fill and glyph", s.container && s.edge && s.glyph && s.fill, s);
 
 /* ── .dropzone and .thumb-grid ────────────────────────────────────────────────── */
 
@@ -444,6 +505,10 @@ s = await evaluate(`(() => { const { cs, rect, resolve, same } = __c; const z = 
     input: [rect('${T("dropzone-input")}').w, rect('${T("dropzone-input")}').h, getComputedStyle(i).display !== 'none' && getComputedStyle(i).visibility === 'visible', i.tabIndex] }; })()`);
 check(".dropzone: a padded grid behind a 1px DASHED --control-edge, in --muted-foreground", s.z.join() === "grid,1px,dashed,true,true,16px,pointer", s.z);
 check("...its file input is hidden to the eye (1px) and still in the tab order", s.input.join() === "1,1,true,0", s.input);
+s = await evaluate(`(() => { const { el, cs, resolve, same } = __c; const z = cs('${T("dropzone")}'), g = cs('${T("dropzone")}', '::before');
+  return [g.content, g.width, g.height, same(g.backgroundColor, z.color), g.maskImage === resolve('var(--ico-image-plus)', 'mask-image'), el('${T("dropzone")}').querySelector('.ico') === null]; })()`);
+check("...its glyph is its OWN: data-icon on the zone, a 24px ::before in currentColor through the named mask, no .ico child",
+  s.join() === '"",24px,24px,true,true,true', s);
 for (const [how, go] of [["hover", (e) => withForced(T("dropzone"), ["hover"], e)], ["data-dragging", (e) => evaluate(e.replaceAll(T("dropzone"), T("dropzone-dragging")))]]) {
   s = await go(`(() => { const { cs, resolve, same } = __c; const z = cs('${T("dropzone")}');
     return [same(z.borderTopColor, resolve('var(--primary)')), same(z.color, resolve('var(--primary)')), same(z.backgroundColor, resolve('color-mix(in srgb, var(--primary) 8%, transparent)'))]; })()`);
@@ -453,33 +518,21 @@ s = await withForced(T("dropzone-disabled"), ["hover"], `(() => { const { cs, re
   return [z.opacity, z.cursor, same(z.borderTopColor, resolve('var(--control-edge)'))]; })()`);
 check("...disabled input: the zone is .45 and does not light", s.join() === "0.45,default,true", s);
 
-// The keyboard path, with REAL keys: Tab from the control before it lands on the hidden input and
-// rings the zone; Space opens the picker. Then a real mouse click: it opens the picker too, and
-// draws no ring, which is the difference between :has(:focus-visible) and :focus-within.
-await send("Page.setInterceptFileChooserDialog", { enabled: true });
-await evaluate(`__c.el('${T("choice-warning")}').focus(); null`);
-await key("Tab", "Tab", 9);
-s = await evaluate(`(() => { const z = __c.cs('${T("dropzone")}'); return { active: document.activeElement === __c.el('${T("dropzone-input")}'), ring: [z.outlineWidth, z.outlineStyle, z.outlineOffset] }; })()`);
-check("Tab reaches the drop zone's hidden input", s.active, s);
-check("...and the ZONE shows the focus ring", s.ring.join() === "2px,solid,2px", s.ring);
-let before = events.filter((m) => m === "Page.fileChooserOpened").length;
-await key(" ", "Space", 32, " ");
-await sleep(200);
-check("...Space opens the file picker", events.filter((m) => m === "Page.fileChooserOpened").length > before);
-await evaluate("document.activeElement.blur(); null");
-// `instant`: base.css makes scrolling smooth, and a rect read mid-scroll puts the click somewhere else.
-const zone = await evaluate(`(() => { const z = __c.el('${T("dropzone")}'); z.scrollIntoView({ block: 'center', behavior: 'instant' }); const q = z.getBoundingClientRect();
-  return { x: q.left + 12, y: q.top + 12, hit: document.elementFromPoint(q.left + 12, q.top + 12) === z }; })()`);
-before = events.filter((m) => m === "Page.fileChooserOpened").length;
-for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
-  await send("Input.dispatchMouseEvent", { type, x: zone.x, y: zone.y, button: "left", clickCount: 1 });
-}
-await sleep(200);
-s = await evaluate(`[document.activeElement === __c.el('${T("dropzone-input")}'), __c.cs('${T("dropzone")}').outlineStyle]`);
-check("precondition: the click lands on the zone itself", zone.hit, zone);
-check("a mouse click anywhere on the zone opens the picker", events.filter((m) => m === "Page.fileChooserOpened").length > before);
-check("...and focuses the input, as :focus-within would see it, yet draws NO ring", s.join() === "true,none", s);
-await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1 });
+// THE DRAG STATE, fired the way WebKit fires it. Moving from the zone onto a child sends dragenter to
+// the child and then dragleave to the zone, and WebKit (configr runs in WKWebView) leaves that
+// dragleave's relatedTarget null. A handler that asks "did it leave the zone?" of relatedTarget clears
+// the state there, while the pointer is still over the zone; counting enters and leaves does not.
+s = await evaluate(`(() => { const z = __c.el('${T("dropzone")}'), child = __c.el('${T("dropzone")} .dropzone-note');
+  const fire = (node, type) => node.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, relatedTarget: null, dataTransfer: new DataTransfer() }));
+  const on = () => z.hasAttribute('data-dragging');
+  fire(z, 'dragenter'); const entered = on();
+  fire(child, 'dragenter'); fire(z, 'dragleave'); const overChild = on();
+  fire(child, 'dragleave'); const left = on();
+  fire(z, 'dragenter'); fire(z, 'drop'); const dropped = on();
+  return { entered, overChild, left, dropped }; })()`);
+check("drag: entering the zone sets data-dragging", s.entered === true, s);
+check("...crossing onto a child KEEPS it, though that dragleave carries a null relatedTarget (WebKit)", s.overChild === true, s);
+check("...leaving the zone clears it, and so does a drop", s.left === false && s.dropped === false, s);
 
 s = await evaluate(`(() => { const { cs, rect, resolve, same } = __c; const g = cs('${T("thumbs")}'), t = __c.el('${T("thumbs")} > .thumb'), r = t.getBoundingClientRect();
   const b = __c.el('${T("thumb-remove")}'), br = b.getBoundingClientRect(), bc = getComputedStyle(b);
@@ -494,6 +547,10 @@ s = await withForced(`${T("thumbs")} > .thumb`, ["hover"], `__c.cs('${T("thumb-r
 check("...and shown when its thumbnail is hovered", s === "1", s);
 s = await withForced(`${T("thumbs")} > .thumb`, ["focus-within"], `__c.cs('${T("thumb-remove")}').opacity`);
 check("...or holds focus", s === "1", s);
+s = await evaluate(`__c.cs('${T("thumb-remove-disabled")}').opacity`);
+check("...a DISABLED remove rests hidden like the others", s === "0", s);
+s = await withForced(`.thumb:has(> ${T("thumb-remove-disabled")})`, ["hover"], `__c.cs('${T("thumb-remove-disabled")}').opacity`);
+check("...and shows at the disabled .45 when its thumbnail is hovered, never at full strength", s === "0.45", s);
 
 /* ── .reveal ──────────────────────────────────────────────────────────────────── */
 
@@ -503,6 +560,10 @@ s = await withForced(T("reveal-host"), ["hover"], `__c.cs('${T("reveal")}').opac
 check("...hovering its host shows it", s === "1", s);
 s = await evaluate(`(() => { const b = __c.el('${T("reveal-btn")}'); b.focus(); const out = [document.activeElement === b, getComputedStyle(__c.el('${T("reveal")}')).opacity]; b.blur(); return out; })()`);
 check("...and a hidden action is still a TAB STOP: focusing it shows it", s.join() === "true,1", s);
+s = await evaluate(`__c.cs('${T("reveal-disabled")}').opacity`);
+check("...a disabled .btn-icon.reveal rests hidden like the others", s === "0", s);
+s = await withForced(T("reveal-host-disabled"), ["hover"], `__c.cs('${T("reveal-disabled")}').opacity`);
+check("...and shows at the disabled .45 when its host is hovered: the reveal never outranks disabled", s === "0.45", s);
 
 /* ── .confirm-inline and .confirm-code ────────────────────────────────────────── */
 
@@ -519,9 +580,13 @@ check(".confirm-code-value: --fs-xl, 700, tracked .16em, tabular, --primary, mon
 check(".confirm-code-input: the ONE text size, tracked .14em, capped at 14rem, at --control-h, mono",
   s.input.join() === "12px,1.68px,224px,28,1px,true,true", s.input);
 check(".confirm-code-status: one line reserved; muted by default, --warning under data-tone", s.status.every(Boolean), s.status);
-s = await withForced(T("code-input"), ["focus", "focus-visible"], `(() => { const { cs, resolve, same } = __c; const i = cs('${T("code-input")}');
-  return [i.outlineWidth, i.outlineStyle, same(i.borderTopColor, resolve('var(--primary)'))]; })()`);
-check("...focus-visible: the ring AND a --primary edge", s.join() === "2px,solid,true", s);
+s = await evaluate(`(() => { const { el, cs, resolve, same } = __c; const box = el('${T("confirm-code")}'); box.dataset.tone = 'destructive';
+  const out = [getComputedStyle(box).getPropertyValue('--tone') !== '', same(cs('${T("code-status")}').color, resolve('var(--muted-foreground)'))];
+  delete box.dataset.tone; return out; })()`);
+check("...the status reads only its OWN data-tone: inside a toned container it stays muted", s.join() === "true,true", s);
+s = await withForced(T("code-input-disabled"), ["hover"], `(() => { const { cs, resolve, same } = __c; const i = cs('${T("code-input-disabled")}');
+  return [i.opacity, i.cursor, same(i.borderTopColor, resolve('var(--control-edge)'))]; })()`);
+check("...a disabled code input is .45 with a default cursor, and does not light --primary under the pointer", s.join() === "0.45,default,true", s);
 
 /* ── no radius, anywhere, except the one circle ───────────────────────────────── */
 
@@ -540,14 +605,57 @@ s = await evaluate(`(() => {
   return bad; })()`);
 check("no border-radius on any control or pseudo-element, except the radio and its dot (50%)", s.length === 0, s.slice(0, 6));
 
-/* ── self-sufficient: tokens.css + controls.css alone compute the same ────────── */
+/* ── hidden hides every control (X3) ──────────────────────────────────────────── */
+
+// Every class here sets its own display, and an author display beats the browser's [hidden] rule, so
+// `hidden` hid NOTHING until tokens.css carried the one rule that answers it for the whole system
+// (until this branch contains it, the demo's stand-in block carries the same line, and the NOTE at
+// the top says so). Display none, and no box at all.
+s = await evaluate(`(() => {
+  const sels = ['${T("rest")}', '${T("sm")}', '${T("switch-off")}', '${T("cb-off")}', '${T("radio-off")}', 'label:has(> ${T("cb-off")})', '${T("group-icons")}',
+    '${T("actions")}', '${T("actions")} .form-status', '${T("btn-row")}', '${T("seg-text")}', '${T("seg-text")} > :nth-child(2)', '${T("choice-grid")}', '${T("choice-off")}',
+    '${T("dropzone")}', '${T("thumbs")}', '${T("thumbs")} > .thumb', '${T("reveal")}', '${T("confirm-armed")}', '${T("confirm-note")}', '${T("confirm-code")}',
+    '${T("code-input")}', '${T("code-status")}'];
+  const shown = [];
+  for (const sel of sels) {
+    const n = __c.el(sel);
+    n.hidden = true;
+    const d = getComputedStyle(n).display, r = n.getBoundingClientRect();
+    if (d !== 'none' || r.width * r.height > 0) shown.push(sel + ' -> ' + d);
+    n.hidden = false;
+  }
+  return shown; })()`);
+check("hidden: every control, group and row is display: none and draws no box (23 cases)", s.length === 0, s);
+
+/* ── BARE MODE: base.css and components.css switched off ──────────────────────── */
+
+// A disabled <link> leaves document.styleSheets and its rules stop applying. Both are asserted on the
+// way in, so nothing in this section can pass by reading a page that still has them. Re-enabled, a
+// sheet comes back asynchronously, so the way out waits for it.
+//
+// THE PAGE KEEPS ITS FONT. The body's font is base.css's to set, and a surface without base.css sets
+// its own (netmon does), so the bare page gets the same body font, inline. That is what makes font
+// family and size comparable in the snapshot: a control that takes its font from the page computes
+// the same in both, and one that took it from a base.css or components.css rule does not.
+const setBare = async (on) => {
+  await evaluate(on
+    ? `(() => { const b = getComputedStyle(document.body), keep = [b.fontFamily, b.fontSize, b.lineHeight];
+        for (const l of document.querySelectorAll('link[href$="base.css"], link[href$="components.css"]')) l.disabled = true;
+        [document.body.style.fontFamily, document.body.style.fontSize, document.body.style.lineHeight] = keep; })(); null`
+    : `(() => { for (const l of document.querySelectorAll('link[href$="base.css"], link[href$="components.css"]')) l.disabled = false;
+        document.body.style.removeProperty('font-family'); document.body.style.removeProperty('font-size'); document.body.style.removeProperty('line-height'); })(); null`);
+  const read = () => evaluate(`[[...document.styleSheets].map((x) => (x.href || '').split('/').pop()).filter((n) => n === 'base.css' || n === 'components.css').length,
+    getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.btn-terminal')).paddingTop]`);
+  let state = await read();
+  for (let i = 0; !on && state[0] !== 2 && i < 50; i += 1) { await sleep(50); state = await read(); }
+  return state;
+};
 
 // What each control's own rules decide. Sizes only where the class fixes them (the rest track the
-// inherited font, which base.css legitimately sets); colour only where the class sets it (a layout
-// row inherits it from <body>); a border colour only where a border is drawn (base.css recolours
-// every invisible one).
+// inherited font); colour only where the class sets it (a layout row inherits it from <body>); a
+// border colour only where a border is drawn (base.css recolours every invisible one).
 const SNAPSHOT = `(() => {
-  const props = ['box-sizing', 'min-height', 'width', 'height', 'padding-top', 'padding-left', 'margin-left', 'border-top-width', 'border-top-style', 'border-top-color', 'border-top-left-radius', 'background-color', 'background-image', 'mask-image', 'color', 'cursor', 'opacity', 'display', 'gap', 'z-index', 'font-weight'];
+  const props = ['box-sizing', 'min-height', 'width', 'height', 'padding-top', 'padding-left', 'margin-left', 'border-top-width', 'border-top-style', 'border-top-color', 'border-top-left-radius', 'background-color', 'background-image', 'mask-image', 'color', 'cursor', 'opacity', 'display', 'gap', 'z-index', 'font-family', 'font-size', 'font-weight'];
   const subjects = [
     // [hook, pseudos, fixed size, own colour]
     ['rest', ['::before'], true, true], ['sm', ['::before'], true, true], ['bare', ['::before'], true, true],
@@ -555,35 +663,97 @@ const SNAPSHOT = `(() => {
     ['switch-off', ['::after'], false, true], ['switch-on', ['::after'], false, true],
     ['cb-off', ['::before'], true, false], ['cb-on', ['::before'], true, false], ['cb-mixed', ['::before'], true, false], ['radio-on', ['::before'], true, false],
     ['choice-on', ['::before'], false, true], ['choice-warning', ['::before'], false, true],
-    ['dropzone', [], false, true], ['dropzone-dragging', [], false, true], ['thumb-remove', ['::before'], true, true],
-    ['code-value', [], false, true], ['code-input', [], false, true], ['code-status-bad', [], false, true], ['confirm-note', [], false, true],
+    ['dropzone', ['::before'], false, true], ['dropzone-dragging', ['::before'], false, true], ['thumb-remove', ['::before'], true, true],
+    ['code-value', [], false, true], ['code-input', [], false, true], ['code-input-disabled', [], false, true], ['code-status-bad', [], false, true], ['confirm-note', [], false, true],
     ['seg-text', [], false, false], ['confirm-armed', [], false, false], ['actions', [], false, false], ['actions-ruled', [], false, false],
     ['btn-row', [], false, false], ['group-icons', [], false, false], ['choice-grid', [], false, false], ['thumbs', [], false, false],
   ];
   const out = {};
-  const snap = (key, c, sized, coloured) => {
+  const snap = (key, n, pseudo, sized, coloured) => {
+    const c = getComputedStyle(n, pseudo);
     out[key] = props.filter((p) => (sized || !['width', 'height'].includes(p)) && (coloured || p !== 'color') && (p !== 'border-top-color' || c.borderTopStyle !== 'none'))
       .map((p) => p + ':' + c.getPropertyValue(p)).join(';');
   };
   for (const [id, pseudos, sized, coloured] of subjects) {
     const n = __c.el('[data-t="' + id + '"]');
-    snap(id, getComputedStyle(n), sized, coloured);
-    for (const pseudo of pseudos) snap(id + pseudo, getComputedStyle(n, pseudo), true, true);
+    snap(id, n, null, sized, coloured);
+    for (const pseudo of pseudos) snap(id + pseudo, n, pseudo, true, true);
   }
-  for (const b of document.querySelectorAll('[data-t="seg-text"] > button, [data-t="seg-icons"] > button')) snap('segment ' + (b.textContent || b.getAttribute('aria-label')), getComputedStyle(b), !b.textContent, true);
+  for (const b of document.querySelectorAll('[data-t="seg-text"] > button, [data-t="seg-icons"] > button')) snap('segment ' + (b.textContent || b.getAttribute('aria-label')), b, null, !b.textContent, true);
   return out; })()`;
+
+// A control that shows text inherits the page's font. A <button> does NOT by default: the browser gives
+// it 13.33px Arial, beside base.css or not, so a control that lost `font: inherit` is caught here in
+// either mode, and nowhere else.
+const FONTS = `(() => {
+  const nodes = [['.btn-icon', '${T("rest")}'], ['.switch', '${T("switch-off")}'], ['.choice-card', '${T("choice-off")}'], ['.choice-card (pressed)', '${T("choice-on")}'],
+    ...[...document.querySelectorAll('${T("seg-text")} > button')].map((b, i) => ['.segmented > button ' + (i + 1), '${T("seg-text")} > :nth-child(' + (i + 1) + ')'])];
+  return nodes.map(([name, sel]) => { const n = __c.el(sel), c = getComputedStyle(n), p = getComputedStyle(n.parentElement);
+    return c.fontFamily === p.fontFamily && c.fontSize === p.fontSize ? null : name + ': ' + c.fontFamily + ' ' + c.fontSize + ', the page ' + p.fontFamily + ' ' + p.fontSize; }).filter(Boolean); })()`;
+
 const full = await evaluate(SNAPSHOT);
-await evaluate(`for (const l of document.querySelectorAll('link[href$="base.css"], link[href$="components.css"]')) l.disabled = true; null`);
-const bare = await evaluate(SNAPSHOT);
-// A disabled <link> leaves document.styleSheets, and its rules stop applying: both are asserted, so
-// the comparison below cannot pass by comparing a page with itself.
-const off = await evaluate(`[[...document.styleSheets].map((x) => (x.href || '').split('/').pop()).filter((n) => n === 'base.css' || n === 'components.css').length,
-  getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.btn-terminal')).paddingTop]`);
-const drift = Object.keys(full).filter((k) => full[k] !== bare[k]).map((k) => `${k}\n          with:    ${full[k]}\n          without: ${bare[k]}`);
+s = await evaluate(FONTS);
+check("every control that shows text follows the page's font, family and size (with base.css)", s.length === 0, s);
+
+const off = await setBare(true);
 check("precondition: base.css and components.css really are switched off (gone from the page, body unpainted, .btn-terminal unstyled)",
   off[0] === 0 && off[1] === "rgba(0, 0, 0, 0)" && off[2] === "1px", off);
-check("SELF-SUFFICIENT: with base.css and components.css off, every control computes the same", drift.length === 0, drift.slice(0, 3).join("\n        "));
-await evaluate(`for (const l of document.querySelectorAll('link[disabled], link')) l.disabled = false; null`);
+
+// FOCUS RINGS. base.css draws this same ring on every :focus-visible element, so with it loaded a
+// control whose own rule was deleted still showed one and the assertion could not fail. Here only the
+// control's own rule can draw it; the browser's default ring is `auto`, 1px, and fails the check.
+const RING = (sel, extra) => `(() => { const { cs, resolve, same } = __c; const b = cs('${sel}');
+  return [b.outlineWidth, b.outlineStyle, b.outlineOffset, same(b.outlineColor, resolve('var(--ring)'))${extra}].join(); })()`;
+for (const [name, sel, want, extra = ""] of [
+  [".btn-icon", T("rest"), "2px,solid,2px,true"],
+  [".switch, around its label and track", T("switch-off"), "2px,solid,2px,true"],
+  ["a checkbox", T("cb-off"), "2px,solid,2px,true"],
+  ["a radio", T("radio-off"), "2px,solid,2px,true"],
+  [".segmented > button, lifted above a pressed neighbour (z 2)", `${T("seg-text")} > :nth-child(2)`, "2px,solid,2px,true,2", ", b.zIndex"],
+  [".choice-card", T("choice-off"), "2px,solid,2px,true"],
+  [".confirm-code-input, with a --primary edge", T("code-input"), "2px,solid,2px,true,true", ", same(b.borderTopColor, resolve('var(--primary)'))"],
+]) {
+  s = await withForced(sel, ["focus", "focus-visible"], RING(sel, extra));
+  check(`bare: ${name} draws its OWN 2px --ring outline, 2px out, on :focus-visible`, s === want, s);
+}
+
+// The drop zone's keyboard path, with REAL keys: Tab from the control before it lands on the hidden
+// input and rings the zone; Space opens the picker. Then a real mouse click: it opens the picker too,
+// and draws no ring, which is the difference between :has(:focus-visible) and :focus-within.
+await send("Page.setInterceptFileChooserDialog", { enabled: true });
+await evaluate(`__c.el('${T("choice-in-tone-on")}').focus(); null`);
+await key("Tab", "Tab", 9);
+s = await evaluate(`(() => { const { cs, resolve, same } = __c; const z = cs('${T("dropzone")}');
+  return { active: document.activeElement === __c.el('${T("dropzone-input")}'), ring: [z.outlineWidth, z.outlineStyle, z.outlineOffset, same(z.outlineColor, resolve('var(--ring)'))] }; })()`);
+check("bare: Tab reaches the drop zone's hidden input", s.active, s);
+check("...and the ZONE shows its own focus ring", s.ring.join() === "2px,solid,2px,true", s.ring);
+let before = events.filter((m) => m === "Page.fileChooserOpened").length;
+await key(" ", "Space", 32, " ");
+await sleep(200);
+check("...Space opens the file picker", events.filter((m) => m === "Page.fileChooserOpened").length > before);
+await evaluate("document.activeElement.blur(); null");
+const zone = await evaluate(`(() => { const z = __c.el('${T("dropzone")}'); z.scrollIntoView({ block: 'center', behavior: 'instant' }); const q = z.getBoundingClientRect();
+  return { x: q.left + 12, y: q.top + 12, hit: document.elementFromPoint(q.left + 12, q.top + 12) === z }; })()`);
+before = events.filter((m) => m === "Page.fileChooserOpened").length;
+for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+  await send("Input.dispatchMouseEvent", { type, x: zone.x, y: zone.y, button: "left", clickCount: 1 });
+}
+await sleep(200);
+s = await evaluate(`[document.activeElement === __c.el('${T("dropzone-input")}'), __c.cs('${T("dropzone")}').outlineStyle]`);
+check("precondition: the click lands on the zone itself", zone.hit, zone);
+check("a mouse click anywhere on the zone opens the picker", events.filter((m) => m === "Page.fileChooserOpened").length > before);
+check("...and focuses the input, as :focus-within would see it, yet draws NO ring", s.join() === "true,none", s);
+await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1 });
+await evaluate("document.activeElement.blur(); null");
+
+const bareSnapshot = await evaluate(SNAPSHOT);
+const drift = Object.keys(full).filter((k) => full[k] !== bareSnapshot[k]).map((k) => `${k}\n          with:    ${full[k]}\n          without: ${bareSnapshot[k]}`);
+check("SELF-SUFFICIENT: with base.css and components.css off, every control computes the same box, edge, colours, font and state",
+  drift.length === 0, drift.slice(0, 3).join("\n        "));
+s = await evaluate(FONTS);
+check("...and every control that shows text still follows the page's font without them", s.length === 0, s);
+const back = await setBare(false);
+check("...and the two files are back on for everything below", back[0] === 2, back);
 
 /* ── motion ───────────────────────────────────────────────────────────────────── */
 
@@ -604,15 +774,220 @@ await evaluate("document.documentElement.classList.add('anim-off'); null");
 
 /* ── print ────────────────────────────────────────────────────────────────────── */
 
+// WP6's filter dropdown and sort control are .btn-group too, and they carry the value a printed list
+// was filtered and sorted by. They are not on this page, so two stand in for them, markup only.
+await evaluate(`(() => { const host = __c.el('#c3 .demo-states');
+  for (const kind of ['filter-dd', 'sort-ctl']) { const g = document.createElement('div'); g.className = 'btn-group ' + kind; g.dataset.t = 'print-' + kind; g.innerHTML = '<button type="button">source: seedr</button>'; host.append(g); } })(); null`);
 await send("Emulation.setEmulatedMedia", { media: "print" });
 s = await evaluate(`(() => { const shown = (sel) => getComputedStyle(__c.el(sel)).display;
   return { gone: ['${T("rest")}', '${T("group-icons")}', '${T("seg-text")}', '${T("actions")}', '${T("btn-row")}', '${T("dropzone")}', '${T("reveal")}', '${T("confirm-armed")}', '${T("confirm-code")}'].map(shown),
     kept: [shown('${T("switch-on")}'), shown('${T("cb-on")}'), shown('${T("choice-on")}')],
+    valueGroups: [shown('${T("print-filter-dd")}'), shown('${T("print-sort-ctl")}')],
     exact: [['${T("cb-on")}'], ['${T("cb-on")}', '::before'], ['${T("radio-on")}', '::before'], ['${T("switch-on")}', '::after']].map(([sel, pseudo]) => { const c = __c.cs(sel, pseudo); return c.printColorAdjust || c.webkitPrintColorAdjust; }) }; })()`);
 check("print removes the controls that only act", s.gone.every((d) => d === "none"), s.gone);
 check("...keeps the ones that carry a value", s.kept.every((d) => d !== "none"), s.kept);
+check("...keeps a .btn-group that is a filter dropdown or a sort control, so the printed list says how it was narrowed", s.valueGroups.every((d) => d !== "none"), s.valueGroups);
 check("...and keeps their fills on paper (print-color-adjust: exact), or a checked box prints empty", s.exact.every((v) => v === "exact"), s.exact);
 await send("Emulation.setEmulatedMedia", { media: "" });
+await evaluate(`for (const g of document.querySelectorAll('[data-t^="print-"]')) g.remove(); null`);
+
+/* ── forced colours (X1): 4 themes x 2 forced palettes, and the fallback engine ─ */
+
+// High Contrast replaces every author colour with a system colour and every fill with Canvas. Read on
+// every theme, because an author colour that leaks through is only caught where it happens to be
+// dark on dark (warm's brown on a black Canvas) or light on light (green's green on a white one).
+//   · each state pair is read on the part that SHOWS the state (a track, a box's fill, a card's fill)
+//     and must compute two different PAINTED colours;
+//   · each glyph, mark, knob and dot must reach 3:1 against what it is painted on, and each word on a
+//     redrawn state 4.5:1. A disabled one only has to differ: it is .45 in every mode, and WCAG
+//     exempts an inactive control;
+//   · PAINTED means the host's opacity is in it, and for text it means PIXELS, below.
+// Deleting the block, or switching a glyph to `forced-color-adjust: none`, turns these red.
+const FORCED = `(() => {
+  const { el, cs, parse, over, ratio, resolve } = __c;
+  const canvas = parse(resolve('Canvas'));
+  const T = (id) => el('[data-t="' + id + '"]');
+  const P = (id) => el('[data-surface="background"] [data-probe="' + id + '"]');
+  const opacity = (n) => { let o = 1; for (let m = n; m; m = m.parentElement) o *= +getComputedStyle(m).opacity; return o; };
+  const faded = (v, o) => { const c = parse(v); return [c[0], c[1], c[2], c[3] * o]; };
+  const fill = (n) => over(faded(cs(n).backgroundColor, opacity(n)), canvas);
+  const ink = (n) => over(faded(cs(n).color, opacity(n)), fill(n));
+  const mark = (n, pseudo = '::before') => { const g = cs(n, pseudo); return { ink: over(faded(g.backgroundColor, opacity(n)), fill(n)), mask: g.maskImage }; };
+  const knob = (n) => { const a = cs(n, '::after'), o = opacity(n), track = over(faded(a.backgroundColor, o), fill(n)), m = /(color\\(srgb[^)]*\\)|rgba?\\([^)]*\\))/.exec(a.backgroundImage);
+    return { track, edge: over(faded(a.borderTopColor, o), fill(n)), knob: m ? over(faded(m[1], o), track) : null }; };
+  const edge = (n) => over(faded(cs(n).borderTopColor, opacity(n)), canvas);
+  const k = (c) => c ? c.slice(0, 3).map((v) => Math.round(v * 255)).join(',') : 'none';
+  const r = (a, b) => a && b ? Math.round(ratio(a, b) * 100) / 100 : 0;
+  const out = [];
+  const pair = (name, a, b) => out.push({ name: name + ' differ', ok: k(a) !== k(b), got: k(a) + ' vs ' + k(b) });
+  const shows = (name, fg, bg, floor = 3) => out.push({ name: name + ' reaches ' + floor + ':1', ok: r(fg, bg) >= floor, got: r(fg, bg) + ' — ' + k(fg) + ' on ' + k(bg) });
+  const apart = (name, fg, bg) => out.push({ name: name + ' is drawn in a colour of its own', ok: k(fg) !== k(bg), got: k(fg) + ' on ' + k(bg) });
+  // A part that opts out of forcing keeps whatever colour it names, so it must name only the reader's
+  // system colours. An author colour there can clear 3:1 on the emulated palette by luck and fail on
+  // the reader's own.
+  const SYSTEM = ['Canvas', 'CanvasText', 'ButtonText', 'ButtonFace', 'ButtonBorder', 'Highlight', 'HighlightText', 'GrayText', 'Field', 'FieldText', 'LinkText']
+    .map((name) => k(over(parse(resolve(name)), canvas)));
+  const system = (name, parts) => { const foreign = parts.filter(([, c]) => !SYSTEM.includes(k(c)));
+    out.push({ name: name + ' paints only system colours', ok: foreign.length === 0, got: foreign.map(([part, c]) => part + ' ' + k(c)).join(', ') }); };
+
+  const sOff = knob(T('switch-off')), sOn = knob(T('switch-on')), sdOff = knob(T('switch-disabled')), sdOn = knob(T('switch-disabled-on'));
+  pair('switch: the on and off tracks', sOn.track, sOff.track);
+  pair('switch: the on and off knobs', sOn.knob, sOff.knob);
+  shows('switch off: the knob on its track', sOff.knob, sOff.track);
+  shows('switch on: the knob on its track', sOn.knob, sOn.track);
+  shows('switch off: the track edge', sOff.edge, fill(T('switch-off')));
+  system('switch off', [['edge', sOff.edge], ['knob', sOff.knob]]);
+  system('switch on', [['track', sOn.track], ['edge', sOn.edge], ['knob', sOn.knob]]);
+  pair('switch, disabled: the on and off tracks', sdOn.track, sdOff.track);
+  apart('switch, disabled on: the knob', sdOn.knob, sdOn.track);
+
+  const box = (id) => { const n = T(id), m = mark(n); return { fill: fill(n), ink: m.ink, sig: k(fill(n)) + '|' + k(m.ink) + '|' + m.mask }; };
+  const cOff = box('cb-off'), cOn = box('cb-on'), cMixed = box('cb-mixed'), cdOff = box('cb-disabled'), cdOn = box('cb-disabled-on');
+  pair('checkbox: the checked and unchecked fills', cOn.fill, cOff.fill);
+  out.push({ name: 'checkbox: unchecked, checked and indeterminate are three different drawings', ok: new Set([cOff.sig, cOn.sig, cMixed.sig]).size === 3, got: [cOff.sig, cOn.sig, cMixed.sig].map((x) => x.slice(0, 60)).join(' / ') });
+  shows('checkbox checked: the check on its fill', cOn.ink, cOn.fill);
+  shows('checkbox indeterminate: the minus on its fill', cMixed.ink, cMixed.fill);
+  pair('checkbox, disabled: the checked and unchecked fills', cdOn.fill, cdOff.fill);
+  apart('checkbox, disabled checked: the check', cdOn.ink, cdOn.fill);
+  const rOff = box('radio-off'), rOn = box('radio-on');
+  pair('radio: the checked and unchecked fills', rOn.fill, rOff.fill);
+  shows('radio checked: the dot on its fill', rOn.ink, rOn.fill);
+  system('checkbox checked', [['fill', cOn.fill], ['check', cOn.ink]]);
+  system('checkbox indeterminate', [['fill', cMixed.fill], ['minus', cMixed.ink]]);
+  system('radio checked', [['fill', rOn.fill], ['dot', rOn.ink]]);
+
+  for (const [off, pressed, name] of [['star', 'star-on', '.btn-icon'], ['bare', 'bare-on', '.btn-icon--bare']]) {
+    const a = T(off), b = T(pressed);
+    pair(name + ': the pressed and unpressed fills', fill(b), fill(a));
+    pair(name + ': the pressed and unpressed glyphs', mark(b).ink, mark(a).ink);
+    shows(name + ' unpressed: the glyph', mark(a).ink, fill(a));
+    shows(name + ' pressed: the glyph on its fill', mark(b).ink, fill(b));
+  }
+  const toned = P('tone-destructive-pressed'), tonedOff = P('tone-destructive');
+  pair('.btn-icon[data-tone]: the pressed and unpressed fills', fill(toned), fill(tonedOff));
+  shows('.btn-icon[data-tone] pressed: the glyph on its fill', mark(toned).ink, fill(toned));
+  shows('.btn-icon[data-tone] unpressed: the glyph', mark(tonedOff).ink, fill(tonedOff));
+  shows('.btn-icon --bare with a tone: the glyph', mark(T('bare-tone')).ink, fill(T('bare-tone')));
+  shows('.btn-icon --bare --sm inside a toned container (the shape of a notice dismiss): the glyph', mark(T('in-tone')).ink, fill(T('in-tone')));
+  shows('.btn-icon busy: the spinner', mark(T('busy')).ink, fill(T('busy')));
+  shows('.btn-icon expanded: the glyph', mark(T('expanded')).ink, fill(T('expanded')));
+  pair('.btn-icon, disabled: the pressed and unpressed fills', fill(T('star-on-disabled')), fill(T('disabled')));
+  apart('.btn-icon, disabled: the glyph', mark(T('disabled')).ink, fill(T('disabled')));
+  apart('.btn-icon, aria-disabled: the glyph', mark(T('aria-disabled')).ink, fill(T('aria-disabled')));
+  apart('.btn-icon, disabled pressed: the glyph', mark(T('star-on-disabled')).ink, fill(T('star-on-disabled')));
+
+  const segOn = el('[data-t="seg-text"] > [aria-pressed="true"]'), segOff = el('[data-t="seg-text"] > [aria-pressed="false"]:not(:disabled)');
+  pair('.segmented: the pressed and unpressed fills', fill(segOn), fill(segOff));
+  shows('.segmented pressed: its word on its fill', ink(segOn), fill(segOn), 4.5);
+  shows('.segmented unpressed: its word', ink(segOff), fill(segOff), 4.5);
+  const iconOn = el('[data-t="seg-icons"] > [aria-pressed="true"]'), iconOff = el('[data-t="seg-icons"] > [aria-pressed="false"]');
+  shows('.segmented icon pressed: the glyph on its fill', mark(iconOn).ink, fill(iconOn));
+  shows('.segmented icon unpressed: the glyph', mark(iconOff).ink, fill(iconOff));
+  system('.segmented pressed', [['fill', fill(segOn)], ['word', ink(segOn)], ['edge', edge(segOn)], ['glyph', mark(iconOn).ink]]);
+
+  const chOn = T('choice-on'), chOff = T('choice-off');
+  pair('.choice-card: the chosen and unchosen fills', fill(chOn), fill(chOff));
+  shows('.choice-card chosen: its title on its fill', ink(el('.choice-title', chOn)), fill(chOn), 4.5);
+  shows('.choice-card chosen: its description on its fill', ink(el('.choice-desc', chOn)), fill(chOn), 4.5);
+  shows('.choice-card chosen: the glyph on its fill', mark(chOn).ink, fill(chOn));
+  shows('.choice-card unchosen: the glyph', mark(chOff).ink, fill(chOff));
+  shows('.choice-card chosen with a tone: the glyph on its fill', mark(T('choice-warning')).ink, fill(T('choice-warning')));
+  pair('.choice-card with a tone: chosen against unchosen', fill(T('choice-warning')), fill(chOff));
+  system('.choice-card chosen', [['fill', fill(chOn)], ['edge', edge(chOn)], ['title', ink(el('.choice-title', chOn))], ['description', ink(el('.choice-desc', chOn))], ['glyph', mark(chOn).ink]]);
+  system('.btn-icon pressed', [['fill', fill(T('star-on'))], ['edge', edge(T('star-on'))], ['glyph', mark(T('star-on')).ink]]);
+
+  const zone = T('dropzone'), dragging = T('dropzone-dragging');
+  pair('.dropzone: the dragging and resting colours', ink(dragging), ink(zone));
+  shows('.dropzone: the glyph', mark(zone).ink, fill(zone));
+  shows('.dropzone dragging: the glyph', mark(dragging).ink, fill(dragging));
+  return out; })()`;
+
+// COMPUTED COLOURS CANNOT SEE EVERYTHING. Chromium paints a Canvas backplate behind each line of text in
+// forced colours, over whatever fill the box has: the word computes HighlightText on Highlight and is
+// painted HighlightText on Canvas, a solid block. So the PIXELS are asked too, from one capture of the
+// page per cell: a word on a redrawn state must sit on its fill (most of its own box is the fill
+// colour, which it cannot be under a backplate) and must be painted (some pixels are nearer its ink
+// than its fill); a glyph must be painted where it is drawn.
+const REGIONS = `(() => {
+  const { el, cs, parse, over, resolve } = __c;
+  const canvas = parse(resolve('Canvas'));
+  const rgb = (c) => c.slice(0, 3).map((v) => Math.round(v * 255));
+  const fillOf = (n) => over(parse(cs(n).backgroundColor), canvas);
+  const page = (r) => ({ x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height });
+  const text = (name, n) => { const range = document.createRange(); range.selectNodeContents(n); const host = n.closest('button'), fill = fillOf(host);
+    return { name, kind: 'text', ...page(range.getBoundingClientRect()), ink: rgb(over(parse(cs(n).color), fill)), under: rgb(fill) }; };
+  const glyph = (name, n, box) => { const fill = fillOf(n), r = n.getBoundingClientRect();
+    return { name, kind: 'glyph', ...page({ left: r.left + box[0], top: r.top + box[1], width: box[2], height: box[3] }), ink: rgb(over(parse(cs(n, '::before').backgroundColor), fill)), under: rgb(fill) }; };
+  const centred = (n, size) => { const r = n.getBoundingClientRect(); return [(r.width - size) / 2, (r.height - size) / 2, size, size]; };
+  const segOn = el('[data-t="seg-text"] > [aria-pressed="true"]'), chOn = el('[data-t="choice-on"]');
+  return [
+    text('.segmented pressed: its word', segOn),
+    text('.choice-card chosen: its title', el('.choice-title', chOn)),
+    text('.choice-card chosen: its description', el('.choice-desc', chOn)),
+    glyph('.btn-icon: the glyph', el('[data-t="rest"]'), centred(el('[data-t="rest"]'), 14)),
+    glyph('.btn-icon pressed: the glyph', el('[data-t="star-on"]'), centred(el('[data-t="star-on"]'), 14)),
+    glyph('.btn-icon--bare--sm in a toned container (the shape of a notice dismiss): the glyph', el('[data-t="in-tone"]'), centred(el('[data-t="in-tone"]'), 12)),
+    glyph('.segmented icon pressed: the glyph', el('[data-t="seg-icons"] > [aria-pressed="true"]'), centred(el('[data-t="seg-icons"] > [aria-pressed="true"]'), 14)),
+    glyph('.choice-card chosen: the glyph', chOn, [17, 13, 24, 24]),
+    glyph('.dropzone: the glyph', el('[data-t="dropzone-dragging"]'), [(el('[data-t="dropzone-dragging"]').getBoundingClientRect().width - 24) / 2, 17, 24, 24]),
+  ]; })()`;
+const paint = async () => {
+  const regions = await evaluate(REGIONS);
+  const shots = [];
+  for (const r of regions) {
+    const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: r.x, y: r.y, width: Math.max(1, r.w), height: Math.max(1, r.h), scale: 1 }, captureBeyondViewport: true });
+    shots.push(data);
+  }
+  return evaluate(`(async () => { const regions = ${JSON.stringify(regions)}, shots = ${JSON.stringify(shots)};
+    const d2 = (p, i, q) => (p[i] - q[0]) ** 2 + (p[i + 1] - q[1]) ** 2 + (p[i + 2] - q[2]) ** 2;
+    const out = [];
+    for (const [at, r] of regions.entries()) {
+      const img = new Image(); img.src = 'data:image/png;base64,' + shots[at]; await img.decode();
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const px = g.getImageData(0, 0, c.width, c.height).data, n = px.length / 4;
+      let inked = 0, onFill = 0;
+      for (let i = 0; i < px.length; i += 4) { if (d2(px, i, r.ink) < d2(px, i, r.under)) inked += 1; if (d2(px, i, r.under) <= 3 * 12 * 12) onFill += 1; }
+      const share = Math.round((onFill / n) * 100) / 100;
+      out.push({ name: r.name, ok: r.kind === 'text' ? share >= 0.4 && inked >= 4 : inked >= 6, got: 'ink ' + r.ink + ' on ' + r.under + ': ' + inked + ' px nearer the ink, ' + share + ' of ' + n + ' px the fill' });
+    }
+    return out; })()`);
+};
+
+const forcedCells = async (engine) => {
+  for (const theme of ["warm", "green", "mono", "paper"]) {
+    await evaluate(`document.documentElement.dataset.theme = '${theme}'; null`);
+    for (const scheme of ["light", "dark"]) {
+      await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
+      await sleep(60);
+      const cell = `${engine}, ${theme}, ${scheme} palette`;
+      const active = await evaluate("matchMedia('(forced-colors: active)').matches");
+      if (!active) { check(`precondition: forced colours are active (${cell})`, false, active); continue; }
+      const bad = (await evaluate(FORCED)).filter((row) => !row.ok);
+      check(`forced colours (${cell}): every state pair differs and every glyph, mark, knob and word on a state reaches its ratio`, bad.length === 0, bad.map((row) => `${row.name}: ${row.got}`).join("\n        "));
+      const unpainted = (await paint()).filter((row) => !row.ok);
+      check(`forced colours (${cell}): PIXELS: each word on a redrawn state sits on its fill, not a Canvas backplate, and each glyph is painted`, unpainted.length === 0, unpainted.map((row) => `${row.name}: ${row.got}`).join("\n        "));
+      s = await withForced(`${T("seg-text")} > [aria-pressed="true"]`, ["focus", "focus-visible"], `(() => { const { cs, resolve, same } = __c; const b = cs('${T("seg-text")} > [aria-pressed="true"]');
+        return [b.outlineStyle, same(b.outlineColor, resolve('Highlight'))]; })()`);
+      check(`forced colours (${cell}): a pressed segment, opted out of forcing, still rings in the system's Highlight`, s.join() === "solid,true", s);
+    }
+  }
+  await send("Emulation.setEmulatedMedia", { features: [] });
+  await evaluate("document.documentElement.dataset.theme = 'warm'; null");
+};
+s = await evaluate("CSS.supports('forced-color-adjust', 'preserve-parent-color')");
+check("precondition: this browser has preserve-parent-color, so the first pass renders the glyphs' main branch", s === true, s);
+await forcedCells("preserve-parent-color");
+
+// THE FALLBACK, for an engine without preserve-parent-color: the same stylesheet with that condition
+// made false in both @supports rules, so the `none` + CanvasText branch is the one that renders. It
+// has to pass the same measurements.
+s = await evaluate(`(async () => { const link = document.querySelector('link[href$="controls.css"]'); const css = await (await fetch(link.href)).text();
+  const swapped = css.replaceAll('(forced-color-adjust: preserve-parent-color)', '(forced-color-adjust: no-such-value)');
+  const style = document.createElement('style'); style.id = 'fallback-engine'; style.textContent = swapped; link.after(style); link.disabled = true;
+  return [(css.match(/\\(forced-color-adjust: preserve-parent-color\\)/g) || []).length, CSS.supports('forced-color-adjust', 'no-such-value')]; })()`);
+check("precondition: the fallback pass swapped both @supports conditions, and the swapped one is false", s[0] === 2 && s[1] === false, s);
+await forcedCells("fallback (no preserve-parent-color)");
+await evaluate(`(() => { document.getElementById('fallback-engine').remove(); document.querySelector('link[href$="controls.css"]').disabled = false; })(); null`);
 
 /* ── a coarse pointer: 44px, and revealed actions always visible ──────────────── */
 
@@ -623,13 +998,15 @@ s = await evaluate(`(() => { const { rect, cs } = __c; return {
   media: [matchMedia('(pointer: coarse)').matches, matchMedia('(hover: none)').matches],
   sizes: { btnIcon: rect('${T("rest")}'), sm: rect('${T("sm")}'), switch: rect('${T("switch-off")}').h, check: rect('label:has(> ${T("cb-off")})').h,
     segment: rect('${T("seg-text")} > button').h, iconSegment: rect('${T("seg-icons")} > button'), card: rect('${T("choice-off")}').h, code: rect('${T("code-input")}').h },
-  shown: [cs('${T("reveal")}').opacity, cs('${T("thumb-remove")}').opacity] }; })()`);
+  shown: [cs('${T("reveal")}').opacity, cs('${T("thumb-remove")}').opacity],
+  disabled: [cs('${T("reveal-disabled")}').opacity, cs('${T("thumb-remove-disabled")}').opacity] }; })()`);
 check("precondition: the page sees a coarse pointer and no hover", s.media.join() === "true,true", s.media);
 const z = s.sizes;
 check("coarse: every control reaches 44px — icon buttons both ways, a segment, a switch, a .check label, a card, the code input",
   z.btnIcon.w >= 44 && z.btnIcon.h >= 44 && z.sm.w >= 44 && z.sm.h >= 44 && z.switch >= 44 && z.check >= 44 && z.segment >= 44 &&
   z.iconSegment.w >= 44 && z.iconSegment.h >= 44 && z.card >= 44 && z.code >= 44, z);
 check("(hover: none): revealed actions and a thumbnail's remove are simply visible", s.shown.join() === "1,1", s.shown);
+check("...and a DISABLED revealed action and a disabled remove stay at .45, never full strength", s.disabled.join() === "0.45,0.45", s.disabled);
 await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 await load();
 await evaluate("document.documentElement.classList.add('anim-off'); null");
@@ -664,12 +1041,15 @@ const PAIRS = `(() => {
     ['text', '.confirm-code-status, data-tone=warning', (p) => text(P(p, 'code-status'))],
     ['edge', '--control-edge (btn-icon, segment, box, track, zone)', (p) => edge(P(p, 'icon-rest'))],
     ['edge', '.btn-icon glyph at rest: --primary', (p) => glyph(P(p, 'icon-rest'))],
-    ['edge', '.btn-icon glyph hover / pressed: on its 12% wash', (p) => glyph(P(p, 'icon-pressed'))],
+    ['edge', '.btn-icon glyph hover / open: on its 12% wash', (p) => glyph(P(p, 'icon-expanded'))],
+    ['edge', '.btn-icon pressed: the --primary fill against the surface', (p) => [[parse(cs(P(p, 'icon-pressed')).backgroundColor), under(P(p, 'icon-pressed'), false)]]],
+    ['edge', '.btn-icon pressed: --primary-foreground glyph on --primary', (p) => glyph(P(p, 'icon-pressed'))],
     ['edge', '.btn-icon--bare glyph at rest: --muted-foreground', (p) => glyph(P(p, 'icon-bare'))],
-    ['edge', '.btn-icon--bare glyph hover / pressed: --primary on --muted', (p) => glyph(P(p, 'icon-bare-pressed'))],
+    ['edge', '.btn-icon--bare glyph hover / open: --primary on --muted', (p) => glyph(P(p, 'icon-bare-expanded'))],
+    ['edge', '.btn-icon--bare pressed: --primary-foreground glyph on --primary', (p) => glyph(P(p, 'icon-bare-pressed'))],
     ['edge', '.btn-icon[data-tone] glyph at rest (worst of 6 tones)', (p) => tones.map((t) => glyph(P(p, 'tone-' + t)))],
-    ['edge', '.btn-icon[data-tone] glyph pressed (worst of 6 tones)', (p) => tones.map((t) => glyph(P(p, 'tone-' + t + '-pressed')))],
-    ['edge', '.btn-icon[data-tone] edge pressed (worst of 6 tones)', (p) => tones.map((t) => edge(P(p, 'tone-' + t + '-pressed')))],
+    ['edge', '.btn-icon[data-tone] pressed: --primary-foreground glyph on the tone (worst of 6)', (p) => tones.map((t) => glyph(P(p, 'tone-' + t + '-pressed')))],
+    ['edge', '.btn-icon[data-tone] pressed: the tone fill against the surface (worst of 6)', (p) => tones.map((t) => edge(P(p, 'tone-' + t + '-pressed')))],
     ['edge', '.switch off: knob against its track', (p) => [[parse(firstColour(cs(P(p, 'switch-off'), '::after').backgroundImage)), track(P(p, 'switch-off'))]]],
     ['edge', '.switch on: --primary track against the surface', (p) => [[parse(cs(P(p, 'switch-on'), '::after').backgroundColor), under(P(p, 'switch-on'))]]],
     ['edge', '.switch on: knob against the track', (p) => [[parse(firstColour(cs(P(p, 'switch-on'), '::after').backgroundImage)), track(P(p, 'switch-on'))]]],
@@ -681,7 +1061,7 @@ const PAIRS = `(() => {
     ['edge', '.choice-card pressed: the tone edge (primary, warning)', (p) => [edge(P(p, 'choice-pressed')), edge(P(p, 'choice-warning'))]],
     ['edge', '.choice-card glyph, rest and pressed', (p) => [glyph(P(p, 'choice-rest')), glyph(P(p, 'choice-pressed')), glyph(P(p, 'choice-warning'))]],
     ['edge', '.dropzone hover / dragging: --primary edge', (p) => edge(P(p, 'drop-dragging'))],
-    ['edge', '.dropzone glyph at rest', (p) => { const i = el('.ico', P(p, 'drop-rest')); return [parse(getComputedStyle(i).color), under(i, false)]; }],
+    ['edge', '.dropzone glyph, at rest and dragging', (p) => [glyph(P(p, 'drop-rest')), glyph(P(p, 'drop-dragging'))]],
     ['edge', 'focus ring: --ring', (p) => [[parse(resolve('var(--ring)')), under(p)]]],
   ];
   return rows.map(([kind, name, get]) => {
@@ -694,6 +1074,11 @@ const PAIRS = `(() => {
     return { kind, name, per };
   }); })()`;
 
+// PRESSED IS TOLD FROM HOVERED, on every theme. The first version drew pressed as the hover wash, so a
+// reader pointing at a toggle could not tell whether it was on. The fills (over the page) must differ
+// by 3:1, the same bar as any other edge a state rests on.
+const LOOK = (id) => `(() => { const { cs, parse, over, resolve } = __c; const page = parse(resolve('var(--background)'));
+  const b = cs('${T(id)}'), fill = over(parse(b.backgroundColor), page); return { fill, glyph: over(parse(cs('${T(id)}', '::before').backgroundColor), fill) }; })()`;
 const THEMES = ["warm", "green", "mono", "paper"];
 const table = new Map();
 for (const theme of THEMES) {
@@ -703,6 +1088,12 @@ for (const theme of THEMES) {
     const entry = table.get(row.name) || { kind: row.kind, themes: {} };
     entry.themes[theme] = row.per;
     table.set(row.name, entry);
+  }
+  for (const [off, pressed, name] of [["star", "star-on", "bordered"], ["bare", "bare-on", "--bare"]]) {
+    const hovered = await withForced(T(off), ["hover"], LOOK(off));
+    s = await evaluate(`(() => { const { ratio } = __c; const h = ${JSON.stringify(hovered)}, p = ${LOOK(pressed)};
+      return { fills: Math.round(ratio(h.fill, p.fill) * 100) / 100, glyphs: Math.round(ratio(h.glyph, p.glyph) * 100) / 100 }; })()`);
+    check(`pressed is told from hovered, ${theme}, ${name}: the two fills differ by 3:1 or more`, s.fills >= 3, s);
   }
 }
 await evaluate("document.documentElement.dataset.theme = 'warm'; null");

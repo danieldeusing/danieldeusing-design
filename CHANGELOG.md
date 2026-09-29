@@ -4,6 +4,141 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.60.0 (2026-09-29)
+
+### One vocabulary for every surface
+
+The estate's four apps — seedr, configr, danieldeusing.de and cockpit — each drew the same things their
+own way, and none of the differences had been chosen. 437 of their elements were inventoried and merged
+into 100 system elements: the version more of seedr, configr and danieldeusing.de used won, and
+cockpit's won for tables, tab bars and what only cockpit had. They were built as separate packages and
+land together here.
+
+**Upgrading a surface: read [`docs/migrations/0.60.0.md`](docs/migrations/0.60.0.md) first.** It lists
+every removal and rename, the markup a component now requires, and what a strict CSP needs.
+
+Every new stylesheet renders on `tokens.css` alone, so a tokens-only surface (netmon, configr, seedr's
+studio) can load any one of them. Every one is imported by the bundle (`index.css`), by the Tailwind
+entry in `layer(components)`, and exported on its own (`@danieldeusing/design/<file>.css`). The runtime
+barrel re-exports every module, and importing it touches no DOM (`check-integration` imports it in
+Node), so a server-side render can import it.
+
+### Breaking
+
+- **Removed, with no shim:** `.filter-ctl`, `.filter-set` and `.filter-set-label` (0.58.0–0.59.0's text
+  filters). A filter is now a real control: `select[data-filter]` for one of several, `.switch` for
+  on/off, a `.chip-set` for several. Also removed: `.tbl-toolbar`, `.tbl-search` and
+  `.tbl-filter-input` (`initTableTools()` renders a `.filter-bar` with a `.search-field`), and
+  `initSelects()`'s `data-select="off"` opt-out.
+- **The Tailwind entry is layered.** `base.css` is in `@layer base` and every component file in
+  `@layer components`, so a Tailwind utility now beats the system on the same element. Measured in the
+  consumers: seedr's border-colour utilities, danieldeusing.de's `p-6` on a card and every
+  `outline-none` had been losing to unlayered system rules. `tokens.css` and `print.css` stay unlayered.
+  Every radius step is 0, bare `rounded` and `rounded-2xl` included.
+- **The tab bar moved to `data.css`.** A surface that loads `components.css` without `data.css` loses
+  `.tabs`; the tab's focus ring is `--ring`.
+- **`.card-terminal`** pads `var(--card-pad)` (12px, was `.85rem 1.1rem`), and only a card that is a
+  link or a button answers the pointer: `--primary` edge and a `--secondary` fill, no glow.
+- **One popup look (M0).** A chosen option or menu item shows a ✓ column instead of a left edge and
+  bold; a `.dropdown-item` rests in `--popover-foreground`; `.select-panel` no longer sets `position`
+  (`select.js` writes it inline, so a framework can put the class on its own listbox). Every popup has
+  the `--control-edge` edge and the `--elev-float` glow.
+- **A `details.dropdown` panel of rows is an ARIA menu** (roles, arrow keys, typeahead), and a labelled
+  section in it is a `role="group"` named by its label. A renderer that writes menus writes that shape.
+- **Checkboxes and radios are restyled everywhere** (a square box, a `--primary` fill), and text inputs
+  and selects are `--control-h` tall (28px) with a `--primary` edge on focus.
+- **Element defaults (F5):** bare `h1`–`h4`, `code`, `kbd`, `pre`, `mark`, `hr`, `blockquote` and
+  `figure` have the house look. A page that relied on the browser's look for them changes.
+- **`.btn-terminal` is `inline-flex`** with an icon slot, and its destructive and edit glyphs are the
+  lucide `trash-2` and `pencil` masks.
+- **`hidden` hides everything.** One rule in `tokens.css`,
+  `[hidden]:not([hidden="until-found" i]) { display: none !important }`, replaces `base.css`'s
+  `tr[hidden]` and every per-class guard. A print-only reveal of a `hidden` element now needs a class.
+- **`html.anim-off` stops transitions too**, and it moved to `tokens.css` with the keyframes. Under
+  forced colours no transition runs at all.
+- **`--content-pad` is 1.25rem below 40rem**, and a body with a `footer.status` reserves the footer's height
+  (`--status-h`, then the rendered height `initLsNav()` measures), so a page no longer pads its column
+  for it.
+- **The diagram zoom is a `<dialog>`** (`dialog.dgm-overlay`, styled in `overlays.css`): `.dgm-btn`,
+  `.dgm-close` and `.dgm-locked` are gone; the opener, `.dgm-zoomable`, stays in `components.css`.
+- **The tooltip panel** sits on `--popover` with the float glow, Escape closes it, it never sets
+  `aria-describedby` to a tip that repeats the control's name, and it moves into an open dialog.
+- **Removed: `.toc-label`.** A table of contents is `.toc` holding a `nav.navlist` with its
+  `.navlist-label` (`chrome.css`).
+- **The minimap marks its bar `aria-current="true"`**, not `.active`, and returns `null` on a page that
+  has a table of contents.
+- **`.text-*` utilities moved** from `base.css` to `utilities.css`, which the bundle loads after every
+  component file, so a utility beats a component's colour as it does in a Tailwind app.
+
+### Added
+
+- **Tokens (F1–F3, F7, the display step).** `--control-h` (28px), `--control-edge`, `--card-pad`,
+  `--icon-sm/-size/-lg/-xl`, `--dot-size`, `--status-h`; twelve categorical hues `--cat-red` …
+  `--cat-pink`, measured on every theme; `--elev-float`, `--elev-modal` and `--backdrop`; `data-tone`
+  on any element sets `--tone` from the five status accents, `primary` and `muted`; `--fs-display`
+  (30px, 36px from 40rem) and `--lh-display` (1.2) for a public page title and an error code, nothing
+  else. Tailwind: `border-control-edge`, `text-cat-*`, `shadow-float`, `shadow-modal`, `text-fs-display`.
+- **Icons (`icons.css`, I1–I3).** 51 lucide words as `--ico-*` masks, `data-icon="<word>"` on any glyph
+  host, and `.ico` (`--sm`, `--lg`, `--xl`, `data-tone`). Every glyph keeps its parent's colour under
+  forced colours. The set is closed: a word outside it is an empty box.
+- **Controls (`controls.css`).** `.btn-icon`, `.btn-group`, `.form-actions` and `.btn-row`, `.switch`,
+  checkbox and radio, `.segmented`, `.choice-card`, `.dropzone` and `.thumb-grid`, `.reveal`,
+  `.confirm-inline` and `.confirm-code`. None has a runtime.
+- **Filters, search and sort (`filters.css`; `runtime/search.js`, `sort.js`, `popup.js`).**
+  `.search-field`, `select[data-filter]` (a search row above 20 options, or with `data-search`; the
+  popup is then a dialog), `.sort-ctl`, `.filter-bar`, `.chip-set` and `.chip`, `.filter-chips`,
+  `button.value-filter`, `.result-count`, `.load-more` and the autocomplete contract;
+  `positionPopup()` is the one placement arithmetic every popup uses.
+- **Feedback, tags and counts (`feedback.css`, `tags.css`; `runtime/notice.js`).** `.empty`, `.notice`
+  (a live-region rule: `alert` only for destructive and warning), `.callout`, `.banner` in a
+  `.bar-stack`, `.state`, `.spinner` and `.loading`, `.fence` for untrusted text, `.dot`; `.tag` on
+  cockpit's D10 axes (dashed = does not count, dotted = off) with `data-tone` for a state and
+  `data-hue` for an identity, and `.count`.
+- **Data (`data.css`; `runtime/time.js`, `tabs.js`, `charts.js`, `tickstrip.js`, `pick.js`).**
+  `table.dense` and its cell vocabulary, `table.kv` / `dl.kv`, the `.when` cell, viewer-zone stamps
+  (`formatStamp()`, `formatAgo()`, `whenHtml()`, `initRelativeTimes()`), line and bar charts with a
+  non-colour cue per series, the APG tab bar (`initTabs()`), the ticker strip runtime, and the pick
+  cell. The table engine's filter menu takes M0's ✓ and the menu keys.
+- **Cards and lists (`cards.css`).** What goes inside a card (K2), `.card-grid`, `.stat-tile`, `.panel`,
+  `.row-list`, `.entry`, `.manpage`, `.tree` (`.tree-label` is required), `.split` / `.splitter`,
+  `.clamp` and `.console`. One selected-row look for every list: the rail's.
+- **Overlays (`overlays.css`; `runtime/dialog.js`).** `dialog.dialog` and its drawer, confirm and alert
+  forms, `initDialogs()` / `openDialog()` / `closeDialog()`, the context menu, and the zoom view with
+  pinch and arrow-key pan.
+- **Content (`content.css`; `runtime/copy.js`).** `.page-title` (+ `--display`) and `.lede`,
+  `.eyebrow`, `.section-head` and `.subhead`, `.markdown`, `.code-block` / `.code-view` with syntax and
+  diff lines, `.cmd`, `[data-copy]` buttons that say whether they worked, `.meta`, and the boot log;
+  `templates/error-page.html` for a 404 and a crash page.
+- **Chrome (`chrome.css`; `runtime/toc.js`).** The header's slots (`.bar-side`, `.bar-center`,
+  `.bar-history`, `.bar-status`), `.bar-stack`, `.crumbs`, `.page-toolbar` and `--sticky-top`, a table of
+  contents (`.layout`, `.toc`, `.navlist`, `initToc()`), `.wrap--full`, `.scrollbars-thin`, and the
+  language switcher in the templates.
+- **Components (`components.css`).** `.btn-terminal` icon slot, busy state and `--danger` / `--success`;
+  `.disclosure-btn`; `.field-desc`, `.field-error` and the row variants; `details.fold` counts, tones and
+  `initFolds()` for print; `.legend-label`; `attachMenuKeys()` for a menu a page places itself.
+- **`base.css`:** the element defaults and `.bg-dots`. **`utilities.css`:** the text colour utilities.
+
+### Fixed
+
+- **`tokens.json` published wrong defaults.** Its parser read a `:root` inside a media query as the
+  default (it would have said `--content-pad: 1.25rem`, the phone gutter) and stopped a block at a brace
+  inside a comment, so 0.59.0's file lacked `space-section`, `fs-2xl`, `lh-tight`, `lh-base` and
+  `field-label-w`. It now reads the unconditional `:root` blocks only. The 51 icon drawings are left
+  out: they are CSS masks of lucide's licensed path data, of no use to a native or Figma consumer.
+- **Lucide's licence travels into the minified bundle.** The minifier stripped every comment, the
+  `/*!` licence included; it keeps `/*!` comments now (0 copies before, 1 after).
+
+### Checks
+
+Twenty-two suites are new (`check-cards`, `-charts`, `-chrome`, `-components`, `-content`,
+`-controls`, `-copy`, `-data`, `-dropdown`, `-feedback`, `-filters`, `-fold`, `-foundations`, `-icons`,
+`-minimap`, `-notice`, `-overlays`, `-tabs`, `-tailwind-layers`, `-tickstrip`, `-time`, and
+`check-integration`, which reads the entry points, the published tokens, the stand-in markers and the
+runtime's CSP safety). A suite whose subject is rendering measures it in a real browser, the forced
+palettes included, and every check was seen to fail on a mutant. CI and the release
+workflow now run every `scripts/check-*.mjs`, with a missing browser, a stand-in or a missing lucide
+drawing each a failure, and `check-release-gate` fails a suite that is left out of either.
+
 ## 0.59.0 (2026-09-28)
 
 ### Changed

@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>danieldeusing-design — foundations</title>
+
+    <!-- Pre-paint: theme and motion before first paint. `?theme=green` and `?anim=off` override the
+         stored choice, so a check or a screenshot can ask for one state without clicking. -->
+    <script>
+      (() => {
+        const themes = ["warm", "green", "mono", "paper"];
+        const q = new URLSearchParams(location.search);
+        let t = "warm";
+        try { const s = localStorage.getItem("theme"); if (themes.includes(s)) t = s; } catch {}
+        if (themes.includes(q.get("theme"))) t = q.get("theme");
+        document.documentElement.dataset.theme = t;
+        let off = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (q.get("anim") === "off") off = true;
+        if (off) document.documentElement.classList.add("anim-off");
+      })();
+    </script>
+
+    <!-- A page's OWN rules, deliberately loaded BEFORE the system: an element default must lose to them
+         by specificity, not by stylesheet order. check-foundations reads the contest elements in F5. -->
+    <style id="page-own">
+      .demo-scope h2 { font-size: 20px; font-weight: 400; }
+      h2.demo-cls { font-size: 20px; }
+      .demo-scope code { border: 0; }
+      mark.demo-cls { background: transparent; }
+    </style>
+
+    <!-- What a build-free page gets from the bundle, minus the component files: WP1 is the token
+         layer, the element defaults and the text utilities, and must stand on these alone. -->
+    <link rel="stylesheet" href="../src/reset.css" />
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" />
+    <link rel="stylesheet" href="../src/utilities.css" />
+
+    <style>
+      /* Page-only layout. Every colour and size below is a token; nothing here is part of the
+         system, which is why every class carries the demo- prefix. */
+      .demo-wrap { max-width: var(--content-w); margin-inline: auto; padding: 1.5rem var(--content-pad) 4rem; }
+      .demo-bar {
+        position: sticky; top: 0; z-index: 30;
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem;
+        padding: 0.5rem var(--content-pad); background: var(--card); border-bottom: 1px solid var(--border);
+      }
+      .demo-bar strong { color: var(--primary); }
+      .demo-controls { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+      .demo-btn {
+        min-block-size: var(--control-h); padding: 0 0.6rem; font: inherit; color: var(--muted-foreground);
+        background: transparent; border: 1px solid var(--control-edge); cursor: pointer;
+      }
+      .demo-btn[aria-pressed="true"] {
+        color: var(--primary); border-color: var(--primary); font-weight: 700;
+        background: color-mix(in srgb, var(--primary) 12%, transparent);
+      }
+      .demo-lede { color: var(--muted-foreground); max-width: 72ch; margin-block: 0.4rem 1rem; }
+      .demo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; }
+      .demo-cols { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); }
+      .demo-label { color: var(--muted-foreground); }
+      .demo-surface { padding: 0.6rem 0.75rem; border: 1px solid var(--border); }
+      .demo-surface[data-surface="background"] { background: var(--background); }
+      .demo-surface[data-surface="card"] { background: var(--card); }
+      .demo-surface[data-surface="muted"] { background: var(--muted); }
+      .demo-surface > * + * { margin-top: 0.35rem; }
+      .demo-field {
+        box-sizing: border-box; min-block-size: var(--control-h); inline-size: 100%; padding: 0 0.5rem;
+        font: inherit; color: var(--foreground); background: transparent; border: 1px solid var(--control-edge);
+      }
+      .demo-box { display: grid; place-items: center; border: 1px solid var(--control-edge); }
+      .demo-card { padding: var(--card-pad); background: var(--card); border: 1px solid var(--border); }
+      .demo-status {
+        display: flex; align-items: center; min-block-size: var(--status-h); padding-inline: 0.75rem;
+        background: var(--card); border: 1px solid var(--border); color: var(--muted-foreground);
+      }
+      .demo-gutter { background: color-mix(in srgb, var(--primary) 12%, transparent); padding-inline: var(--content-pad); }
+      .demo-gutter > div { background: var(--card); padding: 0.4rem 0; text-align: center; }
+      /* A glyph drawn from an icon token: the recipe the tokens.css block documents. */
+      .demo-ico {
+        display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);
+        background: currentColor; mask: var(--i) center / contain no-repeat;
+      }
+      .demo-ico[data-size="sm"] { inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+      .demo-ico[data-size="lg"] { inline-size: var(--icon-lg); block-size: var(--icon-lg); }
+      .demo-ico[data-size="xl"] { inline-size: var(--icon-xl); block-size: var(--icon-xl); }
+      .demo-icons { display: grid; gap: 0.25rem 1rem; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); }
+      .demo-icons li { display: flex; align-items: center; gap: 0.5rem; min-block-size: var(--control-h); }
+      .demo-dot { display: inline-block; inline-size: var(--dot-size); block-size: var(--dot-size); border-radius: 50%; background: var(--success); }
+      .demo-swatches { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr)); }
+      .demo-swatch { border: 1px solid var(--border); }
+      .demo-swatch > div { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0.6rem; color: var(--c); }
+      .demo-swatch .on-bg { background: var(--background); }
+      .demo-swatch .on-card { background: var(--card); }
+      .demo-swatch .on-muted { background: var(--muted); }
+      .demo-swatch .solid { background: var(--c); color: var(--background); font-weight: 700; }
+      .demo-swatch .edge { border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); margin: 0.3rem 0.6rem; }
+      .demo-stage { position: relative; display: grid; place-items: center; min-block-size: 13rem; padding: 1rem; background: var(--background); border: 1px solid var(--border); }
+      .demo-stage::before { content: ""; position: absolute; inset: 0; background: var(--backdrop); }
+      .demo-dialog { position: relative; max-inline-size: 24rem; padding: 1rem; background: var(--card); border: 1px solid var(--control-edge); box-shadow: var(--elev-modal); }
+      .demo-popup { max-inline-size: 16rem; padding: 0.25rem 0; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--control-edge); box-shadow: var(--elev-float); }
+      .demo-popup p { padding: 0.3rem 0.75rem; }
+      .demo-popup p:first-child { background: var(--muted); }
+      .demo-spin { background: currentColor; mask: var(--ico-loader-circle) center / contain no-repeat; inline-size: var(--icon-lg); block-size: var(--icon-lg); animation: dd-spin 1s linear infinite; }
+      /* Colour the PARENT, never the glyph: a glyph coloured directly keeps that colour in forced colours. */
+      .demo-tinted { display: inline-flex; color: var(--primary); }
+      /* The recipe's forced-colours half (tokens.css, ICON MASKS): without it every glyph paints Canvas. */
+      @media (forced-colors: active) {
+        .demo-ico, .demo-spin { forced-color-adjust: preserve-parent-color; }
+        @supports not (forced-color-adjust: preserve-parent-color) {
+          .demo-ico, .demo-spin { forced-color-adjust: none; background: CanvasText; }
+        }
+      }
+      .demo-pulse { animation: dd-pulse 2s ease-in-out infinite; }
+      .demo-fade { padding: 0.3rem 0.6rem; border: 1px solid var(--control-edge); transition: background-color 0.15s ease, color 0.15s ease; }
+      .demo-fade:hover { background: var(--primary); color: var(--primary-foreground); }
+      .demo-cursor { display: inline-block; inline-size: 0.55em; block-size: 1em; background: var(--primary); vertical-align: -0.1em; }
+      .demo-tone { padding: 0.4rem 0.6rem; color: var(--foreground); border: 1px solid color-mix(in srgb, var(--tone, var(--border)) 60%, transparent); background: color-mix(in srgb, var(--tone, transparent) 6%, transparent); }
+      .demo-tone b { color: var(--tone, var(--muted-foreground)); }
+      .demo-dots { padding: 1rem; border: 1px solid var(--border); }
+      .demo-dots .demo-card { min-block-size: 3.5rem; }
+      .demo-values { color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+      .demo-display { font-size: var(--fs-display); font-weight: 700; line-height: var(--lh-tight); color: var(--primary); }
+      section { scroll-margin-top: 4rem; }
+      .demo-flex { display: flex; gap: 0.5rem; }
+      .demo-restack { display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="demo-bar">
+      <span><strong>foundations</strong> <span class="demo-label">· WP1 · tokens.css + base.css + utilities.css</span></span>
+      <span class="demo-controls" role="group" aria-label="theme">
+        <button type="button" class="demo-btn" data-set-theme="warm">warm</button>
+        <button type="button" class="demo-btn" data-set-theme="green">green</button>
+        <button type="button" class="demo-btn" data-set-theme="mono">mono</button>
+        <button type="button" class="demo-btn" data-set-theme="paper">paper</button>
+        <button type="button" class="demo-btn" id="anim-toggle">motion off</button>
+      </span>
+    </div>
+
+    <main class="demo-wrap">
+      <h1 id="page-title">Foundations</h1>
+      <p class="demo-lede">Every token and element default the 0.60.0 foundations package adds, in every state, on every theme.
+        This page loads reset.css, tokens.css and base.css and nothing else.</p>
+
+      <!-- ── F1 ─────────────────────────────────────────────────────────── -->
+      <section id="f1">
+        <h2>F1 · control, size and layout tokens</h2>
+        <p class="demo-lede">One height for every single-line control, one card inset, four glyph sizes, the dot, the status bar and the
+          phone gutter. Values below are read back from the page.</p>
+        <div class="demo-cols">
+          <div class="demo-surface" data-surface="background">
+            <p class="demo-label">--control-h + --control-edge on --background</p>
+            <input id="ctl-field" class="demo-field" aria-label="sample field" placeholder="28px, edge 60% foreground" />
+          </div>
+          <div class="demo-surface" data-surface="card" id="edge-card">
+            <p class="demo-label">…on --card</p>
+            <input class="demo-field" aria-label="sample field on card" placeholder="same edge" />
+          </div>
+          <div class="demo-surface" data-surface="muted" id="edge-muted">
+            <p class="demo-label">…on --muted</p>
+            <input class="demo-field" aria-label="sample field on muted" placeholder="same edge" />
+          </div>
+        </div>
+        <div class="demo-row" style="margin-top: 0.75rem">
+          <div id="ctl-box" class="demo-box" style="inline-size: 6rem; block-size: var(--control-h)">28px</div>
+          <div id="card-pad" class="demo-card">--card-pad</div>
+          <span class="demo-row" style="gap: 0.5rem">
+            <span class="demo-ico" data-size="sm" id="ico-sm" style="--i: var(--ico-check)"></span>
+            <span class="demo-ico" id="ico-md" style="--i: var(--ico-check)"></span>
+            <span class="demo-ico" data-size="lg" id="ico-lg" style="--i: var(--ico-check)"></span>
+            <span class="demo-ico" data-size="xl" id="ico-xl" style="--i: var(--ico-check)"></span>
+            <span class="demo-label">--icon-sm / -size / -lg / -xl</span>
+          </span>
+          <span><span class="demo-dot" id="dot"></span> <span class="demo-label">--dot-size</span></span>
+        </div>
+        <div id="status-bar" class="demo-status" style="margin-top: 0.75rem">--status-h: the footer.status height</div>
+        <div class="demo-gutter" id="gutter" style="margin-top: 0.75rem"><div>--content-pad: <span id="gutter-value"></span> (1.25rem below 40rem)</div></div>
+        <p class="demo-values" id="f1-values" style="margin-top: 0.5rem"></p>
+      </section>
+
+      <!-- ── display step ───────────────────────────────────────────────── -->
+      <section id="display">
+        <h2>The display step · --fs-display</h2>
+        <p class="demo-lede">One size above the heading scale, for a public-site page title and an error page's status code only:
+          30px, 36px from 40rem. An app's title stays --fs-2xl. Resize the window across 40rem to see it step.</p>
+        <p class="demo-label">a public page title (what .page-title--display will wear)</p>
+        <h1 class="demo-display" id="display-title">Articles<span class="cursor-block demo-cursor" aria-hidden="true"></span></h1>
+        <p class="demo-label" style="margin-top: 0.75rem">an error page's status code</p>
+        <p class="demo-display" id="display-code">404</p>
+        <p class="demo-label" style="margin-top: 0.75rem">for contrast, an app title at --fs-2xl</p>
+        <h1 id="display-app-title">Automation · review</h1>
+        <p class="demo-values" id="display-value" style="margin-top: 0.5rem"></p>
+      </section>
+
+      <!-- ── F2 ─────────────────────────────────────────────────────────── -->
+      <section id="f2">
+        <h2>F2 · categorical colours</h2>
+        <p class="demo-lede">Twelve named hues on one L/C pair per theme: text on each surface, a 50% edge, and the solid fill that
+          carries --background text.</p>
+        <div class="demo-swatches" id="cats"></div>
+      </section>
+
+      <!-- ── F3 ─────────────────────────────────────────────────────────── -->
+      <section id="f3">
+        <h2>F3 · elevation and backdrop</h2>
+        <div class="demo-cols">
+          <div>
+            <p class="demo-label">--elev-float on a popup, edged with --control-edge</p>
+            <div class="demo-popup" id="popup"><p>highlighted row</p><p>row</p><p>row</p></div>
+          </div>
+          <div>
+            <p class="demo-label">--elev-modal on a dialog over --backdrop</p>
+            <div class="demo-stage" id="stage">
+              <div class="demo-dialog" id="dialog"><h3>remove poi/vu3?</h3><p>The scrim dims the page; on the dark themes the edge is what separates the dialog.</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── F5 ─────────────────────────────────────────────────────────── -->
+      <section id="f5">
+        <h2>F5 · element defaults</h2>
+        <div class="demo-cols">
+          <div>
+            <h1 id="el-h1">h1 · --fs-2xl</h1>
+            <h2 id="el-h2">h2 · --fs-xl <code id="el-code-h2">code</code></h2>
+            <h3 id="el-h3">h3 · --fs-lg</h3>
+            <h4 id="el-h4">h4 · body size, bold</h4>
+            <h5 id="el-h5">h5 · body size, bold</h5>
+            <h6 id="el-h6">h6 · body size, bold</h6>
+          </div>
+          <div>
+            <p id="el-p">Inline <code id="el-code">npm run build</code>, a keycap <kbd id="el-kbd">Ctrl</kbd>+<kbd>K</kbd>,
+              output <samp id="el-samp">exit 0</samp> and a <mark id="el-mark">highlighted match</mark>.</p>
+            <p class="text-muted-foreground" id="el-muted-line">In muted text a <mark id="el-mark-muted">match</mark> keeps foreground text.</p>
+            <pre id="el-pre"><code id="el-pre-code">node scripts/build.mjs
+	built dist + tokens</code></pre>
+          </div>
+        </div>
+        <hr id="el-hr" />
+        <div class="demo-cols">
+          <blockquote id="el-quote">
+            <p>A dropdown should ALWAYS have the custom layout for the list, not the system one.</p>
+            <cite id="el-cite">Daniel, 2026-09-28</cite>
+          </blockquote>
+          <figure id="el-figure">
+            <svg id="el-figure-svg" viewBox="0 0 240 80" width="240" height="80" role="img" aria-label="sample chart">
+              <rect x="10" y="40" width="30" height="30" fill="var(--cat-blue)"></rect>
+              <rect x="60" y="20" width="30" height="50" fill="var(--cat-teal)"></rect>
+              <rect x="110" y="30" width="30" height="40" fill="var(--cat-amber)"></rect>
+              <rect x="160" y="10" width="30" height="60" fill="var(--cat-pink)"></rect>
+            </svg>
+            <figcaption id="el-figcaption">A figure keeps its caption muted and italic.</figcaption>
+          </figure>
+        </div>
+        <div class="demo-cols" style="margin-top: 0.75rem">
+          <div class="demo-surface" data-surface="card"><p>On --card: <code>inline</code> and <mark>mark</mark>.</p></div>
+          <div class="demo-surface" data-surface="muted"><p>On --muted: <code>inline</code> and <mark>mark</mark>.</p></div>
+        </div>
+      </section>
+
+      <!-- ── contests: a page's own rule beats an element default ─────────── -->
+      <section id="contests">
+        <h2>A page's own rule beats an element default</h2>
+        <p class="demo-lede">These rules load BEFORE the system (the page-own style block), so each wins by specificity alone.</p>
+        <div class="demo-scope"><h2 id="contest-scoped">.demo-scope h2 · 20px, weight 400</h2>
+          <p><code id="contest-code">.demo-scope code · no box</code></p></div>
+        <h2 class="demo-cls" id="contest-cls">h2.demo-cls · 20px</h2>
+        <p><mark class="demo-cls" id="contest-mark">mark.demo-cls · no tint</mark></p>
+      </section>
+
+      <!-- ── X3 ─────────────────────────────────────────────────────────── -->
+      <section id="x3">
+        <h2>X3 · hidden hides, whatever display an author set</h2>
+        <p class="demo-lede">Nothing below is visible. The last line is hidden="until-found": searching the page for
+          "reveal this" shows it, which is why the rule must not force it to display: none.</p>
+        <div class="demo-flex" id="hid-class" hidden>a class that sets display: flex, plus hidden</div>
+        <span id="hid-inline" style="display: inline-block" hidden>an inline display, plus hidden</span>
+        <table><tbody><tr class="demo-restack" id="hid-row" hidden><td>a row a narrow-screen rule restacks, plus hidden</td></tr></tbody></table>
+        <div class="demo-flex" id="hid-until" hidden="until-found">hidden="until-found": find-in-page can reveal this</div>
+      </section>
+
+      <!-- ── F6 ─────────────────────────────────────────────────────────── -->
+      <section id="f6">
+        <h2>F6 · motion</h2>
+        <p class="demo-lede">dd-spin and dd-pulse, a .15s transition and the block cursor. "motion off" sets html.anim-off, which
+          stops keyframes AND transitions and hides the cursor.</p>
+        <div class="demo-row">
+          <span class="demo-tinted"><span class="demo-spin" id="spin" role="img" aria-label="spinning"></span></span>
+          <span><span class="demo-dot demo-pulse" id="pulse"></span> live</span>
+          <span class="demo-fade" id="fade">hover fades .15s</span>
+          <span>wordmark<span class="cursor-block demo-cursor" id="cursor"></span></span>
+          <span class="demo-values" id="f6-values"></span>
+        </div>
+      </section>
+
+      <!-- ── F7 ─────────────────────────────────────────────────────────── -->
+      <section id="f7">
+        <h2>F7 · tone</h2>
+        <p class="demo-lede">One attribute; the demo box reads var(--tone) for its label, edge and a 6% tint.</p>
+        <div class="demo-cols" id="tones">
+          <div class="demo-tone" data-tone="primary" id="tone-primary"><b>primary:</b> text on a 6% tint</div>
+          <div class="demo-tone" data-tone="success" id="tone-success"><b>success:</b> installed</div>
+          <div class="demo-tone" data-tone="warning" id="tone-warning"><b>warning:</b> two sources publish this skill</div>
+          <div class="demo-tone" data-tone="destructive" id="tone-destructive"><b>failed:</b> could not read the file</div>
+          <div class="demo-tone" data-tone="info" id="tone-info"><b>info:</b> dispatching</div>
+          <div class="demo-tone" data-tone="pending" id="tone-pending"><b>pending:</b> no verdict yet</div>
+          <div class="demo-tone" data-tone="muted" id="tone-muted"><b>muted:</b> superseded</div>
+          <div class="demo-tone" data-tone="warning"><span class="demo-tone" id="tone-nested"><b>nested:</b> inherits warning</span></div>
+          <div class="demo-tone" data-tone="loud" id="tone-unknown"><b>unknown value:</b> sets nothing</div>
+        </div>
+      </section>
+
+      <!-- ── F8 ─────────────────────────────────────────────────────────── -->
+      <section id="f8">
+        <h2>F8 · text colour utilities</h2>
+        <div class="demo-cols">
+          <div class="demo-surface" data-surface="background" id="f8-bg"></div>
+          <div class="demo-surface" data-surface="card"></div>
+          <div class="demo-surface" data-surface="muted"></div>
+        </div>
+      </section>
+
+      <!-- ── F10 ────────────────────────────────────────────────────────── -->
+      <section id="f10">
+        <h2>F10 · dotted ground</h2>
+        <div class="bg-dots demo-dots" id="dots">
+          <div class="demo-cols"><div class="demo-card">card</div><div class="demo-card">card</div><div class="demo-card">card</div></div>
+        </div>
+      </section>
+
+      <!-- ── icons ─────────────────────────────────────────────────────── -->
+      <section id="icons">
+        <h2>Icon masks</h2>
+        <p class="demo-lede">Every --ico-* token, drawn as a mask in currentColor at --icon-size. The second glyph is the same token in
+          --primary, set on its parent, the third at --icon-xl.</p>
+        <ul class="demo-icons" id="icon-list"></ul>
+      </section>
+    </main>
+
+    <script type="module">
+      const html = document.documentElement;
+      const ICONS = ["check", "minus", "x", "search", "filter", "arrow-up", "arrow-down", "chevron-down", "chevron-left",
+        "trash-2", "pencil", "loader-circle", "refresh-cw", "star", "star-filled", "history", "home", "image-plus",
+        "triangle-alert", "package", "download"];
+      const CATS = ["red", "orange", "amber", "lime", "green", "teal", "cyan", "blue", "indigo", "violet", "purple", "pink"];
+      const TEXT = ["foreground", "muted-foreground", "primary", "success", "warning", "destructive", "info", "pending"];
+
+      document.getElementById("icon-list").innerHTML = ICONS.map((n) =>
+        `<li><span class="demo-ico" style="--i: var(--ico-${n})"></span>` +
+        `<span class="demo-tinted"><span class="demo-ico" style="--i: var(--ico-${n})"></span></span>` +
+        `<span class="demo-ico" data-size="xl" style="--i: var(--ico-${n})"></span><code>--ico-${n}</code></li>`).join("");
+      document.getElementById("cats").innerHTML = CATS.map((n) =>
+        `<div class="demo-swatch" id="cat-${n}" style="--c: var(--cat-${n})">` +
+        `<div class="on-bg"><span>--cat-${n}</span><span>bg</span></div>` +
+        `<div class="on-card"><span>text</span><span>card</span></div>` +
+        `<div class="on-muted"><span>text</span><span>muted</span></div>` +
+        `<div class="edge"><span>50% edge</span></div>` +
+        `<div class="solid"><span>solid</span><span>--background</span></div></div>`).join("");
+      for (const box of document.querySelectorAll("#f8 .demo-surface")) {
+        box.innerHTML = `<p class="demo-label">on --${box.dataset.surface}</p>` +
+          TEXT.map((t) => `<p class="text-${t}">.text-${t}</p>`).join("");
+      }
+
+      const px = (prop) => { const p = document.createElement("div"); p.style.cssText = `position:absolute;visibility:hidden;inline-size:var(${prop})`;
+        document.body.append(p); const w = p.getBoundingClientRect().width; p.remove(); return `${w}px`; };
+      const readout = () => {
+        document.getElementById("gutter-value").textContent = px("--content-pad");
+        document.getElementById("display-value").textContent =
+          `--fs-display ${px("--fs-display")} at ${innerWidth}px wide · --fs-2xl ${px("--fs-2xl")}`;
+        document.getElementById("f1-values").textContent =
+          ["--control-h", "--card-pad", "--icon-sm", "--icon-size", "--icon-lg", "--icon-xl", "--dot-size", "--status-h"]
+            .map((t) => `${t} ${px(t)}`).join(" · ");
+        const s = getComputedStyle(document.getElementById("spin"));
+        const f = getComputedStyle(document.getElementById("fade"));
+        document.getElementById("f6-values").textContent =
+          `animation: ${s.animationName} · transition: ${f.transitionDuration}`;
+      };
+
+      const sync = () => {
+        for (const b of document.querySelectorAll("[data-set-theme]")) b.setAttribute("aria-pressed", String(b.dataset.setTheme === html.dataset.theme));
+        document.getElementById("anim-toggle").setAttribute("aria-pressed", String(html.classList.contains("anim-off")));
+        readout();
+      };
+      document.addEventListener("click", (e) => {
+        const theme = e.target.closest("[data-set-theme]");
+        if (theme) { html.dataset.theme = theme.dataset.setTheme; try { localStorage.setItem("theme", html.dataset.theme); } catch {} }
+        if (e.target.closest("#anim-toggle")) html.classList.toggle("anim-off");
+        sync();
+      });
+      addEventListener("resize", readout);
+      sync();
+    </script>
+  </body>
+</html>

@@ -1,8 +1,7 @@
 /*
  * danieldeusing-design — Tailwind v4 entry point.
  *
- * For apps that use Tailwind v4. Import AFTER Tailwind itself so this wins over
- * Preflight:
+ * For apps that use Tailwind v4. Import AFTER Tailwind itself:
  *
  *   @import "tailwindcss";
  *   @import "@danieldeusing/design/tailwind.css";
@@ -12,13 +11,49 @@
  * `text-foreground`, `border-border`, `font-mono`, etc. resolve to the live CSS
  * variables and follow html[data-theme] at runtime. No reset is imported here:
  * Tailwind's Preflight already normalizes the document.
+ *
+ * ── LAYERED (0.60.0): a utility beats the system on the same element ──────────
+ *
+ * Until 0.60.0 every file here was imported UNLAYERED, and an unlayered rule beats every rule in
+ * any cascade layer whatever its specificity — so the system silently won over every Tailwind
+ * utility a consumer wrote on the same element. Measured in the consumers, not reasoned:
+ *
+ *   · seedr: base.css's `* { border-color: var(--border) }` defeated EVERY border-colour utility.
+ *     The active filter trigger, the filter chips, every badge edge and the card hovers all
+ *     rendered --border; seedr patched two of them back with unlayered rules of its own.
+ *   · danieldeusing.de: `p-6` and `sm:p-8` on every `.card-terminal` did nothing, and
+ *     `hover:border-destructive` on a non-live app card never showed.
+ *   · both: `outline-none` lost to the system's `:focus-visible`, so a shadcn button carried the
+ *     system outline AND Tailwind's ring.
+ *
+ * Nobody chose any of that; it fell out of an import statement. The layers now say what each file
+ * is: the document look is `base` (after Preflight, which lives there too), the classes are
+ * `components`, and Tailwind's utilities — the layer after both — win on the element they are
+ * written on. That is the precedence a Tailwind author already expects.
+ *
+ * Two files stay unlayered on purpose:
+ *   · tokens.css is variables, the kill switch, the tone map and the `hidden` rule. configr and
+ *     seedr's studio import it directly and unlayered; the same file must not cascade differently
+ *     through this entry.
+ *   · print.css must beat everything on paper, a utility included (a `flex` on the chrome must not
+ *     keep it on the page), and only unlayered normal declarations beat every layer.
+ *
+ * ⚠️ EVERY COMPONENT FILE GOES IN `layer(components)`. A new src/*.css imported here without it
+ * is unlayered again, and reinstates for that file the exact failure described above.
+ * scripts/check-tailwind-layers.mjs compiles this entry with Tailwind and fails if it does.
+ *
+ * The build-free bundle (index.css) stays unlayered: with no Tailwind there are no utilities to
+ * yield to, and a surface's own unlayered stylesheet still wins on source order. Its text colour
+ * utilities (utilities.css) come after its component files, for the precedence this entry gets from
+ * layers. This entry does NOT import them: Tailwind generates its own `text-*` from the colours
+ * below, in its utilities layer.
  */
 
 @import "./tokens.css";
-@import "./base.css";
-@import "./components.css";
-@import "./chrome.css";
-@import "./tooltip.css";
+@import "./base.css" layer(base);
+@import "./components.css" layer(components);
+@import "./chrome.css" layer(components);
+@import "./tooltip.css" layer(components);
 @import "./print.css";
 
 @theme inline {
@@ -47,14 +82,47 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  /* The field edge (0.60.0): `border-control-edge` on an input, a trigger, a bordered icon
+     button. A container keeps `border-border`. */
+  --color-control-edge: var(--control-edge);
+  /* The twelve categorical hues (0.60.0): `text-cat-teal`, `border-cat-teal`, `bg-cat-teal`.
+     Assign them to things by NAME; a hashed or free hue is outside what was measured. */
+  --color-cat-red: var(--cat-red);
+  --color-cat-orange: var(--cat-orange);
+  --color-cat-amber: var(--cat-amber);
+  --color-cat-lime: var(--cat-lime);
+  --color-cat-green: var(--cat-green);
+  --color-cat-teal: var(--cat-teal);
+  --color-cat-cyan: var(--cat-cyan);
+  --color-cat-blue: var(--cat-blue);
+  --color-cat-indigo: var(--cat-indigo);
+  --color-cat-violet: var(--cat-violet);
+  --color-cat-purple: var(--cat-purple);
+  --color-cat-pink: var(--cat-pink);
 
   --font-sans: var(--font-mono);
   --font-mono: var(--font-mono);
 
+  /* Every radius step is 0, including the four Tailwind has that this file used to leave at their
+     defaults — `rounded-2xl` was 1rem until 0.60.0 — and bare `rounded`, which reads Tailwind's
+     own `--radius` key (0.25rem by default). That one is a literal, because `var(--radius)` under
+     its own name would be a self-reference in the theme layer Tailwind emits. `rounded-full` is not
+     a theme step and stays round: it is for a true circle (a dot, a radio), the one shape the
+     no-radius rule allows. */
+  --radius: 0rem;
+  --radius-xs: var(--radius);
   --radius-sm: var(--radius);
   --radius-md: var(--radius);
   --radius-lg: var(--radius);
   --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+  --radius-4xl: var(--radius);
+  /* Popups glow, they do not cast a shadow (0.60.0): `shadow-float` on a menu or listbox,
+     `shadow-modal` on a dialog. Tailwind's own `shadow-sm…2xl` are left alone, as `text-xs…base`
+     are below — remapping a default name would reskin every existing use of it. */
+  --shadow-float: var(--elev-float);
+  --shadow-modal: var(--elev-modal);
   /* Layout + type, so a Tailwind app reaches the same measurements as a plain
      one: `max-w-content` is the shared column, `text-fs-*` the shared scale.
      Tailwind's OWN text-xs/sm/base are deliberately left alone — silently
@@ -68,4 +136,10 @@
   --text-fs-lg: var(--fs-lg);
   --text-fs-xl: var(--fs-xl);
   --text-fs-2xl: var(--fs-2xl);
+  /* The one display step (0.60.0): `text-fs-display`, 30px and 36px from 40rem — the token carries
+     the breakpoint, so it replaces `text-3xl sm:text-4xl` with one class. For a public-site page
+     title and an error page's status code ONLY; an app's title stays `text-fs-2xl`, and nothing a
+     person reads as text takes it. It sets the size alone: the line height stays the heading's
+     (--lh-tight), where `text-3xl` brought its own 1.2. */
+  --text-fs-display: var(--fs-display);
 }

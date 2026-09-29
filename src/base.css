@@ -95,20 +95,6 @@ tbody tr:last-child > * {
 tr > *:first-child { padding-inline-start: 0; }
 tr > *:last-child { padding-inline-end: 0; }
 
-/* A HIDDEN ROW MUST ACTUALLY BE HIDDEN, and `!important` is what makes that true.
-   The UA's own `[hidden] { display: none }` is a one-attribute selector, so ANY rule that
-   sets `display` on a row outruns it — and the estate has those: a narrow-screen media
-   query that restacks a key/value table as `.ask table.kv tr { display: block }` scores
-   higher and would put every hidden row back on screen, on phones only. Worse than a
-   cosmetic slip, because `hidden` that loses to a stylesheet is still exposed to a screen
-   reader: the table would announce rows nobody can see it announcing.
-
-   This is the mechanism `initTablePagination()` turns a page with, and it is declared
-   here rather than beside the pager because it is a correction to the ELEMENT: a row a
-   consumer hides for its own reasons has exactly the same problem. Same `display: none
-   !important` the print stylesheet and the diagram overlay already use. */
-tr[hidden] { display: none !important; }
-
 /* Tailwind v4's reset drops the default button cursor — restore it for all
    interactive controls (buttons, summaries, role=button). */
 button:not(:disabled),
@@ -195,4 +181,131 @@ body::after {
    it true. */
 :where(p) + :where(table, .tablewrap, svg, .legend) {
   margin-block-start: 0.6rem;
+}
+
+
+/* ── ELEMENT DEFAULTS — the house look for bare markup (0.60.0) ─────────────────
+   Until 0.60.0 the system styled the body, tables and focus, and left every other element to the
+   browser. So each surface drew its own inline code (cockpit's `code.inline` alone has 831 uses;
+   pagr, seedr and configr each carry another), its own <pre>, quote rule and figure — while a
+   page that wrote plain markup got the user agent's look. Measured on a 0.59.0 page: <code> and
+   <pre> computed to the generic `monospace` (the platform's fallback face, not JetBrains Mono), a
+   <mark> that is yellow on black on all four themes, an inset grey <hr>, an h3 at 14.04px. Each
+   of those is a decision the system should make once.
+
+   ZERO SPECIFICITY, as in the section rhythm above: wrapped in :where() so any class a surface
+   puts on the element beats it, and a surface that already styles its own `code` keeps its look.
+
+   ⚠️ EXCEPT the heading sizes and weight and the code font, which are plain type selectors, and
+   must stay that way. In a Tailwind app this file sits in `@layer base` beside Preflight, and
+   Preflight resets exactly these with type selectors (`h1…h6 { font-size: inherit; font-weight:
+   inherit }`, `code, kbd, samp, pre { font-family: …; font-size: 1em }`). In one layer the higher
+   specificity wins whatever the order, so the :where() form lost to Preflight: measured through a
+   real Tailwind compile, a bare h1, h2 and h3 all rendered at 12px and weight 400. At equal
+   specificity this file comes second and wins, and any class still beats a type selector. Only
+   the properties Preflight contests are raised; everything else stays at zero.
+   scripts/check-tailwind-layers.mjs fails if a heading or a code element loses again.
+
+   The type steps are the scale's — h1 --fs-2xl, h2 --fs-xl, h3 --fs-lg — and h4 to h6 are body
+   size in bold: a fourth heading size would be exactly the near-miss ONE TEXT SIZE removed. Code
+   is text a person reads, so it takes the one text size too, even inside a heading.
+   <pre> joins the code elements in `font: inherit`. The user agent gives it the generic
+   monospace family, so without that line every code block in the estate would render in a
+   different font from the code beside it.
+   <mark> is --warning at 30% under FOREGROUND text, not inherited text: that pair is measured,
+   5.54:1 at worst (green, over --muted). Inherited, a mark inside muted text — a caption, a
+   table header, a nav label — would put --muted-foreground on the tint at 2.79-4.38:1. */
+h1 { font-size: var(--fs-2xl); }
+h2 { font-size: var(--fs-xl); }
+h3 { font-size: var(--fs-lg); }
+h4, h5, h6 { font-size: var(--fs-base); }
+h1, h2, h3, h4, h5, h6 { font-weight: 700; }
+:where(h1, h2, h3) {
+  line-height: var(--lh-tight);
+  color: inherit;
+}
+
+code, kbd, samp, pre {
+  font: inherit;
+  font-size: var(--fs-base);
+}
+/* The `font` shorthand above resets line height to inherited, at type specificity, so the block's
+   own line height has to be stated at the same specificity to survive it. */
+pre { line-height: var(--lh-base); }
+/* Inline code and a keycap are the same small box: a --muted fill with a hairline. Square, like
+   everything else — a rounded keycap is the one place other systems reach for a radius. */
+:where(:not(pre) > code, kbd) {
+  padding: 0.05rem 0.35rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+:where(pre) {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  tab-size: 2;
+}
+/* The block already draws the box; the <code> inside it must not draw a second one. Declared
+   after the inline rule so it also wins for a code nested deeper inside a <pre>. */
+:where(pre code) {
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+:where(mark) {
+  background: color-mix(in srgb, var(--warning) 30%, transparent);
+  color: var(--foreground);
+}
+/* Forced colours (Windows High Contrast) swap an author background for Canvas and keep its alpha,
+   so the tint above fades to about 1.04:1 on the page and a search hit disappears. The mode keeps a
+   system colour, and it has a pair for exactly this: the palette's own Mark under MarkText. */
+@media (forced-colors: active) {
+  :where(mark) { background-color: Mark; color: MarkText; }
+}
+
+:where(hr) {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin-block: 1.5rem;
+}
+
+/* A quotation is someone else's words: a rule down its start edge and the muted colour, never
+   italic body text that competes with the page's own voice. The citation sits on its own line. */
+:where(blockquote) {
+  margin: 0;
+  padding-inline-start: 0.75rem;
+  border-inline-start: 2px solid var(--border);
+  color: var(--muted-foreground);
+}
+:where(blockquote cite) {
+  display: block;
+  margin-top: 0.4rem;
+  font-style: normal;
+}
+
+:where(figure) { margin: 0; }
+:where(figure > :is(img, video, svg)) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}
+:where(figcaption) {
+  margin-top: 0.5rem;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+
+/* ── DOTTED GROUND `.bg-dots` (0.60.0) ──────────────────────────────────────────
+   configr lays its catalogue grids on a 24px dot lattice; this is that ground, drawn in --border
+   so it stays a texture on every theme. Decorative only: behind a grid or a list of cards, never
+   behind a block of text, where a dot under a letter is noise at 12px. */
+.bg-dots {
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
 }

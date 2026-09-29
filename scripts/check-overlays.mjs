@@ -300,7 +300,8 @@ const holdsColour = ({ width, bpp, px }, box, paint) => {
  * something else — a neighbour the forced palette made visible, a border the crop slid onto — and
  * is left out. The ratio is carried by the changed pixels alone. Where what the crop is mostly
  * painted in stays when the element goes (a glyph or a ring on a surface), each changed pixel is
- * read against what it becomes. Where it goes too (a word or a ring on the element's own fill), the
+ * read against that surface — never against what the pixel becomes, or a glyph drawn over a
+ * neighbour's ink would borrow the neighbour's contrast. Where it goes too (a word or a ring on the element's own fill), the
  * fill's change proves the crop is the element's, and every pixel that is not the fill is read
  * against it — HighlightText on Highlight does not change when hidden (it IS the Canvas colour), yet
  * it is the element's; and a fill alone carries nothing, so a word the fill hides reads 1:1.
@@ -318,7 +319,7 @@ const diffIn = (shown, hidden, box) => {
       const same = a.every((v, k) => Math.abs(v - b[k]) <= 8);
       if (!same) changed += 1;
       if (same && !ownFill) continue;
-      const r = ownFill ? contrast(a, on) : contrast(a, b);
+      const r = contrast(a, on);
       if (r > ratio) { ratio = r; ink = a.join(","); }
     }
   }

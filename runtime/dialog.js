@@ -38,6 +38,9 @@
  *   · FOCUS COMES BACK to what held it when the dialog opened, else to the control that opened
  *     it. The "else" is Safari: a mouse click does not focus a button there, so what held focus at
  *     open was <body>, and the platform's own restore put the reader back at the top of the page.
+ *     And when both are gone — the page re-rendered its row while the dialog was open, as cockpit's
+ *     approvals do — to a connected `[data-dialog-open="<this id>"]`, if the page has one again. A
+ *     page that re-renders its opener as something else, or somewhere else, hands focus back itself.
  *   · A DIALOG WITHOUT A NAME GETS ITS TITLE'S. Every cockpit dialog was unnamed: "dialog" is all
  *     a screen reader said. An unnamed dialog is linked to its `.dialog-title` (an id is generated
  *     if the title has none).
@@ -58,7 +61,9 @@
  *     `aria-busy="true"`, Escape, the backdrop and every `[data-dialog-close]` do nothing: they
  *     would walk away from a write that is still running, and the page would have nowhere left to
  *     say how it ended. The page closes it with closeDialog() when the write returns. Busy is
- *     `aria-busy` + `aria-disabled`, never `disabled`, which would throw focus to <body>.
+ *     `aria-busy` + `aria-disabled`, never `disabled`, which would throw focus to <body>. The
+ *     runtime marks the closers it is ignoring `aria-disabled` for as long as that lasts, so the X
+ *     says it is off rather than silently doing nothing.
  *
  * FRAMEWORK APPS do not run this (they own their nodes — house rule 10): they render the same markup
  * on a native <dialog>, call showModal() themselves and apply the same focus rule.
@@ -105,8 +110,20 @@ function onBackdrop(dialog, event) {
   return event.clientX < r.left || event.clientX >= r.right || event.clientY < r.top || event.clientY >= r.bottom;
 }
 
+/* On the ROOT, in the capture phase (`cancel` does not bubble), so an alert a page opened with a
+   bare showModal() is covered as well as one opened here. */
 function onCancel(event) {
-  if (undismissable(event.currentTarget)) event.preventDefault();
+  const dialog = event.target;
+  if (dialog instanceof HTMLDialogElement && undismissable(dialog)) event.preventDefault();
+}
+
+/* The dialog Escape will close: the topmost modal. Focus is always inside it (everything else is
+   inert), so the focused element's dialog is the one — including a native dialog a page put on top
+   of an alert, which this module never opened and whose Escape must go through. */
+function topmostModal(event) {
+  const from = event.target instanceof Element ? event.target.closest("dialog") : null;
+  if (from?.matches(":modal")) return from;
+  return topmost() ?? [...document.querySelectorAll("dialog")].filter((d) => d.matches(":modal")).at(-1) ?? null;
 }
 
 /*
@@ -122,7 +139,7 @@ function onCancel(event) {
  */
 function onKeydown(event) {
   if (event.key !== "Escape" || event.defaultPrevented) return;
-  const top = topmost();
+  const top = topmostModal(event);
   if (top && undismissable(top)) event.preventDefault();
 }
 
@@ -136,11 +153,41 @@ function onClose(event) {
   // The platform restores focus too, to what held it at showModal(). This covers the two cases it
   // does not: nothing held it (<body>), or that element is gone. An element behind a dialog that
   // is still open is inert and refuses focus, so this cannot pull focus out of a stack.
-  for (const el of [state.returnTo, state.opener]) {
+  const again = dialog.id
+    ? document.querySelector(`[data-dialog-open="${CSS.escape(dialog.id)}"]:not([aria-disabled="true"])`)
+    : null;
+  for (const el of [state.returnTo, state.opener, again]) {
     if (!el || el === document.body || !el.isConnected) continue;
     el.focus();
     if (document.activeElement === el) return;
   }
+}
+
+/* The closers a committing footer switches off, marked so, and unmarked when the write returns.
+   Only what this module marked is unmarked: an answer the page itself set aria-disabled (X5) is
+   the page's to restore. */
+function syncLock(dialog) {
+  const locked = committing(dialog);
+  for (const closer of dialog.querySelectorAll("[data-dialog-close]")) {
+    if (locked && !closer.hasAttribute("aria-disabled")) {
+      closer.setAttribute("aria-disabled", "true");
+      closer.dataset.dialogLocked = "";
+    } else if (!locked && "dialogLocked" in closer.dataset) {
+      closer.removeAttribute("aria-disabled");
+      delete closer.dataset.dialogLocked;
+    }
+  }
+}
+const lockObserver = new MutationObserver((records) => {
+  const touched = new Set(records.map((r) => r.target.closest?.("dialog")).filter(Boolean));
+  for (const dialog of touched) syncLock(dialog);
+});
+
+function installKeys() {
+  if (keysInstalled) return;
+  keysInstalled = true;
+  window.addEventListener("keydown", onKeydown);
+  document.addEventListener("cancel", onCancel, true);
 }
 
 function name(dialog) {
@@ -168,13 +215,9 @@ function name(dialog) {
 export function openDialog(dialogOrId, opener = null) {
   const dialog = resolve(dialogOrId);
   if (dialog.open) return dialog;
-  if (!keysInstalled) {
-    keysInstalled = true;
-    window.addEventListener("keydown", onKeydown);
-  }
+  installKeys();
   if (!known.has(dialog)) {
     known.add(dialog);
-    dialog.addEventListener("cancel", onCancel);
     dialog.addEventListener("close", onClose);
   }
   const returnTo = document.activeElement;
@@ -240,6 +283,8 @@ function onPointerDown(event) {
 export function initDialogs(root = document) {
   if (roots.has(root)) return;
   roots.add(root);
+  installKeys();
   root.addEventListener("pointerdown", onPointerDown);
   root.addEventListener("click", onClick);
+  lockObserver.observe(root, { subtree: true, attributes: true, attributeFilter: ["aria-busy"] });
 }

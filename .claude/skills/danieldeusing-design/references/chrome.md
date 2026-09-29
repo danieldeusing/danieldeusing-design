@@ -10,6 +10,7 @@ this file says why each piece is shaped the way it is.
 
 Contents:
 
+- Start from the templates
 - The header bar has three slots (0.60.0)
 - `.bar-stack` — a banner and the header stick as one layer (0.60.0)
 - `.crumbs` — the prompt-path breadcrumb (0.60.0)
@@ -26,6 +27,35 @@ Contents:
 - Two chrome.css lines that belong to other references (D1, D9)
 - Forced colours and `hidden`
 - The runtime calls
+
+## Start from the templates
+
+The chrome has a markup contract, and two templates ship it in the package, so a surface reads the
+canonical markup out of its own `node_modules` instead of copying whatever the nearest surface does
+today — which is how the pre-rail dropdown propagated in the first place:
+
+- **`templates/page-chrome.html`** — the chrome alone: `header.bar`, the `ls -l` rail and
+  `footer.status`, in that order, with the pre-paint `<head>` block and the runtime calls. Start
+  here for any surface.
+- **`templates/documentation.html`** — a whole one-file doc built on it.
+
+**The rail is conditional; the bar and the footer are not.** A nav whose only entry is the current
+page is furniture: it costs 17rem of width to say where the reader already is. Ship the rail when
+there is somewhere else to go. To omit it, delete the `.ls-nav-head` and the `.ls-nav` and NOTHING
+ELSE: `nav.site-nav`, the `.nav-burger` and the `.mobile-footer` stay, because the burger is where
+a phone finds the footer's controls. The layout needs no edit — `html:has(.ls-nav)` reserves the
+rail's width, so without one the page keeps its full width.
+
+The rail's state is applied BEFORE first paint by one inline line in `<head>` (the runtime is a
+module at the end of `<body>`, so a reader who hid the rail would otherwise watch it paint and jump
+away on every load):
+
+```js
+try { if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off"; } catch {}
+```
+
+The same block applies the theme (`localStorage["theme"]`) and `html.anim-off`
+(`localStorage["anim"]`, or `prefers-reduced-motion`) — see the template.
 
 ## The header bar has three slots (0.60.0)
 

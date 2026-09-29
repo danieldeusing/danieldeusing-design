@@ -115,8 +115,9 @@
       }
     </style>
     <!-- WP2 · M0 one popup look (the rows of a .select-panel), C1 --danger — the selectors and the
-         forced-colours rules as wp2-components 14ba3ca ships them, so the context menu's own rules are
-         measured against the weights they will actually meet -->
+         forced-colours rules as wp2-components 14ba3ca ships them (the disabled row's CanvasText ring
+         as 9c17242 does), so the context menu's own rules are measured against the weights they will
+         actually meet -->
     <style id="standin-wp2" media="not all">
       .select-panel {
         box-sizing: border-box; margin: 0; padding: 0.25rem 0; list-style: none; font-size: var(--fs-base);
@@ -144,7 +145,7 @@
         .dropdown-item:is(:hover, :focus-visible, [data-active="true"], [data-highlighted]) {
           forced-color-adjust: none; background: Highlight; color: HighlightText; outline-color: HighlightText;
         }
-        :is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled) { background: none; color: GrayText; }
+        :is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled) { background: none; color: GrayText; outline-color: CanvasText; }
       }
     </style>
     <!-- WP6 · M4 .search-field and .match-count, in the drawer's toolbar -->

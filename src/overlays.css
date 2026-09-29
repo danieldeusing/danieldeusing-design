@@ -279,20 +279,13 @@ dialog.dialog.dialog--drawer {
    opted out, holding the author ink — it painted the theme's muted colour on the forced Canvas,
    3.00-3.52:1 in four of them. GrayText is what a forced palette says "not available" with, and a
    system colour stays what it is whether the row is forced or opted out.
-   ITS FOCUS RING, TOO. The keys walk onto this row (it is focusable so a screen reader hears it),
-   and components.css inks a highlighted row's inset ring HighlightText — right on a Highlight fill,
-   but a disabled row loses the fill, and HighlightText IS the Canvas colour on both forced palettes:
-   the ring measured 1:1 in all eight cells, so the reader could not see where the keys were.
-   CanvasText, the estate's ring for a focused row that is disabled or states something (the lead's
-   ruling; components.css does the same for its own disabled rows): the ring of a row with no fill
-   is drawn in the colour of text on the Canvas it sits on. Once M0 carries it this rule is
-   redundant; it stays until the two meet. */
+   ITS FOCUS RING is components.css's, not this file's: a focused row that is disabled or states
+   something is ringed CanvasText there (M0; the lead's ruling), because the HighlightText ring of a
+   highlighted row IS the Canvas colour and measured 1:1 on a row with no fill. Only the ink needs
+   this file, since only the ink is outranked by the muted colour above. */
 @media (forced-colors: active) {
   .context-menu .dropdown-item[aria-disabled="true"] {
     color: GrayText;
-  }
-  .context-menu .dropdown-item[aria-disabled="true"]:focus-visible {
-    outline-color: CanvasText;
   }
 }
 

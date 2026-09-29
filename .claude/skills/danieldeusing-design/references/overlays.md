@@ -517,9 +517,9 @@ what this replaces).
   cells. (Its ink is set through `--btn-icon-color`, never `color`, which would tie with
   `.btn-icon`'s own on specificity.) The one row this file colours, the stated
   context-menu row, is `GrayText` there; without it the row read like an action and, under the keys,
-  painted the theme's muted ink at 3.00–3.52:1. Its focus ring is `CanvasText`, the estate's ring
-  for a focused row that is disabled or states something: the popup row's ring is `HighlightText`,
-  drawn for a `Highlight` fill, and a disabled row has no fill — `HighlightText` is the `Canvas`
-  colour on both palettes, so the keys vanished on it (1:1). `scripts/check-overlays.mjs` reads all
+  painted the theme's muted ink at 3.00–3.52:1. Its focus ring is `CanvasText`, and that one is
+  `components.css`'s (M0), not this file's: the popup row's ring is `HighlightText`, drawn for a
+  `Highlight` fill, and a disabled row has no fill — `HighlightText` is the `Canvas` colour on both
+  palettes, so the keys vanished on it (1:1). `scripts/check-overlays.mjs` reads all
   of these back as painted pixels, on a light and a dark forced palette, with real keyboard focus,
   and hides each element and shoots again to prove the ink it measured was that element's.

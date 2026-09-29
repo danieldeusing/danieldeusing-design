@@ -94,17 +94,22 @@ learned to keep them apart first (C56), and configr's catalog filter had to lear
 ## `.notice` — an outcome, reported where it happened (S2)
 
 ```html
-<div role="status" id="install-result"></div>        <!-- rendered empty, with the view -->
-<!-- …then, when the install finishes, put the notice INTO it (no role of its own): -->
-<div class="notice" data-tone="success"><p>installed review into ~/.claude/skills.</p></div>
+<!-- the region is rendered EMPTY with the view; when the install finishes, the notice goes into it -->
+<div role="status" id="install-result">
+  <div class="notice" data-tone="success"><p>installed review into ~/.claude/skills.</p></div>
+</div>
 
 <div class="notice" data-tone="warning" role="alert">
   <span class="notice-label">warning:</span><p>two sources publish this skill; the newer one wins.</p>
   <button type="button" class="btn-icon btn-icon--bare btn-icon--sm notice-dismiss" data-icon="x"
           aria-label="dismiss"></button>
 </div>
-<div class="notice notice--lg" data-tone="success" data-icon="circle-check" role="status">
-  <div><p>you are on the latest version.</p><p class="text-muted-foreground">version 0.60.0</p></div>
+
+<!-- a dialog's result slot, the same pattern: a --lg notice is a result, so it always arrives later -->
+<div role="status" id="update-result">
+  <div class="notice notice--lg" data-tone="success" data-icon="circle-check">
+    <div><p>you are on the latest version.</p><p class="text-muted-foreground">version 0.60.0</p></div>
+  </div>
 </div>
 ```
 
@@ -132,7 +137,9 @@ would only repeat the colour. No `data-tone` is a neutral notice.
 - **One dismiss, the bare ×, named "dismiss".** `.notice-dismiss` only places it (end of the first
   line). The button itself is `.btn-icon.btn-icon--bare.btn-icon--sm` from controls.css. configr had
   three spellings of this one act; there is one now.
-- `--lg` is a **result**, not a remark: the "update finished / update failed" block of a dialog.
+- `--lg` is a **result**, not a remark: the "update finished / update failed" block of a dialog. A
+  result arrives after an action, so a status `--lg` always goes into the dialog's status region, never
+  carries the role itself.
   It has more room and a leading `data-icon` glyph at the display size, in the tone.
 - **The tint is 6% of the tone mixed into `--background`.** Do not raise it and do not change it to
   sit over `transparent`. Over `transparent` the box takes on the colour of whatever surface it sits
@@ -189,7 +196,7 @@ both jobs 186 times, which is why a form result and a standing explanation looke
   <ul class="banner-list"><li>netmon: adguard unreachable <a href="/netmon/">fix →</a></li>…</ul>
 </div>
 <div class="bar-stack">                               <!-- chrome.css: the sticky layer -->
-  <div class="banner" role="alert"><p class="banner-title">control is frozen</p>…</div>
+  <div class="banner" role="status"><p class="banner-title">control is frozen</p>…</div>
   <header class="bar">…</header>
 </div>
 ```
@@ -205,8 +212,9 @@ and add `.bleed-rail` so it spans the `ls -l` rail's reserved gutter like the he
   (chrome.md, WP3). Never two siblings sticking at top 0**: they do not stack, they overlap, and the
   header disappears under the banner the moment the page scrolls. The stack is the sticky element
   and it bleeds past the rail itself, so a banner inside it takes no `.bleed-rail` of its own.
-- `role="alert"` for an alarm, `role="status"` for information. **Render it only when there is
-  something to say.** An empty banner is still a red strip.
+- `role="alert"` for an alarm, `role="status"` for information: a frozen control plane is a state,
+  not an alarm, so it is a status (S4). **Render it only when there is something to say.** An empty
+  banner is still a red strip.
 
 ## `.state` — a status word with a glyph (S5)
 
@@ -234,14 +242,24 @@ only in hue. In a cell it never wraps. As a `<p>` it is an inline error line tha
 ## `.spinner` and `.loading` — always with words (S6)
 
 ```html
+<!-- in the page from the first render: the row may carry the role itself -->
 <div aria-busy="true">
   <p class="loading" role="status"><span class="spinner" aria-hidden="true"></span>loading skills…</p>
+</div>
+
+<!-- mounted later (a reload, a retry): into a status region the view rendered empty -->
+<div role="status" id="reload-status">
+  <p class="loading"><span class="spinner" aria-hidden="true"></span>reloading skills…</p>
 </div>
 ```
 
 **A spinner is never the message.** `html.anim-off` and `prefers-reduced-motion` stop it and leave
 the arc standing, so the words have to say everything on their own. `.loading` is the row it lives
-in: muted, `role="status"`. The region being filled carries `aria-busy="true"` until it settles.
+in: muted, and a status. **Its role follows the notice's rule** (the lead's ruling): a row that is
+in the page from the first render may carry `role="status"` itself; one mounted later goes into a
+`role="status"` region that was already in the page and carries no role of its own, since a live
+region created together with its words is announced unreliably. The region being FILLED (the list,
+not the status region) carries `aria-busy="true"` until it settles.
 A spinner inside a busy BUTTON is the control's own state (controls.md): `aria-busy="true"` with
 `aria-disabled="true"`, never `disabled`, which throws keyboard focus to `<body>` mid-action.
 `.spinner` is the text's glyph size and takes its line's colour, and `--lg` is for a whole-page

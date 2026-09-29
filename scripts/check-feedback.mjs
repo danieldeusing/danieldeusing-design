@@ -312,7 +312,7 @@ const FIXTURE = `
   </div>
   <span class="tag tag--dotted" id="fx-gone-dotted">removed</span>
   <div class="banner banner--sticky" id="fx-gone-sticky"><p>removed</p></div>
-  <div id="fx-fc" style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px">
+  <div id="fx-fc" style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; padding: 12px">
     <div class="empty" id="fx-fc-empty" data-icon="folder-open"></div>
     <div class="empty" id="fx-fc-empty-warn" data-tone="warning" data-icon="triangle-alert"></div>
     <div class="notice notice--lg" id="fx-fc-notice-lg" data-tone="success" data-icon="circle-check"></div>
@@ -322,6 +322,9 @@ const FIXTURE = `
     <span class="tag" style="--tag-color: var(--cat-teal)"><span class="ico" id="fx-fc-ico" data-icon="package"></span></span>
     <span class="spinner" id="fx-fc-spinner"></span>
     <span class="dot" id="fx-fc-dot" data-tone="success"></span>
+    <button type="button" class="tag tag--solid" id="fx-fc-solid-button" data-tone="primary">global</button>
+    <button type="button" class="tag" id="fx-fc-tag-button" data-tone="info">github.com</button>
+    <div class="banner" id="fx-fc-banner"><p>x <a href="#fx" id="fx-fc-banner-link">fix →</a></p></div>
   </div>
   <div id="fx-hidden">${HIDDEN.map(([id, html]) => html.replace(/ hidden>/, ` id="fx-h-${id}" hidden>`)).join("")}</div>
 </div>`;
@@ -610,28 +613,48 @@ await check("every icon the demo names is in I1's set (X6)", () => evaluate(`
   [...new Set([...document.querySelectorAll("[data-icon]")].map((el) => el.dataset.icon))]
     .filter((name) => !${JSON.stringify(I1)}.includes(name)).map((name) => "data-icon=\\"" + name + "\\" is not in I1")`));
 
-/* The lead's ruling: role="alert" only for warning and destructive. Every other tone, and no tone, is a
-   status — on the notice itself when it is in the page from the start, or on the region it is put in. */
-await check("demo notices: alert only for warning and destructive, status for every other tone", () => evaluate(`
-  [...document.querySelectorAll(".notice")].flatMap((n) => {
-    const loud = ["warning", "destructive"].includes(n.dataset.tone), role = n.getAttribute("role");
-    const where = (n.dataset.tone || "untoned") + " notice '" + n.textContent.trim().slice(0, 40) + "'";
-    if (loud) return role === "alert" ? [] : [where + " has role=" + role + ", wants alert"];
-    if (role === "status" || (role === null && n.parentElement.closest("[role='status']"))) return [];
-    return [where + " has role=" + role + ", wants status (or none inside a status region)"];
-  })`));
-await check("the demo shows a status notice put into a role=status region that was already in the page", () => evaluate(`(async () => {
-  const button = document.getElementById("install-demo"), region = document.getElementById("install-status");
-  if (!button || !region) return ["no #install-demo button / #install-status region on the demo page"];
+/* The lead's rulings on live roles, for a notice and a loading row alike: role="alert" only for warning and
+   destructive. Everything else is a status, carried by the element itself only when it is in the page
+   from the first render, and otherwise by a role="status" region that was there first, the element
+   carrying none: a status inside a status is two live regions for one message. A --lg notice is a
+   RESULT, which arrives after an action by definition, so it always goes into a region. */
+const ROLES = String.raw`((root) => [...root.querySelectorAll(".notice, .loading")].flatMap((n) => {
+  const role = n.getAttribute("role"), region = n.parentElement && n.parentElement.closest("[role='status']");
+  const loud = n.matches(".notice") && ["warning", "destructive"].includes(n.dataset.tone);
+  const what = (n.matches(".loading") ? "loading row" : (n.dataset.tone || "untoned") + (n.matches(".notice--lg") ? " --lg" : "") + " notice") +
+    " '" + n.textContent.trim().replace(/\s+/g, " ").slice(0, 40) + "'";
+  if (loud) return role === "alert" ? [] : [what + " has role=" + role + ", wants alert"];
+  if (region) return role ? [what + " carries role=" + role + " inside a status region, which already carries it"] : [];
+  if (n.matches(".notice--lg")) return [what + " is a result: it goes into a role=status region already in the page"];
+  return role === "status" ? [] : [what + " has role=" + role + " and no status region around it"];
+}))`;
+await check("demo: alert only for warning and destructive; a status on the element itself or on the region it sits in, never both", () =>
+  evaluate(`${ROLES}(document)`));
+await check("feedback.md's examples follow the same rule, and its frozen banner is a status (S4)", () => evaluate(`(async () => {
+  const md = await (await fetch("/.claude/skills/danieldeusing-design/references/feedback.md")).text();
+  const blocks = [...md.matchAll(/\x60\x60\x60html\\n([\\s\\S]*?)\x60\x60\x60/g)].map((m) => m[1]);
+  const docs = blocks.map((html) => new DOMParser().parseFromString(html, "text/html"));
+  const problems = docs.flatMap((doc) => ${ROLES}(doc));
+  for (const b of docs.flatMap((doc) => [...doc.querySelectorAll(".banner")]))
+    if (/frozen/.test(b.textContent) && b.getAttribute("role") !== "status") problems.push("the frozen banner has role=" + b.getAttribute("role") + ", wants status");
+  const seen = docs.reduce((n, doc) => n + doc.querySelectorAll(".notice, .loading").length, 0);
+  return seen ? problems : ["read " + blocks.length + " html examples and found no notice or loading row in them: the check measured nothing"];
+})()`));
+// A notice and a loading row mounted LATER: each goes into a status region the page rendered empty.
+await check("the demo mounts a later notice and a later loading row into role=status regions that were already there", () => evaluate(`(async () => {
   const problems = [];
-  if (region.getAttribute("role") !== "status") problems.push("the region is not role=status");
-  if (region.children.length) problems.push("the region is not empty before anything happened");
-  button.click();
-  await new Promise((r) => setTimeout(r, 50));
-  const n = region.querySelector(".notice");
-  if (!n) problems.push("the button put no .notice into the region");
-  else if (n.hasAttribute("role")) problems.push("the notice inside the region carries role=" + n.getAttribute("role") + " — the region carries it");
-  region.replaceChildren();
+  for (const [button, region, sel] of [["install-demo", "install-status", ".notice"], ["reload-demo", "reload-status", ".loading"]]) {
+    const b = document.getElementById(button), r = document.getElementById(region);
+    if (!b || !r) { problems.push("no #" + button + " button / #" + region + " region on the demo page"); continue; }
+    if (r.getAttribute("role") !== "status") problems.push("#" + region + " is not role=status");
+    if (r.children.length) problems.push("#" + region + " is not empty before anything happened");
+    b.click();
+    await new Promise((ok) => setTimeout(ok, 50));
+    const n = r.querySelector(sel);
+    if (!n) problems.push("#" + button + " put no " + sel + " into #" + region);
+    else if (n.hasAttribute("role")) problems.push(sel + " inside #" + region + " carries role=" + n.getAttribute("role") + ", the region carries it");
+    r.replaceChildren();
+  }
   return problems;
 })()`));
 
@@ -824,27 +847,51 @@ const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.cap
   for (let i = 0; i < out.length; i += bpp) { const l = lum(i); lo = Math.min(lo, l); hi = Math.max(hi, l); }
   return { width, height, ratio: (hi + 0.05) / (lo + 0.05) };
 };
+/* [what, how it is clipped, minimum]. A glyph: the box inside the border, where nothing but the glyph
+   is drawn. A word: the box of its own text, where a backplate would sit. A ring: the outline's top
+   band (offset 2px, width 2px) and the 2px outside it — an element opted out with `none` owns its
+   ring too, and keeps --ring unless the forced block says otherwise. */
 const PAINTED = [...["#fx-fc-empty", "#fx-fc-empty-warn", "#fx-fc-notice-lg", "#fx-fc-callout", "#fx-fc-tag-glyph", "#fx-fc-tag-icon",
-  "#fx-fc-ico", "#fx-fc-spinner", "#fx-fc-dot"].map((sel) => [sel, "glyph", 3]), ["#fx-tag-solid", "text", 4.5], ["#fx-count-overlay", "text", 4.5]];
+  "#fx-fc-ico", "#fx-fc-spinner", "#fx-fc-dot"].map((sel) => [sel, "glyph", 3]), ["#fx-tag-solid", "text", 4.5], ["#fx-count-overlay", "text", 4.5],
+  ...["#fx-fc-solid-button", "#fx-fc-tag-button", "#fx-fc-banner-link"].map((sel) => [sel, "ring", 3])];
+/* Captured WITHOUT captureBeyondViewport, after scrolling the element into view: that flag re-lays the
+   page without its scrollbar, and a clip computed beforehand then reads pixels up to 7.5px away (WP12
+   measured a 1.34:1 glyph passing at 21:1 that way). */
+const shoot = async (sel, kind) => {
+  const clip = await evaluate(`(() => {
+    const el = document.querySelector(${JSON.stringify(sel)});
+    el.scrollIntoView({ block: "center", behavior: "instant" });
+    const b = el.getBoundingClientRect(), cs = getComputedStyle(el), px = (p) => parseFloat(cs.getPropertyValue(p));
+    let r;
+    if (${JSON.stringify(kind)} === "text") { const range = document.createRange(); range.selectNodeContents(el); r = range.getBoundingClientRect(); }
+    else if (${JSON.stringify(kind)} === "ring") r = { left: b.left - 4, top: b.top - 6, width: b.width + 8, height: 4 };
+    else r = { left: b.left + px("border-left-width"), top: b.top + px("border-top-width"),
+      width: b.width - px("border-left-width") - px("border-right-width"), height: b.height - px("border-top-width") - px("border-bottom-width") };
+    return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, scale: 1 };
+  })()`);
+  const { data } = await send("Page.captureScreenshot", { format: "png", clip });
+  return decodePng(Buffer.from(data, "base64")).ratio;
+};
+const measure = async (sel, kind) => { if (kind === "ring") await tabTo(sel); return shoot(sel, kind); };
+/* Before any ratio is trusted, each clip must be reading ITS element: ink with the element there,
+   none with it taken away (hidden, its word made transparent, or its focus removed). A clip that lands
+   on a neighbour's ink fails here instead of passing everywhere below. */
+const HIDE = { glyph: "el.style.visibility = 'hidden'", text: "el.style.color = 'transparent'", ring: "el.blur()" };
+const owned = async () => {
+  const problems = [];
+  for (const [sel, kind] of PAINTED) {
+    const on = await measure(sel, kind);
+    await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); ${HIDE[kind]}; })(); null`);
+    const off = await shoot(sel, kind);
+    await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.style.visibility = ""; el.style.color = ""; })(); null`);
+    if (!(on >= 1.5 && off < 1.2)) problems.push(`${sel} (${kind}): ${on.toFixed(2)}:1 with it, ${off.toFixed(2)}:1 without it — the clip is not reading this ${kind}`);
+  }
+  return problems;
+};
 const painted = async () => {
   const problems = [];
   for (const [sel, kind, min] of PAINTED) {
-    // A glyph fixture: its box inside the border, where nothing but the glyph is drawn. A word: the
-    // box of its own text, where a backplate would sit.
-    const clip = await evaluate(`(() => {
-      const el = document.querySelector(${JSON.stringify(sel)});
-      el.scrollIntoView({ block: "center", behavior: "instant" });
-      let r;
-      if (${JSON.stringify(kind)} === "text") { const range = document.createRange(); range.selectNodeContents(el); r = range.getBoundingClientRect(); }
-      else {
-        const b = el.getBoundingClientRect(), cs = getComputedStyle(el), px = (p) => parseFloat(cs.getPropertyValue(p));
-        r = { left: b.left + px("border-left-width"), top: b.top + px("border-top-width"),
-          width: b.width - px("border-left-width") - px("border-right-width"), height: b.height - px("border-top-width") - px("border-bottom-width") };
-      }
-      return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, scale: 1 };
-    })()`);
-    const { data } = await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: true });
-    const { ratio } = decodePng(Buffer.from(data, "base64"));
+    const ratio = await measure(sel, kind);
     if (!(ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${ratio.toFixed(2)}:1, wants ${min}`);
   }
   return problems;
@@ -866,6 +913,9 @@ const FORCED = String.raw`(() => {
    black — which is what `forced-color-adjust: none` + `currentColor` does in Chromium. So "not
    the Canvas colour" is not enough: a glyph must be drawn in the FORCED colour of the words it
    sits with (its host's, or its parent's for a glyph that is an element), on both palettes. */
+await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
+await evaluate(`document.documentElement.classList.add("anim-off"); null`);
+await check("X1 painted: every clip reads its own element (ink with it, none without it), before any forced ratio is trusted", owned);
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   await sleep(100);
@@ -887,12 +937,16 @@ for (const scheme of ["light", "dark"]) {
       return va === vb ? [what + ": both " + va] : [];
     });
   })()`));
-  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
-  await evaluate(`document.documentElement.classList.add("anim-off"); null`);
-  await check(`X1 forced colours, ${scheme} palette, PAINTED: every glyph reaches 3:1 and every word on a fill 4.5:1 (pixels read back)`, painted);
-  await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
-  await send("Emulation.clearDeviceMetricsOverride");
+  // Every theme: a forced palette overrides the glyphs and the words, but a ring under `none` keeps
+  // the THEME's --ring, which is dark on warm and paper and light on green and mono.
+  for (const theme of THEMES) {
+    await setTheme(theme);
+    await check(`X1 forced colours, ${scheme} palette, ${theme}, PAINTED: glyphs 3:1, words on a fill 4.5:1, focus rings 3:1 (pixels read back)`, painted);
+  }
+  await setTheme("warm");
 }
+await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
+await send("Emulation.clearDeviceMetricsOverride");
 await send("Emulation.setEmulatedMedia", { features: [] });
 
 /* ── 4. contrast, every new pairing, four themes × three surfaces ────────────────────────────── */

@@ -184,6 +184,10 @@ button.tag:disabled { opacity: 0.45; cursor: default; }
     background: CanvasText;
   }
   .tag--solid { border-color: CanvasText; }
+  /* `none` hands the focus ring back to the author too: a focused solid button.tag kept --ring and
+     measured 1.00-2.94:1 on 4 of the 8 theme × palette pairs. Highlight, the colour the browser
+     forces every other ring here to; 0,3,0 to outrank `button.tag:focus-visible` (0,2,1). */
+  .tag.tag--solid:focus-visible { outline-color: Highlight; }
   /* The overlay keeps its ring in the page colour: it is what cuts the count out of its host's edge. */
   .count--overlay { border-color: Canvas; }
   @supports not (forced-color-adjust: preserve-parent-color) {

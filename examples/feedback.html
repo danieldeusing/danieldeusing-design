@@ -314,7 +314,7 @@
           <div class="notice" data-tone="pending" role="status"><span class="notice-label">unknown:</span><p>the check timed out, so nothing is known about this source yet.</p></div>
           <div class="notice" data-tone="primary" role="status"><span class="notice-label">refused:</span><p>this agent cannot read that scope.</p></div>
           <div class="notice" data-tone="muted" role="status"><span class="notice-label">skipped:</span><p>no change since the last run.</p></div>
-          <div class="notice notice--lg" data-tone="success" data-icon="circle-check" role="status"><div><p>you are on the latest version.</p><p class="demo-note">version 0.60.0</p></div></div>
+          <div role="status"><div class="notice notice--lg" data-tone="success" data-icon="circle-check"><div><p>you are on the latest version.</p><p class="demo-note">version 0.60.0</p></div></div></div>
           <div class="notice notice--lg" data-tone="warning" data-icon="triangle-alert" role="alert"><div><p>the update could not be downloaded.</p><p class="demo-note">github answered 502 — try again in a minute.</p></div><button type="button" class="btn-icon btn-icon--bare btn-icon--sm notice-dismiss" data-icon="x" aria-label="dismiss"></button></div>
         </div>
         <h3>a status notice goes into a region that is already there</h3>
@@ -399,6 +399,13 @@
         <div aria-busy="true" id="busy-region">
           <p class="loading" role="status"><span class="spinner" aria-hidden="true"></span>loading skills…</p>
         </div>
+        <h3>a loading row mounted later goes into a region that is already there</h3>
+        <p class="lede">The row above is in the page from the first render, so it carries
+          <code>role="status"</code> itself. A reload mounts its row later: into an empty
+          <code>&lt;div role="status"&gt;</code> the page rendered first, with no role of its own —
+          the same rule as a notice. Whatever ends the load replaces the row.</p>
+        <div class="row"><button type="button" class="demo-btn" id="reload-demo">reload skills</button></div>
+        <div role="status" id="reload-status"></div>
       </section>
 
       <!-- ── S7 ─────────────────────────────────────────────────────────────── -->
@@ -549,6 +556,15 @@
         notice.innerHTML = '<p>installed review into ~/.claude/skills.</p>' +
           '<button type="button" class="btn-icon btn-icon--bare btn-icon--sm notice-dismiss" data-icon="x" aria-label="dismiss"></button>';
         document.getElementById("install-status").replaceChildren(notice);
+      });
+
+      // The same for a load: the row goes into the region, and the result replaces it there.
+      document.getElementById("reload-demo").addEventListener("click", () => {
+        const region = document.getElementById("reload-status");
+        region.innerHTML = '<p class="loading"><span class="spinner" aria-hidden="true"></span>reloading skills…</p>';
+        setTimeout(() => {
+          if (region.querySelector(".loading")) region.innerHTML = '<div class="notice" data-tone="success"><p>12 skills reloaded.</p></div>';
+        }, 1500);
       });
 
       const bare = document.getElementById("bare-link");

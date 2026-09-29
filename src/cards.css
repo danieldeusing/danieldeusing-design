@@ -1058,6 +1058,12 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   border-inline-end: 0;
   border-inline-start: 1px solid var(--border);
 }
+/* I1 has panel-left-open and no right-hand twin, so the strip of a right-hand pane mirrors it: the
+   sidebar drawn on the right, the arrow pointing back into the content. Unmirrored, the strip at the
+   right edge showed a LEFT sidebar opening rightwards, out of the page. */
+.pane-collapsed--end > .ico {
+  transform: scaleX(-1);
+}
 /* The label in eyebrow type (P2, restated). */
 .pane-collapsed > :not(.ico) {
   writing-mode: vertical-rl;

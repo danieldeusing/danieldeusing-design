@@ -422,7 +422,7 @@ const FIXTURE = `
   <div class="splitter" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="resize the split" aria-valuenow="128" aria-valuemin="100" aria-valuemax="400" id="fx-hsplit" style="width: 640px"></div>
   <div class="split" id="fx-split-fixed" style="--split-size: 10rem; width: 480px"><div class="split-pane" id="fx-fixed-a">a</div><div class="split-pane" id="fx-fixed-b">b</div></div>
   <div class="split" id="fx-split-left" style="width: 480px"><button type="button" class="pane-collapsed" id="fx-collapsed" aria-label="show files"><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span id="fx-collapsed-label" aria-hidden="true">files</span></button><div class="split-pane" id="fx-left-rest">rest</div></div>
-  <div class="split" id="fx-split-right" style="width: 480px; --split-size: 10rem"><div class="split-pane" id="fx-right-rest">rest</div><button type="button" class="pane-collapsed pane-collapsed--end" id="fx-collapsed-end" aria-label="show preview"><span aria-hidden="true">preview</span></button></div>
+  <div class="split" id="fx-split-right" style="width: 480px; --split-size: 10rem"><div class="split-pane" id="fx-right-rest">rest</div><button type="button" class="pane-collapsed pane-collapsed--end" id="fx-collapsed-end" aria-label="show preview"><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span aria-hidden="true">preview</span></button></div>
   <div class="split" id="fx-split-kept" style="width: 480px; --split-size: 10rem"><div class="split-pane" id="fx-kept-rest">rest</div><div class="splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-label="resize kept" hidden></div><div class="split-pane" hidden>kept</div><button type="button" class="pane-collapsed pane-collapsed--end" aria-label="show kept"><span aria-hidden="true">kept</span></button></div>
   <button type="button" class="pane-collapsed" id="fx-collapsed-disabled" disabled aria-label="show nothing"><span aria-hidden="true">x</span></button>
   <button type="button" class="list-row" id="fx-focus-probe" style="display: none">never shown</button>
@@ -638,6 +638,7 @@ const EXPECT = [
     ["#fx-collapsed-label", "", "writing-mode", { is: "vertical-rl" }], ["#fx-collapsed-label", "", "text-transform", { is: "uppercase" }],
     ["#fx-collapsed-label", "", "letter-spacing", "0.05em"],
     ...edge("#fx-collapsed-end", "left", "1px", "solid", "var(--border)"), ["#fx-collapsed-end", "", "border-right-width", { is: "0px" }],
+    ["#fx-collapsed > .ico", "", "transform", { is: "none" }], ["#fx-collapsed-end > .ico", "", "transform", { is: "matrix(-1, 0, 0, 1, 0, 0)" }],
     ["#fx-collapsed-disabled", "", "opacity", { is: "0.45" }], ["#fx-collapsed-disabled", "", "cursor", { is: "default" }],
   ]],
   ["K11 clamp — capped with a fade that blends into the surface under it; open is uncapped", [

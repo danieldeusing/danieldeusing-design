@@ -69,9 +69,8 @@ a `role=button` div. This is seedr's pattern, with one focus ring where seedr dr
 
 - **Every other control in the card is raised above the link for you**: a `button`, another `a`,
   an `input`, a `select`, a `textarea`, a `summary`, a `label`, anything a `tabindex` of 0 or more
-  makes focusable. A value filter
-  (`button.value-filter`) or a favourite star (`.btn-icon`) presses as itself. Do not give it a
-  z-index of your own.
+  makes focusable. A value filter (`button.value-filter`) or a favourite star (`.btn-icon`) presses
+  as itself. Do not give it a z-index of your own.
 - **The overlay stretches only inside a host that declares it** — `.card-terminal--link`, or K7's
   `.entry`. A `.card-link` in a card without the modifier is a plain title link and the card has
   no hover: visibly wrong, and harmless. Unscoped, the same slip would lay an invisible link over
@@ -103,10 +102,10 @@ card that has a `.card-title` child. In a grid every card also stretches to the 
 ### Modifiers
 
 - **`[data-tone]` — the state of the thing the card stands for** (configr's "installed" is
-  `data-tone="success"`): a half-strength edge and a 4% tint. **4%, not the 6% step** the system uses
-  under tone-coloured text: a card also carries its description and foot in `--muted-foreground`,
-  and on warm that measures 4.49:1 on a 5% destructive tint and 4.42 on 6%; at 4% the worst of all
-  seven tones is 4.56. The tint is a hint. **Write the state as well** — a tag inside the card —
+  `data-tone="success"`): a half-strength edge and a **4% tint**, lighter than the 6% step the
+  system puts under tone-coloured text, because a card also carries its description and foot in
+  `--muted-foreground`. On warm that text measures 4.49:1 on a 5% destructive tint and 4.42 on 6%;
+  with 4% the worst of all seven tones is 4.56. The tint is a hint. **Write the state as well** — a tag inside the card —
   because forced colours (Windows High Contrast) erase both the tint and the edge colour. A card's
   tone is its own or none: an untoned card inside a toned box keeps its own colours.
 - **`--rule` — the TYPE of the thing** (configr's list cards: a skill, an agent, a hook): a 4px start
@@ -162,7 +161,7 @@ tabular.
 | `.stat-value` | the number. Tabular figures, so a refresh does not jitter |
 | `.stat-note` | what the number means, muted |
 | `.stat-cta` | `--primary`, at the tile's end corner. A `<span>` when the whole tile is the link (`a.stat-tile`); an `<a>` of its own in a static tile (44px on a touch screen) |
-| a leading `.ico.ico--xl` | seedr's category glyph, coloured by the surface's `--cat-*` |
+| a leading `.ico.ico--xl` | seedr's category glyph. It paints the colour of the text around it, so a category hue (`--cat-*`) goes on a wrapper, not on the glyph: forced colours cannot reach a `color` declared on the glyph itself |
 
 **The state is `data-state`**, cockpit's vocabulary:
 
@@ -321,8 +320,8 @@ eight label widths; there are three.
 Below 40rem the lead sits over the body; `.entry--keep` stays two columns at every width
 (certificates, awards). `.entry-lead--accent` is the timeline's bold `--primary` year. The title
 takes its **element's** size (an `h2` is `--fs-xl`, a `p` the body size) in bold `--primary`; the
-description sits .75rem under it, muted. `.entry-list--ruled` rules between entries with 2rem of air
-(2.5rem around `--wide` ones).
+description sits .75rem under it, muted. `.entry-list--ruled` rules each entry off, above the first
+and below every one, with 2rem of air (2.5rem around `--wide` ones).
 
 **The whole entry opens the title.** danieldeusing.de underlined the title when the pointer was
 anywhere on the entry while only the title took the click — a hover that promised more than it
@@ -344,8 +343,8 @@ raised above it, and the entry draws the one focus ring. The title is a real hea
 ```
 
 danieldeusing.de's man-page card, on its home, configr and seedr pages. A header and a footer row
-of three equal slots (the middle one hidden below 40rem), section headings in bold `--primary`, bodies indented 1.25rem
-(1.75rem from 40rem) in `--muted-foreground`. Two corrections to the original: the frame rows were
+of three equal slots (the middle one hidden below 40rem), section headings in bold `--primary`,
+bodies indented 1.25rem (1.75rem from 40rem) in `--muted-foreground`. Two corrections to the original: the frame rows were
 faint text at 11px (2.3–2.9:1) and are the body size in `--muted-foreground` now (4.84:1 on
 `--card`); the section labels were paragraphs and are **headings** now, at the level the page's
 outline needs, so NAME → SYNOPSIS is something a screen reader can jump between. The capitals are
@@ -376,7 +375,7 @@ framework components (a framework never lets a design-system script walk nodes i
 - **The label goes in `.tree-label`** — that span is what is cut off with an ellipsis when the name
   is longer than the tree is wide.
 - **A branch** (a treeitem with `aria-expanded`) gets a chevron — right when closed, down when open —
-  and its glyph is `--primary`; a leaf gets a spacer, so leaves and branches line up. Glyphs:
+  and its folder glyph is `--primary`; a leaf gets a spacer, so leaves and branches line up. Glyphs:
   `folder-open` / `folder` for a branch, `file` / `file-code` for a leaf. The chevron is
   `--muted-foreground`, not the row's colour faded: faded `--primary` on a hovered or selected row
   measured 2.39–2.59:1, under the 3:1 a state glyph needs, on exactly the rows being looked at.
@@ -441,7 +440,7 @@ when it is selected, and arrowing past forty files must not fetch forty.
   margins, so the hit area overlaps the panes while the line and the gap stay where they were.
 - **`.pane-collapsed`** is what a hidden pane leaves: a 2rem strip with the pane's name written down
   it, which brings the pane back in one click. Its rule sits on the content side; `--end` is for a
-  right-hand pane. Below 48rem it becomes a 2rem bar with the label read across. Its name is its
+  right-hand pane, and mirrors its glyph (the set has no right-hand panel glyph). Below 48rem it becomes a 2rem bar with the label read across. Its name is its
   `aria-label` ("show files"); a `data-tip` saying the same thing again is announced twice — leave
   it off, or make it say something the name does not.
 - Nothing animates: a pane follows the pointer.
@@ -543,11 +542,12 @@ in the window.
 
 - **`hidden` hides any of them**, whatever `display` the class sets: tokens.css answers that once for
   the whole system. Do not add a `[hidden]` rule of your own.
-- **Forced colours** (Windows High Contrast): the tree's chevrons keep their paint, the splitter rests
-  in the system's button colour and lights up in `Highlight`, and a current or selected row — and the
-  console's current line — is drawn as the platform draws a selection, `Highlight` behind
-  `HighlightText`. Tints, tones, type rules and state edges lose their colour in that mode, which is
-  why each of them is also written as a word.
+- **Forced colours** (Windows High Contrast): the tree's chevrons and the glyphs in panel heads and
+  tree rows take the colour their row is forced to, the splitter rests in the system's button colour
+  and lights up in `Highlight`, and a current or selected row — and the console's current line — is
+  drawn as the platform draws a selection, `Highlight` behind `HighlightText`. Tints, tones, type
+  rules and state edges lose their colour in that mode, which is why each of them is also written as
+  a word.
 - **Print**: splitters and strips go, every scroller shows all its content, clamps open, and a panel,
   a row or a man page is not cut across two sheets.
 - **Motion**: only the card flash moves, and reduced motion and `html.anim-off` stop it.

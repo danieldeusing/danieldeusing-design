@@ -147,8 +147,19 @@ input.addEventListener("input", () => {
   wrapper and `outline: none` on the input; pagr's `grep` ended up with a box inside a box.
 - `.match-count` ("3/17") sits beside a search that steps through matches. The field is not a live
   region; the count is.
-- A query the page cannot use (a broken regex) is `aria-invalid="true"` on the input: its edge turns
-  `--destructive` and stays so under the pointer and in focus.
+- **A query the page cannot use (a broken regex) is `aria-invalid="true"` on the input AND a
+  `.field-error` (C9) that says what is wrong, tied to the input by `aria-describedby`.** The edge
+  turns `--destructive` and stays so under the pointer and in focus — but colour is never the only
+  signal (WCAG 1.4.1), and a forced-colours palette has no error colour at all. The words do the
+  work; `role="alert"` when they appear after the reader typed.
+
+  ```html
+  <div class="search-field">
+    <input type="search" aria-label="search logs" aria-invalid="true" aria-describedby="grep-err" value="(((">
+    <button type="button" class="search-clear" aria-label="clear search"></button>
+  </div>
+  <p class="field-error" id="grep-err" role="alert">not a valid pattern: unclosed group</p>
+  ```
 - `data-1p-ignore` because a password manager otherwise offers to fill every filter box on a page.
 
 ## A filter — `<select data-filter>`
@@ -205,15 +216,24 @@ That is all a page writes. `initSelects()` renders seedr's and configr's filter 
 - Keys are the APG select-only combobox: Enter, Space, ArrowDown and Alt+ArrowDown open; ↑/↓ move;
   Home/End jump; typing jumps to a label (a repeated letter cycles); Enter picks; Escape closes and
   changes nothing; Tab moves on. Focus stays on the trigger; the highlighted row is pointed at with
-  `aria-activedescendant`.
+  `aria-activedescendant`. (A filter with a search row opens a dialog instead — below.)
 - **This control needs `components.css`**: it is an enhanced select, and the select's wrapper, panel
   and rows live there. Everything else in `filters.css` works on tokens alone. Which half of the pair
   is drawn on top — the focused one above the hovered one — is `.btn-group`'s (`controls.css`).
 
 An `<option data-icon="…">` shows its `.ico` before its label in the row and, while it is the value,
-in the trigger (configr's option icons). `aria-invalid="true"` on the `<select>` is mirrored onto the
-trigger, whose edge turns `--destructive` — the select itself is transparent and hidden from
-assistive technology, so an error pinned to it reaches nobody.
+in the trigger (configr's option icons).
+
+**An invalid select says what is wrong in TEXT.** Put `aria-invalid="true"` on the `<select>` AND
+tie a `.field-error` (C9) to it with `aria-describedby`. The runtime mirrors BOTH onto the trigger
+(the select itself is transparent and hidden from assistive technology, so anything pinned only to
+it reaches nobody): the trigger's edge turns `--destructive`, and the error text is its description.
+The edge alone is colour alone (WCAG 1.4.1), and it is gone in a forced-colours palette.
+
+```html
+<select aria-label="kind" aria-invalid="true" aria-describedby="kind-err">…</select>
+<p class="field-error" id="kind-err">pick a kind this list can show</p>
+```
 
 ## A long filter gets a search row — `data-search`
 
@@ -223,9 +243,13 @@ one unasked**, however long: it keeps the listbox keys — a typed letter jumps 
 starts, Home and End move the highlight, Space picks (C8).
 
 ```html
-<div class="select-panel">                              <!-- the popup; it scrolls -->
+<button type="button" class="select-trigger select-trigger--filter" role="combobox"
+        aria-haspopup="dialog" aria-expanded="true" aria-controls="dd-select-4-panel" …>label</button>
+
+<div class="select-panel" role="dialog" aria-label="label" id="dd-select-4-panel">   <!-- it scrolls -->
   <div class="select-search"><div class="search-field">
-    <input type="search" aria-label="search label" aria-controls="dd-select-4-listbox" aria-activedescendant="dd-select-4-o3">
+    <input type="search" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-label="search label"
+           aria-controls="dd-select-4-listbox" aria-activedescendant="dd-select-4-o3">
   </div></div>
   <ul class="select-list" role="listbox" id="dd-select-4-listbox" aria-label="label">
     <li class="select-option" role="option" id="dd-select-4-o3" aria-selected="false">label 2</li> …
@@ -234,15 +258,21 @@ starts, Home and End move the highlight, Space picks (C8).
 </div>
 ```
 
+- **The popup is a DIALOG, and the box in it is the combobox** (the APG's combobox with a dialog
+  popup). The trigger says `aria-haspopup="dialog"`, its `aria-controls` names the panel, and it
+  carries no `aria-activedescendant` while the panel is open. The panel is `role="dialog"`, named
+  for the facet. The box keeps `type="search"` and is `role="combobox"` with `aria-expanded="true"`,
+  `aria-autocomplete="list"`, `aria-controls` (the listbox) and `aria-activedescendant` (the
+  highlighted row). A list with NO search row is unchanged: the popup is the listbox itself, and the
+  trigger says `aria-haspopup="listbox"`, points at it and carries the highlight.
 - **The row sits ABOVE the listbox, never in it.** A listbox may own only options and groups; a text
-  box inside one is read as part of the list. So a list with a search row is a `div.select-panel`
-  holding the row, then `ul.select-list[role=listbox]`, then the "no matches" line. The row is
-  sticky and opaque, so rows scroll under it.
-- **Opening moves focus into the box**, which keeps `type="search"` and carries `aria-controls` (the
-  listbox) and `aria-activedescendant` (the highlighted row). Typing narrows the rows to labels
-  containing the text, case-insensitively; the "all" row steps aside while anything is typed. **Once
-  anything is typed, the first match is the highlight** — even when the value in force matches too —
-  so "type, Enter" picks what was narrowed to. "no matches" says so.
+  box inside one is read as part of the list. So the dialog holds the row, then
+  `ul.select-list[role=listbox]`, then the "no matches" line. The row is sticky and opaque, so rows
+  scroll under it.
+- **Opening moves focus into the box.** Typing narrows the rows to labels containing the text,
+  case-insensitively; the "all" row steps aside while anything is typed. **Once anything is typed,
+  the first match is the highlight** — even when the value in force matches too — so "type, Enter"
+  picks what was narrowed to. "no matches" says so.
 - ↑/↓ move, Enter picks, Escape closes and hands focus back to the trigger, Tab closes and moves on
   from the trigger. Home and End move the caret, as they do in any text box. Only a press on the box
   itself takes focus; a press anywhere else in the panel leaves it in the box.
@@ -424,19 +454,20 @@ component renders the same classes on the same roles:
 |---|---|
 | a search box | `div.search-field` > `input[type=search]` + `button.search-clear[aria-label]` — `hidden` while the box is empty, `disabled` while the box is |
 | a filter, closed | `span.filter-dd.btn-group[role=group][aria-label="<facet> filter"]` > `span.select-field` (the `<select>` and its trigger) + `button.filter-clear[aria-label="clear <facet> filter"]` |
-| its trigger | `button.select-trigger.select-trigger--filter[role=combobox][aria-expanded][aria-controls=<listbox id>]`, `data-active="true"` while it filters |
+| its trigger | `button.select-trigger.select-trigger--filter[role=combobox][aria-expanded]`, `data-active="true"` while it filters; `aria-haspopup="listbox"` + `aria-controls=<listbox id>` + the highlight's `aria-activedescendant` when the popup has no search row, `aria-haspopup="dialog"` + `aria-controls=<panel id>` and no `aria-activedescendant` when it has one; the `<select>`'s `aria-invalid` and `aria-describedby` (its `.field-error`) mirrored |
 | the popup, no search row | `ul.select-panel[role=listbox]` |
-| the popup, with one | `div.select-panel` > `div.select-search` (> `div.search-field` > `input[type=search]`), then `ul.select-list[role=listbox]`, then `div.select-empty` ("no matches", `hidden` while anything matches) |
+| the popup, with one | `div.select-panel[role=dialog][aria-label=<facet>]` > `div.select-search` (> `div.search-field` > `input[type=search][role=combobox][aria-expanded=true][aria-autocomplete=list][aria-controls=<listbox id>][aria-activedescendant]`), then `ul.select-list[role=listbox]`, then `div.select-empty` ("no matches", `hidden` while anything matches) |
 | a row | `li.select-option[role=option][aria-selected]`, `data-active="true"` on the highlighted one, an `.ico` before the label when the option has an icon |
 | an `<optgroup>` | `div.select-optgroup[role=group][aria-label=<label>]` > `div.select-group[aria-hidden=true]` (the visible heading), then its rows |
 | a sort | `div.sort-ctl.btn-group[role=group]` > `button.sort-dir[data-dir]` named by the NEXT action + the field |
 | several values | `div.chip-set[role=group][aria-label]` of `button.chip[aria-pressed]` |
 
-A listbox owns only options and groups — a framework's search box goes above its listbox, not in it.
+A listbox owns only options and groups — a framework's search box goes above its listbox, not in it,
+and the popup that holds both is a `role="dialog"` whose box is the combobox.
 
 **A surface that loads `tokens.css` and `filters.css`, and nothing else, gets working controls** —
 every class here declares its own box, font, edge, focus ring, disabled state and 44px touch target,
 and draws itself in a forced-colours palette: each glyph in its control's forced colour, a pressed or
 current chip `HighlightText` on `Highlight`, a filtering trigger's edge `Highlight`, disabled
-`GrayText`. The filter dropdown is the one exception: it needs `components.css`, because it is an
+`GrayText` — still dimmed to `.45`, as in every palette. The filter dropdown is the one exception: it needs `components.css`, because it is an
 enhanced select — and its search row needs `filters.css`.

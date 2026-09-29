@@ -202,9 +202,8 @@
 
    `background-color`, NOT the `background` shorthand: the caret is the trigger's background
    IMAGE (two gradient halves, components.css), and the shorthand would reset it to none. */
-/* 0.3rem of block padding, not the 0.35rem a plain trigger carried until 0.60.0: at 12px on a
-   1.3 line the text is 15.6px, so 0.3rem + two 1px edges is 27.2px and min-block-size lifts it to
-   exactly --control-h, where 0.35rem overshoots to 28.8 and stands proud of the search box.
+/* NO BLOCK PADDING OF ITS OWN: the plain trigger's (components.css) is derived from --control-h
+   and is exactly 28px already, and a filter is that control with a funnel, not a second box.
 
    `.select-trigger.select-trigger--filter`, two classes, in every rule here: the plain trigger in
    components.css is one class, and at equal weight whichever file loads LAST would win. The filter
@@ -212,7 +211,6 @@
 .select-trigger.select-trigger--filter {
   box-sizing: border-box;
   min-block-size: var(--control-h);
-  padding-block: 0.3rem;
   gap: 0.375rem;
   color: var(--foreground);
   background-color: transparent;
@@ -640,8 +638,9 @@
    `preserve-parent-color` takes the first rule, CanvasText: always visible, if not always its
    context's colour.
 
-   THE STATES are redrawn in the palette's own terms: on = Highlight, disabled = GrayText, at full
-   strength — at .45 a disabled glyph painted 2.27–2.94:1 (measured, light palette). A pressed chip
+   THE STATES are redrawn in the palette's own terms: on = Highlight, disabled = GrayText — at .45
+   here too, as everywhere in the estate (lead ruling): an inactive control is exempt from the 3:1
+   (WCAG 1.4.11), and dimming is what says "not now" in every palette. A pressed chip
    carries TEXT, so it opts out whole and names both halves of its pair, HighlightText on Highlight:
    left to the browser, text gets a Canvas backplate, and on a plain <button> that turned
    HighlightText-on-Highlight into HighlightText-on-Canvas, 1.05:1 (measured). In the chip's own box
@@ -670,8 +669,6 @@
       background: currentColor;
     }
   }
-  :is(.search-field > input[type="search"], .search-clear, .select-trigger.select-trigger--filter, .filter-clear, .sort-dir,
-    .chip, .value-filter):disabled { opacity: 1; }
   .search-field[data-pending]::after {
     forced-color-adjust: none;
     background: Highlight;

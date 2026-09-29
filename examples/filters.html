@@ -54,15 +54,16 @@
          What the demo borrows from packages still in flight, so the page shows the intended look.
          Written from SPEC.md; the packages' own CSS is the truth once merged. -->
     <style id="preview-wp2-m0-c8">
-      /* WP2 · M0 one popup look + C8 trigger: a ✓ column on every row, no position in CSS, the
-         trigger at --control-h on the --control-edge. */
+      /* WP2 · M0 one popup look + C8 trigger + C9 error line: a ✓ column on every row, no position
+         in CSS, the trigger at --control-h on the --control-edge, the error in --destructive. */
       .select-panel { position: static; box-sizing: border-box; padding: 0.25rem 0; border-color: var(--control-edge); box-shadow: var(--elev-float); }
       .select-option { gap: 0.5rem; padding: 0.3rem 0.9rem 0.3rem 0.5rem; border-inline-start: 0; }
       .select-option::before { content: ""; flex: none; inline-size: var(--icon-sm); block-size: var(--icon-sm); }
       .select-option[aria-selected="true"] { color: inherit; font-weight: 400; }
       .select-option[aria-selected="true"]::before { background: var(--primary); -webkit-mask: var(--ico-check) center / contain no-repeat; mask: var(--ico-check) center / contain no-repeat; }
-      .select-trigger { box-sizing: border-box; min-block-size: var(--control-h); padding-block: 0.3rem; border-color: var(--control-edge); gap: 0.4rem; }
+      .select-trigger { box-sizing: border-box; min-block-size: var(--control-h); padding-block: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2); border-color: var(--control-edge); gap: 0.4rem; }
       .select-trigger[aria-invalid="true"] { border-color: var(--destructive); }
+      .field-error { flex-basis: 100%; margin: 0; color: var(--destructive); }
     </style>
     <style id="preview-wp4-ico">
       /* WP4 · I1 the .ico glyph span */
@@ -206,7 +207,8 @@
           <div class="state"><span class="label">long list: a search row</span>
             <select data-filter aria-label="model" id="f-model"></select></div>
           <div class="state"><span class="label">option icons · invalid (C8)</span>
-            <select aria-label="kind" aria-invalid="true"><option data-icon="file">skill</option><option data-icon="folder">plugin</option><option data-icon="star">favourite</option></select></div>
+            <select aria-label="kind" aria-invalid="true" aria-describedby="kind-err"><option data-icon="file">skill</option><option data-icon="folder">plugin</option><option data-icon="star">favourite</option></select>
+            <p class="field-error" id="kind-err">pick a kind this list can show</p></div>
         </div>
       </section>
 

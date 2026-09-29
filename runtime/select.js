@@ -32,8 +32,9 @@
  * character cycles, as a native select does), Enter selects, Escape closes
  * without changing anything, Tab moves on. Focus never leaves the trigger —
  * the active option is pointed at with `aria-activedescendant` — so there is
- * nowhere for it to get stuck. (A list with a search row moves it into the box
- * while it is open, and hands it back to the trigger when it closes.)
+ * nowhere for it to get stuck. (A list with a search row opens as a DIALOG:
+ * focus moves into its box, which carries the pointer while it is open, and
+ * goes back to the trigger when it closes.)
  *
  * THERE IS NO OPT-OUT (0.60.0, Daniel: "A dropdown should ALWAYS have the custom
  * layout for the list, not the system one"). `data-select="off"` used to skip a
@@ -58,8 +59,9 @@
  *     span.select-field > select + button.select-trigger(.select-trigger--filter)
  *     button.filter-clear
  *   ul.select-panel[role=listbox]             the popup of a list with no search row
- *   div.select-panel                          the popup of a list WITH one:
- *     div.select-search > div.search-field > input[type=search]
+ *   div.select-panel[role=dialog]             the popup of a list WITH one (the trigger
+ *     div.select-search > div.search-field      then says aria-haspopup="dialog"):
+ *       > input[type=search][role=combobox]     the box, which owns the highlight
  *     ul.select-list[role=listbox]
  *     div.select-empty                        "no matches"
  *   li.select-option[role=option]             every row, with an .ico for data-icon
@@ -162,10 +164,21 @@ function syncTrigger(instance) {
   trigger.disabled = select.disabled;
   // An invalid select must SAY so where the reader is looking. The select itself
   // is transparent and aria-hidden, so a red edge or an announcement pinned to it
-  // reaches nobody; the trigger is the control now.
-  const invalid = select.getAttribute("aria-invalid");
-  if (invalid === null) trigger.removeAttribute("aria-invalid");
-  else trigger.setAttribute("aria-invalid", invalid);
+  // reaches nobody; the trigger is the control now. The error's TEXT goes with it:
+  // the `.field-error` the page ties to the select with aria-describedby is the
+  // trigger's description too, since colour alone says nothing (WCAG 1.4.1).
+  for (const attribute of ["aria-invalid", "aria-describedby"]) {
+    const text = select.getAttribute(attribute);
+    if (text === null) trigger.removeAttribute(attribute);
+    else trigger.setAttribute(attribute, text);
+  }
+  // A popup with a search row is a DIALOG (it holds a text box and a list); a
+  // plain one is the listbox itself. Decided here, not once at enhance: the row
+  // comes and goes with the option count, and the trigger must say which before
+  // it opens.
+  const dialog = searchable(instance);
+  trigger.setAttribute("aria-haspopup", dialog ? "dialog" : "listbox");
+  trigger.setAttribute("aria-controls", `${instance.id}-${dialog ? "panel" : "listbox"}`);
   syncIcon(instance, option);
   if (!instance.filter) {
     value.textContent = option ? label(option) : "";
@@ -280,9 +293,7 @@ function enhance(select) {
   trigger.className = isFilter ? "select-trigger select-trigger--filter" : "select-trigger";
   trigger.id = `${id}-trigger`;
   trigger.setAttribute("role", "combobox");
-  trigger.setAttribute("aria-haspopup", "listbox");
   trigger.setAttribute("aria-expanded", "false");
-  trigger.setAttribute("aria-controls", `${id}-listbox`);
 
   const value = document.createElement("span");
   value.className = "select-value";
@@ -378,7 +389,7 @@ function enhance(select) {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ["disabled", "selected", "value", "label", "aria-invalid", "aria-label", "data-icon"],
+    attributeFilter: ["disabled", "selected", "value", "label", "aria-invalid", "aria-describedby", "aria-label", "data-icon", "data-search"],
   });
 }
 
@@ -398,15 +409,20 @@ function buildPanel(instance) {
    * part of the list. So a list with a search row is a `div.select-panel` holding
    * the row, then the listbox, then the "no matches" line.
    *
-   * Focus moves INTO the box on open — it has to hold focus to be typed into — so
-   * it, not the trigger, carries `aria-activedescendant` while the list is out, and
-   * `aria-controls` names the listbox those ids live in.
+   * AND THAT PANEL IS A DIALOG (lead ruling, the APG's combobox-with-dialog): it
+   * holds a text box and a list, and focus moves into it. The box inside is the
+   * combobox proper — it has to hold focus to be typed into — so it, not the
+   * trigger, carries `aria-activedescendant` while the list is out, with
+   * `aria-controls` naming the listbox those ids live in.
    */
   let panel = list;
   instance.search = null;
   instance.empty = null;
   if (searchable(instance)) {
     panel = document.createElement("div");
+    panel.id = `${instance.id}-panel`;
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", facet || "options");
     list.className = "select-list";
     const row = document.createElement("div");
     row.className = "select-search";
@@ -414,6 +430,9 @@ function buildPanel(instance) {
     field.className = "search-field";
     const input = document.createElement("input");
     input.type = "search";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-expanded", "true");
+    input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("aria-label", `search ${facet || "options"}`);
     input.setAttribute("aria-controls", list.id);
     input.setAttribute("autocomplete", "off");
@@ -591,14 +610,16 @@ function setActive(instance, index) {
   if (previous) previous.removeAttribute("data-active");
   instance.active = index;
   const item = instance.items[index];
-  // Whichever of the two holds focus carries the pointer, so both are given it.
-  const pointers = instance.search ? [instance.trigger, instance.search] : [instance.trigger];
+  // The element that holds focus carries the pointer: the search box when the
+  // popup is a dialog, the trigger when it is the listbox. Never both — the
+  // trigger of a dialog points at the dialog, not into it.
+  const pointer = instance.search || instance.trigger;
   if (!item) {
-    for (const element of pointers) element.removeAttribute("aria-activedescendant");
+    pointer.removeAttribute("aria-activedescendant");
     return;
   }
   item.setAttribute("data-active", "true");
-  for (const element of pointers) element.setAttribute("aria-activedescendant", item.id);
+  pointer.setAttribute("aria-activedescendant", item.id);
   item.scrollIntoView({ block: "nearest" });
 }
 

@@ -186,7 +186,7 @@ const observeLocks = (root) => {
     const touched = new Set(records.map((r) => r.target.closest?.("dialog")).filter(Boolean));
     for (const dialog of touched) syncLock(dialog);
   });
-  observeLocks(root);
+  lockObserver.observe(root, { subtree: true, attributes: true, attributeFilter: ["aria-busy"] });
 };
 
 function installKeys() {

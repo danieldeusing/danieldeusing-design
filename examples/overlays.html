@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dialogs and overlays</title>
+
+    <!-- Theme pre-paint: ?theme= wins (screenshots, checks), then the stored choice. -->
+    <script>
+      (() => {
+        const themes = ["warm", "green", "mono", "paper"];
+        let theme = new URLSearchParams(location.search).get("theme");
+        if (!themes.includes(theme)) {
+          try { theme = localStorage.getItem("theme"); } catch {}
+        }
+        document.documentElement.dataset.theme = themes.includes(theme) ? theme : "warm";
+      })();
+    </script>
+
+    <!-- tokens + the two files this package ships (overlays.css, tooltip.css). `data-full` links are
+         what a page usually has beside them; `?bare` drops them, which is the tokens-only surface
+         (configr, seedr studio, netmon) the two files must render on by themselves.
+         The sibling packages of 0.60.0 (icons, controls, filters, feedback, cards) are linked where
+         they will live: on this branch they 404, after integration they load and the stand-ins
+         below switch themselves off. -->
+    <link rel="stylesheet" href="../src/reset.css" data-full />
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" data-full />
+    <link rel="stylesheet" href="../src/components.css" data-full />
+    <link rel="stylesheet" href="../src/chrome.css" data-full />
+    <link rel="stylesheet" href="../src/icons.css" data-full />
+    <link rel="stylesheet" href="../src/controls.css" data-full />
+    <link rel="stylesheet" href="../src/filters.css" data-full />
+    <link rel="stylesheet" href="../src/feedback.css" data-full />
+    <link rel="stylesheet" href="../src/cards.css" data-full />
+
+    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
+         STAND-INS — NOT PART OF THIS PACKAGE, AND NOT IN src/.
+         Other work packages of 0.60.0 own these and land in parallel. Each block is DISABLED
+         (media="not all") and the script at the top of <body> switches it on only when the real
+         thing is missing, so once the siblings are integrated this page renders and measures the
+         real tokens and classes, not these copies. The header says which are in force.
+         ══════════════════════════════════════════════════════════════════════════════════════════ -->
+    <style id="standin-wp1" media="not all">
+      /* WP1 · F1 control and glyph sizes, F3 elevation and backdrop, F7 tone, F6 motion */
+      :root {
+        --control-h: 1.75rem;
+        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
+        --icon-sm: 0.75rem; --icon-size: 0.875rem; --icon-lg: 1rem; --icon-xl: 1.5rem;
+        --elev-float: 0 0 20px var(--glow-soft);
+        --elev-modal: 0 0 40px var(--glow-soft);
+        --backdrop: rgb(0 0 0 / 0.5);
+      }
+      html[data-theme="green"], html[data-theme="mono"] { --backdrop: rgb(0 0 0 / 0.6); }
+      [data-tone="primary"] { --tone: var(--primary); }
+      [data-tone="success"] { --tone: var(--success); }
+      [data-tone="warning"] { --tone: var(--warning); }
+      [data-tone="destructive"] { --tone: var(--destructive); }
+      [data-tone="info"] { --tone: var(--info); }
+      [data-tone="pending"] { --tone: var(--pending); }
+      [data-tone="muted"] { --tone: var(--muted-foreground); }
+      @keyframes dd-spin { to { transform: rotate(1turn); } }
+      html.anim-off *, html.anim-off *::before, html.anim-off *::after {
+        animation: none !important; transition: none !important;
+      }
+    </style>
+    <!-- I1 · glyphs: the --ico-<word> masks, the [data-icon] → --ico mapping and .ico. The script
+         fills in only the pieces that are missing and names them in the header. -->
+    <style id="standin-i1" media="not all"></style>
+    <!-- WP5 · C2 .btn-icon, C4 .form-actions, C5 .switch — what the dialogs need of them -->
+    <style id="standin-wp5" media="not all">
+      .btn-icon {
+        position: relative; display: inline-grid; place-items: center; box-sizing: border-box;
+        inline-size: var(--control-h); block-size: var(--control-h); margin: 0; padding: 0; font: inherit;
+        color: var(--btn-icon-color, var(--primary)); background: transparent;
+        border: 1px solid var(--control-edge); cursor: pointer;
+      }
+      .btn-icon[data-icon]::before {
+        content: ""; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor;
+        -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
+      }
+      .btn-icon:hover { border-color: currentColor; background: color-mix(in srgb, currentColor 12%, transparent); }
+      .btn-icon:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+      .btn-icon:disabled { opacity: 0.45; cursor: default; }
+      .form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.5rem; margin-top: 1rem; }
+      .form-status {
+        flex: 1 1 0; min-inline-size: 0; margin: 0; color: var(--muted-foreground);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .switch {
+        display: inline-flex; align-items: center; gap: 0.5rem; box-sizing: border-box; min-block-size: var(--control-h);
+        margin: 0; padding: 0; font: inherit; color: var(--foreground); background: none; border: 0; cursor: pointer;
+      }
+      .switch::after {
+        content: ""; flex: none; box-sizing: border-box; inline-size: 2rem; block-size: 1.125rem;
+        border: 1px solid var(--control-edge);
+        background: linear-gradient(var(--muted-foreground), var(--muted-foreground)) 2px 50% / 0.75rem 0.75rem no-repeat;
+      }
+      .switch[aria-checked="true"]::after {
+        background-color: var(--primary); border-color: var(--primary);
+        background-image: linear-gradient(var(--primary-foreground), var(--primary-foreground));
+        background-position: calc(100% - 2px) 50%;
+      }
+      .switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    </style>
+    <!-- WP2 · M0 one popup look (the rows of a .select-panel), C1 --danger -->
+    <style id="standin-wp2" media="not all">
+      .select-panel { box-sizing: border-box; margin: 0; padding: 0.25rem 0; list-style: none; color: var(--popover-foreground); background: var(--popover); border: 1px solid var(--control-edge); box-shadow: var(--elev-float); overflow-y: auto; }
+      .select-panel .dropdown-item {
+        display: flex; align-items: center; gap: 0.5rem; inline-size: 100%; box-sizing: border-box;
+        padding: 0.3rem 0.9rem 0.3rem 0.5rem; font: inherit; line-height: var(--lh-tight); text-align: start;
+        color: var(--popover-foreground); background: none; border: 0; white-space: nowrap; cursor: pointer;
+      }
+      .select-panel .dropdown-item::before { content: ""; flex: none; inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+      .select-panel .dropdown-item:hover, .select-panel .dropdown-item:focus-visible { background: var(--muted); }
+      .select-panel .dropdown-item:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+      .select-panel .dropdown-item--danger { color: var(--destructive); }
+      .select-panel .dropdown-item[aria-disabled="true"] { cursor: default; }
+      .select-panel .dropdown-item[aria-disabled="true"]:hover { background: none; }
+      .dropdown-sep { block-size: 1px; margin: 0.25rem 0; background: var(--border); }
+      .dropdown-label { padding: 0.35rem 0.9rem 0.15rem 0.5rem; color: var(--muted-foreground); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+      .btn-terminal--danger { color: var(--destructive); border-color: color-mix(in srgb, var(--destructive) 60%, var(--border)); }
+      .btn-terminal--danger:hover { border-color: currentColor; background: color-mix(in srgb, currentColor 10%, transparent); }
+    </style>
+    <!-- WP6 · M4 .search-field and .match-count, in the drawer's toolbar -->
+    <style id="standin-wp6" media="not all">
+      .search-field { position: relative; display: flex; align-items: center; min-inline-size: 0; }
+      .search-field > input { min-block-size: var(--control-h); }
+      .match-count { min-inline-size: 3.5em; text-align: center; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+    </style>
+    <!-- WP7 · S3 .callout, inside the confirm -->
+    <style id="standin-wp7" media="not all">
+      .callout {
+        padding-block: 0.25rem; padding-inline: 0.625rem 0; color: var(--muted-foreground);
+        border-inline-start: 2px solid var(--tone, var(--primary));
+      }
+      .callout > * { margin: 0; }
+    </style>
+    <!-- WP8 · K12 .console, the drawer's scrollback -->
+    <style id="standin-wp8" media="not all">
+      .console { display: flex; flex-direction: column; box-sizing: border-box; min-block-size: 0; background: var(--card); }
+      .console-body {
+        flex: 1; box-sizing: border-box; min-block-size: 12rem; overflow: auto; padding: 0.75rem;
+        background: var(--background); color: var(--foreground); white-space: pre-wrap; overflow-wrap: anywhere;
+      }
+      .console--fill { block-size: 100%; }
+      .console-body:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+    </style>
+
+    <link rel="stylesheet" href="../src/overlays.css" />
+    <link rel="stylesheet" href="../src/tooltip.css" />
+
+    <style>
+      /* Page-only layout. Nothing here is under test. It sets the body font and colours because in
+         ?bare base.css is not loaded — which is exactly what a tokens-only surface does itself. */
+      body {
+        margin: 0; font-family: var(--font-mono); font-size: var(--fs-base); line-height: var(--lh-base);
+        background: var(--background); color: var(--foreground);
+      }
+      .wrap { max-width: 64rem; margin-inline: auto; padding: 1.5rem 1.5rem 6rem; }
+      .demo-head {
+        position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center;
+        gap: 0.5rem 1rem; padding: 0.6rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border);
+      }
+      .demo-head h1 { margin: 0; font-size: var(--fs-base); font-weight: 700; }
+      .demo-head .spacer { flex: 1; }
+      .demo-btn {
+        font: inherit; padding: 0.2rem 0.5rem; color: var(--muted-foreground); background: none;
+        border: 1px solid var(--border); cursor: pointer; text-decoration: none;
+      }
+      .demo-btn[aria-pressed="true"] { color: var(--primary); border-color: var(--primary); }
+      .demo-note { color: var(--muted-foreground); }
+      section { margin-top: 2.25rem; }
+      section > h2 { margin: 0 0 0.25rem; font-size: var(--fs-lg); }
+      .lede { margin: 0 0 0.75rem; color: var(--muted-foreground); max-width: 72ch; }
+      .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+      .surfaces { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr)); }
+      .surface { padding: 0.75rem; border: 1px solid var(--border); min-width: 0; }
+      .surface[data-surface="background"] { background: var(--background); }
+      .surface[data-surface="card"] { background: var(--card); }
+      .surface[data-surface="muted"] { background: var(--muted); }
+      .surface-cap { margin: 0 0 0.5rem; color: var(--muted-foreground); }
+      .demo-result { margin-top: 0.75rem; color: var(--muted-foreground); min-height: 1lh; }
+      .demo-files { margin: 0; padding: 0; list-style: none; }
+      .demo-row {
+        display: block; inline-size: 100%; padding: 0.3rem 0.5rem; font: inherit; text-align: start;
+        color: var(--foreground); background: none; border: 0; cursor: default;
+      }
+      .demo-row:hover { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+      .diagram { padding: 0.5rem; border: 1px solid var(--border); color: var(--foreground); }
+      .diagram svg { display: block; inline-size: 100%; block-size: auto; }
+      .demo-figure { margin: 0; }
+      .demo-figure img, .demo-canvas canvas { display: block; max-inline-size: 100%; border: 1px solid var(--border); }
+      .demo-figure figcaption { margin-top: 0.4rem; color: var(--muted-foreground); }
+      .demo-tall p { margin: 0 0 0.75rem; }
+      .demo-kv { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
+      .demo-kv dt { color: var(--muted-foreground); }
+      .demo-kv dd { margin: 0; }
+      /* ?bare drops chrome.css, which owns the table wrapper; keep the dialog's table readable. */
+      .demo-table { border-collapse: collapse; }
+      .demo-table th, .demo-table td { padding: 0.3rem 0.9rem 0.3rem 0; text-align: left; }
+    </style>
+  </head>
+  <body>
+    <script>
+      /* Switch on each stand-in only where the real thing is missing, and say which are in force.
+         `?bare` first drops the data-full stylesheets. */
+      (() => {
+        const root = document.documentElement;
+        if (new URLSearchParams(location.search).has("bare")) {
+          document.querySelectorAll("link[data-full]").forEach((link) => link.remove());
+          root.dataset.bare = "";
+        }
+        const token = (name) => getComputedStyle(root).getPropertyValue(name).trim() !== "";
+        const probe = (html, test) => {
+          const host = document.createElement("div");
+          host.innerHTML = html;
+          document.body.append(host);
+          const ok = test(getComputedStyle(host.firstElementChild));
+          host.remove();
+          return ok;
+        };
+        const ICONS = {
+          "x": "<path d='M18 6 6 18'/><path d='m6 6 12 12'/>",
+          "arrow-left": "<path d='m12 19-7-7 7-7'/><path d='M19 12H5'/>",
+          "maximize-2": "<path d='M15 3h6v6'/><path d='m21 3-7 7'/><path d='m3 21 7-7'/><path d='M9 21H3v-6'/>",
+          "triangle-alert": "<path d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/><path d='M12 9v4'/><path d='M12 17h.01'/>",
+          "download": "<path d='M12 15V3'/><path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/><path d='m7 10 5 5 5-5'/>",
+          "arrow-up": "<path d='m5 12 7-7 7 7'/><path d='M12 19V5'/>",
+          "arrow-down": "<path d='M12 5v14'/><path d='m19 12-7 7-7-7'/>",
+          "refresh-cw": "<path d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/><path d='M21 3v5h-5'/><path d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/><path d='M8 16H3v5'/>",
+        };
+        const svg = (body) => "url(\"data:image/svg+xml," + encodeURIComponent(
+          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' " +
+          "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" + body + "</svg>") + "\")";
+        const inForce = [];
+        const use = (id, missing) => {
+          if (!missing) return;
+          document.getElementById(id).media = "all";
+          inForce.push(id.replace("standin-", ""));
+        };
+        use("standin-wp1", !token("--control-h") || !token("--elev-modal"));
+
+        const absent = Object.keys(ICONS).filter((n) => !token("--ico-" + n));
+        const unmapped = Object.keys(ICONS).filter((n) =>
+          !probe('<span data-icon="' + n + '"></span>', (s) => s.getPropertyValue("--ico").trim() !== ""));
+        const drawn = probe('<span class="ico ico--xl"></span>', (s) => s.display !== "inline" && s.width !== "auto");
+        const glyphs = [];
+        let css = "";
+        if (absent.length) {
+          css += ":root {" + absent.map((n) => "--ico-" + n + ": " + svg(ICONS[n]) + ";").join("") + "}";
+          glyphs.push("tokens " + absent.join(" "));
+        }
+        if (unmapped.length) {
+          css += unmapped.map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
+          glyphs.push("mapping " + unmapped.join(" "));
+        }
+        if (!drawn) {
+          css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
+            " vertical-align: -0.125em; background: var(--tone, currentColor);" +
+            " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
+            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }";
+          glyphs.push(".ico");
+        }
+        if (css) {
+          const block = document.getElementById("standin-i1");
+          block.textContent = css;
+          block.media = "all";
+          inForce.push("i1 (" + glyphs.join("; ") + ")");
+        }
+        use("standin-wp5", !probe('<button class="btn-icon"></button>', (s) => s.display === "inline-grid"));
+        use("standin-wp2", !probe('<div class="dropdown-sep"></div>', (s) => s.height === "1px"));
+        use("standin-wp6", !probe('<span class="match-count"></span>', (s) => s.fontVariantNumeric === "tabular-nums"));
+        use("standin-wp7", !probe('<div class="callout"></div>', (s) => s.borderInlineStartWidth === "2px"));
+        use("standin-wp8", !probe('<div class="console"></div>', (s) => s.display === "flex"));
+        root.dataset.standins = inForce.join(" ") || "none";
+      })();
+    </script>
+
+    <header class="demo-head">
+      <h1>WP9 · dialogs and overlays</h1>
+      <span class="spacer"></span>
+      <span class="row" role="group" aria-label="theme">
+        <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
+        <button type="button" class="demo-btn" data-theme-pick="green">green</button>
+        <button type="button" class="demo-btn" data-theme-pick="mono">mono</button>
+        <button type="button" class="demo-btn" data-theme-pick="paper">paper</button>
+      </span>
+      <button type="button" class="demo-btn" id="anim-btn" aria-pressed="true">anim</button>
+      <a class="demo-btn" id="bare-link" href="?bare">tokens only</a>
+      <span class="demo-note">stand-ins in force: <span id="standins"></span></span>
+    </header>
+
+    <main class="wrap">
+      <p class="lede">
+        <code>src/overlays.css</code>, <code>src/tooltip.css</code>, <code>runtime/dialog.js</code>,
+        <code>runtime/tooltip.js</code> and <code>runtime/diagramzoom.js</code>. Every dialog is a native
+        <code>&lt;dialog&gt;</code> opened with <code>showModal()</code>: the page behind goes inert, Tab stays
+        inside, Escape closes the topmost, focus comes back. The context menu is page code on
+        <code>positionPopup()</code> and <code>attachMenuKeys()</code>.
+      </p>
+      <p class="demo-result" id="result" role="status" data-t="result"></p>
+
+      <section id="dialogs">
+        <h2>dialog — sizes and parts</h2>
+        <p class="lede">Each opener is <code>[data-dialog-open]</code>. The last line above says what the last dialog closed with.</p>
+        <div class="row">
+          <button type="button" class="btn-terminal btn-terminal--compact" data-dialog-open="dlg-default" data-t="open-default">join (default, 28rem)</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-sm">--sm</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-lg">--lg</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-xl">--xl</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-full">--full, flush body</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-fit">--fit</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-rich" data-t="open-rich">back, actions, toolbar, sections, a table</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-autofocus" data-t="open-autofocus">[autofocus]</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-nest-a" data-t="open-nest">a dialog over a dialog</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-unnamed" data-t="open-unnamed">unnamed in markup</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-default" aria-disabled="true" data-t="open-inactive" data-tip="aria-disabled: the runtime ignores the press">inactive opener</button>
+        </div>
+      </section>
+
+      <section id="confirm">
+        <h2>confirm and alert</h2>
+        <p class="lede">A confirm has no X: its footer is the answer pair, cancel first. An alert has no X either, and Escape and the backdrop do nothing.</p>
+        <div class="row">
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger" data-dialog-open="dlg-confirm" data-t="open-confirm">remove poi/vu3</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-discard" data-t="open-discard">discard draft (commits for a second)</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-alert" data-t="open-alert">crash report (alert)</button>
+        </div>
+      </section>
+
+      <section id="drawer">
+        <h2>drawer</h2>
+        <p class="lede">The same dialog against the right edge: toolbar, a flush body holding the scrollback, the status in the foot.</p>
+        <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="logs" data-t="open-drawer">logs — dd-infra-cockpit</button>
+      </section>
+
+      <section id="tooltips">
+        <h2>tooltip</h2>
+        <p class="lede">Hover or focus. Escape hides a tip and nothing else. No tip while a list is open, or on a control whose own popup is open.</p>
+        <div class="surfaces">
+          <div class="surface" data-surface="background">
+            <p class="surface-cap">--background</p>
+            <div class="row">
+              <span tabindex="0" data-t="tip-background" data-tip="claude-fable-5 · effort xhigh · (copilot reported the model)">model</span>
+              <span tabindex="0" data-tip="cost&#9;$0.42&#10;input&#9;12 400&#10;output&#9;3 100">cost</span>
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" aria-haspopup="menu" aria-expanded="false" data-popup-demo data-t="tip-popup" data-tip="opens the actions menu">actions ▾</button>
+            </div>
+          </div>
+          <div class="surface" data-surface="card">
+            <p class="surface-cap">--card</p>
+            <div class="row">
+              <span tabindex="0" data-t="tip-card" data-tip="dd-infra-cockpit · up 3 days · ddstudio">cockpit</span>
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-t="tip-button" data-tip="re-reads every host now, not at the next poll">refresh</button>
+            </div>
+          </div>
+          <div class="surface" data-surface="muted">
+            <p class="surface-cap">--muted</p>
+            <div class="row">
+              <span tabindex="0" data-t="tip-muted" data-tip="poi/vu3 · 12 open reviews">poi/vu3</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="context">
+        <h2>context menu</h2>
+        <p class="lede">Right-click a row, or focus one and press Shift+F10 or the Menu key. Arrows, Home/End and typing walk it; Enter runs; Escape, Tab and a press outside close it and hand focus back to the row.</p>
+        <div class="surfaces">
+          <div class="surface" data-surface="background">
+            <p class="surface-cap">--background</p>
+            <ul class="demo-files" data-ctx-list>
+              <li><button type="button" class="demo-row" data-ctx-row data-name="src/app.ts" data-t="row-app">src/app.ts</button></li>
+              <li><button type="button" class="demo-row" data-ctx-row data-name="src/index.css">src/index.css</button></li>
+              <li><button type="button" class="demo-row" data-ctx-row data-name="README.md" data-t="row-readme">README.md</button></li>
+            </ul>
+            <button type="button" class="demo-btn" data-t="after-rows">after the list</button>
+          </div>
+          <div class="surface" data-surface="card">
+            <p class="surface-cap">--card</p>
+            <ul class="demo-files" data-ctx-list>
+              <li><button type="button" class="demo-row" data-ctx-row data-name="runtime/dialog.js">runtime/dialog.js</button></li>
+            </ul>
+          </div>
+          <div class="surface" data-surface="muted">
+            <p class="surface-cap">--muted</p>
+            <ul class="demo-files" data-ctx-list>
+              <li><button type="button" class="demo-row" data-ctx-row data-name="src/overlays.css">src/overlays.css</button></li>
+            </ul>
+          </div>
+        </div>
+        <p class="row" style="margin-top: 0.75rem">
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-ctx" data-t="open-ctx">a context menu inside a dialog</button>
+        </p>
+      </section>
+
+      <section id="zoom">
+        <h2>zoom view</h2>
+        <p class="lede">Every diagram, figure and canvas here is an opener (Enter, Space or a click). Inside: wheel and + − 0 zoom, drag pans, Escape closes.</p>
+        <div class="surfaces">
+          <div class="surface" data-surface="background">
+            <p class="surface-cap">--background</p>
+            <div class="diagram" data-t="dgm-background">
+              <svg viewBox="0 0 240 120" width="240" height="120" role="img" aria-label="request flow">
+                <g fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="8" y="40" width="60" height="36" /><rect x="92" y="40" width="60" height="36" /><rect x="176" y="40" width="56" height="36" />
+                  <path d="M68 58h24M152 58h24" />
+                </g>
+                <g fill="currentColor" font-size="10" font-family="monospace">
+                  <text x="20" y="62">edge</text><text x="100" y="62">cockpit</text><text x="186" y="62">host</text>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="surface" data-surface="card">
+            <p class="surface-cap">--card</p>
+            <figure class="demo-figure" data-t="dgm-figure">
+              <img alt="network map" width="220" height="110"
+                   src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 110'%3E%3Crect width='220' height='110' fill='%23d9cdb6'/%3E%3Ccircle cx='50' cy='55' r='22' fill='%238a4516'/%3E%3Ccircle cx='170' cy='55' r='22' fill='%231c5f9e'/%3E%3Cpath d='M72 55h76' stroke='%2343352a' stroke-width='3'/%3E%3C/svg%3E" />
+              <figcaption>an image with alt text: the opener says "zoom: network map"</figcaption>
+            </figure>
+          </div>
+          <div class="surface" data-surface="muted">
+            <p class="surface-cap">--muted</p>
+            <div class="demo-canvas diagram" data-t="dgm-canvas"><canvas width="200" height="100"></canvas></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ── the dialogs ─────────────────────────────────────────────────────────────────────────── -->
+
+    <dialog class="dialog" id="dlg-default" aria-labelledby="dlg-default-t" data-t="dlg-default">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-default-t">join the review</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close" data-t="default-x"></button>
+      </header>
+      <div class="dialog-body" data-t="default-body">
+        <p style="margin: 0 0 0.75rem">You join <span tabindex="0" data-tip="poi/vu3 · 12 open reviews · (from the forge)" data-t="tip-in-dialog">poi/vu3</span> as the fifth reviewer.</p>
+        <label for="join-agent">agent</label>
+        <select id="join-agent" data-t="join-select">
+          <option>claude</option><option>codex</option><option>copilot</option>
+        </select>
+        <p style="margin: 0.75rem 0 0"><input type="text" aria-label="note" placeholder="a note for the others" data-t="join-note" /></p>
+      </div>
+      <footer class="dialog-foot form-actions" data-t="default-foot">
+        <p class="form-status" role="status" data-t="default-status">nothing is sent until you join</p>
+        <button type="button" class="btn-terminal btn-terminal--compact" data-dialog-close="join" data-t="default-join">join</button>
+      </footer>
+    </dialog>
+
+    <dialog class="dialog dialog--sm" id="dlg-sm" aria-labelledby="dlg-sm-t" data-t="dlg-sm">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-sm-t">--sm, 24rem</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body"><p style="margin: 0">A short question or a single field.</p></div>
+    </dialog>
+
+    <dialog class="dialog dialog--lg" id="dlg-lg" aria-labelledby="dlg-lg-t" data-t="dlg-lg">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-lg-t">--lg, 42rem</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body"><p style="margin: 0">A form with a few rows.</p></div>
+    </dialog>
+
+    <dialog class="dialog dialog--xl" id="dlg-xl" aria-labelledby="dlg-xl-t" data-t="dlg-xl">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-xl-t">--xl, 56rem</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body"><p style="margin: 0">A table or a plan.</p></div>
+    </dialog>
+
+    <dialog class="dialog dialog--full" id="dlg-full" aria-labelledby="dlg-full-t" data-t="dlg-full">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-full-t">--full, with a flush body</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body dialog-body--flush" data-t="full-body">
+        <div class="console console--fill"><div class="console-body" tabindex="0" aria-label="output">$ npm run check:release
+check-release: 12 checks
+PASS  every export resolves
+PASS  the skill pins the current release</div></div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--fit" id="dlg-fit" aria-labelledby="dlg-fit-t" data-t="dlg-fit">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-fit-t">stats</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body">
+        <dl class="demo-kv"><dt>reviews</dt><dd>41</dd><dt>median</dt><dd>6m 12s</dd><dt>spend</dt><dd>$12.40</dd></dl>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--lg" id="dlg-rich" aria-labelledby="dlg-rich-t" data-t="dlg-rich">
+      <header class="dialog-head">
+        <button type="button" class="btn-icon dialog-back" data-icon="arrow-left" aria-label="back" data-t="rich-back"></button>
+        <h2 class="dialog-title" id="dlg-rich-t" data-t="rich-title">a plan with a title long enough to be cut off before it pushes the X away</h2>
+        <button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh the plan" data-tip="refresh the plan"></button>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close" data-t="rich-x"></button>
+      </header>
+      <div class="dialog-toolbar" data-t="rich-toolbar">
+        <div class="search-field"><input type="search" aria-label="search the plan" placeholder="search…" /></div>
+        <button type="button" role="switch" aria-checked="false" class="switch" data-switch>hide done</button>
+        <span class="match-count">3/17</span>
+      </div>
+      <div class="dialog-body demo-tall" data-t="rich-body">
+        <div class="dialog-section">
+          <p>The first part of the dialog. Sections are separated by 1.5rem, cockpit's gap.</p>
+        </div>
+        <div class="dialog-section" data-t="rich-section-2">
+          <p>The second part. The table below keeps its header on the dialog's surface while it scrolls.</p>
+          <div class="tablewrap" style="max-block-size: 9rem; overflow: auto">
+            <table class="demo-table">
+              <thead><tr><th data-t="rich-th">step</th><th>who</th><th>state</th></tr></thead>
+              <tbody>
+                <tr><td>plan</td><td>claude</td><td>done</td></tr><tr><td>implement</td><td>codex</td><td>done</td></tr>
+                <tr><td>review</td><td>copilot</td><td>running</td></tr><tr><td>fix</td><td>claude</td><td>queued</td></tr>
+                <tr><td>verify</td><td>codex</td><td>queued</td></tr><tr><td>merge</td><td>—</td><td>queued</td></tr>
+                <tr><td>deploy</td><td>—</td><td>queued</td></tr><tr><td>announce</td><td>—</td><td>queued</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="dialog-section">
+          <p>Enough text below to make the body scroll while the head and the foot stay put.</p>
+          <p>…</p><p>…</p><p>…</p><p>…</p><p>…</p><p>…</p><p>…</p><p>…</p><p>…</p><p>…</p><p>…</p><p>…</p>
+          <p data-t="rich-last">the last line of the body</p>
+        </div>
+      </div>
+      <footer class="dialog-foot form-actions" data-t="rich-foot">
+        <p class="form-status" role="status">a long status that runs past the space it has and is cut off rather than wrapping the buttons</p>
+        <button type="button" class="btn-terminal btn-terminal--compact" data-dialog-close="apply">apply the plan</button>
+      </footer>
+    </dialog>
+
+    <dialog class="dialog dialog--sm" id="dlg-autofocus" aria-labelledby="dlg-autofocus-t" data-t="dlg-autofocus">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-autofocus-t">rename</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body"><input type="text" aria-label="new name" value="poi/vu3" autofocus data-t="autofocus-input" /></div>
+      <footer class="dialog-foot form-actions">
+        <button type="button" class="btn-terminal btn-terminal--compact" data-dialog-close="rename">rename</button>
+      </footer>
+    </dialog>
+
+    <dialog class="dialog" id="dlg-nest-a" aria-labelledby="dlg-nest-a-t" data-t="dlg-nest-a">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-nest-a-t">first dialog</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body">
+        <p style="margin: 0 0 0.75rem">A dialog opened from here goes on top; this one goes inert under it.</p>
+        <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-nest-b" data-t="open-nest-b">open a second one</button>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--sm" id="dlg-nest-b" aria-labelledby="dlg-nest-b-t" data-t="dlg-nest-b">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-nest-b-t">second dialog</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close" data-t="nest-b-x"></button>
+      </header>
+      <div class="dialog-body"><p style="margin: 0">Escape closes this one and only this one.</p></div>
+    </dialog>
+
+    <dialog class="dialog dialog--sm" id="dlg-unnamed" data-t="dlg-unnamed">
+      <header class="dialog-head">
+        <h2 class="dialog-title" data-t="unnamed-title">named by its title</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body"><p style="margin: 0">No aria-labelledby in the markup; openDialog() links the title.</p></div>
+    </dialog>
+
+    <dialog class="dialog dialog--confirm dialog--sm" id="dlg-confirm" aria-labelledby="dlg-confirm-t" data-t="dlg-confirm">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-confirm-t">remove poi/vu3?</h2>
+      </header>
+      <div class="dialog-body">
+        <p style="margin: 0 0 0.75rem">Its reviews, its runs and its settings go with it.</p>
+        <div class="callout" data-tone="warning"><p>This cannot be undone from cockpit.</p></div>
+      </div>
+      <footer class="dialog-foot form-actions">
+        <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-close="cancel" data-t="confirm-cancel">cancel</button>
+        <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger" data-dialog-close="remove" data-t="confirm-remove">remove</button>
+      </footer>
+    </dialog>
+
+    <dialog class="dialog dialog--confirm dialog--sm" id="dlg-discard" aria-labelledby="dlg-discard-t" data-t="dlg-discard">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-discard-t">discard the draft?</h2>
+      </header>
+      <div class="dialog-body"><p style="margin: 0">The draft has 3 unsaved edits.</p></div>
+      <footer class="dialog-foot form-actions">
+        <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-close="cancel">cancel</button>
+        <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger" id="discard-go" data-t="discard-go">discard</button>
+      </footer>
+    </dialog>
+
+    <dialog class="dialog dialog--alert dialog--sm" id="dlg-alert" aria-labelledby="dlg-alert-t" data-t="dlg-alert">
+      <header class="dialog-head">
+        <span class="ico ico--xl" data-icon="triangle-alert" data-tone="destructive" aria-hidden="true" data-t="alert-glyph"></span>
+        <h2 class="dialog-title" id="dlg-alert-t">configr stopped</h2>
+      </header>
+      <div class="dialog-body" data-t="alert-body"><p style="margin: 0">The scanner crashed while reading ~/.claude. A report with the stack trace can go to the maintainer.</p></div>
+      <footer class="dialog-foot form-actions">
+        <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-close="ok" data-t="alert-ok">ok</button>
+        <button type="button" class="btn-terminal btn-terminal--compact" data-dialog-close="send" data-t="alert-send">send report</button>
+      </footer>
+    </dialog>
+
+    <dialog class="dialog dialog--drawer" id="logs" aria-labelledby="logs-t" data-t="dlg-drawer">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="logs-t">logs — <span style="color: var(--primary)">ddstudio</span> / dd-infra-cockpit</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close logs" data-t="drawer-x"></button>
+      </header>
+      <div class="dialog-toolbar" data-t="drawer-toolbar">
+        <select aria-label="lines" data-t="drawer-lines"><option>200 lines</option><option>1000 lines</option><option>all</option></select>
+        <button type="button" role="switch" aria-checked="true" class="switch" data-switch>follow</button>
+        <div class="search-field"><input type="search" aria-label="search the log" placeholder="search…" /></div>
+        <span class="match-count">3/17</span>
+        <button type="button" class="btn-icon" data-icon="arrow-up" aria-label="previous match"></button>
+        <button type="button" class="btn-icon" data-icon="arrow-down" aria-label="next match"></button>
+        <button type="button" class="btn-icon" data-icon="download" aria-label="download the log"></button>
+      </div>
+      <div class="dialog-body dialog-body--flush" data-t="drawer-body">
+        <div class="console console--fill"><div class="console-body" tabindex="0" aria-labelledby="logs-t" id="log-lines"></div></div>
+      </div>
+      <footer class="dialog-foot form-actions"><p class="form-status" role="status">streaming · 1 204 lines</p></footer>
+    </dialog>
+
+    <dialog class="dialog" id="dlg-ctx" aria-labelledby="dlg-ctx-t" data-t="dlg-ctx">
+      <header class="dialog-head">
+        <h2 class="dialog-title" id="dlg-ctx-t">files</h2>
+        <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
+      </header>
+      <div class="dialog-body">
+        <ul class="demo-files" data-ctx-list>
+          <li><button type="button" class="demo-row" data-ctx-row data-name="src/tooltip.css" data-t="row-in-dialog">src/tooltip.css</button></li>
+          <li><button type="button" class="demo-row" data-ctx-row data-name="runtime/tooltip.js">runtime/tooltip.js</button></li>
+        </ul>
+      </div>
+    </dialog>
+
+    <!-- The context menu. The page clones it per open: it is not in the document until then. -->
+    <template id="ctx-menu">
+      <ul class="select-panel context-menu" role="menu">
+        <li class="dropdown-label" role="none" aria-hidden="true">file</li>
+        <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="open">open in editor</button></li>
+        <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="reveal">reveal in finder</button></li>
+        <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="copy">copy path</button></li>
+        <li role="none"><button type="button" class="dropdown-item" role="menuitem" aria-disabled="true" data-action="history">no history — this file is not in a repository yet, so there is nothing to compare it with</button></li>
+        <li class="dropdown-sep" role="separator"></li>
+        <li role="none"><button type="button" class="dropdown-item dropdown-item--danger" role="menuitem" data-action="delete">delete</button></li>
+      </ul>
+    </template>
+
+    <script type="module">
+      import { initDialogs, closeDialog } from "../runtime/dialog.js";
+      import { initTooltips } from "../runtime/tooltip.js";
+      import { initDiagramZoom } from "../runtime/diagramzoom.js";
+      import { initSelects } from "../runtime/select.js";
+
+      /* ── STAND-INS for two sibling runtimes (WP2's attachMenuKeys, WP6's positionPopup) ──────────
+         Imported when the real module exports them; until then these copies of their contracts run,
+         and the header says so. Delete both at integration. */
+      const standinsJs = [];
+      const dropdownModule = await import("../runtime/dropdown.js");
+      const popupModule = await import("../runtime/popup.js").catch(() => ({}));
+
+      const ITEM = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
+      const typed = new WeakMap();
+      const navigable = (panel) =>
+        [...panel.querySelectorAll(ITEM)].filter((item) => !item.disabled && item.getClientRects().length > 0);
+      const typeahead = (panel, items, current, character) => {
+        const now = Date.now();
+        const state = typed.get(panel);
+        const text = (state && now - state.at <= 700 ? state.text + character : character).toLowerCase();
+        typed.set(panel, { text, at: now });
+        const repeated = text.length > 1 && new Set(text).size === 1;
+        const needle = repeated ? text[0] : text;
+        const from = Math.max(items.indexOf(current) + (repeated || text.length === 1 ? 1 : 0), 0);
+        for (let i = 0; i < items.length; i += 1) {
+          const item = items[(from + i) % items.length];
+          if ((item.textContent || "").trim().toLowerCase().startsWith(needle)) return item;
+        }
+        return null;
+      };
+      const standInAttachMenuKeys = (panel, { onClose, returnFocusTo } = {}) => {
+        for (const item of panel.querySelectorAll(ITEM)) item.tabIndex = -1;
+        const close = () => { onClose?.(); if (returnFocusTo?.isConnected) returnFocusTo.focus(); };
+        const onKeydown = (event) => {
+          const items = navigable(panel);
+          const current = event.target instanceof Element ? event.target.closest(ITEM) : null;
+          const index = items.indexOf(current);
+          const go = (item) => { event.preventDefault(); item?.focus(); };
+          switch (event.key) {
+            case "ArrowDown": go(items[(index + 1) % items.length]); return;
+            case "ArrowUp": go(index < 0 ? items.at(-1) : items[(index - 1 + items.length) % items.length]); return;
+            case "Home": go(items[0]); return;
+            case "End": go(items.at(-1)); return;
+            case "Escape": event.preventDefault(); event.stopPropagation(); close(); return;
+            case "Tab": if (event.shiftKey) event.preventDefault(); close(); return;
+            case " ": case "Enter":
+              if (current && current.tagName !== "BUTTON" && !(event.key === "Enter" && current.tagName === "A")) { event.preventDefault(); current.click(); }
+              return;
+            default:
+              if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                const hit = typeahead(panel, items, current, event.key);
+                if (hit) go(hit);
+              }
+          }
+        };
+        const onClick = (event) => {
+          const item = event.target instanceof Element ? event.target.closest(ITEM) : null;
+          if (!item || !panel.contains(item) || item.getAttribute("aria-disabled") === "true") return;
+          const active = document.activeElement;
+          const stranded = !active || active === document.body || panel.contains(active);
+          onClose?.();
+          if (stranded && returnFocusTo?.isConnected) returnFocusTo.focus();
+        };
+        panel.addEventListener("keydown", onKeydown);
+        panel.addEventListener("click", onClick);
+        return () => { panel.removeEventListener("keydown", onKeydown); panel.removeEventListener("click", onClick); };
+      };
+      const standInPositionPopup = (panel, anchor, { gap = 4, edge = 8, minWidth = 0, align = "start", side } = {}) => {
+        const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
+        const point = !(anchor instanceof Element);
+        const rect = point ? { left: anchor.x, right: anchor.x, top: anchor.y, bottom: anchor.y } : anchor.getBoundingClientRect();
+        const anchorWidth = point ? 0 : anchor.offsetWidth ?? rect.width / zoom;
+        const scrolled = panel.scrollTop;
+        panel.style.position = "fixed"; panel.style.left = "0px"; panel.style.top = "-9999px";
+        panel.style.minInlineSize = `${Math.max(anchorWidth, minWidth)}px`;
+        panel.style.maxInlineSize = `${(window.innerWidth - edge * 2) / zoom}px`;
+        panel.style.maxBlockSize = "";
+        const below = window.innerHeight - rect.bottom - gap - edge;
+        const above = rect.top - gap - edge;
+        const wanted = panel.getBoundingClientRect().height;
+        const up = side ? side === "above" : wanted > below && above > below;
+        const room = Math.max(up ? above : below, 72);
+        const style = getComputedStyle(panel);
+        const frame = style.boxSizing === "border-box" ? 0
+          : parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+        if (wanted > room) panel.style.maxBlockSize = `${room / zoom - frame}px`;
+        const box = panel.getBoundingClientRect();
+        const wantX = align === "end" ? rect.right - box.width : rect.left;
+        const x = Math.min(Math.max(wantX, edge), Math.max(edge, window.innerWidth - box.width - edge));
+        const y = up ? rect.top - gap - box.height : rect.bottom + gap;
+        panel.style.left = `${x / zoom}px`; panel.style.top = `${y / zoom}px`;
+        panel.scrollTop = scrolled;
+        return { side: up ? "above" : "below" };
+      };
+      const attachMenuKeys = dropdownModule.attachMenuKeys ?? (standinsJs.push("attachMenuKeys (WP2)"), standInAttachMenuKeys);
+      const positionPopup = popupModule.positionPopup ?? (standinsJs.push("positionPopup (WP6)"), standInPositionPopup);
+      document.documentElement.dataset.standinsJs = standinsJs.join(" ") || "none";
+
+      /* ── the system's runtime, once at startup ── */
+      initDialogs();
+      initTooltips();
+      initSelects();
+      initDiagramZoom(".diagram, .demo-figure");
+
+      /* ── page code ── */
+      const result = document.getElementById("result");
+      // `close` does not bubble: caught on the way down.
+      document.addEventListener("close", (event) => {
+        if (event.target.matches?.("dialog.dialog")) {
+          result.textContent = `#${event.target.id} closed · returnValue "${event.target.returnValue}"`;
+        }
+      }, true);
+
+      // A committing confirm: the action is busy and both answers are disabled until it is done.
+      document.getElementById("discard-go").addEventListener("click", async (event) => {
+        const go = event.currentTarget;
+        const dialog = go.closest("dialog");
+        const answers = dialog.querySelectorAll(".dialog-foot button");
+        go.setAttribute("aria-busy", "true");
+        answers.forEach((b) => { b.disabled = true; });
+        await new Promise((done) => setTimeout(done, 1000));
+        go.removeAttribute("aria-busy");
+        answers.forEach((b) => { b.disabled = false; });
+        closeDialog(dialog, "discard");
+      });
+
+      // Switches flip their own state (C5: no runtime).
+      document.addEventListener("click", (event) => {
+        const s = event.target.closest?.("[data-switch]");
+        if (s) s.setAttribute("aria-checked", String(s.getAttribute("aria-checked") !== "true"));
+        const popup = event.target.closest?.("[data-popup-demo]");
+        if (popup) popup.setAttribute("aria-expanded", String(popup.getAttribute("aria-expanded") !== "true"));
+      });
+
+      document.getElementById("log-lines").textContent = Array.from({ length: 120 }, (_, i) =>
+        `2026-09-28 20:${String(i % 60).padStart(2, "0")}:07  GET /api/containers 200 ${12 + (i % 9)}ms`).join("\n");
+
+      const canvas = document.querySelector(".demo-canvas canvas");
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#1a6b2e";
+      ctx.fillRect(20, 20, 70, 60);
+      ctx.fillStyle = "#a02c2c";
+      ctx.fillRect(110, 20, 70, 60);
+
+      /* ── THE CONTEXT MENU — no module: the page opens it, places it and wires the keys ──────────
+         references/overlays.md carries this as the recipe. */
+      const template = document.getElementById("ctx-menu");
+      let menu = null; // { panel, row, detach }
+      const closeMenu = () => {
+        if (!menu) return;
+        const { panel, detach } = menu;
+        menu = null;
+        detach();
+        panel.remove();
+      };
+      const openMenu = (row, at) => {
+        closeMenu();
+        const panel = template.content.firstElementChild.cloneNode(true);
+        panel.setAttribute("aria-label", `actions for ${row.dataset.name}`);
+        panel.addEventListener("click", (event) => {
+          const item = event.target.closest('[role="menuitem"]');
+          if (!item || item.getAttribute("aria-disabled") === "true") return;
+          result.textContent = `${item.dataset.action} · ${row.dataset.name}`;
+        });
+        // Inside an open modal dialog the rest of the page is inert and beneath it: the menu goes
+        // into the dialog, as a select's list does.
+        (row.closest("dialog[open]") ?? document.body).append(panel);
+        positionPopup(panel, at);
+        menu = { panel, row, detach: attachMenuKeys(panel, { onClose: closeMenu, returnFocusTo: row }) };
+        panel.querySelector(ITEM).focus();
+      };
+      document.addEventListener("contextmenu", (event) => {
+        const row = event.target.closest?.("[data-ctx-row]");
+        if (!row) return;
+        event.preventDefault();
+        row.focus();
+        openMenu(row, { x: event.clientX, y: event.clientY });
+      });
+      // Shift+F10 and the Menu key. Cancelling the key also stops the browser's own contextmenu event
+      // for it (measured), so the menu opens once, under the row rather than at a guessed point.
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+        const row = event.target.closest?.("[data-ctx-row]");
+        if (!row) return;
+        event.preventDefault();
+        const r = row.getBoundingClientRect();
+        openMenu(row, { x: r.left, y: r.bottom });
+      });
+      // A press outside closes it. Focus is left where the press put it; only a press that put it
+      // nowhere (<body>) hands it back to the row. The check runs after the press has moved focus.
+      document.addEventListener("pointerdown", (event) => {
+        if (!menu || menu.panel.contains(event.target)) return;
+        const { row } = menu;
+        closeMenu();
+        setTimeout(() => {
+          if (!document.activeElement || document.activeElement === document.body) row.focus();
+        });
+      }, true);
+
+      /* ── demo chrome ── */
+      const root = document.documentElement;
+      const pick = (theme) => {
+        root.dataset.theme = theme;
+        try { localStorage.setItem("theme", theme); } catch {}
+        document.querySelectorAll("[data-theme-pick]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themePick === theme)));
+      };
+      document.querySelectorAll("[data-theme-pick]").forEach((b) => b.addEventListener("click", () => pick(b.dataset.themePick)));
+      pick(root.dataset.theme);
+      const anim = document.getElementById("anim-btn");
+      anim.addEventListener("click", () => {
+        root.classList.toggle("anim-off");
+        anim.setAttribute("aria-pressed", String(!root.classList.contains("anim-off")));
+      });
+      const bare = root.hasAttribute("data-bare");
+      const bareLink = document.getElementById("bare-link");
+      bareLink.textContent = bare ? "full page" : "tokens only";
+      bareLink.href = bare ? "?" : "?bare";
+      document.getElementById("standins").textContent =
+        `${root.dataset.standins}${standinsJs.length ? ` · js: ${standinsJs.join(", ")}` : ""}`;
+      window.demoReady = true;
+    </script>
+  </body>
+</html>

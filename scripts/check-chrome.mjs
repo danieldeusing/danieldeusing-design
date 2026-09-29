@@ -237,6 +237,8 @@ await check(".bar--app is the 36px window strip: static, with the traffic-light 
   () => near(app.h, 36, 0.01) && app.pos === "static" && app.pl === "80px", app);
 await check("…and its wordmark cursor does not blink", () => app.anim === "none", app);
 await check(".bar-status speaks in the muted ink", () => app.status === app.muted, app);
+await check("an icon-button summary in the bar keeps its own box (the bar's summary padding skips it)",
+  () => page(`T.cs("header.bar .bar-history summary", "paddingTop") === "0px"`));
 
 /* ═══ 2. .bar-stack: a banner and the header stick as ONE layer ═════════════════════════════════ */
 await load();
@@ -317,6 +319,14 @@ await page(`window.__writes = 0; const set = document.documentElement.style.setP
 for (const y of [901, 902, 903, 904]) await scrollTo(y);
 await check("a scroll that moves no chrome writes nothing to <html> (it runs on every scroll event)",
   () => page(`window.__writes === 0`), () => page(`window.__writes`));
+
+await load("nobanner");
+await page(`const ol = document.querySelector(".toc ol"); for (let i = 0; i < 40; i++) ol.insertAdjacentHTML("beforeend", '<li><a href="#top">padding entry ' + i + '</a></li>'); null`);
+await scrollTo(900);
+const longToc = await page(`({ toc: T.rect(".toc-inner"), footer: T.rect("footer.status").top, sticky: parseFloat(T.inline("--sticky-top")),
+  scrolls: document.querySelector(".toc-inner").scrollHeight > document.querySelector(".toc-inner").clientHeight })`);
+await check("a long TOC stays between the sticky layers and the footer, and scrolls itself",
+  () => near(longToc.toc.top, longToc.sticky) && longToc.toc.bottom <= longToc.footer + 0.5 && longToc.scrolls, longToc);
 
 /* ═══ 5. the footer and its clearance ═══════════════════════════════════════════════════════════ */
 const clearance = async () => {
@@ -455,6 +465,10 @@ await check("button.doc-link: no box of its own — padding 0, no border, no fil
 await check("…in its parent's font, not the browser's button font (X2)", () => buttons.font[0] === buttons.font[1] && buttons.font[2] === buttons.font[3], buttons.font);
 await check("…the forward one in --primary, the quiet one muted (never red)", () => buttons.color === buttons.primary && buttons.doc[0] === buttons.doc[1], buttons);
 await check("…and disabled at .45 with no pointer", () => buttons.disabled[0] === "0.45" && buttons.disabled[1] === "default", buttons.disabled);
+// reset.css gives every button `font: inherit`, so these can only fail with it off: ?bare.
+const inherits = await page(`[["#demo-crumbs button", "#demo-crumbs"], [".ls-nav-toggle", ".ls-nav-head"]].map(([c, p]) =>
+  [c, T.cs(c, "fontFamily") === T.cs(p, "fontFamily") && T.cs(c, "fontSize") === T.cs(p, "fontSize")]).filter(([, ok]) => !ok)`);
+await check("bare page: the crumbs' button segment and the rail toggle carry their parent's font themselves", () => inherits.length === 0, inherits);
 await load("nobanner");
 const column = await page(`({ max: T.cs("main.wrap", "maxWidth"), pad: T.cs("main.wrap", "paddingLeft"), full: T.cs("#full-wrap", "maxWidth"), fullPad: T.cs("#full-wrap", "paddingLeft") })`);
 await check(".wrap is --content-w wide with the --content-pad gutter; .wrap--full drops the cap and keeps the gutter",

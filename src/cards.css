@@ -1,0 +1,1364 @@
+/*
+ * danieldeusing-design — cards and lists (0.60.0).
+ *
+ * The shapes every surface builds out of a box and a list: what goes INSIDE a card (K2), the card
+ * grid (K3), the stat tile (K4), the panel (K5), the row list (K6), the dated entry (K7), the man
+ * page (K8), the tree (K9), the split view (K10), the text clamp (K11) and the log console (K12).
+ * Before this file each of them existed three to seven times across seedr, configr,
+ * danieldeusing.de, cockpit, netmon and the family site — a selected row alone had seven looks —
+ * and none of the differences had been chosen. Where the sources disagreed, the version seedr,
+ * configr and danieldeusing.de share won; where only cockpit had the thing, cockpit's did.
+ *
+ * WHAT IT NEEDS: tokens.css, and nothing else. A surface that loads tokens.css and this file
+ * (netmon's shape) draws every rule here exactly as the full bundle does: each interactive class
+ * brings its own box, font, focus ring and disabled state, and no rule leans on reset.css, base.css
+ * or components.css. What the MARKUP borrows is other files' business — the glyph of an `.ico`, a
+ * `.btn-icon` in a panel head, a `.tag` in a card — and so is `.card-terminal` itself: the card BOX
+ * (fill, edge, padding, the hover of a card that is a link) is K1 in components.css, and K2 only
+ * decorates it. K2's modifiers are written one step more specific than K1's rules, so the order the
+ * two files load in never decides which one wins.
+ *
+ * NO RUNTIME, on purpose. The tree (K9), the splitter (K10) and the clamp (K11) each have a keyboard
+ * or a measuring half, and every one of them lives in a framework component today: seedr's and
+ * configr's file explorers and detail pages. A framework never runs a design-system enhancer over
+ * nodes it owns (house rule 10), and no build-free page has a tree, a resizable pane or a clamped
+ * README. So the contract is written down in references/cards.md and the app implements it. The
+ * console's follow-the-bottom behaviour belongs to the page for the same reason.
+ *
+ * ONE SELECTED ROW. The rail's you-are-here row (chrome.css) is the marker for the current or the
+ * selected row in every list that can hold one — a row list, a tree: the same 12% tint, the same 3px
+ * inset edge, the same --primary title with the rail's glow. configr drew "this one" six different
+ * ways and cockpit a seventh; a reader who has learned one marker should never have to learn a
+ * second. The rail's trailing `←` is the one part NOT copied: it points from the right-hand rail
+ * back at the content, and a list or a tree sits on the content's LEFT, where the same arrow points
+ * away from what it describes. A row list's far end also belongs to its meta slot.
+ *
+ * AN EDGE THAT CARRIES INFORMATION KEEPS IT UNDER THE POINTER. A card's type rule (K2 `--rule`) and
+ * a stat tile's state edge (K4) are content, not chrome. K1's hover recolours a card's edge to
+ * --primary; these two sides keep their colour through it, so hovering a tile never makes a broken
+ * service look fine for as long as the pointer rests on it.
+ */
+
+
+/* ── K2 · CARD ANATOMY — head, title, description, foot ──────────────────────────────────────────
+   <article class="card-terminal card-terminal--link">
+     <div class="card-head">…a value filter, a glyph…</div>
+     <h3 class="card-title"><a class="card-link" href="/skills/review">review</a></h3>
+     <p class="card-desc">Reviews the current diff against the repository's conventions.</p>
+     <footer class="card-foot">…stats, a date…</footer>
+   </article>
+
+   ONE LINK PER CARD, AND ITS NAME IS THE TITLE. danieldeusing.de wrapped the whole card in the <a>,
+   so a screen reader read title, description, date and tags out as one link name. configr made the
+   card a `div role=button`, which no link gesture — middle click, open in a new tab — ever reaches.
+   seedr had it right: the link is the title, and its ::after is stretched over the card, so the
+   whole box still takes the click. Anything else in the card that is interactive — a value filter,
+   a favourite star — is raised above that overlay, or it could never be pressed.
+
+   THE OVERLAY STRETCHES ONLY INSIDE A HOST THAT DECLARES IT: `.card-terminal--link` (and K7's
+   `.entry`). An absolutely positioned ::after covers its nearest positioned ancestor, so a
+   `.card-link` in a card that forgot the modifier would otherwise lay an invisible link over
+   whatever positioned box sits above it — a panel, a dialog, the whole page. Unscoped, the missing
+   modifier is a page-sized click trap; scoped, it is a title link that works and a card without a
+   hover, which is visibly wrong and harmless.
+
+   ONE RING, NOT TWO. The link's own outline would draw around one word in the middle of the card.
+   The card draws the ring instead, from `:has(.card-link:focus-visible)`, and the link's is
+   suppressed — seedr drew both at once. The suppression sits behind @supports, so an engine
+   without :has() keeps the link's ring rather than losing every ring. */
+.card-terminal--link {
+  position: relative;
+}
+.card-link {
+  color: inherit;
+  text-decoration: none;
+}
+:is(.card-terminal--link, .entry) .card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+:is(.card-terminal--link, .entry) :is(a[href]:not(.card-link), button, input, select, textarea, summary, label, [tabindex]:not([tabindex="-1"])) {
+  position: relative;
+  z-index: 1;
+}
+.card-terminal--link:has(.card-link:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@supports selector(:has(*)) {
+  :is(.card-terminal--link, .entry) .card-link:focus-visible {
+    outline: none;
+  }
+}
+
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+/* 500, not bold: the title is the name of the thing, and in a grid of forty cards forty bold titles
+   are a wall. seedr and configr both settled on medium weight at the body size. */
+.card-title {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  color: var(--foreground);
+}
+/* Left-aligned, clamped to three lines by default. seedr justified this text, which in a narrow
+   monospace column opens rivers between the words; it is not adopted. `--clamp-lines` lets a
+   surface ask for more or fewer. */
+.card-desc {
+  margin: 0;
+  color: var(--muted-foreground);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--clamp-lines, 3);
+  overflow: hidden;
+}
+/* `margin-top: auto` is what puts every foot on the same line across a row of cards: in the flex
+   column below the foot takes whatever height the card has left. */
+.card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: auto;
+  color: var(--muted-foreground);
+}
+
+/* THE PARTS ARE SPACED BY THE CARD, AS A COLUMN. In a grid every card also stretches to the tallest
+   in its row, so the feet line up. A lone card built from these parts stacks the same way — its own
+   rule, because an engine without :has() drops a whole selector list, and the grid case has to
+   survive it. Every grid item loses its margin — base.css spaces a <section> that follows another
+   section, and a grid item pushed down by that margin sits lower than its neighbours — and may
+   shrink to its track, so one long unbroken word cannot widen a column. */
+.card-grid > * {
+  margin: 0;
+  min-inline-size: 0;
+}
+.card-grid > .card-terminal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  block-size: 100%;
+}
+.card-terminal:has(> .card-title) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* A clamp or a table inside a card fades into the card, not into the page behind it. K1 sets
+   --tablewrap-fade for the table; the clamp's fade (K11) is declared here, beside the clamp.
+
+   A card's tone is its own or none. --tone inherits, so an untoned card inside a toned container
+   would otherwise flash (below) in the container's colour; it resets at its root, as every
+   component with a neutral default does (F7). */
+.card-terminal {
+  --clamp-fade: var(--card);
+}
+.card-terminal:not([data-tone]) {
+  --tone: initial;
+}
+
+/* A TONE is a state of the thing the card stands for — configr's "installed" is
+   `data-tone="success"`. Half-strength edge, and a 4% tint.
+
+   4%, NOT THE 6% STEP. 6% is measured for tone-coloured TEXT on a tint; a card also carries its
+   description and foot in --muted-foreground, and that is the pairing that breaks first. Measured
+   on warm, --muted-foreground on a 5% destructive tint over --card is 4.49:1 and on 6% 4.42 — below
+   AA — while at 4% the worst of all seven tones is 4.56. The tint is a hint; the edge and the tag
+   inside the card carry the state.
+
+   A tone does not beat K1's hover. The hover rule for a toned card that is a link is restated one
+   step more specific, because `.card-terminal[data-tone]` and K1's `.card-terminal--link:hover`
+   tie, and a tie would go to whichever file loaded last. */
+.card-terminal[data-tone] {
+  --clamp-fade: color-mix(in srgb, var(--tone) 4%, var(--card));
+  --tablewrap-fade: color-mix(in srgb, var(--tone) 4%, var(--card));
+  border-color: color-mix(in srgb, var(--tone) 50%, var(--border));
+  background: color-mix(in srgb, var(--tone) 4%, var(--card));
+}
+:is(a, button).card-terminal[data-tone]:hover,
+.card-terminal--link[data-tone]:hover {
+  border-color: var(--primary);
+  background: var(--secondary);
+}
+
+/* A TYPE RULE: configr's list cards carry a 4px edge in the colour of what the card is (a skill, an
+   agent, a hook). The colour is the surface's choice of categorical hue, `--rule-color:
+   var(--cat-teal)`. It is the card's type, not its state, so it keeps its colour when a hover or a
+   tone recolours the rest of the edge — hence the extra selectors, each one step more specific than
+   the rule it has to outrank (K1's hover, the tone, the toned hover). */
+.card-terminal.card-terminal--rule,
+.card-terminal.card-terminal--rule:is(:hover, [data-tone]),
+.card-terminal.card-terminal--rule[data-tone]:hover {
+  border-inline-start: 4px solid var(--rule-color, var(--primary));
+}
+
+/* AN OUTCOME FLASH: configr pulses a card's edge for half a second when an install finishes, so
+   the eye finds the card that changed. Add the class, remove it on `animationend`. It is a ring that
+   fades, not a glow and not a lift — configr's hover lift is not adopted: a card that moves under
+   the pointer is a card the pointer can lose. */
+.card-terminal--flash {
+  animation: dd-flash 0.5s ease-out;
+}
+@keyframes dd-flash {
+  from { box-shadow: 0 0 0 1px var(--tone, var(--primary)); }
+}
+
+
+/* ── K3 · CARD GRID ──────────────────────────────────────────────────────────────────────────────
+   As many columns of at least 16rem as fit, and one column on a phone — `min(…, 100%)` stops a
+   16rem track from overflowing a narrower screen. The gap is 1rem, seedr's and danieldeusing.de's
+   (configr used 8px); `--card-min` and `--card-gap` are the two knobs. `auto-fill`, not `auto-fit`:
+   a row of two cards keeps card-sized cards instead of stretching them across the page. The list
+   reset lets the grid be the <ul> a list of cards semantically is. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min, 16rem), 100%), 1fr));
+  gap: var(--card-gap, 1rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+
+/* ── K4 · STAT TILE — one number and what it means ───────────────────────────────────────────────
+   <a class="stat-tile" data-state="action" href="/automation/approvals">
+     <span class="stat-label">approvals</span><span class="stat-value">3</span>
+     <span class="stat-note">waiting on me</span><span class="stat-cta">review →</span></a>
+
+   cockpit's home tiles, netmon's summary tiles, seedr's category tiles and three family pages drew
+   the same thing — a label, a big number, a line under it — at three widths, four value sizes and
+   three label spacings. One tile now, and the value is --fs-xl (seedr's 18px): cockpit's 24px was
+   the one value in the estate at the display step.
+
+   THE STATE IS AN EDGE FIRST. `data-state` is cockpit's vocabulary: `idle` (fine, green edge),
+   `action` (something waits on me — warning edge, value and tint), `broken` (the same in
+   destructive) and `unknown`. UNKNOWN NEVER READS AS 0: a tile that could not count shows "—" or
+   "?" in a muted value behind a dashed edge, because a confident 0 on a dashboard is a lie that
+   looks exactly like good news. A tile can also take a plain `data-tone` (F7), which colours its
+   edge and its label.
+
+   4% TINT, NOT 6%, for the same reason as K2's tone: the label and the note are --muted-foreground,
+   which measures 4.47:1 on a 6% warning tint and 4.42 on a 6% destructive one (warm, over --card);
+   at 4% the worst is 4.56, and the warning value on its own tint is still 4.89. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--stat-min, 11rem), 100%), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stat-grid > * {
+  margin: 0;
+  min-inline-size: 0;
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  box-sizing: border-box;
+  padding: 0.75rem 0.9rem;
+  color: inherit;
+  text-decoration: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--stat-edge, var(--border));
+}
+/* A tone does not leak in from a toned container: without a data-tone of its own the tile's label
+   and edge keep their defaults, whatever it sits inside. */
+.stat-tile:not([data-tone]) {
+  --tone: initial;
+}
+.stat-tile[data-tone] {
+  --stat-edge: var(--tone);
+}
+/* The eyebrow (P2), restated so a tile needs nothing but this file. */
+.stat-label {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  line-height: var(--lh-tight);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tone, var(--muted-foreground));
+}
+.stat-value {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+}
+.stat-note {
+  color: var(--muted-foreground);
+}
+.stat-cta {
+  margin-top: auto;
+  align-self: flex-end;
+  color: var(--primary);
+}
+.stat-tile[data-state="idle"] {
+  --stat-edge: var(--success);
+}
+.stat-tile[data-state="action"] {
+  --stat-edge: var(--warning);
+  background: color-mix(in srgb, var(--warning) 4%, var(--card));
+}
+.stat-tile[data-state="action"] .stat-value {
+  color: var(--warning);
+}
+.stat-tile[data-state="broken"] {
+  --stat-edge: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 4%, var(--card));
+}
+.stat-tile[data-state="broken"] .stat-value {
+  color: var(--destructive);
+}
+.stat-tile[data-state="unknown"] {
+  --stat-edge: var(--muted-foreground);
+  border-inline-start-style: dashed;
+}
+.stat-tile[data-state="unknown"] .stat-value {
+  color: var(--muted-foreground);
+}
+/* A tile that is a link takes K1's hover — --primary edge, --secondary fill — except on the state
+   edge, which stays the state (see the file header). */
+a.stat-tile {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+a.stat-tile:hover {
+  border-color: var(--primary);
+  border-inline-start-color: var(--stat-edge, var(--primary));
+  background: var(--secondary);
+}
+a.stat-tile:hover .stat-cta,
+a.stat-cta:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+:is(a.stat-tile, a.stat-cta):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  a.stat-cta {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 44px;
+  }
+}
+
+
+/* ── K5 · PANEL — a filled box with a ruled head ─────────────────────────────────────────────────
+   <section class="panel" aria-labelledby="files-t">
+     <header class="panel-head"><span class="ico" data-icon="folder-tree"></span>
+       <h3 class="panel-title" id="files-t">files</h3><div class="panel-actions">…</div></header>
+     <div class="panel-body">…</div>
+     <footer class="panel-foot">…</footer>
+   </section>
+
+   A container, not a card: no hover, no focus of its own. seedr and configr agree on the shape —
+   --card fill, a 40px head strip with a rule under it, a --primary glyph, the title, the actions at
+   the end — and cockpit's entity cards (transparent, no rule) move to it.
+
+   THE BODY SCROLLS, THE HEAD AND FOOT STAY. Give the panel a height (or make it a `.split-pane`)
+   and only the body scrolls; `min-block-size: 0` on the panel and the body is what lets a flex
+   child shrink below its content instead of pushing the page longer.
+
+   COLLAPSIBLE (cockpit's config cards): a `.disclosure-btn` first in the head, and the body carries
+   `hidden`. The page keeps the open set across re-renders. A collapsed panel is one line: its head
+   loses the rule, or the rule and the panel's own bottom edge double up. `hidden` needs nothing
+   here: tokens.css hides every [hidden] element whatever display its class sets, once, for the
+   whole system — a per-class guard is how one class ends up guarded and the next one not. */
+/* A panel and a console are usually <section>s, and base.css spaces a section that follows another
+   by --space-section (2.5rem): the rhythm BETWEEN parts of a page. Inside a stack of panels it is a
+   2.5rem hole between two cards. Reset at zero specificity, so the reset only undoes that rhythm
+   and any margin the page gives a panel still wins. */
+:where(.panel, .console) {
+  margin: 0;
+}
+.panel {
+  --tablewrap-fade: var(--card);
+  --clamp-fade: var(--card);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-block-size: 0;
+  min-inline-size: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  box-sizing: border-box;
+  min-block-size: 2.5rem;
+  padding: 0 var(--card-pad);
+  border-block-end: 1px solid var(--border);
+}
+.panel-head > .ico {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  color: var(--primary);
+}
+/* Any heading level; the class sets the size. 500 like K2's card title. */
+.panel-title {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* studio's pane heads and explorer strips: the title in eyebrow type (P2, restated here). */
+.panel-head--eyebrow .panel-title {
+  line-height: var(--lh-tight);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  margin-inline-start: auto;
+}
+.panel-body {
+  flex: 1;
+  min-block-size: 0;
+  overflow: auto;
+  padding: var(--card-pad);
+}
+/* A tree, a row list, a table or code runs edge to edge. */
+.panel-body--flush {
+  padding: 0;
+}
+.panel-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  flex: none;
+  box-sizing: border-box;
+  min-block-size: 2.5rem;
+  padding: 0 var(--card-pad);
+  border-block-start: 1px solid var(--border);
+}
+.panel-head:last-child,
+.panel-head:has(+ .panel-body[hidden]) {
+  border-block-end: 0;
+}
+
+/* THE IDENTITY RAIL (cockpit's agent cards): a 2.5rem column down the panel's start edge holding a
+   logo or the agent's initials. The tint is 5%, not cockpit's 7%: --muted-foreground on a 7% muted
+   tint measures 4.44:1 on warm, on 6% 4.50 and on 5% 4.55. The mark is decorative; the title names
+   the thing. */
+.panel--mark {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+}
+.panel-mark {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--muted-foreground) 5%, transparent);
+  border-inline-end: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.panel-mark > :is(img, svg) {
+  inline-size: var(--icon-lg);
+  block-size: var(--icon-lg);
+  object-fit: contain;
+}
+.panel-main {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  min-inline-size: 0;
+}
+
+
+/* ── K6 · ROW LIST — a list whose rows are links or choices ──────────────────────────────────────
+   <ul class="row-list"><li><a class="list-row" href="…">
+     <time class="list-row-lead">2026-09-25</time><span class="list-row-title">…</span>
+     <span class="list-row-meta">…</span></a></li></ul>
+
+   danieldeusing.de's article and brief lists, cockpit's hairline rows and its overlay's file list,
+   studio's master columns. A hairline between rows, never around each one: a list is one thing.
+
+   TWO HOVERS FOR TWO JOBS. A row that navigates is one link, so its hover is a link's — the title
+   underlines (danieldeusing.de). A row in a selection list (`--select`, the master column of a
+   master-detail view) takes the menu highlight, --muted, because it is a choice among siblings
+   (studio, cockpit). The current row is the rail's marker (file header): on its 12% tint
+   --muted-foreground falls to 4.08:1 (warm, over --card), so the lead, the meta and the
+   description turn --foreground there (8.07).
+
+   THE ROW IS THE CONTROL, and it brings its own reset — an <a> and a <button> arrive with an
+   underline, a system font, centred text and a border, and a list whose rows are both must look
+   the same. Inside a flush card (`.card-terminal--flush`) the rows carry the card's padding, so
+   the hairlines run edge to edge. */
+.row-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row-list > li + li {
+  border-block-start: 1px solid var(--border);
+}
+/* A list standing on the page, not in a card: a rule over the first row and under the last. */
+.row-list--ruled {
+  border-block: 1px solid var(--border);
+}
+.list-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-content: center;
+  gap: 0.25rem 1.5rem;
+  box-sizing: border-box;
+  inline-size: 100%;
+  margin: 0;
+  padding: 0.5rem var(--card-pad);
+  font: inherit;
+  text-align: start;
+  color: inherit;
+  text-decoration: none;
+  background: none;
+  border: 0;
+}
+button.list-row {
+  cursor: pointer;
+}
+.row-list--loose .list-row {
+  padding-block: 1rem;
+}
+/* A date or an id. `--row-lead-w` on the list gives every lead one width, so the titles start on
+   one line (danieldeusing.de's brief column is 10.5rem). */
+.list-row-lead {
+  flex: 0 0 var(--row-lead-w, auto);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.list-row-title {
+  flex: 1 1 12rem;
+  min-inline-size: 0;
+  font-weight: 700;
+  color: var(--primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Truncating a title on a phone hides the only words the row has; danieldeusing.de truncates from
+   40rem up and wraps below. */
+@media (max-width: 40rem) {
+  .list-row-title {
+    white-space: normal;
+  }
+}
+.list-row-desc {
+  flex-basis: 100%;
+  color: var(--muted-foreground);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--clamp-lines, 2);
+  overflow: hidden;
+}
+.list-row-meta {
+  margin-inline-start: auto;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+a.list-row:not([aria-disabled="true"]):hover .list-row-title {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+/* Inset, because the row is flush with its container and an outset ring would be clipped by it. */
+.list-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.list-row:is(:disabled, [aria-disabled="true"]) {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (pointer: coarse) {
+  .list-row {
+    min-block-size: 44px;
+  }
+}
+
+.row-list--select .list-row {
+  padding: 0.25rem 0.5rem;
+  column-gap: 0.75rem;
+}
+.row-list--select .list-row-title {
+  font-weight: 400;
+  color: var(--foreground);
+}
+.row-list--select .list-row:where(:not(:disabled, [aria-disabled="true"])):hover {
+  background: var(--muted);
+}
+/* The current / selected row: the rail's marker (chrome.css `.ls-row[aria-current="page"]`), value
+   for value. After the hover and as specific, so the marker survives the pointer. */
+.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]) {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--primary);
+}
+.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]) .list-row-title {
+  color: var(--primary);
+  font-weight: 700;
+  text-shadow: 0 0 8px var(--glow);
+}
+.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]) :is(.list-row-lead, .list-row-meta, .list-row-desc) {
+  color: var(--foreground);
+}
+
+
+/* ── K7 · ENTRY — a dated or labelled record ─────────────────────────────────────────────────────
+   <ol class="entry-list entry-list--ruled"><li class="entry">
+     <time class="entry-lead" datetime="2026-09-25">2026-09-25</time>
+     <div><h2 class="entry-title"><a class="card-link" href="…">…</a></h2>
+       <p class="entry-desc">…</p></div></li></ol>
+
+   danieldeusing.de's timeline, CV, article index and apps page: a label column and a body. They
+   used eight label widths; there are three — 5rem (a year, a certificate), 8.75rem (a date, the
+   default) and 12.5rem (an aside with a name, a status and a stack line). Below 40rem the lead sits
+   over the body, except in `--keep`, which stays two columns at every width (certificates, awards).
+
+   THE WHOLE ENTRY OPENS THE TITLE. danieldeusing.de underlined the title when the pointer was
+   anywhere on the entry while only the title took the click — a hover that promised more than it
+   delivered. The title link is K2's stretched `.card-link`, so the promise is kept, and the
+   `#tag` buttons are raised above it (K2 raises every interactive child of an entry). */
+.entry-list {
+  display: grid;
+  row-gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--entry-lead-w, 8.75rem) minmax(0, 1fr);
+  column-gap: var(--entry-gap, 2rem);
+  row-gap: 0.25rem;
+  align-items: baseline;
+}
+.entry--narrow {
+  --entry-lead-w: 5rem;
+  --entry-gap: 1.5rem;
+}
+.entry--wide {
+  --entry-lead-w: 12.5rem;
+  --entry-gap: 2.5rem;
+}
+@media (max-width: 40rem) {
+  .entry:not(.entry--keep) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.entry-lead {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+/* The timeline's year. */
+.entry-lead--accent {
+  color: var(--primary);
+  font-weight: 700;
+}
+/* No font-size: the element decides (an h2 is --fs-xl, a p the body size). */
+.entry-title {
+  margin: 0;
+  color: var(--primary);
+  font-weight: 700;
+}
+.entry-title a {
+  color: inherit;
+  text-decoration: none;
+}
+.entry:hover .entry-title a,
+.entry-title a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.entry:has(.card-link:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.entry-desc {
+  margin: 0.75rem 0 0;
+  color: var(--muted-foreground);
+}
+.entry-list--ruled {
+  row-gap: 0;
+}
+.entry-list--ruled > .entry {
+  padding-block: 2rem;
+  border-block-end: 1px solid var(--border);
+}
+.entry-list--ruled > .entry:first-child {
+  border-block-start: 1px solid var(--border);
+}
+.entry-list--ruled > .entry--wide {
+  padding-block: 2.5rem;
+}
+
+
+/* ── K8 · MAN PAGE — a card that reads like `man daniel` ─────────────────────────────────────────
+   <article class="card-terminal manpage" aria-labelledby="man-name">
+     <p class="manpage-frame"><span>DANIEL(1)</span><span>personal manual</span><span>danieldeusing.de</span></p>
+     <h2 class="manpage-sect" id="man-name">NAME</h2><div class="manpage-body"><p>…</p></div>
+     …
+     <p class="manpage-frame"><a class="link-quiet" href="/about">~/about</a><span>2026</span><span>(END)</span></p>
+   </article>
+
+   danieldeusing.de's home, configr and seedr pages. Adopted with two corrections: the header and
+   footer rows were faint text at 11px (2.3–2.9:1) and are now the body size in --muted-foreground
+   (4.84:1 on --card), and the section labels were paragraphs and are now headings, so NAME →
+   SYNOPSIS is something a screen reader can jump between. The capitals are authored, as a man page
+   prints them — they are the words, not a CSS transform. */
+.manpage-frame {
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  color: var(--muted-foreground);
+  letter-spacing: 0.025em;
+}
+.manpage-frame > * {
+  flex: 1 1 0;
+  min-inline-size: 0;
+}
+.manpage-frame > :nth-child(2) {
+  text-align: center;
+}
+.manpage-frame > :last-child {
+  text-align: end;
+}
+@media (max-width: 40rem) {
+  .manpage-frame > :nth-child(2):not(:last-child) {
+    display: none;
+  }
+}
+.manpage-frame:first-child {
+  margin-block-end: 1.5rem;
+}
+.manpage-frame:last-child {
+  margin-block-start: 1.75rem;
+}
+.manpage-sect {
+  margin: 1.25rem 0 0;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  line-height: var(--lh-base);
+  letter-spacing: 0.025em;
+  color: var(--primary);
+}
+.manpage-frame + .manpage-sect {
+  margin-block-start: 0;
+}
+.manpage-body {
+  margin-block-start: 0.375rem;
+  padding-inline-start: 1.25rem;
+  color: var(--muted-foreground);
+}
+@media (min-width: 40.0625rem) {
+  .manpage-body {
+    padding-inline-start: 1.75rem;
+  }
+}
+/* Children zeroed first, so a tokens-only page (no reset) does not bring the user agent's 1em
+   paragraph margins into the indent. */
+.manpage-body > * {
+  margin-block: 0;
+}
+.manpage-body > * + * {
+  margin-block-start: 0.75rem;
+}
+
+
+/* ── K9 · TREE — files, folders, a settings outline ──────────────────────────────────────────────
+   <ul class="tree" role="tree" aria-label="files of review">
+     <li role="treeitem" aria-level="1" aria-expanded="true" tabindex="0">
+       <span class="tree-row"><span class="ico" data-icon="folder-open"></span><span class="tree-label">src</span></span>
+       <ul role="group"><li role="treeitem" aria-level="2" aria-selected="true" tabindex="-1">…</li></ul>
+     </li>
+   </ul>
+
+   seedr's web tree has the APG keyboard (roving tabindex, arrows, Home/End); configr's three trees
+   had tree roles without the keys, or neither. The look and the markup are one here and the app
+   implements seedr's keyboard (references/cards.md); there is no runtime (file header).
+
+   DEPTH IS DRAWN, as in the rail: each level hangs off a vertical guide, 1rem further in, so the
+   eye can follow which parent a row belongs to.
+
+   THE CHEVRON IS --muted-foreground, NOT THE ROW'S COLOUR AT 60%. A 60% glyph is fine at rest
+   (3.26:1 at worst), but the row's colour turns --primary under the pointer and when selected, and
+   60% of --primary on those two backgrounds measures 2.39–2.59:1 on warm — under the 3:1 a state
+   glyph needs, on exactly the rows being looked at. --muted-foreground is 3.95:1 or better on all
+   of them.
+
+   THE FOCUS RING SITS ON THE ROW, not around the item: a focused branch would otherwise outline its
+   whole open subtree. */
+.tree,
+.tree [role="group"] {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tree [role="group"] {
+  margin-inline-start: 0.45rem;
+  padding-inline-start: 0.55rem;
+  border-inline-start: 1px solid color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  box-sizing: border-box;
+  padding: 0.125rem 0.25rem;
+  white-space: nowrap;
+  color: var(--foreground);
+  text-decoration: none;
+  cursor: pointer;
+}
+.tree-label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The chevron column: a spacer on a leaf, so leaves and branches line up. */
+.tree-row::before {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+}
+.tree [aria-expanded] > .tree-row::before,
+.tree .tree-row[aria-expanded]::before {
+  background: var(--muted-foreground);
+  -webkit-mask: var(--ico-chevron-right) center / contain no-repeat;
+  mask: var(--ico-chevron-right) center / contain no-repeat;
+}
+.tree [aria-expanded="true"] > .tree-row::before,
+.tree .tree-row[aria-expanded="true"]::before {
+  -webkit-mask-image: var(--ico-chevron-down);
+  mask-image: var(--ico-chevron-down);
+}
+.tree-row > .ico {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  color: var(--muted-foreground);
+}
+.tree [aria-expanded] > .tree-row > .ico,
+.tree .tree-row[aria-expanded] > .ico {
+  color: var(--primary);
+}
+.tree-row:hover {
+  background: var(--muted);
+  color: var(--primary);
+}
+/* The current / selected row: K6's marker, which is the rail's. */
+.tree [aria-selected="true"] > .tree-row,
+.tree .tree-row[aria-current="page"] {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--primary);
+  color: var(--primary);
+  font-weight: 700;
+  text-shadow: 0 0 8px var(--glow);
+}
+.tree [aria-selected="true"] > .tree-row > .tree-meta,
+.tree .tree-row[aria-current="page"] > .tree-meta {
+  color: var(--foreground);
+  font-weight: 400;
+  text-shadow: none;
+}
+.tree [role="treeitem"]:focus-visible:not(.tree-row) {
+  outline: none;
+}
+.tree [role="treeitem"]:focus-visible > .tree-row,
+.tree .tree-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.tree [aria-disabled="true"] > .tree-row,
+.tree .tree-row[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+.tree [aria-disabled="true"] > .tree-row:hover,
+.tree .tree-row[aria-disabled="true"]:hover {
+  background: none;
+  color: var(--foreground);
+}
+/* Counts, tags, a hover-revealed action — pushed to the row's end. */
+.tree-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-inline-start: auto;
+  color: var(--muted-foreground);
+}
+@media (pointer: coarse) {
+  .tree-row {
+    min-block-size: 44px;
+  }
+}
+
+
+/* ── K10 · SPLIT — panes side by side, and the splitter between them ─────────────────────────────
+   <div class="split" style="--split-size: 18rem">
+     <section class="panel split-pane" id="files">…</section>
+     <div class="splitter" role="separator" tabindex="0" aria-orientation="vertical"
+          aria-controls="files" aria-label="resize file list"
+          aria-valuemin="160" aria-valuemax="640" aria-valuenow="288"></div>
+     <section class="panel split-pane">…</section>
+   </div>
+
+   seedr's and configr's file explorers resize their panes; cockpit's overlay is a fixed
+   master-detail. One layout: the first pane is `--split-size` wide, the last takes the rest, and
+   without a splitter a hairline separates them. Below 48rem the panes stack and the splitters go —
+   each pane is then bounded by its own max-block-size (seedr: 16rem of tree, 24rem of preview).
+
+   THE SPLITTER IS A CONTROL, SO ITS LINE IS A CONTROL EDGE. Drawn in --border it was 1.23–2.00:1 —
+   a divider's contrast on a thing a reader has to find and grab, under the 3:1 WCAG 1.4.11 asks of
+   a component. It is --control-edge at rest (3.26:1 at worst, the field-edge token) and --primary
+   under the pointer, on focus and while dragging (5.59:1 or better).
+
+   A 44PX TARGET THAT DOES NOT WIDEN THE GAP. On a coarse pointer the strip grows to 2.75rem and
+   takes the growth back with negative margins, so the hit area overlaps the panes while the drawn
+   line stays where it was.
+
+   The resizing itself — pointer capture, the arrow keys, remembering the size — is the app's; the
+   keyboard is APG's window splitter and is written down in references/cards.md. Nothing animates: a
+   pane follows the pointer. */
+.split {
+  display: flex;
+  min-block-size: 0;
+  min-inline-size: 0;
+}
+.split-pane {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  min-block-size: 0;
+  margin: 0;
+  overflow: auto;
+}
+.split > .split-pane:first-child {
+  flex: 0 0 var(--split-size, 33%);
+}
+.split > .split-pane:last-child {
+  flex: 1 1 0;
+}
+/* The last PANE, when a right-hand pane was hidden and its strip is now the last child: the pane
+   left over takes the room. A rule of its own, because an engine that cannot read `of S` drops a
+   whole selector list and the plain case must survive it. */
+.split > .split-pane:nth-last-child(1 of .split-pane) {
+  flex: 1 1 0;
+}
+.split-pane + .split-pane {
+  border-inline-start: 1px solid var(--border);
+}
+.splitter {
+  flex: none;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  touch-action: none;
+  background: none;
+  cursor: row-resize;
+  block-size: 1rem;
+}
+.splitter::before {
+  content: "";
+  inline-size: 2.5rem;
+  block-size: 0.25rem;
+  background: var(--control-edge);
+}
+.splitter[aria-orientation="vertical"] {
+  inline-size: 0.75rem;
+  block-size: auto;
+  cursor: col-resize;
+}
+.splitter[aria-orientation="vertical"]::before {
+  align-self: stretch;
+  inline-size: 1px;
+  block-size: auto;
+}
+.splitter:hover::before,
+.splitter:focus-visible::before,
+.splitter[data-dragging]::before {
+  background: var(--primary);
+}
+.splitter:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.splitter[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (pointer: coarse) {
+  .splitter {
+    position: relative;
+    z-index: 1;
+    block-size: 2.75rem;
+    margin-block: -0.875rem;
+  }
+  .splitter[aria-orientation="vertical"] {
+    inline-size: 2.75rem;
+    block-size: auto;
+    margin-block: 0;
+    margin-inline: -1rem;
+  }
+}
+
+/* WHAT A HIDDEN PANE LEAVES BEHIND: a 2rem strip with the pane's name written down it, which
+   brings the pane back in one click — the single-pointer alternative to dragging (WCAG 2.5.7). The
+   rule sits on the content side; `--end` is for a right-hand pane. studio's strip had a label and a
+   tip; configr's collapsed to a bare 40px bar. */
+.pane-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  box-sizing: border-box;
+  inline-size: 2rem;
+  margin: 0;
+  padding: 0.5rem 0 0;
+  font: inherit;
+  color: var(--muted-foreground);
+  background: none;
+  border: 0;
+  border-inline-end: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.pane-collapsed--end {
+  border-inline-end: 0;
+  border-inline-start: 1px solid var(--border);
+}
+/* The label in eyebrow type (P2, restated). */
+.pane-collapsed > :not(.ico) {
+  writing-mode: vertical-rl;
+  line-height: var(--lh-tight);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.pane-collapsed:hover {
+  color: var(--primary);
+}
+.pane-collapsed:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.pane-collapsed:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (pointer: coarse) {
+  .pane-collapsed {
+    min-block-size: 44px;
+  }
+}
+
+/* Stacked. The panes lose the hairline between them when they are not panels (a panel keeps its own
+   edge), and the strip becomes a bar with its label read across and its rule below. */
+@media (max-width: 48rem) {
+  .split {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .split > .splitter {
+    display: none;
+  }
+  .split > .split-pane:first-child {
+    flex: none;
+  }
+  .split-pane:not(.panel) + .split-pane:not(.panel) {
+    border-inline-start: 0;
+  }
+  .pane-collapsed,
+  .pane-collapsed--end {
+    flex-direction: row;
+    inline-size: auto;
+    block-size: 2rem;
+    padding: 0 0.5rem;
+    border-inline: 0;
+    border-block-end: 1px solid var(--border);
+  }
+  .pane-collapsed > :not(.ico) {
+    writing-mode: horizontal-tb;
+  }
+}
+
+
+/* ── K11 · CLAMP — long text shown short, with a way to open it ──────────────────────────────────
+   <div class="section-head"><h3 class="prompt">cat README.md</h3>
+     <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="chevrons-up-down"
+             aria-expanded="false" aria-controls="readme" aria-label="show full content"></button></div>
+   <div class="clamp" id="readme" data-clamped>…</div>
+
+   seedr's and configr's detail pages cap a README at 240px with a fade — the same component
+   written twice. A height clamp, not a disclosure: `details.fold` hides everything or nothing,
+   this shows the first screenful so the reader can decide whether to open the rest.
+
+   THE PAGE DECIDES WHETHER IT IS CLAMPED, by measuring: render open, and set `data-clamped` (and
+   show the toggle) only when the content overflows `--clamp-h` by more than half a rem. A clamp
+   that is always on hides a button that opens nothing on every short README.
+
+   THE FADE BLENDS INTO THE SURFACE UNDER IT, set like --tablewrap-fade: --background by default,
+   --card inside a card or a panel (both set --clamp-fade). A fade to the wrong colour paints a
+   band across the text instead of dissolving it. Clipping is visual only — the hidden text stays
+   in the accessibility tree. */
+.clamp {
+  position: relative;
+}
+.clamp[data-clamped] {
+  max-block-size: var(--clamp-h, 15rem);
+  overflow: hidden;
+}
+.clamp[data-clamped]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 4rem;
+  background: linear-gradient(to top, var(--clamp-fade, var(--background)), transparent);
+  pointer-events: none;
+}
+
+
+/* ── K12 · CONSOLE — a log pane ──────────────────────────────────────────────────────────────────
+   <section class="console" aria-labelledby="log-t">
+     <header class="console-bar"><span class="console-dots"></span>
+       <h3 class="console-title" id="log-t">agent output</h3>
+       <p class="console-status" role="status"><span class="dot dot--pulse" data-tone="success"></span>live</p></header>
+     <div class="console-body" tabindex="0" aria-labelledby="log-t">…one element per line…</div>
+   </section>
+
+   studio's agent log and test panel (the window chrome), with cockpit's live log (the status word
+   and the follow behaviour). The body is the page colour inside a --card frame, so the output
+   reads as a well in the window.
+
+   IT FOLLOWS THE THEME. cockpit's drawer pinned a near-black log (#0a0c0b) in every theme to
+   protect ANSI colours — and it never parsed ANSI at all; the only mention is a comment. The
+   pinned palette protected nothing, and its highlight pair measured 4.07:1. The console is --card
+   and --background like everything else, and a search match is base.css's <mark>.
+
+   NOT A LIVE REGION. Thousands of lines announced one by one would make the page unusable with a
+   screen reader (studio's reasoning, kept). The status line IS one, so "reconnecting…" and "ended"
+   are heard. The body is focusable so the keyboard can scroll it.
+
+   `white-space: pre-wrap` keeps a log's indentation and wraps its long lines — which also means any
+   whitespace BETWEEN the line elements renders. Append the lines from script, with textContent
+   (they are untrusted), and never indent them in markup. */
+.console {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-block-size: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.console-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  box-sizing: border-box;
+  min-block-size: 1.5rem;
+  padding: 0 0.5rem;
+  border-block-end: 1px solid var(--border);
+}
+/* Three circles from one pseudo-element and two shadows — the one place besides a dot that a
+   radius is allowed, because a circle is not a rounded corner. Decorative: aria-hidden. */
+.console-dots {
+  flex: none;
+  inline-size: 2rem;
+}
+.console-dots::before {
+  content: "";
+  display: block;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 50%;
+  background: var(--border);
+  box-shadow: 0.75rem 0 var(--border), 1.5rem 0 var(--border);
+}
+/* The eyebrow (P2, restated) — studio's 10px label, on the one text size. */
+.console-title {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  line-height: var(--lh-tight);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+/* The dot's data-tone says the state: pending connecting, success live (pulsing), muted ended,
+   destructive refused. The word says it too — the colour is never the only signal. */
+.console-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  margin-inline-start: auto;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.console-body {
+  flex: 1;
+  box-sizing: border-box;
+  min-block-size: 12rem;
+  block-size: var(--console-h, 55vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem;
+  background: var(--background);
+  color: var(--foreground);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: var(--lh-base);
+  tab-size: 2;
+}
+/* Inset, so a console that fills a drawer or a pane does not lose its ring to the container. */
+.console-body:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+/* The current search match's line. The matches themselves are <mark>. */
+.console-line--current {
+  background: var(--muted);
+}
+/* Filling a drawer (O2) or a pane (K10): the console takes the container's height and the body the
+   rest of it. Inside a drawer the bar is dropped and the drawer's title names the body. */
+.console--fill {
+  block-size: 100%;
+}
+.console--fill .console-body {
+  block-size: auto;
+}
+
+
+/* ── FORCED COLOURS ──────────────────────────────────────────────────────────────────────────────
+   Windows High Contrast replaces every author background with Canvas and every author text and edge
+   colour with CanvasText, and it drops shadows. Three things in this file are drawn with exactly
+   those, and would vanish:
+     · the tree's chevron is a MASK and the splitter's bar a FILL — both are backgrounds, so both come
+       out Canvas on Canvas: a tree with no way to tell a folder from a file, a splitter nobody can see;
+     · the current / selected row is a TINT and an inset SHADOW, both gone, which leaves the chosen row
+       looking exactly like its neighbours;
+     · the console's current search line is a fill.
+   So the chevron keeps its own paint (forced-color-adjust: none, in currentColor — the text colour
+   its row is forced to), the splitter rests in ButtonText and lights up in Highlight under the
+   pointer, on focus and while dragged, and a chosen row is drawn the way the platform draws a
+   selection: Highlight behind, HighlightText for everything in it.
+
+   THE CHOSEN ROW LEAVES THE MODE, and paints itself. Measured in Chromium: with only a Highlight
+   fill, every text run inside the row keeps the mode's Canvas BACKPLATE, so the row showed black
+   words in white boxes on the Highlight band — and a label that had inherited HighlightText
+   vanished outright, white on its white backplate. With `forced-color-adjust: none` there is no
+   backplate and no forcing, so every colour inside the row has to be a system colour, set here:
+   the words, the edges of another package's tag or count, a glyph, a search match (Mark). The
+   `!important` is that "every": a row's own rules (the current title's --primary, the lead's
+   --foreground) are more specific than any selector that could name all of its descendants.
+
+   Everything else here is text, an edge or a word, and survives the mode as it is. A stat tile's
+   state and a card's tone lose their colour here — which is allowed only because the tile and the
+   card also WRITE them: the value and its note, a tag. */
+@media (forced-colors: active) {
+  .tree [aria-expanded] > .tree-row::before,
+  .tree .tree-row[aria-expanded]::before {
+    forced-color-adjust: none;
+    background: currentColor;
+  }
+  .splitter::before {
+    forced-color-adjust: none;
+    background: ButtonText;
+  }
+  .splitter:hover::before,
+  .splitter:focus-visible::before,
+  .splitter[data-dragging]::before {
+    background: Highlight;
+  }
+  .list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]),
+  .tree [aria-selected="true"] > .tree-row,
+  .tree .tree-row[aria-current="page"],
+  .console-line--current {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+    text-shadow: none;
+  }
+  :is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"], .console-line--current) * {
+    color: HighlightText !important;
+    border-color: HighlightText !important;
+    text-shadow: none !important;
+  }
+  :is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"], .console-line--current) :is(.ico, .dot) {
+    background: HighlightText !important;
+  }
+  /* The same list as the rule above, so it outranks it for a <mark>: a match in the current line
+     keeps the platform's match colours. */
+  :is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"], .console-line--current) mark {
+    background: Mark !important;
+    color: MarkText !important;
+  }
+}
+
+
+/* ── MOTION ──────────────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .card-terminal--flash {
+    animation: none;
+  }
+}
+
+
+/* ── PRINT ───────────────────────────────────────────────────────────────────────────────────────
+   Paper cannot drag a splitter, open a clamp or scroll a pane: the handles go, every scroller shows
+   all of its content, and a panel, a row or a man page is not cut across two sheets. */
+@media print {
+  .splitter,
+  .pane-collapsed {
+    display: none;
+  }
+  .split-pane,
+  .panel-body {
+    overflow: visible;
+  }
+  .panel,
+  .manpage,
+  .list-row {
+    break-inside: avoid;
+  }
+  .clamp[data-clamped] {
+    max-block-size: none;
+    overflow: visible;
+  }
+  .clamp[data-clamped]::after {
+    content: none;
+  }
+  .console-body {
+    block-size: auto;
+    overflow: visible;
+  }
+  .card-terminal--flash {
+    animation: none;
+  }
+}

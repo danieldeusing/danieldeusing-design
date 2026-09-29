@@ -157,6 +157,19 @@
       .strip-host > .tabs { flex: 1; }
       .strip-host .tab { max-inline-size: 11rem; }
       #tab-log { min-height: 1.5em; }
+      /* What the examples below once set in style attributes. A page under style-src 'self' (seedr's)
+         drops every style attribute, so the examples a page copies from carry none: a variable or a
+         spacing a page needs goes in its stylesheet, on a class or an id. */
+      .demo-pad { padding: 0.75rem; }
+      .demo-flush { margin: 0; }
+      .demo-card { --chart-bg: var(--card); }
+      .card-fade { --tablewrap-fade: var(--card); }
+      #card-wrap { --tablewrap-max-h: 8.5rem; }
+      #kv-labels { --field-label-w: 15rem; }
+      #bars { --chart-h: 9rem; }
+      #when .demo-card > p { margin: 0 0 0.4rem; }
+      #when .demo-card > p:last-child { margin: 0; }
+      div[role="tabpanel"] > p { margin: 0.6rem 0 0; }
       html[data-bare] .doc-link--forward { color: var(--primary); }
     </style>
   </head>
@@ -325,8 +338,8 @@
         </div>
 
         <h3>a dense table on a card — the sticky header paints the card (WP3's line)</h3>
-        <div class="card-terminal" style="--tablewrap-fade: var(--card); padding: 0.75rem">
-          <div class="tablewrap" style="--tablewrap-max-h: 8.5rem" id="card-wrap">
+        <div class="card-terminal demo-pad card-fade">
+          <div class="tablewrap" id="card-wrap">
             <table class="dense">
               <thead><tr><th scope="col">container</th><th scope="col">image</th><th class="num" scope="col">restarts</th></tr></thead>
               <tbody>
@@ -385,7 +398,7 @@
           </dl>
         </div>
         <h3>table.kv.kv--labels — a 15rem label column, set on the table</h3>
-        <table class="kv kv--labels" id="kv-labels" style="--field-label-w: 15rem">
+        <table class="kv kv--labels" id="kv-labels">
           <tbody>
             <tr><th scope="row">review type</th><td>public — posts on the pull request</td></tr>
             <tr><th scope="row">comments</th><td>agent info, ELI5</td></tr>
@@ -401,8 +414,8 @@
           The table below is the formatters' own output, in this browser's zone.</p>
         <div class="demo-grid">
           <div class="demo-card">
-            <p style="margin: 0 0 0.4rem">review — reviews the current diff</p>
-            <p style="margin: 0" id="when-inline"></p>
+            <p>review — reviews the current diff</p>
+            <p id="when-inline"></p>
           </div>
           <table class="kv" id="stamps"><tbody></tbody></table>
         </div>
@@ -417,23 +430,24 @@
           <div class="chart-plot" id="trend"></div>
           <figcaption>mistakes per graded review, per week · a hollow week has too few graded reviews and is kept out of the line · dashed: the grader model changed · floor tick: rules were added</figcaption>
         </figure>
-        <div class="demo-card" style="--chart-bg: var(--card)">
-          <figure class="chart" style="--chart-color: var(--cat-blue); margin: 0">
+        <div class="demo-card">
+          <figure class="chart demo-flush" data-hue="blue">
             <div class="chart-plot" id="balance"></div>
             <figcaption>balance through the month, in euros · area and gridlines</figcaption>
           </figure>
         </div>
         <figure class="chart">
-          <div class="chart-plot" id="bars" style="--chart-h: 9rem"></div>
+          <div class="chart-plot" id="bars"></div>
           <figcaption>findings posted per week — peak <span id="bars-peak"></span></figcaption>
         </figure>
-        <figure class="chart">
+        <figure class="chart" id="flow-fig">
           <div class="chart-plot" id="flow"></div>
           <ul class="chart-key">
-            <li style="--chart-color: var(--cat-green)">income</li>
-            <li style="--chart-color: var(--cat-red)">expenses</li>
+            <li data-hue="green">income</li>
+            <li data-hue="red">expenses</li>
+            <li data-hue="blue">net</li>
           </ul>
-          <figcaption>monthly income against expenses, in euros</figcaption>
+          <figcaption>monthly income, expenses and what was left, in euros · solid, outlined, hatched: each series has a shape as well as a hue</figcaption>
         </figure>
       </section>
 
@@ -457,8 +471,8 @@
             <button type="button" class="tab" role="tab" id="tab-learn" aria-controls="sec-learn" aria-selected="true">learn list</button>
             <button type="button" class="tab" role="tab" id="tab-retros" aria-controls="sec-retros" aria-selected="false" tabindex="-1">retrospectives</button>
           </div>
-          <div id="sec-learn" role="tabpanel" aria-labelledby="tab-learn"><p style="margin: 0.6rem 0 0">the learn list — a nested panel.</p></div>
-          <div id="sec-retros" role="tabpanel" aria-labelledby="tab-retros" hidden><p style="margin: 0.6rem 0 0">retrospectives — reached by a deep link, its ancestor opens first.</p></div>
+          <div id="sec-learn" role="tabpanel" aria-labelledby="tab-learn"><p>the learn list — a nested panel.</p></div>
+          <div id="sec-retros" role="tabpanel" aria-labelledby="tab-retros" hidden><p>retrospectives — reached by a deep link, its ancestor opens first.</p></div>
         </section>
         <section class="doc tab-panel" id="sec-workers" role="tabpanel" aria-labelledby="tab-workers" hidden><p>workers: copilot-poi failed to update.</p></section>
         <section class="doc tab-panel" id="sec-queue" role="tabpanel" aria-labelledby="tab-queue" hidden><p>three reviews are waiting on a worker.</p></section>
@@ -471,15 +485,15 @@
 
         <h3>.tabs--compact inside a card, and .tabs--strip in a fixed-height strip</h3>
         <div class="demo-grid">
-          <div class="card-terminal" style="padding: 0.75rem">
+          <div class="card-terminal demo-pad">
             <div class="tabs tabs--compact" role="tablist" aria-label="file view">
               <button type="button" class="tab" role="tab" id="tab-plain" aria-controls="sec-plain" aria-selected="true">plain</button>
               <button type="button" class="tab" role="tab" id="tab-formatted" aria-controls="sec-formatted" aria-selected="false" tabindex="-1">formatted</button>
               <button type="button" class="tab" role="tab" id="tab-syntax" aria-controls="sec-syntax" aria-selected="false" tabindex="-1" aria-disabled="true">syntax</button>
             </div>
-            <div id="sec-plain" role="tabpanel" aria-labelledby="tab-plain"><p style="margin: 0.6rem 0 0">the plain view.</p></div>
-            <div id="sec-formatted" role="tabpanel" aria-labelledby="tab-formatted" hidden><p style="margin: 0.6rem 0 0">the formatted view.</p></div>
-            <div id="sec-syntax" role="tabpanel" aria-labelledby="tab-syntax" hidden><p style="margin: 0.6rem 0 0">not for this file.</p></div>
+            <div id="sec-plain" role="tabpanel" aria-labelledby="tab-plain"><p>the plain view.</p></div>
+            <div id="sec-formatted" role="tabpanel" aria-labelledby="tab-formatted" hidden><p>the formatted view.</p></div>
+            <div id="sec-syntax" role="tabpanel" aria-labelledby="tab-syntax" hidden><p>not for this file.</p></div>
           </div>
           <div>
             <div class="strip-host">
@@ -489,9 +503,9 @@
                 <button type="button" class="tab" role="tab" id="tab-a3" aria-controls="sec-a3" aria-selected="false" tabindex="-1"><span class="tab-label">codex</span></button>
               </div>
             </div>
-            <div id="sec-a1" role="tabpanel" aria-labelledby="tab-a1"><p style="margin: 0.6rem 0 0">claude's settings.</p></div>
-            <div id="sec-a2" role="tabpanel" aria-labelledby="tab-a2" hidden><p style="margin: 0.6rem 0 0">copilot-poi's settings.</p></div>
-            <div id="sec-a3" role="tabpanel" aria-labelledby="tab-a3" hidden><p style="margin: 0.6rem 0 0">codex's settings.</p></div>
+            <div id="sec-a1" role="tabpanel" aria-labelledby="tab-a1"><p>claude's settings.</p></div>
+            <div id="sec-a2" role="tabpanel" aria-labelledby="tab-a2" hidden><p>copilot-poi's settings.</p></div>
+            <div id="sec-a3" role="tabpanel" aria-labelledby="tab-a3" hidden><p>codex's settings.</p></div>
           </div>
         </div>
       </section>
@@ -602,10 +616,11 @@
       const months = [["apr", 5200, 4100], ["may", 5200, 5600], ["jun", 6100, 4300], ["jul", 5200, 3900], ["aug", 5400, 6200], ["sep", 5200, 4700]]
         .map(([month, income, expenses]) => ({ month, income, expenses }));
       renderBarChart(document.getElementById("flow"), months, {
-        label: "monthly income against expenses, in euros", x: (m) => m.month, grid: true, format: (v) => euro.format(v),
+        label: "monthly income, expenses and net, in euros", x: (m) => m.month, grid: true, format: (v) => euro.format(v),
         series: [
-          { key: "income", label: "income", value: (m) => m.income, color: "var(--cat-green)" },
-          { key: "expenses", label: "expenses", value: (m) => m.expenses, color: "var(--cat-red)" },
+          { key: "income", label: "income", value: (m) => m.income, hue: "green" },
+          { key: "expenses", label: "expenses", value: (m) => m.expenses, hue: "red" },
+          { key: "net", label: "net", value: (m) => m.income - m.expenses, hue: "blue" },
         ],
         tip: (m, s) => m.month + " " + s.label + ": " + euro.format(s.value(m)),
       });

@@ -15,7 +15,7 @@
  *     markers: [{ at: 3, kind: "line", tip: "grader model changed" }, { at: 5, kind: "tick", tip: "rules added" }],
  *   });
  *   renderBarChart(plot, months, { label, x, series: [{ key: "in", label: "income", value: (m) => m.income,
- *     color: "var(--cat-green)" }, …], tip: (m, s) => …, grid: true, format: euro });
+ *     hue: "green" }, …], tip: (m, s) => …, grid: true, format: euro });
  *
  * WHY THE SVG IS DRAWN AT THE MEASURED SIZE, AND NEVER SCALED. Both charts this replaces — cockpit's
  * trend and bars, the family financing page's line and grouped bars — drew into a fixed viewBox (720
@@ -30,8 +30,16 @@
  * COLOUR COMES FROM CLASSES, NEVER FROM ATTRIBUTES. The family page found this the hard way: a CSS
  * variable is not valid in an SVG presentation attribute, and `fill="var(--x)"` silently paints black,
  * which on the two dark themes is invisible. Every mark here carries a class and data.css paints it,
- * so a theme switch recolours a chart without redrawing it. A series' colour is written as
- * `--chart-color` on its group, and only ever as a token (`var(--cat-*)`), never a hex.
+ * so a theme switch recolours a chart without redrawing it. A series' `hue` names one of the twelve
+ * `--cat-*` hues and is written as `data-hue` on its group, where data.css maps it to `--chart-color`.
+ * NEVER A STYLE ATTRIBUTE: this wrote `style="--chart-color: …"`, and under a `style-src 'self'`
+ * policy (seedr's) the browser drops it — both series of the flow chart painted --primary there.
+ *
+ * A SERIES IS NEVER TOLD APART BY COLOUR ALONE (the lead's ruling for 0.60.0): income and expenses,
+ * --cat-green against --cat-red, differ by ΔE 0.006 under deuteranopia. So each series also carries a
+ * cue, by its position, in every mode: the first is solid, the second outlined, the third hatched —
+ * `data-cue` on its group, which data.css draws; the key's swatches take the same cue by position.
+ * Three is the most there are: a fourth series would repeat the first cue.
  *
  * THE MARKS SAY WHAT THEY ARE. Cockpit's trend is the model: one hue; a solid dot rests on enough data
  * and a hollow one on too little — and a hollow point BREAKS the line rather than steering it; a
@@ -47,6 +55,10 @@
  */
 
 const plots = new WeakMap(); // plot element -> { build, size, frame }
+const CUES = ["solid", "outline", "hatch"];
+// Half of data.css's 1.5px outline: an outlined or hatched bar is drawn that far inside its box, so its
+// stroke paints the same box a solid bar fills and the 1px between grouped bars stays 1px.
+const INSET = 0.75;
 
 const esc = (value) =>
   String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -77,7 +89,7 @@ export function renderLineChart(plot, points, options = {}) {
  *
  * @param {HTMLElement} plot `.chart-plot` inside a `figure.chart`
  * @param {object[]} rows one per x slot, in order
- * @param {object} [options] label, x(r), series [{ key, label, value(r), color }], tip(r, series), grid, format
+ * @param {object} [options] label, x(r), series [{ key, label, value(r), hue }], tip(r, series), grid, format
  */
 export function renderBarChart(plot, rows, options = {}) {
   mount(plot, options.label, (size) => barChart(size, rows || [], options));
@@ -269,17 +281,37 @@ function barChart(size, rows, o) {
 
   let svg = open(size) + axes(f, ticks, format, yOf, o.grid);
   series.forEach((s, j) => {
-    const color = s.color ? ` style="--chart-color: ${esc(s.color)}"` : "";
+    const cue = CUES[j % CUES.length];
     const key = s.key != null ? ` data-series="${esc(s.key)}"` : "";
-    svg += `<g class="chart-series"${key}${color}>`;
+    const hue = s.hue ? ` data-hue="${esc(s.hue)}"` : "";
+    let lines = "";
+    svg += `<g class="chart-series" data-cue="${cue}"${key}${hue}>`;
     rows.forEach((row, i) => {
       const v = cell(row, s);
       if (v === null) return;
       const x = f.x0 + i * f.slot + (f.slot - group) / 2 + j * (bar + 1);
-      svg += `<rect class="chart-bar" x="${r1(x)}" y="${r1(Math.min(yOf(v), zero))}" width="${r1(bar)}" ` +
-        `height="${r1(Math.abs(yOf(v) - zero))}"${tipAttr(o.tip && o.tip(row, s))}></rect>`;
+      const y = Math.min(yOf(v), zero);
+      const h = Math.abs(yOf(v) - zero);
+      const inset = cue === "solid" ? 0 : Math.min(INSET, bar / 2, h / 2);
+      svg += `<rect class="chart-bar" x="${r1(x + inset)}" y="${r1(y + inset)}" width="${r1(bar - 2 * inset)}" ` +
+        `height="${r1(h - 2 * inset)}"${tipAttr(o.tip && o.tip(row, s))}></rect>`;
+      if (cue === "hatch") lines += hatch(x, y, bar, h);
     });
+    // One path for the series' hatching, over its bars; it takes no pointer, so the tips stay the bars'.
+    if (lines) svg += `<path class="chart-hatch" d="${lines.trim()}"></path>`;
     svg += "</g>";
   });
   return `${svg}${xLabels(f, labels, null)}</svg>`;
+}
+
+// "/" lines 5px apart along the box's diagonal (3.5px between lines), each clipped to the box: the
+// line x + y = c crosses it from its lowest point on the left to its highest on the right.
+function hatch(x, y, w, h) {
+  let d = "";
+  for (let c = x + y + 2.5; c < x + w + y + h; c += 5) {
+    const from = Math.max(x, c - (y + h));
+    const to = Math.min(x + w, c - y);
+    if (to - from > 0.1) d += `M${r1(from)} ${r1(c - from)} L${r1(to)} ${r1(c - to)} `;
+  }
+  return d;
 }

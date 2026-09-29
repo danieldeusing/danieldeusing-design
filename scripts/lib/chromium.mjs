@@ -58,7 +58,8 @@ export async function serve(root, pages = {}) {
   const server = createServer((req, res) => {
     const url = new URL(req.url, "http://x");
     if (Object.hasOwn(pages, url.pathname)) {
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      // By extension, so a harness can serve its own stylesheet: under `style-src 'self'` it has no other.
+      res.writeHead(200, { "content-type": `${types[extname(url.pathname)] || "text/html"}; charset=utf-8` });
       res.end(pages[url.pathname]);
       return;
     }

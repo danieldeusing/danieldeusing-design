@@ -121,10 +121,11 @@ renderLineChart(document.getElementById("trend"), weeks, {
   markers: [{ at: 4, kind: "line", tip: "the grader model changed" }, { at: 7, kind: "tick", tip: "3 rules added" }],
 });
 renderBarChart(plot, months, {
-  label: "monthly income against expenses, in euros", x: (m) => m.month, grid: true, format: euro.format,
+  label: "monthly income, expenses and net, in euros", x: (m) => m.month, grid: true, format: euro.format,
   series: [
-    { key: "income", label: "income", value: (m) => m.income, color: "var(--cat-green)" },
-    { key: "expenses", label: "expenses", value: (m) => m.expenses, color: "var(--cat-red)" },
+    { key: "income", label: "income", value: (m) => m.income, hue: "green" },
+    { key: "expenses", label: "expenses", value: (m) => m.expenses, hue: "red" },
+    { key: "net", label: "net", value: (m) => m.income - m.expenses, hue: "blue" },
   ],
   tip: (m, s) => `${m.month} ${s.label}: ${euro.format(s.value(m))}`,
 });
@@ -142,7 +143,7 @@ renderBarChart(plot, months, {
 | `area` | ✓ | | fill under the line (12% of the series colour) |
 | `grid` | ✓ | ✓ | four to six round ticks and gridlines; without it the y labels are 0 and the maximum |
 | `format` | ✓ | ✓ | formats the y labels |
-| `series` | | ✓ | `[{ key, label, value, color }]` — several are grouped side by side, 1px apart |
+| `series` | | ✓ | `[{ key, label, value, hue }]` — several are grouped side by side, 1px apart; at most three |
 
 **Never scale a chart.** The SVG is written at the plot's measured pixels with no `viewBox`, so every
 label is `--fs-base` because it IS `--fs-base`. Cockpit's and the family page's charts drew into a
@@ -158,10 +159,24 @@ redraw it because the plot did not change size. Patch around the plot, or draw a
 
 **Colour comes from classes, never attributes.** A CSS variable in an SVG presentation attribute is
 invalid and silently paints black, which on the two dark themes is invisible. So the runtime writes
-geometry and class names only, and a theme switch recolours a chart without a redraw. A series'
-colour is `--chart-color` — on the figure for a one-series chart, per series via `color` — and it is
-always a token: `var(--cat-*)` for a categorical series (the family page's income, expenses and net
-are `--cat-green`, `--cat-red` and `--cat-blue`). Never a hex.
+geometry and class names only, and a theme switch recolours a chart without a redraw.
+
+**A hue is `data-hue`, never a style attribute.** A series' colour names one of the twelve `--cat-*`
+hues — red, orange, amber, lime, green, teal, cyan, blue, indigo, violet, purple, pink — as `hue` on
+the series (the runtime writes it as `data-hue` on the series' group), as `data-hue` on the figure
+for a one-series chart (`<figure class="chart" data-hue="blue">`), and as `data-hue` on each item of
+the key. data.css maps each to `--chart-color`. The family page's income, expenses and net are green,
+red and blue. The runtime used to write the colour into a style attribute, and a page under a
+`style-src 'self'` policy (seedr's) drops every one: both series painted `--primary` there. A colour
+outside the twelve is the page's own rule on the series' key, which the runtime writes as
+`data-series` — `.findings .chart-series[data-series="failed"] { --chart-color: var(--destructive) }`.
+Never a hex.
+
+**A series is never told apart by colour alone.** `--cat-green` and `--cat-red` are ΔE 0.006 apart
+under deuteranopia, so in every mode each series also carries a cue, by its position: the **first is
+solid, the second outlined, the third hatched** — the bars and the key's swatches alike. **Three is
+the most a chart takes**: a fourth series would repeat the first cue, so four or more are two charts,
+or a table. A line chart draws one series; its hollow dots are a state, not a series.
 
 **Marks draw at full strength.** Cockpit drew its line at .6 and its bars at .55 (2.47:1 on warm,
 under the 3:1 a graphic needs). Labels are `--muted-foreground`; the axis is `--border`.
@@ -169,21 +184,23 @@ under the 3:1 a graphic needs). Labels are `--muted-foreground`; the axis is `--
 **The y axis starts at zero** whenever the data is all positive: starting at the minimum turns every
 wobble into a cliff, which is how a chart lies without a wrong number.
 
-- On a card, set `--chart-bg: var(--card)` on the card: a hollow dot is filled with it.
+- On a card, set `--chart-bg: var(--card)` on the card, in the page's stylesheet: a hollow dot and an
+  outlined bar are filled with it.
 - The caption and anything like "peak 23" are HTML in the `figcaption`, never SVG text.
 - A lazy chart in a tab draws on the tab's `tab-activated` (below), at the size the panel has when
   it is shown.
 - **Every chart's numbers are also in a table on the page.** That is the accessibility contract: the
   plot is one image with a label saying what is plotted, and the tips are an extra for pointers.
 
-**The key** is a list whose items carry the series colour; the swatch is square, because it names
-a series and is not a status dot. List the series in the order they were passed: under forced
-colours every second series and its swatch are drawn outlined (below).
+**The key** is a list whose items carry the series' hue; the swatch is square, because it names a
+series and is not a status dot, and it draws the series' cue — solid, outlined, hatched — by its
+position. So list the series in the order they were passed.
 
 ```html
 <ul class="chart-key">
-  <li style="--chart-color: var(--cat-green)">income</li>
-  <li style="--chart-color: var(--cat-red)">expenses</li>
+  <li data-hue="green">income</li>
+  <li data-hue="red">expenses</li>
+  <li data-hue="blue">net</li>
 </ul>
 ```
 
@@ -368,11 +385,10 @@ says what was asked for, not what reached the screen:
 - A pinned row's bar is a real 3px `CanvasText` border, on the card's edge when stacked.
 - **A chart is repainted.** SVG keeps its theme colours under a forced palette, so on a dark one
   warm's chart text measured 3.52:1, its line 2.94:1 and its first series' bars 2.93:1, and the key's
-  swatches — backgrounds — vanished into Canvas. With `data.css`, text, line, axis, dots and bars are
-  `CanvasText` (21:1), the grid `GrayText`, and the two states that were colour become fill against
-  no fill: a hollow dot is Canvas inside a `CanvasText` ring, and **every second series is outlined
-  instead of filled**, its swatch in the key too — so list the key in series order. A third series
-  looks like the first; the key's words and the table beside the chart carry it, as they must anyway.
+  swatches — backgrounds — vanished into Canvas. With `data.css` every series, the key's swatches,
+  the text and the axis are `CanvasText` over `Canvas` (21:1) and the grid is `GrayText`. The rest was
+  never colour: a hollow dot is still a ring, and the three series are still solid, outlined and
+  hatched, as they are in every mode.
 - Glyphs (`.ico`, the tickstrip's dots) are the icon set's and the strip's business: a mask glyph
   paints its parent's forced text colour (`forced-color-adjust: preserve-parent-color`).
 

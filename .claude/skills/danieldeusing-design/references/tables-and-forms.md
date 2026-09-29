@@ -49,13 +49,19 @@ because only the page knows which column carries the prose — use a `<colgroup>
 wide one from eating the table:
 
 ```html
-<table>
-  <colgroup><col style="width:4rem" /><col /><col style="width:9rem" /></colgroup>
+<table class="findings">
+  <colgroup><col class="findings-sev" /><col /><col class="findings-when" /></colgroup>
 ```
 
-Give the sentence column no width and let it take the remainder. Without this a
-three-sentence cell sizes the column to its longest line and squeezes every other column
-into a vertical stack of single words.
+```css
+.findings-sev { width: 4rem; }
+.findings-when { width: 9rem; }
+```
+
+The widths go in the page's stylesheet, never in a style attribute: a page under a
+`style-src 'self'` policy (seedr's) drops every one. Give the sentence column no width and let
+it take the remainder. Without this a three-sentence cell sizes the column to its longest line
+and squeezes every other column into a vertical stack of single words.
 
 A long inline-code value or a cell holding more than one item forces the table wider than its
 column; without a scrolling wrapper the browser scrolls the whole page horizontally — the header
@@ -188,8 +194,9 @@ definitions such as contact details.
   The label never wraps, except on a phone, where a nowrap label pushes the value off the screen.
 - **The label column is `--field-label-w`**, the system's one label width, so a block of pairs lines
   up with a `.field-row` form beside it; the 140px, 220px and 9rem chosen per page go. `dl.kv` always
-  has the column; `table.kv` takes it with `.kv--labels`, widened on the table itself
-  (`style="--field-label-w: 15rem"`), the label's end padding included.
+  has the column; `table.kv` takes it with `.kv--labels`, widened on the table itself by the page's
+  stylesheet (`.settings-kv { --field-label-w: 15rem }`, never a style attribute, which a
+  `style-src 'self'` page drops), the label's end padding included.
 - Below 40rem `dl.kv` is one column. `table.kv` restates the base cell box, so it renders the same on
   a surface that loads `tokens.css` + `data.css` only. A `dt` may lead with a glyph from the icon set.
 

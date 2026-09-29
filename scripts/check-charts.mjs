@@ -18,9 +18,16 @@
  *     drawn at: the plot never resizes and the chart never redraws — it overflows its column.
  *   · COLOUR BY CLASS. `fill="var(--x)"` silently paints black; so no mark may carry a colour
  *     attribute, and a theme switch must recolour the SAME nodes with no redraw.
+ *   · NO STYLE ATTRIBUTE. Under seedr's `style-src 'self'` the browser drops every one: the series'
+ *     `style="--chart-color: …"` this used to write left both series in --primary. So a page is loaded
+ *     under that very policy — proven in force first — and each series and each swatch of the key must
+ *     paint its own hue there.
+ *   · A CUE BESIDE THE HUE. Series are solid, outlined and hatched by position, in every mode; an
+ *     outlined bar is inset by half its stroke so every bar paints the same box.
  *
  *   node scripts/check-charts.mjs
  */
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { launch, reporter, requireBrowser, serve } from "./lib/chromium.mjs";
@@ -31,9 +38,12 @@ const { check, done } = reporter("check-charts");
 
 const HARNESS = `<!doctype html><html data-theme="warm"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/data.css">
+<style id="standin-wp1" media="not all">
+  :root { --cat-l: 0.45; --cat-c: 0.075; --cat-green: oklch(var(--cat-l) var(--cat-c) 150); --cat-red: oklch(var(--cat-l) var(--cat-c) 25);
+    --cat-blue: oklch(var(--cat-l) var(--cat-c) 255); }
+</style>
 <style>
   body { margin: 0; font-family: var(--font-mono); font-size: var(--fs-base); }
-  :root { --cat-l: 0.45; --cat-c: 0.075; --cat-green: oklch(var(--cat-l) var(--cat-c) 150); --cat-red: oklch(var(--cat-l) var(--cat-c) 25); }
   .row-grid { display: grid; grid-template-columns: 1fr 1fr; width: 800px; }
   .row-flex { display: flex; width: 800px; }
   .row-flex > .chart { flex: 1; }
@@ -47,6 +57,11 @@ const HARNESS = `<!doctype html><html data-theme="warm"><head><meta charset="utf
 <div style="width: 600px"><figure class="chart"><div class="chart-plot" id="empty"></div></figure></div>
 <div class="row-grid" id="grid-row"><figure class="chart"><div class="chart-plot" id="g1"></div></figure><figure class="chart"><div class="chart-plot" id="g2"></div></figure></div>
 <div class="row-flex" id="flex-row"><figure class="chart"><div class="chart-plot" id="f1"></div></figure><figure class="chart"><div class="chart-plot" id="f2"></div></figure></div>
+<script>
+  // WP1's --cat-* hues, from tokens.css once WP1 has landed; until then the marked stand-in above.
+  window.STANDINS = getComputedStyle(document.documentElement).getPropertyValue("--cat-green").trim() ? "none" : "wp1";
+  if (window.STANDINS !== "none") document.getElementById("standin-wp1").media = "all";
+</script>
 <script type="module">
   import { renderLineChart, renderBarChart } from "/runtime/charts.js";
   window.renderLineChart = renderLineChart;
@@ -73,6 +88,11 @@ const browser = await launch("charts");
 const { evaluate, until, navigate } = browser;
 await navigate(`${server.origin}/__charts.html`);
 await until("window.ready === true");
+const standins = await evaluate("window.STANDINS");
+console.log(`stand-ins in force: ${standins}`);
+if (process.env.DD_FORBID_STANDINS === "1") {
+  await check("DD_FORBID_STANDINS=1: no stand-in is in force — the hues are tokens.css's", () => standins === "none", standins);
+}
 
 /* ── the size, and the text ───────────────────────────────────────────────────────────────────── */
 
@@ -192,22 +212,43 @@ await check("one bar per slot, the slot width less 4px, standing on the zero axi
 await check("the tallest bar is the max; a zero is a bar of no height", () => bars.rects[3].h === Math.max(...bars.rects.map((r) => r.h)) && bars.rects[2].h === 0, JSON.stringify(bars.rects));
 await check("bars are SOLID — full opacity, in --primary (cockpit's .55 measured 2.47:1)", () => bars.fill === "rgb(138, 69, 22)" && bars.opacity === "1", JSON.stringify(bars));
 
-await evaluate(`window.renderBarChart(document.getElementById("grouped"),
-  [["apr", 5200, 4100], ["may", 5200, 5600], ["jun", 6100, 4300]].map(([m, a, b]) => ({ m, a, b })),
-  { label: "flow", x: (r) => r.m, grid: true, format: (v) => "€" + v,
-    series: [{ key: "income", value: (r) => r.a, color: "var(--cat-green)" }, { key: "expenses", value: (r) => r.b, color: "var(--cat-red)" }] }); null`);
+const FLOW = `[["apr", 5200, 4100, 1100], ["may", 5200, 5600, 400], ["jun", 6100, 4300, 1800]].map(([m, a, b, c]) => ({ m, a, b, c }))`;
+const FLOW_SERIES = `[{ key: "income", value: (r) => r.a, hue: "green" }, { key: "expenses", value: (r) => r.b, hue: "red" },
+  { key: "net", value: (r) => r.c, hue: "blue" }]`;
+await evaluate(`window.renderBarChart(document.getElementById("grouped"), ${FLOW},
+  { label: "flow", x: (r) => r.m, grid: true, format: (v) => "€" + v, series: ${FLOW_SERIES} }); null`);
+// A bar's PAINTED box: an outlined or hatched bar is drawn half its 1.5px stroke inside it.
 const grouped = await evaluate(`(() => {
   const groups = q("grouped", "g.chart-series");
-  const rects = groups.map((g) => Array.from(g.querySelectorAll("rect")).map((r) => ({ x: +r.getAttribute("x"), w: +r.getAttribute("width") })));
-  return { keys: groups.map((g) => g.dataset.series), styles: groups.map((g) => g.getAttribute("style")), fills: groups.map((g) => getComputedStyle(g.querySelector("rect")).fill),
+  const rects = groups.map((g) => Array.from(g.querySelectorAll("rect")).map((r) => {
+    const inset = g.dataset.cue === "solid" ? 0 : 0.75;
+    return { x: +r.getAttribute("x") - inset, w: +r.getAttribute("width") + 2 * inset };
+  }));
+  const bar = (g) => getComputedStyle(g.querySelector("rect"));
+  const hatch = q("grouped", "g.chart-series path.chart-hatch");
+  return { keys: groups.map((g) => g.dataset.series), hues: groups.map((g) => g.dataset.hue), cues: groups.map((g) => g.dataset.cue),
+    styled: document.querySelectorAll("#grouped [style]").length,
+    paint: groups.map((g) => [bar(g).fill, bar(g).stroke, bar(g).strokeWidth]),
+    hatch: hatch.map((h) => ({ series: h.parentElement.dataset.series, stroke: getComputedStyle(h).stroke, pointer: getComputedStyle(h).pointerEvents,
+      segments: h.getAttribute("d").split("M").filter(Boolean).length })),
+    tokens: ["--cat-green", "--cat-red", "--cat-blue", "--background"].map((t) => { const p = document.createElement("i"); p.style.color = "var(" + t + ")";
+      document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; }),
     rects, grid: q("grouped", "line.chart-grid").length, ylabels: q("grouped", "text[text-anchor=end]").map((t) => t.textContent) };
 })()`);
-await check("several series are grouped side by side, 1px apart, one <g> per series",
-  () => grouped.keys.join() === "income,expenses" && grouped.rects.every((r) => r.length === 3) &&
-    grouped.rects[0].every((r, i) => Math.abs(grouped.rects[1][i].x - (r.x + r.w + 1)) <= 0.2), JSON.stringify(grouped.rects));
-await check("a series' colour is written as --chart-color on its group, and the bar paints it",
-  () => grouped.styles[0] === "--chart-color: var(--cat-green)" && grouped.fills[0] !== grouped.fills[1] && grouped.fills[0] !== "rgb(138, 69, 22)",
-  JSON.stringify(grouped));
+await check("several series are grouped side by side, 1px apart, one <g> per series — the painted boxes, outlines included",
+  () => grouped.keys.join() === "income,expenses,net" && grouped.rects.every((r) => r.length === 3) &&
+    [0, 1].every((j) => grouped.rects[j].every((r, i) => Math.abs(grouped.rects[j + 1][i].x - (r.x + r.w + 1)) <= 0.2)) &&
+    grouped.rects.every((r) => Math.abs(r[0].w - grouped.rects[0][0].w) <= 0.2), JSON.stringify(grouped.rects));
+await check("a series' hue is `data-hue` on its group, and nothing in the chart carries a style attribute",
+  () => grouped.hues.join() === "green,red,blue" && grouped.styled === 0, JSON.stringify([grouped.hues, grouped.styled]));
+await check("each series carries its cue by position — solid, outlined, hatched — in its own hue",
+  () => grouped.cues.join() === "solid,outline,hatch" &&
+    grouped.paint[0][0] === grouped.tokens[0] &&
+    grouped.paint[1][0] === grouped.tokens[3] && grouped.paint[1][1] === grouped.tokens[1] && grouped.paint[1][2] === "1.5px" &&
+    grouped.paint[2][0] === grouped.tokens[3] && grouped.paint[2][1] === grouped.tokens[2] &&
+    grouped.hatch.length === 1 && grouped.hatch[0].series === "net" && grouped.hatch[0].stroke === grouped.tokens[2] &&
+    grouped.hatch[0].pointer === "none" && grouped.hatch[0].segments >= 3 * 5,
+  JSON.stringify({ cues: grouped.cues, paint: grouped.paint, hatch: grouped.hatch, tokens: grouped.tokens }));
 await check("with `grid`, 4-6 round ticks from zero, formatted by `format`, and a gridline at each but the zero axis",
   () => grouped.ylabels.length >= 4 && grouped.ylabels.length <= 6 && grouped.ylabels[0] === "€0" && grouped.grid === grouped.ylabels.length - 1,
   JSON.stringify(grouped));
@@ -222,6 +263,61 @@ await evaluate(`window.renderLineChart(document.getElementById("empty"), [], { l
 await check("no data draws an empty frame (the axis), not an error", () => evaluate(`q("empty", "line.chart-axis").length === 1`));
 await evaluate(`window.renderLineChart(document.getElementById("empty"), [{ x: "a", value: 2 }, { x: "b", value: 5 }, { x: "c", value: 3 }], { label: "area", area: true }); null`);
 await check("`area` fills under each run of the line", () => evaluate(`q("empty", "path.chart-area").length === 1 && q("empty", "path.chart-area")[0].getAttribute("d").endsWith("Z")`));
+
+/* ── under seedr's policy: style-src 'self' ───────────────────────────────────────────────────────
+   The page carries no inline <style> (the policy would drop it too): the stand-in hues come from a
+   served stylesheet. A style attribute on #csp-probe proves the policy is in force — without that,
+   the colours below would pass whether or not a style attribute carried them. */
+const CSP_STANDIN = `:root { --cat-l: 0.45; --cat-c: 0.075; --cat-green: oklch(var(--cat-l) var(--cat-c) 150);
+  --cat-red: oklch(var(--cat-l) var(--cat-c) 25); --cat-blue: oklch(var(--cat-l) var(--cat-c) 255); }`;
+const CSP_CSS = `body { margin: 0; font-family: var(--font-mono); font-size: var(--fs-base); }
+#csp-flow { width: 600px; }`;
+const CSP_PAGE = `<!doctype html><html data-theme="warm"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="style-src 'self'">
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/data.css"><link rel="stylesheet" href="/__csp.css">
+<link rel="stylesheet" href="/__csp-standin.css" id="standin-wp1" media="not all">
+</head><body>
+<script>
+  if (!getComputedStyle(document.documentElement).getPropertyValue("--cat-green").trim()) document.getElementById("standin-wp1").media = "all";
+</script>
+<p id="csp-probe" style="color: rgb(1, 2, 3)">a style attribute the policy must drop</p>
+<figure class="chart"><div class="chart-plot" id="csp-flow"></div>
+  <ul class="chart-key"><li data-hue="green">income</li><li data-hue="red">expenses</li><li data-hue="blue">net</li></ul>
+</figure>
+<script type="module">
+  import { renderBarChart } from "/runtime/charts.js";
+  renderBarChart(document.getElementById("csp-flow"), ${FLOW}, { label: "flow", x: (r) => r.m, series: ${FLOW_SERIES} });
+  window.ready = true;
+</script></body></html>`;
+const cspServer = await serve(root, { "/__csp.html": CSP_PAGE, "/__csp.css": CSP_CSS, "/__csp-standin.css": CSP_STANDIN });
+await navigate(`${cspServer.origin}/__csp.html`);
+await until("window.ready === true");
+const csp = await evaluate(`(() => {
+  const colour = (expr) => { const p = document.createElement("i"); p.style.color = expr; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; };
+  const bar = (key) => getComputedStyle(document.querySelector('#csp-flow g[data-series="' + key + '"] rect'));
+  return {
+    probe: getComputedStyle(document.getElementById("csp-probe")).color,
+    series: [bar("income").fill, bar("expenses").stroke, bar("net").stroke],
+    key: Array.from(document.querySelectorAll(".chart-key li")).map((li) => getComputedStyle(li, "::before").borderTopColor),
+    hues: ["green", "red", "blue"].map((h) => colour("var(--cat-" + h + ")")),
+    primary: colour("var(--primary)"),
+  };
+})()`);
+await check("under `style-src 'self'` the policy is really in force: a style attribute in the page is dropped",
+  () => csp.probe !== "rgb(1, 2, 3)", csp.probe);
+await check("...and each series still paints its own hue — green, red, blue — none of them --primary",
+  () => csp.series.join() === csp.hues.join() && !csp.series.includes(csp.primary), JSON.stringify(csp));
+await check("...and so does each swatch of the documented key markup (`<li data-hue>`)",
+  () => csp.key.join() === csp.hues.join(), JSON.stringify(csp));
+cspServer.close();
+
+/* ── the documented markup carries no style attribute ─────────────────────────────────────────────
+   Read from the files a page author copies: the chart reference and the demo page. */
+const STYLED = [".claude/skills/danieldeusing-design/references/data.md", ".claude/skills/danieldeusing-design/references/tables-and-forms.md",
+  "examples/data.html"].flatMap((file) => readFileSync(join(root, file), "utf8").split("\n")
+  .map((line, i) => (/(^|[^\w-])style=["']/.test(line) ? `${file}:${i + 1}` : null)).filter(Boolean));
+await check("no style attribute in the data references or the demo page — a `style-src 'self'` page drops every one",
+  () => STYLED.length === 0, STYLED.join(" "));
 
 browser.close();
 server.close();

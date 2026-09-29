@@ -268,8 +268,10 @@ await check("a hollow dot is filled with --chart-bg: the page, or the card it si
 await check("markers: dashed 4 3 and a 3px floor tick, in --muted-foreground",
   async () => (await css("#trend .chart-marker", "strokeDasharray")) === "4px, 3px" && (await css("#trend .chart-tick", "strokeWidth")) === "3px" &&
     (await css("#trend .chart-marker", "stroke")) === (await tok("var(--muted-foreground)")));
-await check("the key: a --dot-size SQUARE swatch in the series colour; the caption muted",
-  async () => (await css(".chart-key li", "width", "::before")) === "8px" && (await css(".chart-key li", "backgroundColor", "::before")) === (await tok("var(--cat-green)")) &&
+await check("the key: an --icon-sm SQUARE swatch in its series' hue, set by `data-hue` (edge and fill); the caption muted",
+  async () => (await css(".chart-key li", "width", "::before")) === "12px" && (await css(".chart-key li", "height", "::before")) === "12px" &&
+    (await css(".chart-key li", "backgroundColor", "::before")) === (await tok("var(--cat-green)")) &&
+    (await css(".chart-key li", "borderTopColor", "::before")) === (await tok("var(--cat-green)")) &&
     (await css("#charts figure .chart-plot + figcaption", "color")) === (await tok("var(--muted-foreground)")));
 
 /* ── D8 · tabs ────────────────────────────────────────────────────────────────────────────────── */
@@ -413,7 +415,68 @@ const measure = (body) => evaluate(`(() => { ${PIXELS} return JSON.stringify((()
 const r2 = (n) => (typeof n === "number" ? Math.round(n * 100) / 100 : n);
 const shown = (v) => () => JSON.stringify(v, (k, n) => r2(n));
 
+/* ── Q6 · a series is never told apart by colour alone ──────────────────────────────────────────
+   The flow chart's three series, and their swatches in the key, are CLASSED from painted pixels and
+   blind to hue: the share of ink (2:1 or more off the chart's canvas) inside the mark, and on its edge.
+   Solid is ink throughout; outlined, an inked edge round a clear inside; hatched, an inked edge round
+   a partly inked inside. The three must come out solid / outlined / hatched in every mode: normal
+   rendering on a light theme and a dark one, and both forced palettes. A swatch is FOUND by its ink,
+   not placed by arithmetic, and must be the 12px square it claims to be; then the figure is taken away
+   and every place measured must hold no ink — so the classes are read off the chart, not a neighbour. */
+const cues = async (mode) => {
+  const read = (rects) => measure(`
+    const canvas = common(box("#flow"));
+    const isInk = (p) => M.ratio(p, canvas) >= 2;
+    const share = (r) => { const all = pixels(r); return all.length ? all.filter(isInk).length / all.length : 0; };
+    const shrink = (r, n) => ({ left: r.left + n, right: r.right - n, top: r.top + n, bottom: r.bottom - n });
+    const kindOf = (r, n) => {
+      const inside = share(shrink(r, n));
+      const rim = share({ left: r.left + 0.25, right: r.left + 0.75, top: r.top + (r.bottom - r.top) / 4, bottom: r.bottom - (r.bottom - r.top) / 4 });
+      const kind = rim < 0.9 ? "none" : inside > 0.9 ? "solid" : inside < 0.05 ? "outline" : inside >= 0.12 && inside <= 0.75 ? "hatch" : "unclear";
+      return { kind, inside, rim };
+    };
+    const inkBox = (r) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let row = Math.round((r.top + scrollY - S.y0) * S.k); row < Math.round((r.bottom + scrollY - S.y0) * S.k); row += 1)
+        for (let col = Math.round((r.left + scrollX - S.x0) * S.k); col < Math.round((r.right + scrollX - S.x0) * S.k); col += 1)
+          if (isInk(at(col, row))) { x0 = Math.min(x0, col); x1 = Math.max(x1, col + 1); y0 = Math.min(y0, row); y1 = Math.max(y1, row + 1); }
+      return x0 === Infinity ? null : { left: x0 / S.k + S.x0 - scrollX, right: x1 / S.k + S.x0 - scrollX, top: y0 / S.k + S.y0 - scrollY, bottom: y1 / S.k + S.y0 - scrollY };
+    };
+    const given = ${JSON.stringify(rects || null)};
+    const bars = given ? given.bars : [...document.querySelectorAll("#flow g.chart-series")].map((g) =>
+      [...g.querySelectorAll("rect")].map((el) => { const b = box(el); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom }; })
+        .sort((a, b) => (b.bottom - b.top) - (a.bottom - a.top))[0]);
+    const swatches = given ? given.swatches : [...document.querySelectorAll("#flow-fig .chart-key li")].map((li) => {
+      const r = box(li); return inkBox({ left: r.left - 1, right: r.left + 14, top: r.top - 2, bottom: r.bottom + 2 }); });
+    const near = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i]))) <= 12;
+    const hues = ["green", "red", "blue"].map((h) => M.rgba("var(--cat-" + h + ")"));
+    const painted = [centre(bars[0]), ...bars.slice(1).map((r) => px(r.left + 0.5, (r.top + r.bottom) / 2))];
+    return { rects: { bars, swatches }, bars: bars.map((r) => kindOf(r, 2.5)),
+      swatches: swatches.map((r) => (r ? { ...kindOf(r, 3), w: r.right - r.left, h: r.bottom - r.top } : { kind: "missing" })),
+      hue: painted.map((p, i) => near(p, hues[i])) };`);
+  await shoot("#flow-fig");
+  const on = await read();
+  await evaluate(`document.getElementById("flow-fig").style.visibility = "hidden"; null`);
+  await shoot("#flow-fig");
+  const off = await read(on.rects);
+  await evaluate(`document.getElementById("flow-fig").style.visibility = ""; null`);
+  const kinds = (list) => list.map((c) => c.kind).join();
+  await check(`Q6 ${mode} — the three series are told apart without their hue: the bars are ${kinds(on.bars)}`,
+    () => kinds(on.bars) === "solid,outline,hatch", shown(on.bars));
+  await check(`Q6 ${mode} — ...and the key's swatches draw the same cues, each a 12px square found by its ink: ${kinds(on.swatches)}`,
+    () => kinds(on.swatches) === "solid,outline,hatch" && on.swatches.every((c) => Math.abs(c.w - 12) <= 1 && Math.abs(c.h - 12) <= 1), shown(on.swatches));
+  await check(`Q6 ${mode} — ...read off the chart itself: with the figure taken away, no ink is left where they were`,
+    () => [...off.bars, ...off.swatches].every((c) => c.inside < 0.05 && c.rim < 0.05), shown(off));
+  return on;
+};
+
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
+for (const t of ["warm", "green"]) {
+  await theme(t);
+  await settle();
+  const on = await cues(`normal ${t}`);
+  await check(`Q6 normal ${t} — ...and each series paints its own hue: green, red, blue`, () => on.hue.every(Boolean), shown(on.hue));
+}
+await theme("warm");
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   await until("matchMedia('(forced-colors: active)').matches", "forced colours");
@@ -462,23 +525,8 @@ for (const scheme of ["light", "dark"]) {
   await check(`X1 ${scheme} — a solid dot (${r2(trend.solid)}:1) and a hollow one (its ring ${r2(trend.ring)}:1) differ by ${r2(trend.fills)}:1 of paint`,
     () => trend.solid >= 3 && trend.ring >= 3 && trend.fills >= 3, shown(trend));
 
-  await shoot("#flow");
-  const bars = await measure(`
-    const canvas = common(box("#flow"));
-    const one = box('#flow g[data-series="income"] rect'), two = box('#flow g[data-series="expenses"] rect');
-    return { filled: M.ratio(centre(one), canvas), outline: ink(grow(two, 1)).ratio, fills: M.ratio(centre(one), centre(two)) };`);
-  await check(`X1 ${scheme} — two series differ: the first filled (${r2(bars.filled)}:1), the second outlined (${r2(bars.outline)}:1), ${r2(bars.fills)}:1 apart`,
-    () => bars.filled >= 3 && bars.outline >= 3 && bars.fills >= 3, shown(bars));
+  await cues(`X1 ${scheme}`);
 
-  await shoot(".chart-key");
-  const key = await measure(`
-    const canvas = common(box(".chart-key"));
-    const size = parseFloat(getComputedStyle(document.querySelector(".chart-key li"), "::before").width);
-    const swatch = (li) => { const r = box(li), m = r.top + r.height / 2; return { left: r.left, right: r.left + size, top: m - size / 2, bottom: m + size / 2 }; };
-    const [a, b] = [...document.querySelectorAll(".chart-key li")].map(swatch);
-    return { filled: M.ratio(centre(a), canvas), outline: ink(grow(b, 1)).ratio, fills: M.ratio(centre(a), centre(b)) };`);
-  await check(`X1 ${scheme} — the key's swatches are painted like their series: filled ${r2(key.filled)}:1, outlined ${r2(key.outline)}:1`,
-    () => key.filled >= 3 && key.outline >= 3 && key.fills >= 3, shown(key));
 }
 await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 900, deviceScaleFactor: 1, mobile: false });
 await sleep(100);

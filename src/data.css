@@ -334,10 +334,13 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
    at .55 (2.47:1 on warm, under the 3:1 a graphic needs) and its labels at .5-.7 (a label at .5
    measures 2.67-3.91:1). Labels are --muted-foreground, which holds AA.
 
-   A series is `--chart-color`, set on the figure for a one-series chart or by the runtime on each
-   series' group, and always a token — `var(--cat-*)` for a categorical series (the family page's
-   income, expenses and net become --cat-green, --cat-red and --cat-blue). `--chart-bg` is what a
-   hollow dot is filled with: set it to --card when the chart sits on a card. */
+   A series is `--chart-color`, and it is set by an ATTRIBUTE, never a style: `data-hue` names one of
+   the twelve --cat-* hues — on the figure for a one-series chart, on each series' group (the runtime
+   writes it from `hue`), on each item of the key. The family page's income, expenses and net are
+   green, red and blue. A `style="--chart-color: …"` is what the runtime and the documented key used
+   to write, and a `style-src 'self'` policy (seedr's) drops every one: both series painted --primary.
+   `--chart-bg` is what a hollow dot and an outlined bar are filled with: set it to --card when the
+   chart sits on a card. */
 /* `min-inline-size: 0`: the drawn SVG is the figure's min-content, so as a `1fr` grid item or a
    `flex: 1` item the figure would hold its column at the width it was drawn at, and the plot would
    never resize to redraw — measured: two charts in a row cut from 800px to 400px stayed at 400 each. */
@@ -383,8 +386,36 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
   stroke: var(--muted-foreground);
   stroke-width: 3;
 }
-/* Bars are SOLID. */
+:where(.chart, .chart-series, .chart-key > li)[data-hue="red"] { --chart-color: var(--cat-red); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="orange"] { --chart-color: var(--cat-orange); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="amber"] { --chart-color: var(--cat-amber); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="lime"] { --chart-color: var(--cat-lime); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="green"] { --chart-color: var(--cat-green); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="teal"] { --chart-color: var(--cat-teal); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="cyan"] { --chart-color: var(--cat-cyan); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="blue"] { --chart-color: var(--cat-blue); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="indigo"] { --chart-color: var(--cat-indigo); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="violet"] { --chart-color: var(--cat-violet); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="purple"] { --chart-color: var(--cat-purple); }
+:where(.chart, .chart-series, .chart-key > li)[data-hue="pink"] { --chart-color: var(--cat-pink); }
+/* Bars are SOLID — the first series'. A SERIES IS NEVER TOLD APART BY COLOUR ALONE (--cat-green and
+   --cat-red are ΔE 0.006 apart under deuteranopia), so in every mode each one carries a cue by its
+   position: the first solid, the second outlined, the third hatched. The runtime writes it as
+   `data-cue` and insets an outlined bar by half its stroke, so every bar paints the same box. The
+   hatch is a path over the bars and takes no pointer, so a bar's tip still answers under it. Three
+   cues is the most: a fourth series would repeat the first. */
 .chart-bar { fill: var(--chart-color, var(--primary)); }
+.chart-series:is([data-cue="outline"], [data-cue="hatch"]) .chart-bar {
+  fill: var(--chart-bg, var(--background));
+  stroke: var(--chart-color, var(--primary));
+  stroke-width: 1.5;
+}
+.chart-hatch {
+  fill: none;
+  stroke: var(--chart-color, var(--primary));
+  stroke-width: 1;
+  pointer-events: none;
+}
 /* The caption — what is plotted, and "peak n" — is HTML, not SVG text, so it wraps and reads like the
    page. Restated from base.css's figcaption so a tokens-only surface draws it the same. */
 .chart > figcaption {
@@ -393,7 +424,9 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
   font-style: italic;
 }
 /* THE KEY — one item per series, a square swatch in the series colour. Square because it is a
-   swatch naming a series, not a status dot (the family page used `.dd-dot`, the theme indicator). */
+   swatch naming a series, not a status dot (the family page used `.dd-dot`, the theme indicator). It
+   draws its series' cue, by the same position, so the key lists the series in the order they were
+   passed. The swatch is --icon-sm: at --dot-size (8px) a hatch is two lines. */
 .chart-key {
   display: flex;
   flex-wrap: wrap;
@@ -406,11 +439,17 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
 .chart-key li::before {
   content: "";
   display: inline-block;
-  inline-size: var(--dot-size);
-  block-size: var(--dot-size);
+  box-sizing: border-box;
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
   margin-inline-end: 0.4rem;
   vertical-align: middle;
   background: var(--chart-color, var(--primary));
+  border: 1.5px solid var(--chart-color, var(--primary));
+}
+.chart-key li:nth-child(3n + 2)::before { background: transparent; }
+.chart-key li:nth-child(3n)::before {
+  background: repeating-linear-gradient(135deg, var(--chart-color, var(--primary)) 0 1px, transparent 1px 3.5px);
 }
 
 /* ── TABS ─────────────────────────────────────────────────────────────────────────────────── (D8)
@@ -558,12 +597,11 @@ section.doc.tab-panel { margin-top: 1.35rem; }
 
    CHARTS ARE THE OTHER WAY ROUND. SVG is `preserve-parent-color` by default, so nothing is forced: a
    chart keeps its THEME colours over whatever Canvas the reader's palette has, and warm's --primary on
-   a black Canvas is under 3:1. So every mark is repainted in CanvasText, the grid in GrayText, and the
-   two states that were colour — a solid dot against a hollow one, one series against the next — become
-   fill against no fill: a hollow dot is Canvas inside a CanvasText ring, and every second series (and
-   its swatch in the key) is outlined instead of filled. The key's words and the table beside the chart
-   carry the rest, as they already must. The swatch is `none` with its system colours DECLARED, so there
-   is no author colour left for `none` to keep. */
+   a black Canvas is under 3:1. So the chart's two colours become the palette's: every series and the
+   key's swatches are CanvasText over Canvas, the text and the axis CanvasText, the grid GrayText. What
+   told a solid dot from a hollow one, and one series from the next, was never the colour: the hollow
+   ring and the solid / outlined / hatched cues are drawn in every mode, so they carry over as they
+   are. The swatch is `none`, so its gradient survives, and its colours are the system ones set here. */
 @media (forced-colors: active) {
   .tab[aria-selected="true"] {
     forced-color-adjust: none;
@@ -581,21 +619,14 @@ section.doc.tab-panel { margin-top: 1.35rem; }
   .chart text { fill: CanvasText; }
   .chart-axis,
   .chart-marker,
-  .chart-tick,
-  .chart-line { stroke: CanvasText; }
+  .chart-tick { stroke: CanvasText; }
   .chart-grid { stroke: GrayText; }
   .chart-area { fill: none; }
-  .chart-dot,
-  .chart-bar { fill: CanvasText; stroke: CanvasText; }
-  .chart-dot--hollow,
-  .chart-series:nth-of-type(2n) .chart-bar { fill: Canvas; }
-  .chart-key li::before {
-    forced-color-adjust: none;
-    box-sizing: border-box;
-    background: CanvasText;
-    border: 1px solid CanvasText;
+  :is(.chart, .chart-series, .chart-key li) {
+    --chart-color: CanvasText;
+    --chart-bg: Canvas;
   }
-  .chart-key li:nth-child(2n)::before { background: Canvas; }
+  .chart-key li::before { forced-color-adjust: none; }
 }
 /* Stacked, the pinned row is one card, so its bar is the card's edge rather than its first line's. */
 @media (forced-colors: active) and (max-width: 40rem) {

@@ -24,7 +24,8 @@
  *   5. Do the states survive forced colours (X1)? Read from PIXELS, on four themes × both palettes and
  *      again as an engine without preserve-parent-color sees the file: every glyph and line this file
  *      draws reaches 3:1 on what it sits on, a chosen row sits on Highlight where its neighbour does
- *      not, and the words on both reach 4.5:1.
+ *      not, the words on both reach 4.5:1, and a focused row's ring 3:1 on its own fill. Every clip
+ *      is proved to hold its element's ink: hidden, the mark takes its ink with it.
  *
  * WHAT IT READS. examples/cards.html is the environment: its stylesheets, and stand-ins for the
  * tokens and classes other packages of 0.60.0 own. Those switch themselves off once the real ones
@@ -269,6 +270,14 @@ window.__wp8 = (() => {
         if (v >= 3) n += m;
       }
       return { bg: "rgb(" + bg + ")", mark: "rgb(" + mark + ")", strongest, n };
+    },
+    // A strip along an element's start edge, just inside it: where its inset focus ring is drawn.
+    // Half a pixel in, so a clip that begins between device pixels takes nothing from outside.
+    edge(sel) {
+      const el = q(sel);
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+      const r = el.getBoundingClientRect();
+      return { x: r.x + scrollX + 0.5, y: r.y + scrollY + 4, w: 5.5, h: r.height - 8 };
     },
     near: (a, b, label, tol = 0.6) => (Math.abs(a - b) <= tol ? null : label + ": " + a.toFixed(2) + " vs " + b.toFixed(2)),
     // Every listed computed property of every fixture this file styles, for the full-vs-bare
@@ -878,14 +887,14 @@ await noRadius();
 // geometry checks above ask the hit-test instead.
 // ONE DOM.getDocument per batch: each call re-numbers the tree, so a node id taken before a second
 // call points at nothing ("Could not find node with given id").
-const hovering = async (sels, fn) => {
+const forcing = async (pseudo, sels, fn) => {
   const ids = [];
   const { root: doc } = await send("DOM.getDocument", { depth: 0 });
   for (const sel of sels) {
     const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector: sel });
     if (!nodeId) throw new Error(`no node for ${sel}`);
     ids.push(nodeId);
-    await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: ["hover"] });
+    await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: [pseudo] });
   }
   await evaluate(`document.documentElement.classList.add("anim-off"); null`); // no transition mid-read
   try { return await fn(); } finally {
@@ -893,6 +902,7 @@ const hovering = async (sels, fn) => {
     await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
   }
 };
+const hovering = (sels, fn) => forcing("hover", sels, fn);
 const expectRows = (rows) => evaluate(`(${JSON.stringify(rows)}).map((r) => window.__wp8.expect(...r)).filter(Boolean)`);
 
 await check("hover on a --link card is K1's, and the type rule keeps its colour through it", () => hovering(["#fx-card-rule"], () => expectRows([
@@ -1074,18 +1084,41 @@ await check(`\`hidden\` hides every element this file styles, whatever display i
 // the author's: both are "not Canvas", and the second measures 1.1–1.8:1 on the palette its theme was
 // not written for. Emulated: forced-colors active, with prefers-color-scheme light and then dark —
 // Chromium picks its light or dark high-contrast palette from it.
-const inkOf = async (sel, lead = false, inset = 0) => {
-  const b = await W(`W.shot(${JSON.stringify(sel)}, ${lead}, ${inset})`);
+// Captured in the viewport (the element scrolled into view first), never with
+// captureBeyondViewport: that re-lays the page without its scrollbar and a clip measured before it
+// lands up to ~7.5px off.
+const clipInk = async (b) => {
   const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: b.x, y: b.y, width: b.w, height: b.h, scale: 3 } });
   return W(`W.ink(${JSON.stringify(data)})`);
 };
-// [what, selector, lead: the row's ::before alone, inset]
+const setHide = (css) => evaluate(`(() => { let s = document.getElementById("wp8-hide");
+  if (!s) { s = document.createElement("style"); s.id = "wp8-hide"; document.head.append(s); }
+  s.textContent = ${JSON.stringify(css)}; return null; })()`);
+// The ink in the clip, and the ink left in the SAME clip with the element's mark hidden. A clip that
+// still finds ink with the mark gone is reading something else, and its ratio proves nothing.
+const inkOf = async (sel, { lead = false, inset = 0, hide = "" } = {}) => {
+  const b = await W(`W.shot(${JSON.stringify(sel)}, ${lead}, ${inset})`);
+  const ink = await clipInk(b);
+  await setHide(`${sel}${hide} { visibility: hidden !important; }`);
+  const blank = await clipInk(b);
+  await setHide("");
+  return { ...ink, blank: blank.n };
+};
+const owns = (ink) => ink.blank <= Math.max(2, ink.n * 0.05);
+// [what, selector, how to clip it and what to hide to take its mark away]
+const CHEVRON = { lead: true, hide: "::before" }, LINE = { inset: 2, hide: "::before" };
 const FORCED_GLYPHS = [
-  ["an open branch's chevron", "#fx-tree-branch-row", true], ["a closed branch's chevron", "#fx-tree-closed-row", true],
-  ["a navigation branch's chevron (a link row)", "#fx-navtree-parent", true], ["a selected branch's chevron", "#fx-tree-selbranch-row", true],
-  ["a branch's folder glyph (a .ico this file colours)", "#fx-tree-branch-ico"], ["a leaf's file glyph (a .ico this file colours)", "#fx-tree-leaf-ico"],
-  ["a selected leaf's glyph", "#fx-tree-selected-ico"], ["a panel head's glyph (a .ico this file colours)", "#fx-panel-ico"],
-  ["the vertical splitter's line", "#fx-vsplit", false, 2], ["the grip", "#fx-hsplit", false, 2],
+  ["an open branch's chevron", "#fx-tree-branch-row", CHEVRON], ["a closed branch's chevron", "#fx-tree-closed-row", CHEVRON],
+  ["a navigation branch's chevron (a link row)", "#fx-navtree-parent", CHEVRON], ["a selected branch's chevron", "#fx-tree-selbranch-row", CHEVRON],
+  ["a branch's folder glyph (a .ico this file colours)", "#fx-tree-branch-ico", {}], ["a leaf's file glyph (a .ico this file colours)", "#fx-tree-leaf-ico", {}],
+  ["a selected leaf's glyph", "#fx-tree-selected-ico", {}], ["a panel head's glyph (a .ico this file colours)", "#fx-panel-ico", {}],
+  ["the vertical splitter's line", "#fx-vsplit", LINE], ["the grip", "#fx-hsplit", LINE],
+];
+// [what, the focusable element, the element that draws its inset ring]
+const FORCED_RINGS = [
+  ["a current row", "#fx-sel-current", "#fx-sel-current"], ["an aria-selected row", "#fx-sel-selected", "#fx-sel-selected"],
+  ["a selected tree row", "#fx-tree-selected", "#fx-tree-selected-row"], ["a current tree link", "#fx-navtree-current", "#fx-navtree-current"],
+  ["a row at rest", "#fx-sel", "#fx-sel"],
 ];
 // [what, the chosen row's words, the resting neighbour's words]
 const FORCED_STATES = [
@@ -1104,25 +1137,43 @@ const forcedCell = async (label, theme, palette) => {
   const onHighlight = (rgb) => rgb.slice(4, -1).split(", ").map(Number).every((v, i) => Math.abs(v - env.highlight[i]) <= 2);
   await check(`${where}: precondition — the emulation took`, () =>
     [env.forced ? null : "(forced-colors: active) does not match", env.dark === (palette === "dark") ? null : "prefers-color-scheme is not " + palette].filter(Boolean));
-  const faint = [];
-  for (const [what, sel, lead, inset] of FORCED_GLYPHS) {
-    const ink = await inkOf(sel, lead, inset);
+  const faint = [], foreign = [];
+  const own = (what, ink) => { if (!owns(ink)) foreign.push(`${what}: ${ink.blank} of its ${ink.n} px of ink stay with its mark hidden`); };
+  for (const [what, sel, how] of FORCED_GLYPHS) {
+    const ink = await inkOf(sel, how);
+    own(what, ink);
     if (!(ink.n >= 30 && ink.strongest >= 3)) faint.push(`${what}: ${ink.strongest.toFixed(2)}:1 at best (${ink.mark} on ${ink.bg}), ${ink.n} px reach 3:1`);
   }
   await check(`${where}: every glyph and line reaches 3:1 on what it sits on (${FORCED_GLYPHS.length}, from pixels)`, () => faint);
   const wrong = [];
   for (const [what, chosen, rest] of FORCED_STATES) {
-    const c = await inkOf(chosen, false, 1), r = await inkOf(rest, false, 1);
+    const c = await inkOf(chosen, { inset: 1 }), r = await inkOf(rest, { inset: 1 });
+    own(what, c);
+    own(what + ", the row at rest", r);
     if (!onHighlight(c.bg)) wrong.push(`${what}: its words sit on ${c.bg}, not Highlight (rgb(${env.highlight.join(", ")}) over Canvas)`);
     if (c.bg === r.bg) wrong.push(`${what}: chosen and at rest on the same ${c.bg}`);
     if (c.strongest < 4.5) wrong.push(`${what}: its words reach ${c.strongest.toFixed(2)}:1 (${c.mark} on ${c.bg})`);
     if (r.strongest < 4.5) wrong.push(`${what}, the row at rest: its words reach ${r.strongest.toFixed(2)}:1`);
   }
   await check(`${where}: a chosen row sits on Highlight, its neighbour does not, and both rows' words reach 4.5:1 (${FORCED_STATES.length}, from pixels)`, () => wrong);
-  const rest = await inkOf("#fx-hsplit", false, 2);
-  const lit = await hovering(["#fx-hsplit"], () => inkOf("#fx-hsplit", false, 2));
+  const rest = await inkOf("#fx-hsplit", LINE);
+  const lit = await hovering(["#fx-hsplit"], () => inkOf("#fx-hsplit", LINE));
+  own("the grip under the pointer", lit);
   await check(`${where}: the grip under the pointer is another colour than at rest, and reaches 3:1`, () =>
     [lit.mark === rest.mark ? `rest and hover are both ${rest.mark}` : null, lit.strongest >= 3 ? null : `hover reaches ${lit.strongest.toFixed(2)}:1`].filter(Boolean));
+  // An element under forced-color-adjust: none keeps its author outline-color too. Each focused row's
+  // inset ring is read from a strip along its start edge, focused and not: the unfocused strip must
+  // be blank, or the ring measured is something else's ink.
+  const rings = [];
+  for (const [what, focusable, drawer] of FORCED_RINGS) {
+    const b = await W(`W.edge(${JSON.stringify(drawer)})`);
+    const off = await clipInk(b);
+    const on = await forcing("focus-visible", [focusable], () => clipInk(b));
+    if (!(on.n >= 30 && on.strongest >= 3)) rings.push(`${what}: its ring reaches ${on.strongest.toFixed(2)}:1 (${on.mark} on ${on.bg}), ${on.n} px`);
+    if (off.n > Math.max(2, on.n * 0.05)) rings.push(`${what}: ${off.n} px of ink in the strip unfocused — it reads something else`);
+  }
+  await check(`${where}: a focused row draws its ring at 3:1 on its own fill, chosen rows included (${FORCED_RINGS.length}, from pixels)`, () => rings);
+  await check(`${where}: every clip holds its element's ink — hidden, the mark takes its ink with it (${FORCED_GLYPHS.length + 2 * FORCED_STATES.length + 1} clips)`, () => foreign);
 };
 for (const palette of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: palette }] });

@@ -1357,6 +1357,15 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
     box-shadow: none;
     text-shadow: none;
   }
+  /* Leaving the mode also stops the forcing of outline-color, so a focused chosen row would keep the
+     author's --ring. Its ring is inset, on the Highlight fill, where CanvasText and Highlight both
+     fail (CanvasText measured 1.86:1 there on the light palette and 2.41:1 on the dark one), so it
+     takes the colour of the row's words. */
+  .list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]):focus-visible,
+  .tree [aria-selected="true"]:focus-visible > .tree-row,
+  .tree .tree-row[aria-current="page"]:focus-visible {
+    outline-color: HighlightText;
+  }
   :is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"], .console-line--current) * {
     color: HighlightText !important;
     border-color: HighlightText !important;

@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>cards and lists</title>
+
+    <!-- Theme pre-paint: ?theme= wins (screenshots, checks), then the stored choice. -->
+    <script>
+      (() => {
+        const themes = ["warm", "green", "mono", "paper"];
+        let theme = new URLSearchParams(location.search).get("theme");
+        if (!themes.includes(theme)) {
+          try { theme = localStorage.getItem("theme"); } catch {}
+        }
+        document.documentElement.dataset.theme = themes.includes(theme) ? theme : "warm";
+      })();
+    </script>
+
+    <!-- tokens + the one file this package ships. `data-full` links are what a page usually has
+         beside them; `?bare` drops them, which is the tokens-only surface (netmon's case) that
+         cards.css must render identically on. components.css is here for `.card-terminal` (K1),
+         the box K2 decorates; chrome.css for `.doc-link` in the surrounding markup. -->
+    <link rel="stylesheet" href="../src/reset.css" data-full />
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" data-full />
+    <link rel="stylesheet" href="../src/components.css" data-full />
+    <link rel="stylesheet" href="../src/chrome.css" data-full />
+
+    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
+         STAND-INS — NOT PART OF THIS PACKAGE, AND NOT IN src/.
+         Other work packages of 0.60.0 own these and land in parallel. The token block is wrapped in
+         :where(), so the real tokens outrank it the day they exist. Every CLASS block is DISABLED
+         (media="not all") and the script at the top of <body> switches it on only when the real
+         class is missing, so once WP1 / WP2 / I1 / WP5 / WP6 / WP7 / WP12 are integrated this page
+         renders and measures the real thing, not these copies. The header says which are in force.
+         They sit BEFORE cards.css, where components.css will be once integrated, so a tie between
+         K1 and K2 resolves here the way it will in the bundle.
+         ══════════════════════════════════════════════════════════════════════════════════════════ -->
+    <style id="standin-tokens" media="not all">
+      /* WP1 · F1 control, size and layout tokens (values from SPEC.md F1) */
+      :where(:root) {
+        --control-h: 1.75rem;
+        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
+        --card-pad: 0.75rem;
+        --icon-sm: 0.75rem; --icon-size: 0.875rem; --icon-lg: 1rem; --icon-xl: 1.5rem;
+        --dot-size: 0.5rem;
+        --cat-l: 0.45; --cat-c: 0.075;
+        --cat-teal: oklch(var(--cat-l) var(--cat-c) 185);
+        --cat-violet: oklch(var(--cat-l) var(--cat-c) 295);
+        --cat-amber: oklch(var(--cat-l) var(--cat-c) 80);
+      }
+      :where(html[data-theme="green"], html[data-theme="mono"]) { --cat-l: 0.74; --cat-c: 0.12; }
+      /* WP1 · F7 tone mapping */
+      :where([data-tone="primary"]) { --tone: var(--primary); }
+      :where([data-tone="success"]) { --tone: var(--success); }
+      :where([data-tone="warning"]) { --tone: var(--warning); }
+      :where([data-tone="destructive"]) { --tone: var(--destructive); }
+      :where([data-tone="info"]) { --tone: var(--info); }
+      :where([data-tone="pending"]) { --tone: var(--pending); }
+      :where([data-tone="muted"]) { --tone: var(--muted-foreground); }
+      /* WP1 · F6 motion */
+      @keyframes dd-pulse { 50% { opacity: 0.25; } }
+      html.anim-off *, html.anim-off *::before, html.anim-off *::after {
+        animation: none !important; transition: none !important;
+      }
+    </style>
+    <!-- WP1 · X3: `hidden` hides every element, whatever display its class sets — answered once, in
+         tokens.css. Until this branch carries it, this is the only [hidden] rule on the page. -->
+    <style id="standin-hidden" media="not all">
+      [hidden]:not([hidden="until-found"]) { display: none !important; }
+    </style>
+    <!-- I1 · glyphs: the --ico-<word> masks, the [data-icon] → --ico mapping, .ico / .ico--xl.
+         Filled in piece by piece by the script, only for what is missing. -->
+    <style id="standin-i1" media="not all"></style>
+    <!-- WP2 · K1 .card-terminal as SPEC.md revises it: --card-pad, a hover only on a card that is a
+         link (primary edge + --secondary fill, no glow), --flush. 0.59.0 glows every card. -->
+    <style id="standin-k1" media="not all">
+      .card-terminal {
+        --tablewrap-fade: var(--card);
+        background: var(--card); border: 1px solid var(--border); padding: var(--card-pad);
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+      }
+      .card-terminal:hover { border-color: var(--border); box-shadow: none; }
+      a.card-terminal:hover, button.card-terminal:hover, .card-terminal--link:hover {
+        border-color: var(--primary); background: var(--secondary);
+      }
+      a.card-terminal { color: inherit; text-decoration: none; }
+      .card-terminal--flush { padding: 0; }
+    </style>
+    <!-- WP2 · C17 .disclosure-btn -->
+    <style id="standin-wp2" media="not all">
+      .disclosure-btn {
+        box-sizing: border-box; display: inline-grid; place-items: center; padding: 0 0.15rem;
+        font: inherit; color: inherit; background: none; border: 0; opacity: 0.6; cursor: pointer;
+      }
+      .disclosure-btn::before { content: "\25B8"; content: "\25B8" / ""; }
+      .disclosure-btn[aria-expanded="true"]::before { content: "\25BE"; content: "\25BE" / ""; }
+      .disclosure-btn:hover, .disclosure-btn:focus-visible { opacity: 1; }
+    </style>
+    <!-- WP5 · C2 .btn-icon -->
+    <style id="standin-wp5" media="not all">
+      .btn-icon {
+        position: relative; display: inline-grid; place-items: center; box-sizing: border-box;
+        inline-size: var(--control-h); block-size: var(--control-h); padding: 0; font: inherit;
+        color: var(--btn-icon-color, var(--primary)); background: transparent;
+        border: 1px solid var(--control-edge); cursor: pointer;
+      }
+      .btn-icon[data-icon]::before {
+        content: ""; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor;
+        -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
+      }
+      .btn-icon:hover { border-color: currentColor; background: color-mix(in srgb, currentColor 12%, transparent); }
+      .btn-icon:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+      .btn-icon--sm { inline-size: 1.5rem; block-size: 1.5rem; }
+      .btn-icon--sm[data-icon]::before { inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+      .btn-icon--bare { border-color: transparent; --btn-icon-color: var(--muted-foreground); }
+      .btn-icon--bare:hover { --btn-icon-color: var(--primary); background: var(--muted); border-color: transparent; }
+    </style>
+    <!-- WP6 · M10 .value-filter, M7 .filter-bar-spacer -->
+    <style id="standin-wp6" media="not all">
+      .value-filter {
+        position: relative; z-index: 1; margin: 0; padding: 0; font: inherit; color: inherit;
+        text-align: inherit; background: none; border: 0; cursor: pointer;
+      }
+      .value-filter:hover .tag { border-color: currentColor; }
+      .value-filter:not(:has(.tag)):hover { text-decoration: underline; text-underline-offset: 4px; }
+      .value-filter:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+      .filter-bar-spacer { flex: 1; }
+    </style>
+    <!-- WP7 · T1 .tag, T2 .count, S8 .dot -->
+    <style id="standin-wp7" media="not all">
+      :is(.tag, .count):not([data-tone]) { --tone: initial; }
+      .tag {
+        --tag-c: var(--tag-color, var(--tone, var(--muted-foreground)));
+        display: inline-flex; align-items: center; gap: 0.25rem; vertical-align: middle; box-sizing: border-box;
+        min-block-size: 1.25rem; padding: 0 0.375rem; font: inherit; font-weight: 600; line-height: 1;
+        white-space: nowrap; color: var(--tag-c); background: transparent;
+        border: 1px solid color-mix(in srgb, var(--tag-c) 50%, transparent);
+      }
+      .count {
+        display: inline-grid; place-items: center; box-sizing: border-box; min-inline-size: 1.25rem;
+        block-size: 1.25rem; padding: 0 0.25rem; font-weight: 600; font-variant-numeric: tabular-nums;
+        line-height: 1; color: var(--tone, var(--muted-foreground));
+        border: 1px solid color-mix(in srgb, var(--tone, var(--muted-foreground)) 50%, transparent);
+      }
+      .dot {
+        display: inline-block; flex: none; inline-size: var(--dot-size); block-size: var(--dot-size);
+        border-radius: 50%; background: var(--tone, currentColor);
+      }
+      .dot--pulse { animation: dd-pulse 2s ease-in-out infinite; }
+    </style>
+    <!-- WP12 · P3 .section-head, P8 .meta / .meta-stat -->
+    <style id="standin-wp12" media="not all">
+      .section-head {
+        display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+        gap: 0.25rem 1rem; margin-block-end: 1rem;
+      }
+      .section-head > * { margin: 0; }
+      .section-head:has(> :last-child:is(button, .btn-icon)) { align-items: center; }
+      .meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; margin: 0; color: var(--muted-foreground); }
+      .meta-stat { display: inline-flex; align-items: center; gap: 0.25rem; font-variant-numeric: tabular-nums; }
+      .meta-stat > .ico { inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+    </style>
+
+    <link rel="stylesheet" href="../src/cards.css" />
+
+    <style>
+      /* Page-only layout. A build-free page brings its own; nothing here is under test. It also sets
+         the body font and colours, because in ?bare mode base.css is not loaded — which is exactly
+         what a tokens-only surface does for itself. */
+      body {
+        margin: 0; font-family: var(--font-mono); font-size: var(--fs-base); line-height: var(--lh-base);
+        background: var(--background); color: var(--foreground);
+      }
+      /* Not `.wrap`: chrome.css owns that name, and a page column that changed width between the full
+         stack and ?bare would make every fixture measure differently in the two. */
+      .demo-wrap { box-sizing: border-box; max-width: 72rem; margin-inline: auto; padding: 1.5rem 1.5rem 6rem; }
+      .demo-head {
+        position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center;
+        gap: 0.5rem 1rem; padding: 0.6rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border);
+      }
+      .demo-head h1 { margin: 0; font-size: var(--fs-base); font-weight: 700; }
+      .demo-head .spacer { flex: 1; }
+      .demo-btn {
+        font: inherit; padding: 0.2rem 0.5rem; color: var(--muted-foreground); background: none;
+        border: 1px solid var(--border); cursor: pointer; text-decoration: none;
+      }
+      .demo-btn[aria-pressed="true"] { color: var(--primary); border-color: var(--primary); }
+      .demo-note { color: var(--muted-foreground); }
+      .demo-wrap > section { margin-top: 2.5rem; }
+      .demo-wrap > section > h2 { margin: 0 0 0.25rem; font-size: var(--fs-lg); }
+      .demo-wrap > section h3.demo-sub { margin: 1.5rem 0 0.5rem; font-size: var(--fs-base); color: var(--muted-foreground); font-weight: 600; }
+      .lede { margin: 0 0 0.75rem; color: var(--muted-foreground); max-width: 80ch; }
+      .demo-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+      .demo-row > * { flex: 1 1 18rem; min-width: 0; }
+      .demo-cap { margin: 0 0 0.35rem; color: var(--muted-foreground); }
+      .fixed-panel { block-size: 14rem; }
+      code { color: var(--muted-foreground); }
+      /* ?bare drops components.css and chrome.css, which colour these two link classes. Only these
+         two: a page-wide `a { color: inherit }` here would hide a link class of cards.css that
+         forgot to reset its own colour — the very thing the tokens-only rendering is for. */
+      html[data-bare] a.link-quiet { color: var(--muted-foreground); text-underline-offset: 4px; }
+      html[data-bare] .demo-head a { color: inherit; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <script>
+      /* Switch on each stand-in only where the real thing is missing, and say which are in force.
+         `?bare` first drops the data-full stylesheets. */
+      (() => {
+        const root = document.documentElement;
+        if (new URLSearchParams(location.search).has("bare")) {
+          document.querySelectorAll("link[data-full]").forEach((link) => link.remove());
+          root.dataset.bare = "";
+        }
+        const token = (name) => getComputedStyle(root).getPropertyValue(name).trim() !== "";
+        const probe = (html, test) => {
+          const host = document.createElement("div");
+          host.innerHTML = html;
+          document.body.append(host);
+          const ok = test(getComputedStyle(host.firstElementChild), host.firstElementChild);
+          host.remove();
+          return ok;
+        };
+        // lucide 0.559.0 (configr's lucide-react), stroke 2 on a 24-unit box
+        const ICONS = {
+          "package": "<path d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/><path d='M12 22V12'/><polyline points='3.29 7 12 12 20.71 7'/><path d='m7.5 4.27 9 5.15'/>",
+          "star": "<path d='M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z'/>",
+          "chevron-right": "<path d='m9 18 6-6-6-6'/>",
+          "chevron-down": "<path d='m6 9 6 6 6-6'/>",
+          "chevrons-up-down": "<path d='m7 15 5 5 5-5'/><path d='m7 9 5-5 5 5'/>",
+          "chevrons-down-up": "<path d='m7 20 5-5 5 5'/><path d='m7 4 5 5 5-5'/>",
+          "folder-tree": "<path d='M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z'/><path d='M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z'/><path d='M3 5a2 2 0 0 0 2 2h3'/><path d='M3 3v13a2 2 0 0 0 2 2h3'/>",
+          "folder-open": "<path d='m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2'/>",
+          "folder": "<path d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/>",
+          "file": "<path d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/><path d='M14 2v5a1 1 0 0 0 1 1h5'/>",
+          "file-code": "<path d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/><path d='M14 2v5a1 1 0 0 0 1 1h5'/><path d='M10 12.5 8 15l2 2.5'/><path d='m14 12.5 2 2.5-2 2.5'/>",
+          "panel-left-open": "<rect width='18' height='18' x='3' y='3' rx='2'/><path d='M9 3v18'/><path d='m14 9 3 3-3 3'/>",
+          "panel-left-close": "<rect width='18' height='18' x='3' y='3' rx='2'/><path d='M9 3v18'/><path d='m16 15-3-3 3-3'/>",
+          "refresh-cw": "<path d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/><path d='M21 3v5h-5'/><path d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/><path d='M8 16H3v5'/>",
+        };
+        const svg = (body) => "url(\"data:image/svg+xml," + encodeURIComponent(
+          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' " +
+          "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" + body + "</svg>") + "\")";
+        const inForce = [];
+        const use = (id, missing) => {
+          if (!missing) return;
+          document.getElementById(id).media = "all";
+          inForce.push(id.replace("standin-", ""));
+        };
+        use("standin-tokens", !token("--card-pad"));
+        use("standin-hidden", !probe('<div class="panel" hidden></div>', (s) => s.display === "none"));
+
+        const absent = Object.keys(ICONS).filter((n) => !token("--ico-" + n));
+        const unmapped = Object.keys(ICONS).filter((n) =>
+          !probe('<span data-icon="' + n + '"></span>', (s) => s.getPropertyValue("--ico").trim() !== ""));
+        const drawn = probe('<span class="ico"></span>', (s) => s.display !== "inline");
+        const glyphs = [];
+        let css = "";
+        if (absent.length) {
+          css += ":root {" + absent.map((n) => "--ico-" + n + ": " + svg(ICONS[n]) + ";").join("") + "}";
+          glyphs.push("tokens " + absent.join(" "));
+        }
+        if (unmapped.length) {
+          css += unmapped.map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
+          // WP4 ships the mapping with a forced-colours default for every [data-icon]::before glyph,
+          // in @layer base so a component's own rule wins (tokens.css, X1): without it a .btn-icon's
+          // glyph paints Canvas on Canvas and the button is an empty box.
+          css += "@layer base { @media (forced-colors: active) {" +
+            " @supports (forced-color-adjust: preserve-parent-color) {" +
+            " [data-icon]::before { forced-color-adjust: preserve-parent-color; --tone: currentColor; } }" +
+            " @supports not (forced-color-adjust: preserve-parent-color) {" +
+            " [data-icon]::before { forced-color-adjust: none; background: CanvasText; } } } }";
+          glyphs.push("mapping " + unmapped.join(" "));
+        }
+        if (!drawn) {
+          css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
+            " vertical-align: -0.125em; background: currentColor;" +
+            " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
+            ".ico[data-tone] { background: var(--tone, currentColor); }" +
+            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }" +
+            // WP4's forced-colours glyph (icons.css @ c35f091, X1): the parent's forced colour, and
+            // CanvasText where preserve-parent-color is unknown. Neither branch sets a color.
+            "@media (forced-colors: active) { @supports (forced-color-adjust: preserve-parent-color) {" +
+            " .ico, .ico[data-tone] { forced-color-adjust: preserve-parent-color; background: currentColor; } }" +
+            " @supports not (forced-color-adjust: preserve-parent-color) {" +
+            " .ico, .ico[data-tone] { forced-color-adjust: none; background: CanvasText; } } }";
+          glyphs.push(".ico");
+        }
+        if (css) {
+          const block = document.getElementById("standin-i1");
+          block.textContent = css;
+          block.media = "all";
+          inForce.push("i1 (" + glyphs.join("; ") + ")");
+        }
+        // K1's card pads by --card-pad (12px); 0.59.0's padded .85rem, and with no components.css at all
+        // (?bare) the class pads nothing — both mean the revised card is missing.
+        use("standin-k1", !probe('<div class="card-terminal"></div>', (s) => s.paddingTop === "12px"));
+        use("standin-wp2", !probe('<button class="disclosure-btn"></button>', (s) => s.opacity === "0.6"));
+        use("standin-wp5", !probe('<button class="btn-icon"></button>', (s) => s.display === "inline-grid"));
+        use("standin-wp6", !probe('<button class="value-filter"></button>', (s) => s.zIndex === "1"));
+        use("standin-wp7", !probe('<span class="tag"></span>', (s) => s.display === "inline-flex"));
+        use("standin-wp12", !probe('<div class="section-head"></div>', (s) => s.display === "flex"));
+        root.dataset.standins = inForce.join(" · ") || "none";
+      })();
+    </script>
+
+    <header class="demo-head">
+      <h1>WP8 · cards and lists</h1>
+      <span class="spacer"></span>
+      <span class="demo-row" style="gap: 0.35rem; flex: none" role="group" aria-label="theme">
+        <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
+        <button type="button" class="demo-btn" data-theme-pick="green">green</button>
+        <button type="button" class="demo-btn" data-theme-pick="mono">mono</button>
+        <button type="button" class="demo-btn" data-theme-pick="paper">paper</button>
+      </span>
+      <button type="button" class="demo-btn" id="anim-btn" aria-pressed="true">anim</button>
+      <a class="demo-btn" id="bare-link" href="?bare">tokens only</a>
+      <span class="demo-note">stand-ins in force: <span id="standins"></span></span>
+    </header>
+
+    <main class="demo-wrap">
+      <p class="lede">
+        Every element of spec entries K2–K12 in every state. The page loads tokens.css and
+        cards.css; reset, base, components and chrome only for the surrounding markup
+        (<code>.card-terminal</code> is K1, in components.css). Open it with <code>?bare</code> for
+        the tokens-only rendering. K9 (tree), K10 (splitter) and K11 (clamp) have no runtime: what
+        is shown is the static state an app renders, and references/cards.md is the keyboard
+        contract it implements.
+      </p>
+
+      <!-- ── K2 + K3 ─────────────────────────────────────────────────────────────────────────── -->
+      <section id="k2">
+        <h2>K2 · card anatomy · K3 · .card-grid</h2>
+        <p class="lede">One link per card, stretched over it; the filter and the star are raised
+          above the link. Tab onto a title to see the ONE ring on the card. The tone is a 4% tint
+          and a half-strength edge; the rule is a type colour and keeps it under the pointer.</p>
+        <ul class="card-grid" id="k3-grid">
+          <li class="card-terminal card-terminal--link" id="k2-card">
+            <div class="card-head">
+              <button type="button" class="value-filter" aria-label="filter by source: official"><span class="tag">official</span></button>
+              <span class="ico" data-icon="package" aria-hidden="true"></span>
+            </div>
+            <h3 class="card-title"><a class="card-link" href="#k2">review</a></h3>
+            <p class="card-desc">Reviews the current diff against the repository's conventions, its tests and the house rules, and says which of them the change breaks and why that matters for the next reader of the code.</p>
+            <footer class="card-foot"><span class="meta-stat"><span style="display: contents; color: var(--cat-teal)"><span class="ico" data-icon="package" aria-hidden="true"></span></span>12</span><time datetime="2026-09-25">3 days ago</time></footer>
+          </li>
+          <li class="card-terminal card-terminal--link" data-tone="success">
+            <div class="card-head">
+              <span class="tag" data-tone="success">installed</span>
+              <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="star" aria-pressed="false" aria-label="favourite deploy-check"></button>
+            </div>
+            <h3 class="card-title"><a class="card-link" href="#k2">deploy-check</a></h3>
+            <p class="card-desc">A toned card: data-tone="success" (configr's installed state).</p>
+            <footer class="card-foot"><time datetime="2026-09-20">8 days ago</time></footer>
+          </li>
+          <li class="card-terminal card-terminal--link card-terminal--rule" style="--rule-color: var(--cat-teal)">
+            <h3 class="card-title"><a class="card-link" href="#k2">a hook</a></h3>
+            <p class="card-desc">--rule with --rule-color: var(--cat-teal) — the type of the thing. Hover it: the rule stays teal.</p>
+            <footer class="card-foot"><span>hook</span></footer>
+          </li>
+          <li class="card-terminal card-terminal--link card-terminal--rule" data-tone="destructive" style="--rule-color: var(--cat-violet)">
+            <h3 class="card-title"><a class="card-link" href="#k2">broken-agent</a></h3>
+            <p class="card-desc">Tone and rule together: the destructive state and a violet type.</p>
+            <footer class="card-foot"><span>agent</span></footer>
+          </li>
+          <li class="card-terminal" id="k2-static">
+            <h3 class="card-title">a static card</h3>
+            <p class="card-desc">No link, so no hover: the pointer is answered only where a click lands (K1).</p>
+            <footer class="card-foot"><span>read-only</span></footer>
+          </li>
+          <li class="card-terminal card-terminal--link" id="k2-flash" data-tone="success">
+            <h3 class="card-title"><a class="card-link" href="#k2">flash</a></h3>
+            <p class="card-desc">--flash: a half-second ring in the tone when an outcome lands.</p>
+            <footer class="card-foot"><button type="button" class="demo-btn" id="flash-btn">replay flash</button></footer>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ── K4 ─────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k4">
+        <h2>K4 · .stat-tile · .stat-grid</h2>
+        <p class="lede">Four states; unknown never reads as 0. The state edge keeps its colour
+          under the pointer.</p>
+        <div class="stat-grid">
+          <a class="stat-tile" data-state="idle" href="#k4"><span class="stat-label">review</span><span class="stat-value">0</span><span class="stat-note">nothing queued</span><span class="stat-cta">open →</span></a>
+          <a class="stat-tile" data-state="action" href="#k4"><span class="stat-label">approvals</span><span class="stat-value">3</span><span class="stat-note">waiting on me</span><span class="stat-cta">review →</span></a>
+          <a class="stat-tile" data-state="broken" href="#k4"><span class="stat-label">runners</span><span class="stat-value">1 down</span><span class="stat-note">dd-infra-ci-2 refused</span><span class="stat-cta">fix →</span></a>
+          <a class="stat-tile" data-state="unknown" href="#k4"><span class="stat-label">executions</span><span class="stat-value">—</span><span class="stat-note">could not count</span><span class="stat-cta">retry →</span></a>
+          <div class="stat-tile" data-tone="info"><span class="stat-label">in flight</span><span class="stat-value">2</span><span class="stat-note">a static tile, data-tone="info"</span></div>
+          <div class="stat-tile"><span style="display: contents; color: var(--cat-amber)"><span class="ico ico--xl" data-icon="package" aria-hidden="true"></span></span><span class="stat-label">skills</span><span class="stat-value">128</span><a class="stat-cta" href="#k4">browse →</a></div>
+        </div>
+      </section>
+
+      <!-- ── K5 ─────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k5">
+        <h2>K5 · .panel</h2>
+        <div class="demo-row">
+          <section class="panel fixed-panel" aria-labelledby="k5-t1" id="k5-panel">
+            <header class="panel-head">
+              <span class="ico" data-icon="folder-tree" aria-hidden="true"></span>
+              <h3 class="panel-title" id="k5-t1">files of seedr/review — a long title that truncates</h3>
+              <div class="panel-actions">
+                <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="chevrons-up-down" aria-controls="k9-tree" aria-expanded="false" aria-label="expand all folders"></button>
+                <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="panel-left-close" aria-label="hide files"></button>
+              </div>
+            </header>
+            <div class="panel-body">
+              <p style="margin: 0 0 0.5rem">A fixed-height panel: the page sets block-size, the body scrolls, the head and the foot stay.</p>
+              <p style="margin: 0 0 0.5rem">Line two of the body.</p>
+              <p style="margin: 0 0 0.5rem">Line three of the body.</p>
+              <p style="margin: 0 0 0.5rem">Line four of the body.</p>
+              <p style="margin: 0 0 0.5rem">Line five of the body.</p>
+              <p style="margin: 0">Line six of the body.</p>
+            </div>
+            <footer class="panel-foot"><span class="demo-note">12 files</span><span class="filter-bar-spacer"></span><button type="button" class="btn-icon btn-icon--sm" data-icon="refresh-cw" aria-label="refresh files"></button></footer>
+          </section>
+          <div>
+            <section class="panel" aria-labelledby="k5-t2">
+              <header class="panel-head panel-head--eyebrow">
+                <h3 class="panel-title" id="k5-t2">explorer</h3>
+              </header>
+              <div class="panel-body panel-body--flush">
+                <ul class="row-list row-list--select" aria-label="capabilities">
+                  <li><button type="button" class="list-row"><span class="list-row-title">review</span><span class="list-row-meta">rw-</span></button></li>
+                  <li><button type="button" class="list-row" aria-current="true"><span class="list-row-title">deploy-check</span><span class="list-row-meta">rw-</span></button></li>
+                </ul>
+              </div>
+            </section>
+            <p class="demo-cap" style="margin-top: 1rem">collapsible (cockpit C95): one open, one collapsed</p>
+            <section class="panel" aria-labelledby="k5-t3" style="margin-bottom: 0.75rem">
+              <header class="panel-head"><button type="button" class="disclosure-btn" aria-expanded="true" aria-controls="k5-b3" aria-label="collapse poi/vu3"></button><h3 class="panel-title" id="k5-t3">poi/vu3</h3></header>
+              <div class="panel-body" id="k5-b3">review type: public — posts on the PR</div>
+            </section>
+            <section class="panel" aria-labelledby="k5-t4" id="k5-collapsed">
+              <header class="panel-head" id="k5-collapsed-head"><button type="button" class="disclosure-btn" aria-expanded="false" aria-controls="k5-b4" aria-label="expand dd/infra"></button><h3 class="panel-title" id="k5-t4">dd/infra</h3></header>
+              <div class="panel-body" id="k5-b4" hidden>review type: internal</div>
+            </section>
+            <p class="demo-cap" style="margin-top: 1rem">identity rail (cockpit C96)</p>
+            <article class="panel panel--mark" aria-labelledby="k5-t5">
+              <div class="panel-mark" aria-hidden="true">CX</div>
+              <div class="panel-main">
+                <header class="panel-head"><h3 class="panel-title" id="k5-t5">codex</h3><div class="panel-actions"><span class="tag" data-tone="success">enabled</span></div></header>
+                <div class="panel-body">model gpt-5.9 · effort high</div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── K6 ─────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k6">
+        <h2>K6 · .row-list / .list-row</h2>
+        <div class="demo-row">
+          <div>
+            <p class="demo-cap">in a flush card, --loose (danieldeusing.de's articles)</p>
+            <div class="card-terminal card-terminal--flush">
+              <ul class="row-list row-list--loose">
+                <li><a class="list-row" href="#k6"><time class="list-row-lead" datetime="2026-09-25">2026-09-25</time><span class="list-row-title">AI agents play fantasy football, and a title long enough to truncate</span><span class="list-row-meta"><span class="tag">series · part 2</span></span></a></li>
+                <li><a class="list-row" href="#k6"><time class="list-row-lead" datetime="2026-09-02">2026-09-02</time><span class="list-row-title">One text size</span><span class="list-row-desc">Four sizes one pixel apart cannot be told apart on sight, so nothing in the estate ever chose between them. A description clamps at two lines by default.</span></a></li>
+              </ul>
+            </div>
+            <p class="demo-cap" style="margin-top: 1rem">--ruled on the page, --row-lead-w: 10.5rem (the brief column), a new-tab row</p>
+            <ul class="row-list row-list--ruled" style="--row-lead-w: 10.5rem">
+              <li><a class="list-row" href="#k6" aria-label="brief for 2026-09-28 (opens briefs.danieldeusing.de)"><time class="list-row-lead" datetime="2026-09-28">mon 2026-09-28</time><span class="list-row-title">markets calm, one deploy</span><span class="list-row-meta" aria-hidden="true">↗</span></a></li>
+              <li><a class="list-row" href="#k6"><time class="list-row-lead" datetime="2026-09-27">sun 2026-09-27</time><span class="list-row-title">weekend</span></a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="demo-cap">--select (a master column): rest, hover, current (with tags and a count), disabled</p>
+            <div class="card-terminal card-terminal--flush">
+              <ul class="row-list row-list--select" aria-label="capabilities" id="k6-select">
+                <li><button type="button" class="list-row" id="k6-rest"><span class="list-row-title">review</span><span class="list-row-meta">rw-</span></button></li>
+                <li><button type="button" class="list-row" aria-current="true" id="k6-current"><span class="list-row-lead">02</span><span class="list-row-title">deploy-check</span><span class="list-row-meta"><span class="tag">draft</span> <span class="count">3</span> <span class="tag" data-tone="success">ok</span> <span class="tag" data-tone="warning">stale</span> <span class="tag" data-tone="destructive">failed</span> <span class="tag" data-tone="info">new</span> <span class="tag" data-tone="pending">queued</span> <span class="tag" data-tone="muted">off</span></span></button></li>
+                <li><button type="button" class="list-row" disabled><span class="list-row-title">disabled</span><span class="list-row-meta">---</span></button></li>
+              </ul>
+            </div>
+            <p class="demo-cap" style="margin-top: 1rem">a listbox: aria-selected belongs to role="option" (or row, treeitem), not to a plain button</p>
+            <ul class="row-list row-list--select" role="listbox" aria-label="agents" id="k6-listbox">
+              <li role="none"><button type="button" class="list-row" role="option" aria-selected="false" tabindex="-1"><span class="list-row-title">claude</span></button></li>
+              <li role="none"><button type="button" class="list-row" role="option" aria-selected="true" tabindex="0"><span class="list-row-title">codex</span><span class="list-row-meta">r--</span></button></li>
+            </ul>
+            <p class="demo-cap" style="margin-top: 1rem">a nav list: aria-current="page"</p>
+            <ul class="row-list row-list--select" aria-label="settings">
+              <li><a class="list-row" href="#k6"><span class="list-row-title">general</span></a></li>
+              <li><a class="list-row" href="#k6" aria-current="page"><span class="list-row-title">agents</span></a></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── K7 ─────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k7">
+        <h2>K7 · .entry</h2>
+        <p class="demo-cap">--ruled, the default 8.75rem lead; hover anywhere opens the title, the #tag is raised</p>
+        <ol class="entry-list entry-list--ruled">
+          <li class="entry" id="k7-entry">
+            <time class="entry-lead" datetime="2026-09-25">2026-09-25</time>
+            <div>
+              <h2 class="entry-title"><a class="card-link" href="#k7">AI agents play fantasy football</a></h2>
+              <p class="entry-desc">Five agents, one league, a season of weekly decisions — and what their mistakes say about how they read a table.</p>
+              <p class="meta" style="margin-top: 0.5rem"><span>~6 min read</span><span aria-hidden="true">·</span><button type="button" class="value-filter" aria-label="filter by tag: agents">#agents</button></p>
+            </div>
+          </li>
+          <li class="entry entry--wide">
+            <div class="entry-lead"><strong>seedr</strong><br />live · astro, react</div>
+            <div>
+              <h2 class="entry-title"><a class="card-link" href="#k7">seedr</a></h2>
+              <p class="entry-desc">--wide: 12.5rem aside, 2.5rem gap and padding.</p>
+            </div>
+          </li>
+        </ol>
+        <div class="demo-row" style="margin-top: 1.5rem">
+          <div>
+            <p class="demo-cap">--narrow with an --accent year (the timeline)</p>
+            <ol class="entry-list">
+              <li class="entry entry--narrow"><span class="entry-lead entry-lead--accent">2026</span><p class="entry-title">design system 0.60.0</p></li>
+              <li class="entry entry--narrow"><span class="entry-lead entry-lead--accent">2024</span><p class="entry-title">cockpit</p></li>
+            </ol>
+          </div>
+          <div>
+            <p class="demo-cap">--narrow --keep: two columns at every width (certificates)</p>
+            <ol class="entry-list">
+              <li class="entry entry--narrow entry--keep"><span class="entry-lead">2021</span><p class="entry-title">a certificate</p></li>
+              <li class="entry entry--narrow entry--keep"><span class="entry-lead">2019</span><p class="entry-title">an award</p></li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── K8 ─────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k8">
+        <h2>K8 · .manpage</h2>
+        <article class="card-terminal manpage" aria-labelledby="man-name">
+          <p class="manpage-frame"><span>DANIEL(1)</span><span>personal manual</span><span>danieldeusing.de</span></p>
+          <h3 class="manpage-sect" id="man-name">NAME</h3>
+          <div class="manpage-body"><p>Daniel Deusing — builds the tools he wants to use</p></div>
+          <h3 class="manpage-sect">SYNOPSIS</h3>
+          <div class="manpage-body"><p>daniel [--build] [--ship] [--write] &lt;idea&gt;</p><p>A second paragraph in the same section.</p></div>
+          <h3 class="manpage-sect">DESCRIPTION</h3>
+          <div class="manpage-body"><p>Section labels are headings; the frame is body text in --muted-foreground.</p></div>
+          <p class="manpage-frame"><a class="link-quiet" href="#k8">~/about</a><span>2026</span><span>(END)</span></p>
+        </article>
+      </section>
+
+      <!-- ── K9 ─────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k9">
+        <h2>K9 · .tree <span class="demo-note">(static — the app implements the APG keyboard)</span></h2>
+        <div class="demo-row">
+          <section class="panel" aria-labelledby="k9-t">
+            <header class="panel-head"><span class="ico" data-icon="folder-tree" aria-hidden="true"></span><h3 class="panel-title" id="k9-t">files of review</h3></header>
+            <div class="panel-body panel-body--flush" style="padding-block: 0.25rem">
+              <ul class="tree" role="tree" aria-label="files of review" id="k9-tree">
+                <li role="treeitem" aria-level="1" aria-expanded="true" tabindex="0" id="k9-src">
+                  <span class="tree-row"><span class="ico" data-icon="folder-open" aria-hidden="true"></span><span class="tree-label">src</span></span>
+                  <ul role="group">
+                    <li role="treeitem" aria-level="2" aria-selected="true" tabindex="-1" id="k9-selected">
+                      <span class="tree-row"><span class="ico" data-icon="file-code" aria-hidden="true"></span><span class="tree-label">app.ts</span><span class="tree-meta"><span class="count">3</span></span></span>
+                    </li>
+                    <li role="treeitem" aria-level="2" aria-expanded="false" tabindex="-1" id="k9-closed">
+                      <span class="tree-row"><span class="ico" data-icon="folder" aria-hidden="true"></span><span class="tree-label">lib</span></span>
+                    </li>
+                    <li role="treeitem" aria-level="2" tabindex="-1" id="k9-leaf">
+                      <span class="tree-row"><span class="ico" data-icon="file" aria-hidden="true"></span><span class="tree-label">a-file-name-long-enough-to-truncate-in-a-narrow-pane.md</span></span>
+                    </li>
+                  </ul>
+                </li>
+                <li role="treeitem" aria-level="1" aria-disabled="true" tabindex="-1">
+                  <span class="tree-row"><span class="ico" data-icon="file" aria-hidden="true"></span><span class="tree-label">disabled.lock</span></span>
+                </li>
+              </ul>
+            </div>
+          </section>
+          <div>
+            <p class="demo-cap">a navigating tree (configr's settings): the rows are links, the current page is aria-current="page"</p>
+            <ul class="tree" role="tree" aria-label="settings" id="k9-nav">
+              <li role="none">
+                <a class="tree-row" role="treeitem" aria-level="1" aria-expanded="true" href="#k9" tabindex="-1"><span class="tree-label">agents</span></a>
+                <ul role="group">
+                  <li role="none"><a class="tree-row" role="treeitem" aria-level="2" href="#k9" aria-current="page" tabindex="0" id="k9-nav-current"><span class="tree-label">codex</span></a></li>
+                  <li role="none"><a class="tree-row" role="treeitem" aria-level="2" href="#k9" tabindex="-1"><span class="tree-label">claude</span></a></li>
+                </ul>
+              </li>
+            </ul>
+            <p class="demo-cap" style="margin-top: 1rem">tags and a count in a selected row follow it</p>
+            <ul class="tree" role="tree" aria-label="changes" id="k9-tags">
+              <li role="treeitem" aria-level="1" aria-selected="true" tabindex="0">
+                <span class="tree-row"><span class="ico" data-icon="file-code" aria-hidden="true"></span><span class="tree-label">app.ts</span><span class="tree-meta"><span class="tag">draft</span> <span class="count">3</span> <span class="tag" data-tone="success">ok</span> <span class="tag" data-tone="warning">stale</span> <span class="tag" data-tone="destructive">failed</span> <span class="tag" data-tone="info">new</span> <span class="tag" data-tone="pending">queued</span> <span class="tag" data-tone="muted">off</span></span></span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── K10 ────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k10">
+        <h2>K10 · .split / .splitter <span class="demo-note">(static — the app implements the APG window splitter)</span></h2>
+        <div class="split" id="k10-split" style="--split-size: 16rem; block-size: 12rem">
+          <section class="panel split-pane" id="k10-files" aria-labelledby="k10-t1">
+            <header class="panel-head"><h3 class="panel-title" id="k10-t1">files</h3><div class="panel-actions"><button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="panel-left-close" aria-controls="k10-files" aria-expanded="true" aria-label="hide files"></button></div></header>
+            <div class="panel-body">the first pane is --split-size wide</div>
+          </section>
+          <div class="splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="k10-files" aria-label="resize file list" aria-valuemin="160" aria-valuemax="640" aria-valuenow="256" id="k10-vsplit"></div>
+          <section class="panel split-pane" aria-labelledby="k10-t2">
+            <header class="panel-head"><h3 class="panel-title" id="k10-t2">preview</h3></header>
+            <div class="panel-body">the last pane takes the rest</div>
+          </section>
+        </div>
+        <div class="splitter" role="separator" tabindex="0" aria-orientation="horizontal" aria-controls="k10-split" aria-label="resize file preview" aria-valuemin="150" aria-valuemax="1200" aria-valuenow="192" id="k10-hsplit"></div>
+
+        <div class="demo-row" style="margin-top: 1.25rem">
+          <div>
+            <p class="demo-cap">the left pane hidden: its strip, then the pane that takes the room</p>
+            <div class="split" style="block-size: 8rem; border: 1px solid var(--border)" id="k10-hidden-left">
+              <button type="button" class="pane-collapsed" aria-controls="k10-files" aria-expanded="false" aria-label="show files" id="k10-collapsed"><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span aria-hidden="true">files</span></button>
+              <div class="split-pane" style="padding: 0.75rem" id="k10-rest-left">preview</div>
+            </div>
+          </div>
+          <div>
+            <p class="demo-cap">the right pane hidden in place: --end, the left pane takes the room</p>
+            <div class="split" style="block-size: 8rem; border: 1px solid var(--border)" id="k10-hidden-right">
+              <div class="split-pane" style="padding: 0.75rem" id="k10-rest-right">files</div>
+              <div class="splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="k10-preview" aria-label="resize preview" hidden></div>
+              <div class="split-pane" id="k10-preview" hidden>preview</div>
+              <button type="button" class="pane-collapsed pane-collapsed--end" aria-controls="k10-preview" aria-expanded="false" aria-label="show preview" id="k10-collapsed-end"><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span aria-hidden="true">preview</span></button>
+            </div>
+          </div>
+          <div>
+            <p class="demo-cap">a fixed master–detail: no splitter, a hairline</p>
+            <div class="split" style="--split-size: 8rem; block-size: 8rem; border: 1px solid var(--border)" id="k10-fixed">
+              <div class="split-pane" style="padding: 0.75rem">master</div>
+              <div class="split-pane" style="padding: 0.75rem" id="k10-detail">detail</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── K11 ────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k11">
+        <h2>K11 · .clamp <span class="demo-note">(static — the page measures and toggles)</span></h2>
+        <div class="demo-row">
+          <div class="card-terminal">
+            <div class="section-head">
+              <h3 class="prompt">cat README.md</h3>
+              <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="chevrons-up-down" aria-expanded="false" aria-controls="k11-clamped" aria-label="show full content"></button>
+            </div>
+            <div class="clamp" id="k11-clamped" data-clamped style="--clamp-h: 7rem">
+              <p style="margin: 0 0 0.5rem">clamped: --clamp-h 7rem here (15rem by default), and the fade blends into the card, because a card sets --clamp-fade: var(--card).</p>
+              <p style="margin: 0 0 0.5rem">Line two of the README. Line two of the README. Line two of the README.</p>
+              <p style="margin: 0 0 0.5rem">Line three of the README.</p>
+              <p style="margin: 0 0 0.5rem">Line four of the README.</p>
+              <p style="margin: 0">Line five of the README.</p>
+            </div>
+          </div>
+          <div class="card-terminal">
+            <div class="section-head">
+              <h3 class="prompt">cat README.md</h3>
+              <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="chevrons-down-up" aria-expanded="true" aria-controls="k11-open" aria-label="show less content"></button>
+            </div>
+            <div class="clamp" id="k11-open" style="--clamp-h: 7rem">
+              <p style="margin: 0 0 0.5rem">open: no data-clamped, no fade, every line.</p>
+              <p style="margin: 0 0 0.5rem">Line two of the README. Line two of the README. Line two of the README.</p>
+              <p style="margin: 0 0 0.5rem">Line three of the README.</p>
+              <p style="margin: 0 0 0.5rem">Line four of the README.</p>
+              <p style="margin: 0">Line five of the README.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── K12 ────────────────────────────────────────────────────────────────────────────── -->
+      <section id="k12">
+        <h2>K12 · .console</h2>
+        <div class="demo-row">
+          <section class="console" aria-labelledby="k12-t1" id="k12-console" style="--console-h: 14rem">
+            <header class="console-bar">
+              <span class="console-dots" aria-hidden="true"></span>
+              <h3 class="console-title" id="k12-t1">agent output</h3>
+              <p class="console-status" role="status"><span class="dot dot--pulse" data-tone="success" aria-hidden="true"></span>live</p>
+            </header>
+            <div class="console-body" tabindex="0" aria-labelledby="k12-t1" id="k12-body"><div>$ claude --review poi/vu3!3302</div><div>reading 14 files…</div><div>  src/app.ts: 3 findings</div><div class="console-line--current">  src/lib/<mark>auth</mark>.ts: 1 finding</div><div>	tab-indented line (tab-size 2)</div><div>a very long line that wraps instead of scrolling sideways: https://example.invalid/a/really/long/path/that/keeps/going/and/going/and/going/until/it/wraps</div><div>done in 42s</div></div>
+          </section>
+          <div>
+            <section class="console" aria-labelledby="k12-t2" style="--console-h: 12rem; margin-bottom: 0.75rem">
+              <header class="console-bar">
+                <span class="console-dots" aria-hidden="true"></span>
+                <h3 class="console-title" id="k12-t2">live log</h3>
+                <p class="console-status" role="status"><span class="dot" data-tone="pending" aria-hidden="true"></span>paused — scroll to the bottom to resume</p>
+              </header>
+              <div class="console-body" tabindex="0" aria-labelledby="k12-t2"><div>line 1</div><div>line 2</div><div>line 3</div><div>line 4</div><div>line 5</div><div>line 6</div></div>
+            </section>
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">jump to newest</button>
+            <section class="console" aria-labelledby="k12-t3" style="--console-h: 12rem; margin-top: 0.75rem">
+              <header class="console-bar">
+                <span class="console-dots" aria-hidden="true"></span>
+                <h3 class="console-title" id="k12-t3">deploy</h3>
+                <p class="console-status" role="status"><span class="dot" data-tone="muted" aria-hidden="true"></span>ended</p>
+              </header>
+              <div class="console-body" tabindex="0" aria-labelledby="k12-t3"><div>deploy finished</div></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      /* Demo chrome only — cards.css has no runtime. */
+      document.getElementById("standins").textContent = document.documentElement.dataset.standins;
+      const params = new URLSearchParams(location.search);
+      const bare = document.getElementById("bare-link");
+      if (params.has("bare")) { bare.href = "?"; bare.textContent = "full stack"; }
+      const mark = () => document.querySelectorAll("[data-theme-pick]").forEach((b) =>
+        b.setAttribute("aria-pressed", String(b.dataset.themePick === document.documentElement.dataset.theme)));
+      mark();
+      document.addEventListener("click", (event) => {
+        const pick = event.target.closest("[data-theme-pick]");
+        if (pick) {
+          document.documentElement.dataset.theme = pick.dataset.themePick;
+          try { localStorage.setItem("theme", pick.dataset.themePick); } catch {}
+          mark();
+        }
+        if (event.target.closest("#anim-btn")) {
+          const off = document.documentElement.classList.toggle("anim-off");
+          event.target.closest("#anim-btn").setAttribute("aria-pressed", String(!off));
+        }
+        if (event.target.closest("#flash-btn")) {
+          const card = document.getElementById("k2-flash");
+          card.classList.remove("card-terminal--flash");
+          void card.offsetWidth;
+          card.classList.add("card-terminal--flash");
+        }
+        // the demo's links go nowhere
+        if (event.target.closest('a[href^="#k"]')) event.preventDefault();
+      });
+      document.getElementById("k2-flash").addEventListener("animationend", (event) =>
+        event.currentTarget.classList.remove("card-terminal--flash"));
+    </script>
+  </body>
+</html>

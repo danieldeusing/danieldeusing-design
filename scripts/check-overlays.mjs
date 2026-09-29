@@ -200,6 +200,10 @@ const drag = async (x1, y1, x2, y2) => {
 const centre = (t) => evaluate(`(() => { const n = __o.$(${JSON.stringify(t)}); n.scrollIntoView({ block: "center" });
   const r = n.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
 const clickT = async (t, button) => { const p = await centre(t); await click(p.x, p.y, button); };
+const clickT_id = async (id) => {
+  const p = await evaluate(`(() => { const r = document.getElementById(${JSON.stringify(id)}).getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+  await click(p.x, p.y);
+};
 
 /* :hover or :focus-visible forced on ONE node through the protocol. */
 const withForced = async (selector, states, expression) => {
@@ -396,6 +400,18 @@ try {
   await check("a second .dialog-section starts 1.5rem down", parts.section === "24px", parts.section);
   await check("a sticky table header inside the dialog is painted in --card, not the page's --background", parts.th, parts);
   await check("a --flush body has no inset", () => evaluate(`(() => { const d = __o.$("dlg-full"); d.showModal(); const p = __o.cs("full-body").padding; d.close(); return p === "0px"; })()`));
+  await reset();
+  await evaluate(`(() => { const d = document.createElement("dialog"); d.className = "dialog"; d.id = "form-dlg";
+    d.innerHTML = '<header class="dialog-head"><h2 class="dialog-title">a form</h2></header><form method="dialog">' +
+      '<div class="dialog-body" id="form-body"><p style="height: 2000px">tall</p></div>' +
+      '<footer class="dialog-foot form-actions" id="form-foot"><button value="save" id="form-save">save</button></footer></form>';
+    document.body.append(d); d.showModal(); })(); null`);
+  const form = await evaluate(`(() => { const d = document.getElementById("form-dlg"), r = d.getBoundingClientRect(), f = document.getElementById("form-foot").getBoundingClientRect(), b = document.getElementById("form-body");
+    return { h: Math.round(r.height), footAtBottom: Math.abs(f.bottom - (r.bottom - 1)) < 1, scrolls: b.scrollHeight > b.clientHeight, form: getComputedStyle(d.querySelector("form")).display }; })()`);
+  await check("a <form method=dialog> wrapping the body and the footer does not break the layout (it is display: contents)",
+    form.form === "contents" && form.h === 810 && form.footAtBottom && form.scrolls, form);
+  await clickT_id("form-save");
+  await check("...and its submit button's value is the answer", () => evaluate(`(() => { const d = document.getElementById("form-dlg"); const ok = !d.open && d.returnValue === "save"; d.remove(); return ok; })()`));
 
   /* ── the drawer, the phone, print ── */
   section("drawer, phone, print");

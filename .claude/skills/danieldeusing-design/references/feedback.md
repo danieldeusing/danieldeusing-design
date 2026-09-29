@@ -113,6 +113,7 @@ learned to keep them apart first (C56), and configr's catalog filter had to lear
 </div>
 <!-- a FAILED result is an alert: it is mounted BESIDE the slot, with its words, never inside it -->
 <div class="notice notice--lg" data-tone="warning" data-icon="triangle-alert" role="alert">
+  <span class="notice-label">failed:</span>
   <div><p>the update could not be downloaded.</p><p class="text-muted-foreground">github answered 502.</p></div>
 </div>
 ```
@@ -272,7 +273,8 @@ A spinner inside a busy BUTTON is the control's own state (controls.md): `aria-b
 load. It is one glyph, lucide's loader-circle, where configr had four sizes in three colours.
 
 Every exit path replaces the loading row: rows, the empty state, or the failure. None of them may
-leave it spinning.
+leave it spinning. A failure is an alert, so when the row sat in a status region the row leaves it
+and the failure is mounted beside the region, never inside it.
 
 ## `.fence` — text a stranger wrote (S7)
 

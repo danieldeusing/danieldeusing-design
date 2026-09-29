@@ -633,7 +633,8 @@ const ROLES = String.raw`((root) => {
   const own = [...root.querySelectorAll(".notice, .loading")].flatMap((n) => {
     const role = n.getAttribute("role"), region = n.parentElement && n.parentElement.closest(live);
     const loud = n.matches(".notice") && ["warning", "destructive"].includes(n.dataset.tone);
-    if (role && region) return []; // reported above
+    if (region && n.matches(live)) return []; // reported above
+    if (loud && !n.querySelector(".notice-label")) return [name(n) + " has no label: the label is the meaning, on every notice that is not a success"];
     if (loud) return role === "alert" ? [] : [name(n) + " has role=" + role + ", wants alert on itself, beside any status slot"];
     if (region) return region.getAttribute("role") === "status" ? [] : [name(n) + " sits in a role=alert region: a status goes into a status region"];
     if (n.matches(".notice--lg")) return [name(n) + " is a result: it goes into a role=status region already in the page"];
@@ -675,6 +676,22 @@ await check("the demo mounts a later notice and a later loading row into role=st
     else if (n.hasAttribute("role")) problems.push(sel + " inside #" + region + " carries role=" + n.getAttribute("role") + ", the region carries it");
     r.replaceChildren();
   }
+  return problems;
+})()`));
+// A load that FAILS: the row leaves the status region, and the failure is an alert mounted beside it.
+await check("the demo's failing reload takes its row out of the status region and mounts the failure beside it, labelled", () => evaluate(`(async () => {
+  const b = document.getElementById("reload-fail-demo"), r = document.getElementById("reload-status");
+  if (!b || !r) return ["no #reload-fail-demo button / #reload-status region on the demo page"];
+  b.click();
+  await new Promise((ok) => setTimeout(ok, 1700));
+  const problems = [];
+  if (r.querySelector(".loading")) problems.push("the loading row is still spinning in #reload-status");
+  if (r.querySelector("[role]")) problems.push("#reload-status holds an element with a live role");
+  const alert = r.nextElementSibling;
+  if (!alert || !alert.matches(".notice[role='alert']")) problems.push("no role=alert notice right after #reload-status");
+  else if (!alert.querySelector(".notice-label")) problems.push("the failure notice has no label");
+  problems.push(...${ROLES}(document));
+  r.replaceChildren(); if (alert && alert.matches(".notice[role='alert']")) alert.remove();
   return problems;
 })()`));
 

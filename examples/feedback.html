@@ -315,7 +315,7 @@
           <div class="notice" data-tone="primary" role="status"><span class="notice-label">refused:</span><p>this agent cannot read that scope.</p></div>
           <div class="notice" data-tone="muted" role="status"><span class="notice-label">skipped:</span><p>no change since the last run.</p></div>
           <div role="status"><div class="notice notice--lg" data-tone="success" data-icon="circle-check"><div><p>you are on the latest version.</p><p class="demo-note">version 0.60.0</p></div></div></div>
-          <div class="notice notice--lg" data-tone="warning" data-icon="triangle-alert" role="alert"><div><p>the update could not be downloaded.</p><p class="demo-note">github answered 502 — try again in a minute.</p></div><button type="button" class="btn-icon btn-icon--bare btn-icon--sm notice-dismiss" data-icon="x" aria-label="dismiss"></button></div>
+          <div class="notice notice--lg" data-tone="warning" data-icon="triangle-alert" role="alert"><span class="notice-label">failed:</span><div><p>the update could not be downloaded.</p><p class="demo-note">github answered 502 — try again in a minute.</p></div><button type="button" class="btn-icon btn-icon--bare btn-icon--sm notice-dismiss" data-icon="x" aria-label="dismiss"></button></div>
         </div>
         <h3>a status notice goes into a region that is already there</h3>
         <p class="lede">An <code>alert</code> may arrive with its words. A <code>status</code> is
@@ -403,8 +403,9 @@
         <p class="lede">The row above is in the page from the first render, so it carries
           <code>role="status"</code> itself. A reload mounts its row later: into an empty
           <code>&lt;div role="status"&gt;</code> the page rendered first, with no role of its own —
-          the same rule as a notice. Whatever ends the load replaces the row.</p>
-        <div class="row"><button type="button" class="demo-btn" id="reload-demo">reload skills</button></div>
+          the same rule as a notice. Whatever ends the load replaces the row, except a failure: that is an
+          alert, so the row leaves the region and the failure is mounted beside it.</p>
+        <div class="row"><button type="button" class="demo-btn" id="reload-demo">reload skills</button> <button type="button" class="demo-btn" id="reload-fail-demo">reload skills (fails)</button></div>
         <div role="status" id="reload-status"></div>
       </section>
 
@@ -564,6 +565,18 @@
         region.innerHTML = '<p class="loading"><span class="spinner" aria-hidden="true"></span>reloading skills…</p>';
         setTimeout(() => {
           if (region.querySelector(".loading")) region.innerHTML = '<div class="notice" data-tone="success"><p>12 skills reloaded.</p></div>';
+        }, 1500);
+      });
+
+      // A failed load: the row leaves the status region, and the alert goes BESIDE it, never inside.
+      document.getElementById("reload-fail-demo").addEventListener("click", () => {
+        const region = document.getElementById("reload-status");
+        region.nextElementSibling?.matches(".notice[role='alert']") && region.nextElementSibling.remove();
+        region.innerHTML = '<p class="loading"><span class="spinner" aria-hidden="true"></span>reloading skills…</p>';
+        setTimeout(() => {
+          region.replaceChildren();
+          region.insertAdjacentHTML("afterend", '<div class="notice" data-tone="destructive" role="alert"><span class="notice-label">failed:</span>' +
+            '<p>could not reload the skills: github answered 502.</p></div>');
         }, 1500);
       });
 

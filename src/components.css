@@ -1276,53 +1276,8 @@ select:disabled,
    Each of these was built once in cockpit/pages/portal.css and then wanted by every other
    surface. They live here so there is ONE definition — the tabs had already drifted into FOUR
    page style blocks before being consolidated, which is exactly the failure this move prevents.
+   (The tabs themselves moved on to data.css in 0.60.0, with their runtime.)
    ═════════════════════════════════════════════════════════════════════════════════════════════ */
-
-/* ── tabs ──────────────────────────────────────────────────────────────────────────────────────
-   Daniel: "I am always searching the tabs. They are not falling into my eyes directly."
-
-   They were low-contrast pills at 0.7 opacity, and the SELECTED one differed from the rest only
-   by a slightly darker border and 8% background — so the row read as six equal chips and the eye
-   had to stop and compare them. This inverts it: the inactive tabs recede to plain muted text
-   with no chrome at all, and the active one is the only thing on the row carrying weight, colour
-   and a fill. Nothing to compare — one thing is loud. */
-.tabs {
-  display: flex; flex-wrap: wrap; gap: 0.15rem; margin: 1.35rem 0 0;
-  border-bottom: 2px solid color-mix(in srgb, var(--border) 80%, transparent);
-}
-.tab {
-  background: transparent; border: 0; margin-bottom: -2px;
-  font: inherit; font-size: var(--fs-base); cursor: pointer; padding: 0.5rem 0.95rem;
-  color: var(--muted-foreground); transition: background 0.12s ease, color 0.12s ease;
-}
-.tab:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
-/* FILLED, not underlined. An underline plus a colour shift was still one thin rule and a hue
-   change on a row of same-weight words — Daniel was still hunting for the row. A solid block of
-   --primary with the page background as its text is the highest-contrast pair the theme owns
-   (5.6:1 on warm), and it is the only filled thing on the page, so it is found without reading. */
-.tab[aria-selected="true"] { background: var(--primary); color: var(--background); font-weight: 700; }
-.tab:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: -2px; }
-/* A TAB ROW HAS TWO HALVES, and they are not the same kind of thing. On the left are the tabs
-   you go to in order to DO something — run a review, edit config, dispatch a job. On the right
-   are the ones you go to in order to UNDERSTAND something — conformance, how it works. Mixing
-   them in one undifferentiated row makes "where do I act?" a reading task every time.
-
-   `.tab--info` on the FIRST reference tab pushes it and every sibling after it to the right,
-   because an auto inline-start margin in a flex row absorbs all the free space. One class, on
-   one element, and the split maintains itself as tabs are added to either side.
-
-   It is dropped below the mobile breakpoint on purpose: the row wraps there, so an auto margin
-   would strand a single tab alone on its own line rather than aligning anything. */
-.tab--info { margin-inline-start: auto; }
-@media (max-width: 40rem) {
-  .tab--info { margin-inline-start: 0; }
-}
-/* 44px on a touch screen — tabs are the primary navigation of these pages, so they are the last
-   control that should be hard to hit. */
-@media (pointer: coarse), (max-width: 40rem) {
-  .tab { padding: 0.7rem 0.8rem; min-height: 44px; }
-}
-section.doc.tab-panel { margin-top: 1.35rem; }
 
 /* ── fold: progressive disclosure whose affordance is always visible ───────────────────────────
    The detail behind a visual has to open by TAP — these pages are read from a phone, where hover

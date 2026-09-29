@@ -869,9 +869,12 @@ await section("SILENT — an icon is for the eye; a menu's label names its group
 // Code, not prose: the comments that record a removal name the class, so they are stripped first.
 await section("REMOVED — the classes 0.60.0 removed are not declared (§1.1), and the glyph lists agree", async () => {
   const css = readFileSync(join(root, "src/components.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  const back = [".filter-ctl", ".filter-set", ".filter-set-label", ".tbl-toolbar", ".tbl-search", ".tbl-filter-input"]
+  // The tab bar moved to data.css with its runtime (WP11): a second .tab here would tie with it and
+  // the bundle's import order would pick the look.
+  const back = [".filter-ctl", ".filter-set", ".filter-set-label", ".tbl-toolbar", ".tbl-search", ".tbl-filter-input",
+    ".tabs", ".tab", ".tab--info", ".tab-panel"]
     .filter((name) => new RegExp(`${name.replace(".", "\\.")}(?![\\w-])`).test(css));
-  check("components.css declares none of .filter-ctl, .filter-set(-label), .tbl-toolbar, .tbl-search, .tbl-filter-input", back.length === 0, back);
+  check("components.css declares none of .filter-ctl, .filter-set(-label), .tbl-toolbar, .tbl-search, .tbl-filter-input, and not the tab bar (data.css)", back.length === 0, back);
   // The forced glyph rule and its `@supports not` fallback list the same selectors twice, by hand.
   const list = (re) => (css.match(re)?.[1] || "").split(",").map((sel) => sel.trim()).filter(Boolean).sort();
   const glyphs = list(/\}\s*([^{}]+)\{\s*forced-color-adjust:\s*preserve-parent-color;/);

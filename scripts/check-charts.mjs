@@ -1,0 +1,202 @@
+#!/usr/bin/env node
+/*
+ * check-charts.mjs — runtime/charts.js in a real browser: the points, the break, the size, the text.
+ *
+ * WHAT IS AT RISK:
+ *   · THE TEXT SIZE. Both charts this replaces set labels at 9-11 units inside a scaled viewBox, so the
+ *     text shrank with the column: a 720-unit chart shown 360px wide printed 5px labels. A computed
+ *     `font-size` of 12px is NOT enough to prove that fixed — under a viewBox the CSS still says 12px
+ *     and the pixels are 6. So the RENDERED glyph box is measured at two plot widths and must match,
+ *     and the SVG must have no viewBox and be exactly the plot's size.
+ *   · THE POINTS. A chart that draws is not a chart that draws the data. The dots are asserted at their
+ *     slots and heights — the max at the top, zero on the axis — and a hollow point must break the line:
+ *     the path's subpaths must be exactly the runs of solid points.
+ *   · A CHART IN A HIDDEN TAB. It measures 0 when rendered; it must draw when the panel is shown, and
+ *     redraw when the plot is resized.
+ *   · COLOUR BY CLASS. `fill="var(--x)"` silently paints black; so no mark may carry a colour
+ *     attribute, and a theme switch must recolour the SAME nodes with no redraw.
+ *
+ *   node scripts/check-charts.mjs
+ */
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { launch, reporter, requireBrowser, serve } from "./lib/chromium.mjs";
+
+requireBrowser("check-charts", "Layout, rendered glyph boxes and a ResizeObserver are browser behaviour.");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const { check, done } = reporter("check-charts");
+
+const HARNESS = `<!doctype html><html data-theme="warm"><head><meta charset="utf-8">
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/data.css">
+<style>
+  body { margin: 0; font-family: var(--font-mono); font-size: var(--fs-base); }
+  :root { --cat-l: 0.45; --cat-c: 0.075; --cat-green: oklch(var(--cat-l) var(--cat-c) 150); --cat-red: oklch(var(--cat-l) var(--cat-c) 25); }
+</style></head><body>
+<div id="box" style="width: 960px"><figure class="chart"><div class="chart-plot" id="line"></div></figure></div>
+<div id="hidden-panel" hidden><figure class="chart"><div class="chart-plot" id="lazy"></div></figure></div>
+<div style="width: 300px"><figure class="chart"><div class="chart-plot" id="narrow"></div></figure></div>
+<div style="width: 600px"><figure class="chart"><div class="chart-plot" id="bars"></div></figure></div>
+<div style="width: 600px"><figure class="chart"><div class="chart-plot" id="grouped"></div></figure></div>
+<div style="width: 600px"><figure class="chart"><div class="chart-plot" id="signed"></div></figure></div>
+<div style="width: 600px"><figure class="chart"><div class="chart-plot" id="empty"></div></figure></div>
+<script type="module">
+  import { renderLineChart, renderBarChart } from "/runtime/charts.js";
+  window.renderLineChart = renderLineChart;
+  window.renderBarChart = renderBarChart;
+  window.frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  window.WEEKS = [
+    { x: "w1", v: 1, n: 12 }, { x: "w2", v: 3, n: 2 }, { x: "w3", v: 2, n: 14 }, { x: "w4", v: 4, n: 16 },
+    { x: "w5", v: 0, n: 11 }, { x: "w6", v: null, n: 0 }, { x: "w7", v: 2, n: 13 }, { x: "w8", v: 1, n: 9 },
+  ];
+  window.LINE = { label: "mistakes per week", x: (p) => p.x, value: (p) => p.v, solid: (p) => p.n >= 5, sub: (p) => "n " + p.n,
+    tip: (p) => p.x + ": " + p.v, markers: [{ at: 2, kind: "line", tip: "model changed" }, { at: 6, kind: "tick", tip: "rules added" }] };
+  window.q = (id, sel) => Array.from(document.querySelectorAll("#" + id + " " + sel));
+  window.ready = true;
+</script></body></html>`;
+
+const server = await serve(root, { "/__charts.html": HARNESS });
+const browser = await launch("charts");
+const { evaluate, until, navigate } = browser;
+await navigate(`${server.origin}/__charts.html`);
+await until("window.ready === true");
+
+/* ── the size, and the text ───────────────────────────────────────────────────────────────────── */
+
+const textAt = async (width) => {
+  await evaluate(`document.getElementById("box").style.width = "${width}px"; window.renderLineChart(document.getElementById("line"), WEEKS, LINE); null`);
+  return evaluate(`(() => {
+    const plot = document.getElementById("line"), svg = plot.querySelector("svg"), texts = q("line", "text");
+    return { plotW: plot.clientWidth, plotH: plot.clientHeight, svgW: Number(svg.getAttribute("width")), svgH: Number(svg.getAttribute("height")),
+      viewBox: svg.getAttribute("viewBox"), sizes: Array.from(new Set(texts.map((t) => getComputedStyle(t).fontSize))),
+      glyphH: Array.from(new Set(texts.map((t) => Math.round(t.getBoundingClientRect().height * 10) / 10))), count: texts.length };
+  })()`);
+};
+const wide = await textAt(960);
+const small = await textAt(360);
+await check("the SVG is drawn at the plot's measured size, with NO viewBox to scale it",
+  () => wide.viewBox === null && wide.svgW === wide.plotW && wide.svgH === wide.plotH && small.svgW === small.plotW && small.plotW === 360,
+  JSON.stringify({ wide, small }));
+await check("every label computes to 12px (--fs-base) at 960px and at 360px",
+  () => wide.sizes.join() === "12px" && small.sizes.join() === "12px", JSON.stringify([wide.sizes, small.sizes]));
+await check("...and RENDERS at the same glyph height at both widths — the pixels, which a viewBox would have shrunk",
+  () => wide.glyphH.length === 1 && small.glyphH.length === 1 && wide.glyphH[0] === small.glyphH[0] && wide.glyphH[0] >= 12,
+  JSON.stringify([wide.glyphH, small.glyphH]));
+await check("the plot is role=img, named by `label`", () => evaluate(`(() => { const p = document.getElementById("line");
+  return p.getAttribute("role") === "img" && p.getAttribute("aria-label") === "mistakes per week"; })()`));
+
+/* ── the points, and the break ────────────────────────────────────────────────────────────────── */
+
+await textAt(960);
+const geo = await evaluate(`(() => {
+  const dots = q("line", "circle.chart-dot").map((c) => ({ x: +c.getAttribute("cx"), y: +c.getAttribute("cy"), hollow: c.classList.contains("chart-dot--hollow"), tip: c.getAttribute("data-tip") }));
+  const axis = q("line", "line.chart-axis")[0];
+  const d = q("line", "path.chart-line")[0].getAttribute("d");
+  const runs = d.split("M").filter(Boolean).map((sub) => sub.split("L").map((pt) => pt.trim().split(/\\s+/).map(Number)));
+  return { dots, axisY: +axis.getAttribute("y1"), runs, labels: q("line", "text").map((t) => t.textContent) };
+})()`);
+const xs = geo.dots.map((d) => d.x);
+const steps = xs.slice(1).map((x, i) => x - xs[i]);
+await check("one dot per point with a value (7 of 8 — the null week draws nothing), at evenly spaced slots",
+  () => geo.dots.length === 7 && Math.max(...steps.filter((s, i) => i !== 4)) - Math.min(...steps.filter((s, i) => i !== 4)) <= 0.2,
+  JSON.stringify(xs));
+await check("the max sits at the top of the plot and a zero ON the axis — the y axis starts at zero",
+  () => { const top = Math.min(...geo.dots.map((d) => d.y)); const zero = geo.dots[4]; return geo.dots[3].y === top && Math.abs(zero.y - geo.axisY) <= 1 && geo.labels.includes("0") && geo.labels.includes("4"); },
+  JSON.stringify(geo.dots));
+await check("a week with too few data is a HOLLOW dot, and the others are solid",
+  () => geo.dots.map((d) => d.hollow).join() === "false,true,false,false,false,false,false", JSON.stringify(geo.dots.map((d) => d.hollow)));
+await check("the line BREAKS at the hollow week and at the missing one: its subpaths are exactly the solid runs [w1] [w3 w4 w5] [w7 w8]",
+  () => geo.runs.length === 3 && geo.runs.map((r) => r.length).join() === "1,3,2" &&
+    geo.runs[1].every(([x], i) => Math.abs(x - geo.dots[2 + i].x) < 0.2) && Math.abs(geo.runs[2][0][0] - geo.dots[5].x) < 0.2,
+  JSON.stringify(geo.runs));
+await check("every mark carries its data-tip", () => geo.dots.every((d) => d.tip && d.tip.startsWith("w")) , JSON.stringify(geo.dots.map((d) => d.tip)));
+await check("the markers: a dashed vertical at its slot from top to axis, a 3px tick on the floor, each with its tip",
+  () => evaluate(`(() => { const m = q("line", "line.chart-marker")[0], t = q("line", "line.chart-tick")[0];
+    return m && t && m.getAttribute("data-tip") === "model changed" && t.getAttribute("data-tip") === "rules added" &&
+      +t.getAttribute("y1") - +t.getAttribute("y2") === 8 && getComputedStyle(t).strokeWidth === "3px" &&
+      getComputedStyle(m).strokeDasharray.replace(/px/g, "") === "4, 3"; })()`));
+await check("a second label line (`sub`) under each x label", () => geo.labels.includes("n 12") && geo.labels.includes("n 14"), JSON.stringify(geo.labels));
+
+/* ── colour by class, never by attribute ──────────────────────────────────────────────────────── */
+
+await check("no mark carries a fill or stroke ATTRIBUTE — a CSS variable there silently paints black",
+  () => evaluate(`!document.querySelector(".chart-plot [fill], .chart-plot [stroke]")`));
+const before = await evaluate(`(() => { window.keepLine = q("line", "path.chart-line")[0]; return getComputedStyle(window.keepLine).stroke; })()`);
+await evaluate(`document.documentElement.dataset.theme = "green"; null`);
+const after = await evaluate(`(() => ({ same: q("line", "path.chart-line")[0] === window.keepLine, stroke: getComputedStyle(window.keepLine).stroke }))()`);
+await evaluate(`document.documentElement.dataset.theme = "warm"; null`);
+await check("a theme switch recolours the SAME path with no redraw (warm --primary -> green --primary)",
+  () => after.same && before === "rgb(138, 69, 22)" && after.stroke === "rgb(51, 255, 102)", JSON.stringify({ before, after }));
+
+/* ── hidden, shown, resized ───────────────────────────────────────────────────────────────────── */
+
+await evaluate(`window.renderLineChart(document.getElementById("lazy"), WEEKS, LINE); null`);
+await check("a plot inside a HIDDEN panel measures 0 and draws nothing yet — a chart drawn at 0 is drawn wrong",
+  () => evaluate(`!document.querySelector("#lazy svg")`));
+await evaluate(`document.getElementById("hidden-panel").hidden = false; null`);
+await until(`!!document.querySelector("#lazy svg")`, "the lazy chart to draw once shown");
+await check("...and draws itself, at the right size, the moment the panel is shown (one ResizeObserver per plot)",
+  () => evaluate(`(() => { const p = document.getElementById("lazy"), s = p.querySelector("svg");
+    return +s.getAttribute("width") === p.clientWidth && p.clientWidth > 0 && q("lazy", "circle").length === 7; })()`));
+await evaluate(`document.getElementById("box").style.width = "500px"; null`);
+await until(`+document.querySelector("#line svg").getAttribute("width") === 500`, "the resize redraw");
+await check("a resized plot is redrawn at its new size, coalesced to a frame",
+  () => evaluate(`+document.querySelector("#line svg").getAttribute("width") === document.getElementById("line").clientWidth`));
+
+/* ── x labels thinned to fit ──────────────────────────────────────────────────────────────────── */
+
+await evaluate(`window.renderLineChart(document.getElementById("narrow"),
+  Array.from({ length: 30 }, (_, i) => ({ x: "2026-09-" + String(i + 1).padStart(2, "0"), v: i % 7 })), { label: "thin" }); null`);
+const thin = await evaluate(`(() => {
+  const xl = q("narrow", "text[text-anchor=middle]").map((t) => t.getBoundingClientRect());
+  return { n: xl.length, overlaps: xl.slice(1).filter((r, i) => r.left < xl[i].right).length };
+})()`);
+await check("30 long x labels in 300px are thinned to every Nth — and none of the kept ones overlap",
+  () => thin.n > 1 && thin.n < 30 && thin.overlaps === 0, JSON.stringify(thin));
+
+/* ── bars ─────────────────────────────────────────────────────────────────────────────────────── */
+
+await evaluate(`window.renderBarChart(document.getElementById("bars"),
+  [3, 9, 0, 12, 6].map((n, i) => ({ x: "w" + i, n })), { label: "findings", x: (r) => r.x, series: [{ value: (r) => r.n }], tip: (r) => r.x + ": " + r.n }); null`);
+const bars = await evaluate(`(() => { const rects = q("bars", "rect.chart-bar").map((r) => ({ x: +r.getAttribute("x"), w: +r.getAttribute("width"), h: +r.getAttribute("height"), y: +r.getAttribute("y"), tip: r.getAttribute("data-tip") }));
+  return { rects, axisY: +q("bars", "line.chart-axis")[0].getAttribute("y1"), fill: getComputedStyle(q("bars", "rect.chart-bar")[0]).fill, opacity: getComputedStyle(q("bars", "rect.chart-bar")[0]).opacity }; })()`);
+const slot = bars.rects[1].x - bars.rects[0].x;
+await check("one bar per slot, the slot width less 4px, standing on the zero axis",
+  () => bars.rects.length === 5 && Math.abs(bars.rects[0].w - (slot - 4)) <= 0.2 && bars.rects.every((r) => Math.abs(r.y + r.h - bars.axisY) <= 1),
+  JSON.stringify(bars));
+await check("the tallest bar is the max; a zero is a bar of no height", () => bars.rects[3].h === Math.max(...bars.rects.map((r) => r.h)) && bars.rects[2].h === 0, JSON.stringify(bars.rects));
+await check("bars are SOLID — full opacity, in --primary (cockpit's .55 measured 2.47:1)", () => bars.fill === "rgb(138, 69, 22)" && bars.opacity === "1", JSON.stringify(bars));
+
+await evaluate(`window.renderBarChart(document.getElementById("grouped"),
+  [["apr", 5200, 4100], ["may", 5200, 5600], ["jun", 6100, 4300]].map(([m, a, b]) => ({ m, a, b })),
+  { label: "flow", x: (r) => r.m, grid: true, format: (v) => "€" + v,
+    series: [{ key: "income", value: (r) => r.a, color: "var(--cat-green)" }, { key: "expenses", value: (r) => r.b, color: "var(--cat-red)" }] }); null`);
+const grouped = await evaluate(`(() => {
+  const groups = q("grouped", "g.chart-series");
+  const rects = groups.map((g) => Array.from(g.querySelectorAll("rect")).map((r) => ({ x: +r.getAttribute("x"), w: +r.getAttribute("width") })));
+  return { keys: groups.map((g) => g.dataset.series), styles: groups.map((g) => g.getAttribute("style")), fills: groups.map((g) => getComputedStyle(g.querySelector("rect")).fill),
+    rects, grid: q("grouped", "line.chart-grid").length, ylabels: q("grouped", "text[text-anchor=end]").map((t) => t.textContent) };
+})()`);
+await check("several series are grouped side by side, 1px apart, one <g> per series",
+  () => grouped.keys.join() === "income,expenses" && grouped.rects.every((r) => r.length === 3) &&
+    grouped.rects[0].every((r, i) => Math.abs(grouped.rects[1][i].x - (r.x + r.w + 1)) <= 0.2), JSON.stringify(grouped.rects));
+await check("a series' colour is written as --chart-color on its group, and the bar paints it",
+  () => grouped.styles[0] === "--chart-color: var(--cat-green)" && grouped.fills[0] !== grouped.fills[1] && grouped.fills[0] !== "rgb(138, 69, 22)",
+  JSON.stringify(grouped));
+await check("with `grid`, 4-6 round ticks from zero, formatted by `format`, and a gridline at each but the zero axis",
+  () => grouped.ylabels.length >= 4 && grouped.ylabels.length <= 6 && grouped.ylabels[0] === "€0" && grouped.grid === grouped.ylabels.length - 1,
+  JSON.stringify(grouped));
+
+await evaluate(`window.renderBarChart(document.getElementById("signed"), [{ x: "a", value: 5 }, { x: "b", value: -3 }], { label: "net" }); null`);
+const signed = await evaluate(`(() => { const r = q("signed", "rect"); const axis = +q("signed", "line.chart-axis")[0].getAttribute("y1");
+  return { axis, a: [+r[0].getAttribute("y"), +r[0].getAttribute("height")], b: [+r[1].getAttribute("y"), +r[1].getAttribute("height")] }; })()`);
+await check("a negative value hangs BELOW the zero axis, a positive one stands on it",
+  () => Math.abs(signed.a[0] + signed.a[1] - signed.axis) <= 1 && Math.abs(signed.b[0] - signed.axis) <= 1 && signed.b[1] > 0, JSON.stringify(signed));
+await evaluate(`window.renderLineChart(document.getElementById("empty"), [], { label: "nothing yet" });
+  window.renderBarChart(document.getElementById("empty"), [], { label: "nothing yet" }); null`);
+await check("no data draws an empty frame (the axis), not an error", () => evaluate(`q("empty", "line.chart-axis").length === 1`));
+await evaluate(`window.renderLineChart(document.getElementById("empty"), [{ x: "a", value: 2 }, { x: "b", value: 5 }, { x: "c", value: 3 }], { label: "area", area: true }); null`);
+await check("`area` fills under each run of the line", () => evaluate(`q("empty", "path.chart-area").length === 1 && q("empty", "path.chart-area")[0].getAttribute("d").endsWith("Z")`));
+
+browser.close();
+server.close();
+done();

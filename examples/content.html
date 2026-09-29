@@ -221,12 +221,15 @@
         }
         if (!probe('<i data-icon="check"></i>', (el) => getComputedStyle(el).getPropertyValue("--ico").trim() !== "")) {
           css += Object.keys(ICONS).map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
-          // WP4's tokens.css ships this default beside the mapping, in @layer base so a component's own
-          // forced-colours rule wins: a [data-icon]::before glyph paints its parent's FORCED colour.
+          // WP4's tokens.css (wp4-icons c35f091) ships this default beside the mapping, in @layer base so
+          // a component's own forced-colours rule wins: a [data-icon]::before glyph paints its parent's
+          // FORCED colour. Without preserve-parent-color: `none` and a CanvasText background, and NO
+          // `color`, so a component's own `@supports not` branch painting currentColor keeps its host's.
           css += "@layer base { @media (forced-colors: active) {" +
-            " [data-icon]::before { forced-color-adjust: none; color: CanvasText; --tone: CanvasText; }" +
             " @supports (forced-color-adjust: preserve-parent-color) {" +
-            " [data-icon]::before { forced-color-adjust: preserve-parent-color; color: inherit; --tone: currentColor; } } } }";
+            " [data-icon]::before { forced-color-adjust: preserve-parent-color; --tone: currentColor; } }" +
+            " @supports not (forced-color-adjust: preserve-parent-color) {" +
+            " [data-icon]::before { forced-color-adjust: none; background: CanvasText; } } } }";
           glyphs.push("[data-icon] mapping");
         }
         if (!probe('<span class="ico"></span>', (el) => getComputedStyle(el).display === "inline-block")) {

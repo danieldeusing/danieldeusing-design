@@ -679,7 +679,7 @@ try {
         forcedCells.set(what, entry);
       }, ({ what }, without, box) => {
         const left = inkIn(without, box);
-        if (left.ratio >= 1.5) leftovers.push(`${scheme}/${theme} ${what}: ${left.ratio}:1 (ink ${left.ink} on ${left.on}) with the element hidden`);
+        if (left.ratio > 1.1) leftovers.push(`${scheme}/${theme} ${what}: ${left.ratio}:1 (ink ${left.ink} on ${left.on}) with the element hidden`);
       });
     }
   }
@@ -687,7 +687,7 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await evaluate(`document.documentElement.dataset.theme = "warm"; null`);
   await reset();
-  await check("forced colours, both palettes: every crop's ink is its element's — hidden, the element takes it with it",
+  await check("forced colours, both palettes: every crop is owned — with its element hidden it measures 1.1:1 or less",
     leftovers.length === 0, leftovers.join("; "));
   for (const [what, { floor, cells }] of forcedCells) {
     const low = Object.entries(cells).filter(([, m]) => m.ratio < floor).map(([c, m]) => `${c} ${m.ratio} (ink ${m.ink} on ${m.on})`);
@@ -753,12 +753,15 @@ try {
   await check("...nor one that starts on the backdrop and ends inside", () => evaluate(`__o.$("dlg-default").open`));
   await evaluate(`__o.$("dlg-default").close(); null`);
   await clickT("open-default");
-  const rim = await evaluate(`(() => { const r = __o.$("dlg-default").getBoundingClientRect(); return { x: r.left + 0.5, y: r.top + r.height / 2 }; })()`);
+  // The border's own pixel: at left + 0.5 the hit test already lands on the body inside it.
+  const rim = await evaluate(`(() => { const d = __o.$("dlg-default"), r = d.getBoundingClientRect(), x = Math.floor(r.left), y = Math.round(r.top + r.height / 2);
+    window.__rimTarget = null; d.addEventListener("pointerdown", (e) => { window.__rimTarget = e.target === d; }, { once: true, capture: true }); return { x, y }; })()`);
   await mouse("mouseMoved", rim.x, rim.y);
   await mouse("mousePressed", rim.x, rim.y, { button: "left", clickCount: 1 });
   await mouse("mouseReleased", 12, 890, { button: "left", clickCount: 1 });
   await sleep(80);
-  await check("...nor one that starts on the dialog's 1px edge and is released on the scrim", () => evaluate(`__o.$("dlg-default").open`));
+  await check("...nor one that starts on the dialog's 1px edge and is released on the scrim",
+    () => evaluate(`window.__rimTarget === true && __o.$("dlg-default").open`), () => evaluate(`({ pressedTheDialog: window.__rimTarget, open: __o.$("dlg-default").open })`));
   await reset();
   await clickT("open-inactive");
   await check("an aria-disabled opener opens nothing", () => evaluate(`__o.open().length === 0`));
@@ -873,9 +876,12 @@ try {
     d.innerHTML = '<div class="dialog-body"><p>a page opened this with its own showModal()</p><button type="button">ok</button></div>';
     document.body.append(d); d.showModal(); })(); null`);
   await key("Escape"); await key("Escape"); await key("Escape");
-  const bareHeld = await evaluate(`document.getElementById("bare-alert").open`);
+  // A close request that is not a key — requestClose(), a phone's back gesture — reaches the
+  // dialog only as `cancel`, and only the root's cancel guard stands in its way.
+  const bareHeld = await evaluate(`(() => { const d = document.getElementById("bare-alert"); if (typeof d.requestClose !== "function") return "no requestClose";
+    d.requestClose(); return d.open; })()`);
   await evaluate(`document.getElementById("bare-alert").remove(); null`);
-  await check("an alert a page opened with a bare showModal() holds against Escape too (the guard is the root's)", bareHeld, { bareHeld });
+  await check("an alert a page opened with a bare showModal() holds against Escape and requestClose() too (the guards are the root's)", bareHeld === true, { bareHeld });
   await evaluate(`(async () => { const m = await import("/runtime/dialog.js"); m.openDialog("dlg-alert");
     const d = document.createElement("dialog"); d.id = "native-top"; d.innerHTML = '<button type="button">ok</button>'; document.body.append(d);
     d.showModal(); d.querySelector("button").focus(); })()`);

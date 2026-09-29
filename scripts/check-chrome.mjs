@@ -31,7 +31,7 @@
  *   node scripts/check-chrome.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize } from "node:path";
@@ -100,13 +100,15 @@ const BASE = `http://127.0.0.1:${server.address().port}/examples/chrome.html`;
 /* ── the browser ──────────────────────────────────────────────────────────────────────────────── */
 const PORT = Number(process.env.DD_CDP_PORT) || 19240 + Math.floor(Math.random() * 400);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const profile = mkdtempSync(join(tmpdir(), "dd-chrome-"));
 const chrome = spawn(CHROME, [
   `--remote-debugging-port=${PORT}`, "--remote-allow-origins=*", "--headless=new",
   "--no-first-run", "--no-default-browser-check", "--disable-gpu",
-  `--user-data-dir=${mkdtempSync(join(tmpdir(), "dd-chrome-"))}`, "about:blank",
-], { stdio: "ignore" });
+  `--user-data-dir=${profile}`, "about:blank",
+], { stdio: "ignore", detached: true });
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+// The browser leads its own process group, so the whole group goes before its profile does.
+const shutdown = () => { try { socket?.close(); } catch {} try { process.kill(-chrome.pid, "SIGKILL"); } catch { chrome.kill("SIGKILL"); } try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch {} server.close(); };
 process.on("exit", shutdown);
 for (let i = 0; ; i += 1) {
   try { await fetch(`http://127.0.0.1:${PORT}/json/version`); break; } catch {}

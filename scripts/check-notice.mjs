@@ -28,7 +28,7 @@
  *   node scripts/check-notice.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -109,9 +109,11 @@ const profile = mkdtempSync(join(tmpdir(), "dd-notice-"));
 const chrome = spawn(CHROME, [
   "--remote-debugging-port=0", "--remote-allow-origins=*", "--headless=new",
   "--no-first-run", "--no-default-browser-check", "--disable-gpu", `--user-data-dir=${profile}`, "about:blank",
-], { stdio: "ignore" });
+], { stdio: "ignore", detached: true });
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+// The browser leads its own process group, so the whole group goes before its profile does: no
+// renderer is still writing into what is removed, and no run leaves a profile in $TMPDIR.
+const shutdown = () => { try { socket?.close(); } catch {} try { process.kill(-chrome.pid, "SIGKILL"); } catch { chrome.kill("SIGKILL"); } try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch {} server.close(); };
 process.on("exit", shutdown);
 
 let port = 0;

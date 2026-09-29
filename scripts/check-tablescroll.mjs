@@ -27,7 +27,7 @@
  *   node scripts/check-tablescroll.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,14 +64,16 @@ if (!CHROME) {
 const PORT = 19223;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const profile = mkdtempSync(join(tmpdir(), "dd-tablescroll-"));
 const chrome = spawn(CHROME, [
   `--remote-debugging-port=${PORT}`, "--remote-allow-origins=*", "--headless=new",
   "--no-first-run", "--no-default-browser-check", "--disable-gpu",
-  `--user-data-dir=${mkdtempSync(join(tmpdir(), "dd-tablescroll-"))}`, "about:blank",
-], { stdio: "ignore" });
+  `--user-data-dir=${profile}`, "about:blank",
+], { stdio: "ignore", detached: true });
 
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); };
+// The browser leads its own process group, so the whole group goes before its profile does.
+const shutdown = () => { try { socket?.close(); } catch {} try { process.kill(-chrome.pid, "SIGKILL"); } catch { chrome.kill("SIGKILL"); } try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch {} };
 process.on("exit", shutdown);
 
 for (let i = 0; ; i += 1) {

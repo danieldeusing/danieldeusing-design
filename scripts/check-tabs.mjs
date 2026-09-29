@@ -221,6 +221,61 @@ await evaluate("window.initTabs(); null");
 await check("a deep link to a DISABLED tab's panel is not honoured — the markup's selection stands",
   () => evaluate(`sel("outer") === "t-a" && shown().split(",").includes("p-a")`), state);
 
+/* ── attributes rewritten in place, with no patcher ───────────────────────────────────────────────
+   What a DOM patcher does to a row, done by the page itself with setAttribute / removeAttribute, so
+   the guard runs from a design checkout alone: a revert of the attribute observation must fail HERE,
+   not only where a danieldeusing-infra checkout happens to sit beside this one.
+     H1 · the S1 shape: the selection is mirrored, and every tabindex is removed;
+     H2 · the S2 shape: the row is put back on a fixed selection, panels OUTSIDE the row's parent. */
+{
+  const HAND = `<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/data.css"></head><body>
+<button type="button" id="start">start</button>
+<div id="m1"><div class="tabs" role="tablist" aria-label="h1">
+  <button type="button" class="tab" role="tab" id="h1-a" aria-controls="h1-p-a" aria-selected="true">a</button>
+  <button type="button" class="tab" role="tab" id="h1-b" aria-controls="h1-p-b">b</button>
+  <button type="button" class="tab" role="tab" id="h1-c" aria-controls="h1-p-c">c</button></div>
+  <div id="h1-p-a" role="tabpanel">a</div><div id="h1-p-b" role="tabpanel">b</div><div id="h1-p-c" role="tabpanel">c</div></div>
+<div id="m2"><div class="tabs" role="tablist" aria-label="h2">
+  <button type="button" class="tab" role="tab" id="h2-a" aria-controls="h2-p-a" aria-selected="true">a</button>
+  <button type="button" class="tab" role="tab" id="h2-b" aria-controls="h2-p-b" aria-selected="false" tabindex="-1">b</button>
+  <button type="button" class="tab" role="tab" id="h2-c" aria-controls="h2-p-c" aria-selected="false" tabindex="-1">c</button></div></div>
+<div id="h2-p-a" role="tabpanel">a</div><div id="h2-p-b" role="tabpanel">b</div><div id="h2-p-c" role="tabpanel">c</div>
+<script type="module">
+  import { initTabs } from "/runtime/tabs.js";
+  const H = ["a", "b", "c"];
+  window.events = [];
+  document.addEventListener("tab-activated", (e) => window.events.push(e.target.id));
+  const tab = (p, h) => document.getElementById(p + "-" + h);
+  window.R = {
+    h1: () => H.forEach((h) => tab("h1", h).removeAttribute("tabindex")),
+    h2: () => H.forEach((h, i) => { tab("h2", h).setAttribute("aria-selected", String(i === 0));
+      if (i) tab("h2", h).setAttribute("tabindex", "-1"); else tab("h2", h).removeAttribute("tabindex"); }),
+  };
+  window.state = (p) => JSON.stringify({
+    selected: H.filter((h) => tab(p, h).getAttribute("aria-selected") === "true").join(","),
+    tabIndex: H.map((h) => tab(p, h).tabIndex).join(","),
+    shown: H.filter((h) => !document.getElementById(p + "-p-" + h).hidden).join(","),
+  });
+  initTabs();
+  window.ready = true;
+</script></body></html>`;
+  const handServer = await serve(root, { "/__hand.html": HAND });
+  await navigate(`${handServer.origin}/__hand.html`);
+  await until("window.ready === true");
+  const hand = {};
+  for (const p of ["h1", "h2"]) {
+    await evaluate(`document.getElementById("${p}-b").click(); events.length = 0; R.${p}(); null`);
+    await sleep(100); // the MutationObserver's turn
+    hand[p] = { ...JSON.parse(await evaluate(`state("${p}")`)), events: await evaluate("events.join(' ')") };
+  }
+  await check("H1 — every tabindex removed in place (no patcher): the row keeps ONE tab stop, on the selected tab, and says nothing",
+    () => hand.h1.selected === "b" && hand.h1.tabIndex === "-1,0,-1" && hand.h1.shown === "b" && hand.h1.events === "", JSON.stringify(hand.h1));
+  await check("H2 — the selection put back on a in place: the panels outside follow the bar, one tab stop, and tab-activated says so",
+    () => hand.h2.selected === "a" && hand.h2.tabIndex === "0,-1,-1" && hand.h2.shown === "a" && hand.h2.events === "h2-a", JSON.stringify(hand.h2));
+  handServer.close();
+}
+
 /* ── a DOM patcher re-renders the row ─────────────────────────────────────────────────────────────
    cockpit re-renders with `cockpitPatch` (cockpit/pages/dom-patch.js), which writes ATTRIBUTES into
    the nodes already there instead of replacing them — so no childList record ever fires. Before
@@ -236,6 +291,10 @@ const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) 
   .find((path) => path && existsSync(path));
 if (!DOM_PATCH) {
   console.log("check-tabs: the dom-patch section SKIPPED — no danieldeusing-infra checkout beside this one (set DD_COCKPIT_DOM_PATCH).");
+  if (process.env.DD_REQUIRE_COCKPIT_DOM_PATCH === "1") {
+    await check("DD_REQUIRE_COCKPIT_DOM_PATCH=1: the real dom-patch.js was found and driven", () => false,
+      "no danieldeusing-infra checkout beside this one and no DD_COCKPIT_DOM_PATCH");
+  }
 } else {
   const PATCH = `<!doctype html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/data.css">

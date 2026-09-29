@@ -70,6 +70,11 @@ const overrides = new Map(
     return [normalize(path).replace(/^\/+/, ""), file];
   }),
 );
+// Cockpit's real attribute patcher, when this machine has the infra checkout: the S1 checks drive it.
+// A design-only checkout skips those (the always-on setAttribute cases still run), unless
+// DD_REQUIRE_COCKPIT_DOM_PATCH=1 makes the missing file a failure.
+const DOM_PATCH = process.env.DD_COCKPIT_DOM_PATCH || `${process.env.HOME}/Work/danieldeusing/danieldeusing-infra/cockpit/pages/dom-patch.js`;
+if (existsSync(DOM_PATCH) && !overrides.has("cockpit/dom-patch.js")) overrides.set("cockpit/dom-patch.js", DOM_PATCH);
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript", ".svg": "image/svg+xml" };
 /*
  * THE TAILWIND ENTRY'S CASCADE, without Tailwind: tokens.css unlayered, chrome.css in
@@ -447,13 +452,16 @@ const crumbs = await page(`(() => { const lis = T.qa("#demo-crumbs li");
     path: T.cs("#demo-crumbs", "color"), home: T.cs("#demo-crumbs .crumbs-home", "color"), current: T.cs('#demo-crumbs [aria-current="page"]', "color"),
     muted: T.colour("var(--muted-foreground)"), primary: T.colour("var(--primary)"), fg: T.colour("var(--foreground)"),
     buttonFont: [T.cs("#demo-crumbs button", "fontFamily"), T.cs("#demo-crumbs", "fontFamily")], ellipsis: T.cs("#demo-crumbs", "textOverflow"),
-    line: T.rect('#demo-crumbs [aria-current="page"]').top, nav: document.querySelector("#demo-crumbs").tagName, label: document.querySelector("#demo-crumbs").getAttribute("aria-label") }; })()`);
+    line: T.rect('#demo-crumbs [aria-current="page"]').top - T.rect("#demo-crumbs").top - parseFloat(T.cs("#demo-crumbs", "paddingTop")), nav: document.querySelector("#demo-crumbs").tagName, label: document.querySelector("#demo-crumbs").getAttribute("aria-label") }; })()`);
 await check('crumbs: a named nav, an ordered list, the separator drawn and not read ("/" / "")',
   () => crumbs.nav === "NAV" && crumbs.label === "breadcrumb" && crumbs.sep === '"/" / ""' && crumbs.first === "none" && crumbs.host === "true", crumbs);
 await check("…muted path, --primary home, --foreground current", () => crumbs.path === crumbs.muted && crumbs.home === crumbs.primary && crumbs.current === crumbs.fg, crumbs);
 await check("…a button segment reads as the link beside it, and the path ellipsizes", () => crumbs.buttonFont[0] === crumbs.buttonFont[1] && crumbs.ellipsis === "ellipsis", crumbs);
 await load("nobanner", { coarse: true });
-const coarse = await page(`({ link: T.rect("#demo-crumbs a").height, button: T.rect("#demo-crumbs button").height, line: T.rect('#demo-crumbs [aria-current="page"]').top,
+// The line is measured from the nav's CONTENT box, not the page: anything above the crumbs that a
+// coarse pointer makes taller (another package's 44px rows) would move an absolute top.
+const coarse = await page(`({ link: T.rect("#demo-crumbs a").height, button: T.rect("#demo-crumbs button").height,
+  line: T.rect('#demo-crumbs [aria-current="page"]').top - T.rect("#demo-crumbs").top - parseFloat(T.cs("#demo-crumbs", "paddingTop")),
   navlist: T.rect(".toc a").height })`);
 await check("coarse pointer: every crumb is a 44px target (a link's padding grows its 14px content area, not the line)",
   () => coarse.link >= 44 && coarse.button >= 44, coarse);
@@ -720,45 +728,51 @@ const PREPARE = `(() => {
     document.body.append(e);
   } })(); null`;
 const cells = [];
-for (const scheme of PALETTES) {
-  await load("nobanner", { forced: true, scheme });
-  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 450 });
-  await page(PREPARE);
-  const probe = await measure([["an empty patch", "#__blank"], ["a line of body text", "#__ink", null, "self"],
-    ["a clip holding a stranger's ink", "#__two", null, ".__one"]]);
-  for (const theme of THEMES) {
-    await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
-    // Parked on the TOC's own section: the TOC has a current entry (nothing is current above the
-    // first section) and the series list is on screen, so nothing below scrolls until the glyphs.
-    await page(`document.getElementById("toc").scrollIntoView({ block: "start", behavior: "instant" }); null`);
-    await frames(4);
-    const text = await measure(TEXT_ON_STATE);
-    const pairs = {};
-    for (const [name, on, off] of PAIRS) {
-      const [a, b] = Object.values(await measure([[`${name} (on)`, on], [`${name} (off)`, off]]));
-      pairs[name] = a && b ? [a.bg, b.bg] : null;
+// THE COLLECTION RUNS INSIDE A CHECK: a throw anywhere in it (a selector gone, a screenshot refused)
+// is a FAIL naming the error, and the suite still finishes and reports the rest (07-controls).
+await check("forced colours: the measurement pass runs to the end on both palettes", async () => {
+  for (const scheme of PALETTES) {
+    await load("nobanner", { forced: true, scheme });
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 450 });
+    await page(PREPARE);
+    const probe = await measure([["an empty patch", "#__blank"], ["a line of body text", "#__ink", null, "self"],
+      ["a clip holding a stranger's ink", "#__two", null, ".__one"]]);
+    for (const theme of THEMES) {
+      await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
+      // Parked on the TOC's own section: the TOC has a current entry (nothing is current above the
+      // first section) and the series list is on screen, so nothing below scrolls until the glyphs.
+      await page(`document.getElementById("toc").scrollIntoView({ block: "start", behavior: "instant" }); null`);
+      await frames(4);
+      const text = await measure(TEXT_ON_STATE);
+      const pairs = {};
+      for (const [name, on, off] of PAIRS) {
+        const [a, b] = Object.values(await measure([[`${name} (on)`, on], [`${name} (off)`, off]]));
+        pairs[name] = a && b ? [a.bg, b.bg] : null;
+      }
+      const rings = {};
+      for (const [name, selector] of FOCUSED) rings[name] = await ringOf(selector);
+      const followed = await follows(FOLLOWS);
+      const glyphs = await measure(GLYPHS);
+      const disabled = Object.values(await measure([["disabled", "#btn-disabled", null, "self"], ["enabled", "#btn-forward", null, "self"]]));
+      cells.push({ scheme, theme, probe, text, glyphs, pairs, rings, followed, disabled });
     }
-    const rings = {};
-    for (const [name, selector] of FOCUSED) rings[name] = await ringOf(selector);
-    const followed = await follows(FOLLOWS);
-    const glyphs = await measure(GLYPHS);
-    const disabled = Object.values(await measure([["disabled", "#btn-disabled", null, "self"], ["enabled", "#btn-forward", null, "self"]]));
-    cells.push({ scheme, theme, probe, text, glyphs, pairs, rings, followed, disabled });
+    await load("nobanner&burger", { forced: true, scheme, width: 375, height: 812 });
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 805 });
+    await page(PREPARE);
+    for (const theme of THEMES) {
+      await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
+      await frames(2);
+      const cell = cells.find((c) => c.scheme === scheme && c.theme === theme);
+      Object.assign(cell.glyphs, await measure(PHONE_GLYPHS));
+      cell.followed.push(...await follows(PHONE_FOLLOWS));
+    }
   }
-  await load("nobanner&burger", { forced: true, scheme, width: 375, height: 812 });
-  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 805 });
-  await page(PREPARE);
-  for (const theme of THEMES) {
-    await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
-    await frames(2);
-    const cell = cells.find((c) => c.scheme === scheme && c.theme === theme);
-    Object.assign(cell.glyphs, await measure(PHONE_GLYPHS));
-    cell.followed.push(...await follows(PHONE_FOLLOWS));
-  }
-}
+  if (process.env.DD_FORCED_PROBE_THROW === "1") throw new Error("probe: the forced pass threw on purpose");
+  return cells.length === PALETTES.length * THEMES.length;
+});
 const cellName = (c) => `${c.scheme} ${c.theme}`;
 console.log(`\nFORCED COLOURS  painted contrast (ink against what it sits on), ${cells.map(cellName).join(" · ")}`);
-for (const [group, key] of [["text on a state", "text"], ["glyph", "glyphs"], ["focused ring", "rings"]]) {
+for (const [group, key] of cells.length ? [["text on a state", "text"], ["glyph", "glyphs"], ["focused ring", "rings"]] : []) {
   for (const name of Object.keys(cells[0][key])) {
     console.log(`  ${group.padEnd(15)} ${name.padEnd(44)} ${cells.map((c) => (c[key][name] ? c[key][name].ratio.toFixed(2) : "  —").padStart(6)).join(" ")}`);
   }
@@ -860,6 +874,146 @@ const ringLows = Object.entries(contrast).flatMap(([t, rows]) => Object.entries(
 await check("the focus ring clears 3:1 against every surface", () => ringLows.length === 0, ringLows);
 const tickLows = Object.entries(contrast).flatMap(([t, rows]) => Object.entries(rows["stale ✕ on its tint · running ● on the strip"]).filter(([, v]) => v < 3).map(([s, v]) => `${t} ${s}: ${v}`));
 await check("the stale ✕ and the running ● clear 3:1 as graphics", () => tickLows.length === 0, tickLows);
+
+/* ═══ 15. fix round 1: jumps, rewritten attributes, late chrome, coarse targets, inline style ═════ */
+// The TOC's truth, read the moment it is asked: the last entry whose target's top is above the
+// reading line (30% down). Independent of the spy, which must agree with it after ANY jump.
+const tocTruth = `(() => { let t = null; for (const a of document.querySelectorAll("[data-toc-link]")) {
+  const e = document.getElementById(a.dataset.tocLink); if (e && e.getBoundingClientRect().top <= innerHeight * 0.3) t = a.dataset.tocLink; } return t; })()`;
+const tocMarked = `[...document.querySelectorAll("[data-toc-link][aria-current]")].map((a) => a.dataset.tocLink).join(",") || null`;
+for (const [query, instant] of [["bare&nobanner", false], ["nobanner", true]]) {
+  await load(query);
+  if (instant) await page(`document.head.insertAdjacentHTML("beforeend", "<style>html { scroll-behavior: auto !important; }</style>"); null`);
+  const wrong = [];
+  for (const id of ["crumbs", "footer", "sticky", "table", "column", "rail", "header", "text-actions", "language", "toc", "crumbs"]) {
+    await press(`.toc a[data-toc-link="${id}"]`);
+    await settle();
+    await frames(3);
+    const [marked, truth] = [await page(tocMarked), await page(tocTruth)];
+    if (marked !== truth) wrong.push(`${id}: marked ${marked}, truth ${truth}`);
+  }
+  await check(`TOC, ${query}${instant ? " with scroll-behavior: auto" : ""}: after every one of 11 clicks, up and down, the marked entry is the true one`,
+    () => wrong.length === 0, wrong);
+  await page(`scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }); null`);
+  await frames(4);
+  const bottom = await page(tocMarked);
+  await page(`scrollTo({ top: 0, behavior: "instant" }); null`);
+  await frames(4);
+  // At y=0 the full page has nothing past the line; on ?bare (no base.css margins) the first section
+  // starts 1.4px above it, so the reading-line rule marks that one. Either way: the truth, and never
+  // the entry the bottom of the page had marked.
+  const top = { bottom, marked: await page(tocMarked), truth: await page(tocTruth) };
+  await check(`…and an instant scrollTo(0) from the bottom marks the truth there${instant ? " (nothing)" : ""}, never the bottom's entry (${query})`,
+    () => top.bottom !== null && top.marked === top.truth && top.marked !== top.bottom && (!instant || top.marked === null), top);
+}
+await load("nobanner");
+await page(`document.getElementById("rail").scrollIntoView({ behavior: "instant" }); null`);
+await frames(4);
+await page(`document.getElementById("rail").remove(); null`);
+await frames(4);
+await check("a target removed with nothing added is let go: its entry is no longer marked, and the mark is the true one",
+  async () => { const [m, t] = [await page(tocMarked), await page(tocTruth)]; return m !== "rail" && m === t; }, async () => [await page(tocMarked), await page(tocTruth)]);
+
+// S1, ALWAYS ON: the page itself rewrites the attributes the runtime owns, as a renderer would.
+await load("nobanner");
+await page(`document.getElementById("rail").scrollIntoView({ behavior: "instant" }); null`);
+await frames(4);
+await page(`(() => { const on = document.querySelector('.toc [aria-current="true"]'); on.removeAttribute("aria-current");
+  document.querySelector('.toc a[data-toc-link="header"]').setAttribute("aria-current", "true"); })(); null`);
+await frames(2);
+await check("a TOC mark the page rewrites is put back (the entry that is current, and only it)", async () => (await page(tocMarked)) === "rail", () => page(tocMarked));
+await press(".ls-nav-toggle");
+await page(`(() => { const b = document.getElementById("second-rail-toggle"); b.setAttribute("aria-expanded", "true"); b.setAttribute("aria-pressed", "true"); })(); null`);
+await frames(2);
+await check("a rail toggle whose aria-expanded the page rewrites says collapsed again, and loses aria-pressed",
+  () => page(`(() => { const b = document.getElementById("second-rail-toggle"); return b.getAttribute("aria-expanded") === "false" && !b.hasAttribute("aria-pressed"); })()`));
+await press("footer.status .anim-toggle");
+await page(`(() => { const t = document.querySelector("footer.status .anim-toggle"); t.setAttribute("aria-pressed", "true"); t.querySelector("[data-anim-box]").textContent = "[x]"; })(); null`);
+await frames(2);
+await check("an anim toggle whose state the page rewrites shows the real state again (off: false, [ ])",
+  () => page(`(() => { const t = document.querySelector("footer.status .anim-toggle"); return document.documentElement.classList.contains("anim-off") && t.getAttribute("aria-pressed") === "false" && t.querySelector("[data-anim-box]").textContent === "[ ]"; })()`));
+
+// S1 with cockpit's real dom-patch.js, when the infra checkout is here.
+if (overrides.has("cockpit/dom-patch.js")) {
+  const inject = () => page(`new Promise((ok) => { const s = document.createElement("script"); s.src = "/cockpit/dom-patch.js"; s.onload = () => ok(typeof cockpitPatch); document.head.append(s); })`);
+  await load("nobanner");
+  await check("cockpit's dom-patch.js loads", async () => (await inject()) === "function");
+  await page(`document.getElementById("rail").scrollIntoView({ behavior: "instant" }); null`);
+  await frames(4);
+  // Each patch is shown to have WRITTEN the stale state (read synchronously, before any observer
+  // runs), so a patch that changed nothing cannot pass for one the runtime repaired.
+  const tocWrote = await page(`(() => { window.__toc = document.querySelector(".toc-inner").innerHTML.replace(/ aria-current="true"/g, "");
+    cockpitPatch(document.querySelector(".toc-inner"), __toc); return !document.querySelector(".toc [aria-current]"); })()`);
+  await frames(3);
+  await check("dom-patch: the TOC re-rendered from markup without the mark keeps the current entry marked",
+    async () => tocWrote && (await page(tocMarked)) === "rail", async () => ({ tocWrote, marked: await page(tocMarked) }));
+  await press(".ls-nav-toggle");
+  const railWrote = await page(`(() => { const row = document.getElementById("second-rail-toggle").parentElement;
+    cockpitPatch(row, row.innerHTML.replace(/aria-expanded="false"/, 'aria-expanded="true" aria-pressed="true"'));
+    return document.getElementById("second-rail-toggle").getAttribute("aria-expanded") === "true"; })()`);
+  await frames(3);
+  await check("dom-patch: a rail toggle patched with its server markup says collapsed, without aria-pressed",
+    async () => railWrote && (await page(`[...document.querySelectorAll("[data-ls-nav-toggle]")].every((b) => b.getAttribute("aria-expanded") === "false" && !b.hasAttribute("aria-pressed"))`)));
+  await press("footer.status .anim-toggle");
+  const animWrote = await page(`(() => { const f = document.querySelector("footer.status .status-right");
+    cockpitPatch(f, f.innerHTML.replace(/aria-pressed="false"/g, 'aria-pressed="true"').replace(/\\[ \\]/g, "[x]"));
+    const t = f.querySelector("[data-anim-toggle]"); return t.getAttribute("aria-pressed") === "true" && t.querySelector("[data-anim-box]").textContent === "[x]"; })()`);
+  await frames(3);
+  await check("dom-patch: the footer's controls patched with server markup still show animation off",
+    async () => animWrote && await page(`[...document.querySelectorAll("[data-anim-toggle]")].every((t) => t.getAttribute("aria-pressed") === "false" && (!t.querySelector("[data-anim-box]") || t.querySelector("[data-anim-box]").textContent === "[ ]"))`));
+} else if (process.env.DD_REQUIRE_COCKPIT_DOM_PATCH === "1") {
+  await check(`cockpit's dom-patch.js is present (DD_REQUIRE_COCKPIT_DOM_PATCH=1): ${DOM_PATCH}`, () => false);
+} else {
+  console.log(`NOTE  no cockpit dom-patch.js at ${DOM_PATCH}: the patcher cases are skipped (the setAttribute cases above still ran)`);
+}
+
+// S2: chrome mounted after initLsNav() is measured, and follows its own size.
+await load("nobanner&notoolbar");
+await page(`document.querySelector("main").insertAdjacentHTML("afterbegin", '<div class="page-toolbar" id="late-toolbar"><span>late toolbar</span></div>'); null`);
+await frames(4);
+const lateSticky = () => page(`({ sticky: parseFloat(T.inline("--sticky-top")), top: parseFloat(T.inline("--ls-nav-top")), h: document.getElementById("late-toolbar").offsetHeight })`);
+const late1 = await lateSticky();
+await check("a .page-toolbar mounted after initLsNav() (a route that renders its own) is measured: --sticky-top = edge + toolbar",
+  () => late1.h > 0 && near(late1.sticky, late1.top + late1.h, 0.5), late1);
+await page(`document.getElementById("late-toolbar").insertAdjacentHTML("beforeend", '<p class="demo-grow">a second line</p>'); document.querySelector("#late-toolbar .demo-grow").style.flexBasis = "100%"; null`);
+await frames(4);
+const late2 = await lateSticky();
+await check("…and when it grows, --sticky-top follows with no scroll and no resize", () => late2.h > late1.h && near(late2.sticky, late2.top + late2.h, 0.5), { late1, late2 });
+
+// S3/S4: a coarse pointer, on a 1024px tablet and on a phone without .mobile-footer.
+const targets = () => page(`(() => {
+  const box = (e) => { const b = e.getBoundingClientRect(); return [Math.round(b.width * 100) / 100, Math.round(b.height * 100) / 100]; };
+  const small = T.qa("footer.status .status-right > :is(a, button, details > summary, .dropdown > summary), footer.status .status-right .dropdown > summary, .ls-nav-toggle")
+    .filter((e) => e.getClientRects().length).map((e) => [e.className || e.tagName, ...box(e)]).filter(([, w, h]) => w < 44 || h < 44);
+  const f = document.querySelector("footer.status"), fb = f.getBoundingClientRect();
+  const clipped = T.qa("footer.status .status-right > *").filter((e) => { const b = e.getBoundingClientRect(); return b.height && (b.top < fb.top - 0.5 || b.bottom > fb.bottom + 0.5 || b.right > innerWidth); }).length;
+  const rows = T.qa(".ls-nav .ls-row").filter((e) => e.getClientRects().length).map((r) => { const b = r.getBoundingClientRect(), n = r.querySelector(".ls-name").getBoundingClientRect(); return Math.round(((n.top - b.top) - (b.bottom - n.bottom)) * 100) / 100; });
+  return { small, footer: f.offsetHeight, status: parseFloat(getComputedStyle(document.body).paddingBottom), clipped, rows,
+    count: T.qa("footer.status .status-right > :is(a, button), footer.status .status-right .dropdown > summary").length }; })()`);
+await load("nobanner", { width: 1024, height: 768, coarse: true });
+const tablet = await targets();
+await check("coarse 1024px tablet: every footer control and the rail toggle is at least 44×44", () => tablet.count >= 3 && tablet.small.length === 0, tablet);
+await check("…the footer grows to hold them and the body reserves exactly its height (--status-h follows)",
+  () => tablet.footer >= 45 && near(tablet.status, tablet.footer, 0.01) && tablet.clipped === 0, tablet);
+await check("…and a rail row's text sits in the middle of its row (the gaps above and below within 2px)",
+  () => tablet.rows.length >= 5 && tablet.rows.every((d) => Math.abs(d) <= 2), tablet.rows);
+await load("nobanner&nomf&nolang", { width: 375, height: 812, coarse: true });
+const phoneCoarse = await targets();
+await check("coarse phone, no .mobile-footer: every footer control is at least 44×44, none clipped, and the body reserves the footer",
+  () => phoneCoarse.count >= 3 && phoneCoarse.small.length === 0 && phoneCoarse.clipped === 0 && near(phoneCoarse.status, phoneCoarse.footer, 0.01), phoneCoarse);
+
+// N2: the reveal's step comes from the position, capped at the twelfth row; and no documented markup
+// carries a style attribute (a strict CSP refuses inline style).
+await load("nobanner");
+const capped = await page(`(() => { const ul = document.querySelector(".ls-panel[data-term-list]");
+  for (let i = 0; i < 8; i += 1) ul.insertAdjacentHTML("beforeend", '<li><a class="dropdown-item ls-row" href="#top"><span class="ls-name">x' + i + '</span></a></li>');
+  document.documentElement.classList.add("term-anim");
+  return T.qa(".ls-panel[data-term-list] > li").map((li) => parseFloat(T.cs(li, "animationDelay"))); })()`);
+await check("the reveal steps by position: row n at 0.6s + (n−1) × 0.11s for the first twelve, every later row with the twelfth",
+  () => capped.length >= 14 && capped.every((d, i) => near(d, 0.6 + Math.min(i, 11) * 0.11, 0.001)), capped);
+const inline = ["examples/chrome.html", "templates/page-chrome.html", "templates/documentation.html", ".claude/skills/danieldeusing-design/references/chrome.md"]
+  .flatMap((f) => readFileSync(join(root, f), "utf8").split("\n").map((l, i) => [f, i + 1, l]).filter(([, , l]) => /<[a-z][^>]*\sstyle\s*=\s*["']/i.test(l) || /`style="/.test(l)).map(([f, n]) => `${f}:${n}`));
+await check("no documented markup carries a style attribute: the demo, both templates, chrome.md", () => inline.length === 0, inline);
 
 console.log(failures ? `\ncheck-chrome: ${failures} FAILED (last check to pass: ${lastPassed})` : "\ncheck-chrome: all checks passed");
 process.exit(failures ? 1 : 0);

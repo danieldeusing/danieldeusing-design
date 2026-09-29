@@ -30,7 +30,7 @@
  *
  *   node scripts/check-integration.mjs
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -200,6 +200,28 @@ for (const file of docs) {
 }
 check(`no documented markup carries a style attribute (${docs.length} files: the templates and the skill's code blocks)`, () =>
   docs.length > 10 ? cspDocs : [`read ${docs.length} files — the wrong directory`]);
+
+// ── the vendored cockpit patcher ────────────────────────────────────────────────────────────────
+// CI points DD_COCKPIT_DOM_PATCH at scripts/fixtures/cockpit-dom-patch.js. It must say which commit it
+// is a copy of, and a local run with the infra checkout beside this one says when the live file has
+// moved on — a NOTE, not a failure: cockpit changing its patcher is not a defect in this package.
+const MARKER = "// ── vendored copy follows ──\n";
+check("the vendored cockpit patcher names its source commit and carries the marker CI's copy is cut at", () => {
+  const text = read("scripts/fixtures/cockpit-dom-patch.js");
+  const problems = [];
+  if (!/^\/\/ VENDORED — danieldeusing-infra cockpit\/pages\/dom-patch\.js at [0-9a-f]{7,} \(\d{4}-\d{2}-\d{2}\)/.test(text)) problems.push("the first line does not name `danieldeusing-infra cockpit/pages/dom-patch.js at <commit> (<date>)`");
+  if (text.split(MARKER).length !== 2) problems.push("the marker line is missing or repeated");
+  else if (!/cockpitPatch/.test(text.split(MARKER)[1])) problems.push("nothing below the marker defines cockpitPatch");
+  return problems;
+});
+const live = join(root, "..", "..", "danieldeusing-infra", "cockpit", "pages", "dom-patch.js");
+const sibling = [join(root, "..", "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"), live].find((p) => existsSync(p));
+if (sibling) {
+  const vendored = read("scripts/fixtures/cockpit-dom-patch.js").split(MARKER)[1];
+  console.log(vendored === readFileSync(sibling, "utf8")
+    ? `      (the vendored patcher matches ${sibling})`
+    : `NOTE  the vendored patcher differs from ${sibling} — refresh scripts/fixtures/cockpit-dom-patch.js`);
+}
 
 console.log(failures ? `\ncheck-integration: ${failures} FAILED` : "\ncheck-integration: all checks passed");
 process.exit(failures ? 1 : 0);

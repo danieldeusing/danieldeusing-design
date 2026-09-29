@@ -68,20 +68,55 @@ jobs:
       # main and a published package. Until 2026-08-24 it ran no suite at all: ci.yml ran three
       # and release.yml ran none, so a red runtime published anyway. (audit design-system #1)
       #
-      # DD_REQUIRE_BROWSER=1 is load-bearing. Both DOM suites exit 0 with "SKIPPED" when they
-      # cannot find a browser, and on a Linux runner they found none — so simply listing them
-      # here would have re-created the same empty gate one layer down.
-      - name: Runtime suites must pass before publishing
+      # The same suites as ci.yml, with the same flags, and check-release on top: DD_REQUIRE_BROWSER=1
+      # is load-bearing — a DOM suite exits 0 with "SKIPPED" when it cannot find a browser, so simply
+      # listing them here would re-create the same empty gate one layer down.
+      # check-icons compares every icon token with lucide's own drawing, at the version tokens.css
+      # names. The package installs nothing, so the drawings are borrowed: into the runner's temp dir,
+      # never into the repository, with no lifecycle scripts.
+      - name: Borrow lucide-react 0.559.0 for check-icons
+        if: steps.decide.outputs.publish == 'true'
+        run: npm install --no-save --no-package-lock --ignore-scripts --prefix "$RUNNER_TEMP/lucide" lucide-react@0.559.0
+
+      - name: Every suite must pass before publishing
         if: steps.decide.outputs.publish == 'true'
         env:
           DD_REQUIRE_BROWSER: "1"
+          DD_FORBID_STANDINS: "1"
+          DD_REQUIRE_LUCIDE: "1"
+          DD_LUCIDE_REACT: ${{ runner.temp }}/lucide/node_modules/lucide-react
+          DD_COCKPIT_DOM_PATCH: ${{ github.workspace }}/scripts/fixtures/cockpit-dom-patch.js
+          DD_REQUIRE_COCKPIT_DOM_PATCH: "1"
         run: |
           node scripts/check-pagination.mjs
+          node scripts/check-integration.mjs
+          node scripts/check-readme-pins.mjs
+          node scripts/check-release-gate.mjs
+          node scripts/check-tooltip-marks.mjs
+          node scripts/check-foundations.mjs
+          node scripts/check-tailwind-layers.mjs
+          node scripts/check-icons.mjs
+          node scripts/check-components.mjs
+          node scripts/check-dropdown.mjs
+          node scripts/check-fold.mjs
+          node scripts/check-minimap.mjs
+          node scripts/check-controls.mjs
+          node scripts/check-feedback.mjs
+          node scripts/check-notice.mjs
+          node scripts/check-filters.mjs
+          node scripts/check-data.mjs
+          node scripts/check-tabs.mjs
+          node scripts/check-time.mjs
+          node scripts/check-tickstrip.mjs
+          node scripts/check-charts.mjs
           node scripts/check-tabletools.mjs
           node scripts/check-tablescroll.mjs
           node scripts/check-tooltip-click.mjs
-          node scripts/check-readme-pins.mjs
-          node scripts/check-release-gate.mjs
+          node scripts/check-cards.mjs
+          node scripts/check-overlays.mjs
+          node scripts/check-content.mjs
+          node scripts/check-copy.mjs
+          node scripts/check-chrome.mjs
           node scripts/check-release.mjs
 
       # No NODE_AUTH_TOKEN and no --provenance: Trusted Publishing authenticates via OIDC

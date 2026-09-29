@@ -23,45 +23,63 @@ jobs:
       - name: Build dist + tokens
         run: node scripts/build.mjs
 
-      # The table pager's arithmetic. node:test, no dependency, no DOM — see the header
-      # of the script for what it covers and what it deliberately leaves to
-      # bin/cockpit-render-check in danieldeusing-infra.
-      - name: Check pagination
-        run: node scripts/check-pagination.mjs
+      # check-icons compares every icon token with lucide's own drawing, at the version tokens.css
+      # names. The package installs nothing, so the drawings are borrowed: into the runner's temp dir,
+      # never into the repository, with no lifecycle scripts.
+      - name: Borrow lucide-react 0.559.0 for check-icons
+        run: npm install --no-save --no-package-lock --ignore-scripts --prefix "$RUNNER_TEMP/lucide" lucide-react@0.559.0
 
-      # The table component's MEMORY: a stored view is untrusted input and it names columns, which
-      # get renamed. Drives a real headless chromium because the subject is localStorage, live
-      # .value properties and a MutationObserver — it SKIPS loudly where no browser exists rather
-      # than going red for its own reasons.
-      - name: Check table tools
+      # EVERY scripts/check-*.mjs, and none may skip (check-release-gate.mjs fails a suite that is
+      # missing here or in release.yml, or a flag missing from its step):
+      #   DD_REQUIRE_BROWSER     a DOM suite with no browser exits 0 with SKIPPED; this makes it a failure
+      #   DD_FORBID_STANDINS     a stand-in for a real rule in force is a failure, not a note
+      #   DD_REQUIRE_LUCIDE      check-icons' drawing comparison must run
+      #   DD_REQUIRE_COCKPIT_DOM_PATCH  the suites that drive the runtime under cockpit's patcher must
+      #                          find it: CI has no infra checkout, so DD_COCKPIT_DOM_PATCH points at the
+      #                          vendored copy in scripts/fixtures (its header names the commit)
+      # check-tailwind-layers' browser half still skips loudly here (no Tailwind compiler on the
+      # runner); its static half, which fails an unlayered import, runs.
+      - name: Every suite
         env:
           DD_REQUIRE_BROWSER: "1"
-        run: node scripts/check-tabletools.mjs
-
-      # The scroll wrapper reaching tables that did not exist when it was called. Same harness and
-      # the same skip. Never wired into CI when it was written, so it had been running nowhere.
-      - name: Check table scroll
-        env:
-          DD_REQUIRE_BROWSER: "1"
-        run: node scripts/check-tablescroll.mjs
-
-      # A tooltipped control must still RECEIVE ITS CLICKS. show() used to park the panel at the
-      # viewport origin to measure it, which dropped it under the cursor and cost every tipped
-      # control its clicks — mousedown and mouseup resolved to an ancestor, so no click was ever
-      # generated. Cockpit shipped both its join buttons with the tooltip REMOVED as a workaround.
-      - name: Check tooltip clicks
-        env:
-          DD_REQUIRE_BROWSER: "1"
-        run: node scripts/check-tooltip-click.mjs
+          DD_FORBID_STANDINS: "1"
+          DD_REQUIRE_LUCIDE: "1"
+          DD_LUCIDE_REACT: ${{ runner.temp }}/lucide/node_modules/lucide-react
+          DD_COCKPIT_DOM_PATCH: ${{ github.workspace }}/scripts/fixtures/cockpit-dom-patch.js
+          DD_REQUIRE_COCKPIT_DOM_PATCH: "1"
+        run: |
+          node scripts/check-pagination.mjs
+          node scripts/check-integration.mjs
+          node scripts/check-readme-pins.mjs
+          node scripts/check-release-gate.mjs
+          node scripts/check-tooltip-marks.mjs
+          node scripts/check-foundations.mjs
+          node scripts/check-tailwind-layers.mjs
+          node scripts/check-icons.mjs
+          node scripts/check-components.mjs
+          node scripts/check-dropdown.mjs
+          node scripts/check-fold.mjs
+          node scripts/check-minimap.mjs
+          node scripts/check-controls.mjs
+          node scripts/check-feedback.mjs
+          node scripts/check-notice.mjs
+          node scripts/check-filters.mjs
+          node scripts/check-data.mjs
+          node scripts/check-tabs.mjs
+          node scripts/check-time.mjs
+          node scripts/check-tickstrip.mjs
+          node scripts/check-charts.mjs
+          node scripts/check-tabletools.mjs
+          node scripts/check-tablescroll.mjs
+          node scripts/check-tooltip-click.mjs
+          node scripts/check-cards.mjs
+          node scripts/check-overlays.mjs
+          node scripts/check-content.mjs
+          node scripts/check-copy.mjs
+          node scripts/check-chrome.mjs
 
       # The dist bundle and tokens.json are committed (jsDelivr serves them). Fail
       # if a source change landed without rebuilding the committed artifacts.
-      - name: Check the README teaches the current release
-        run: node scripts/check-readme-pins.mjs
-
-      - name: Check the release gate still gates
-        run: node scripts/check-release-gate.mjs
-
       - name: Verify committed artifacts are up to date
         run: |
           if ! git diff --exit-code dist tokens/tokens.json; then

@@ -294,6 +294,36 @@ const holdsColour = ({ width, bpp, px }, box, paint) => {
   }
   return false;
 };
+/*
+ * OWNERSHIP, AS A TWO-SHOT DIFF. The same crop is read twice: as drawn, and with ONLY its element
+ * hidden. The pixels that change are the element's; everything else in the crop belongs to
+ * something else — a neighbour the forced palette made visible, a border the crop slid onto — and
+ * is left out. The ratio is carried by the changed pixels alone. Where what the crop is mostly
+ * painted in stays when the element goes (a glyph or a ring on a surface), each changed pixel is
+ * read against what it becomes. Where it goes too (a word or a ring on the element's own fill), the
+ * fill's change proves the crop is the element's, and every pixel that is not the fill is read
+ * against it — HighlightText on Highlight does not change when hidden (it IS the Canvas colour), yet
+ * it is the element's; and a fill alone carries nothing, so a word the fill hides reads 1:1.
+ * Fewer than 3 changed pixels: the crop is not on its element, and no ratio read from it counts.
+ */
+const diffIn = (shown, hidden, box) => {
+  const { width, bpp } = shown;
+  const on = inkIn(shown, box).on.split(",").map(Number);
+  const ownFill = inkIn(hidden, box).on !== on.join(",");
+  let changed = 0, ratio = 1, ink = null;
+  for (let y = Math.ceil(box.y * DPR); y < Math.floor((box.y + box.h) * DPR); y += 1) {
+    for (let x = Math.ceil(box.x * DPR); x < Math.floor((box.x + box.w) * DPR); x += 1) {
+      const i = (y * width + x) * bpp;
+      const a = [shown.px[i], shown.px[i + 1], shown.px[i + 2]], b = [hidden.px[i], hidden.px[i + 1], hidden.px[i + 2]];
+      const same = a.every((v, k) => Math.abs(v - b[k]) <= 8);
+      if (!same) changed += 1;
+      if (same && !ownFill) continue;
+      const r = ownFill ? contrast(a, on) : contrast(a, b);
+      if (r > ratio) { ratio = r; ink = a.join(","); }
+    }
+  }
+  return { changed, ratio: Math.round(ratio * 100) / 100, ownInk: ink };
+};
 const screenshot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
 
 const axOf = async (selector) => {
@@ -349,11 +379,11 @@ window.__o = (() => {
       w: b.width - w("border-left-width") - w("border-right-width"), h: b.height - w("border-top-width") - w("border-bottom-width") }; };
   const textBox = (x) => { const range = document.createRange(); range.selectNodeContents(el(x)); const b = range.getBoundingClientRect();
     return { x: b.left, y: b.top, w: b.width, h: b.height }; };
-  // The left band of an element's outline, one px wider than the ring (outward for an outset ring,
-  // inward for an inset one), so the ring is the crop's majority and what it sits on is its ink.
+  // The left band of an element's outline, 3px wider than the ring (outward for an outset ring,
+  // inward for an inset one), so what the ring sits on is the crop's majority and the ring its ink.
   const ringBand = (x) => { const n = el(x), b = n.getBoundingClientRect(), s = getComputedStyle(n);
     const o = parseFloat(s.outlineOffset) || 0, w = s.outlineStyle === "none" ? 0 : parseFloat(s.outlineWidth) || 0;
-    return { x: b.left - o - w - (o >= 0 ? 1 : 0), y: b.top + 4, w: w + 1, h: b.height - 8 }; };
+    return { x: b.left - o - w - (o >= 0 ? 3 : 0), y: b.top + 4, w: w + 3, h: b.height - 8 }; };
   return { $, el, cs, rect, parse, over, ratio, resolve, same, tip, tipShown, menu, active, open, closeAll, inner, textBox, ringBand };
 })();
 null`;
@@ -581,9 +611,10 @@ try {
      never with captureBeyondViewport (which re-lays the page without its scrollbar and moves every
      box measured beforehand). Every crop is shown to hold its element twice over: once in normal
      colours, where it must contain the colour its element itself paints there; and on each forced
-     palette, where the element is hidden and the shot retaken — whatever ink is still in the crop
-     then was never the element's (a neighbour a forced palette makes visible, a glyph drawn by
-     something else), and the ratio read from it proves nothing.
+     palette, where the element alone is hidden and the shot retaken: only the pixels that change
+     are the element's, they must number 3 or more, and the ratio is read from them alone (diffIn).
+     Ink a forced palette gives a neighbour, or a border a crop slid onto, never changes, so it can
+     neither pass nor fail a measurement it is not part of.
 
      REAL FOCUS. Every ring is drawn by focus the keyboard put there — a Tab into the dialog, the
      arrow keys down the menu — never by a forced pseudo-class, which draws a ring no reader gets. */
@@ -633,9 +664,11 @@ try {
       await enter(state);
       const shot = await screenshot();
       const boxes = new Map();
+      const shownOf = new Map();
       for (const sc of group) {
         const { box, paint } = await evaluate(`({ box: ${CROP[sc.crop](sc.el)}, paint: ${PAINT[sc.paint](sc.el)} })`);
         boxes.set(sc, box);
+        shownOf.set(sc, shot);
         onShot(sc, shot, box, paint);
       }
       if (!removal) continue;
@@ -646,7 +679,7 @@ try {
         await sleep(40);
         const without = await screenshot();
         await evaluate(`${e}.style.removeProperty("visibility"); null`);
-        for (const sc of group.filter((g) => g.el === e)) removal(sc, without, boxes.get(sc));
+        for (const sc of group.filter((g) => g.el === e)) removal(sc, without, boxes.get(sc), shownOf.get(sc));
       }
     }
     await reset();
@@ -662,7 +695,6 @@ try {
     misses.length === 0, misses.join("; "));
 
   const forcedCells = new Map(); // what -> { floor, cells: { "light/warm": { ratio, ink, on } } }
-  const leftovers = []; // ink still in a crop once its element is hidden
   const canvasText = {};
   for (const scheme of ["light", "dark"]) {
     await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
@@ -673,13 +705,10 @@ try {
       document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; })()`)).slice(0, 3).map(Math.round).join(",");
     for (const theme of FORCED_THEMES) {
       await evaluate(`document.documentElement.dataset.theme = "${theme}"; null`);
-      await shootScenes(({ what, floor }, shot, box) => {
+      await shootScenes(() => {}, ({ what, floor }, without, box, shown) => {
         const entry = forcedCells.get(what) || { floor, cells: {} };
-        entry.cells[`${scheme}/${theme}`] = inkIn(shot, box);
+        entry.cells[`${scheme}/${theme}`] = { ...inkIn(shown, box), ...diffIn(shown, without, box) };
         forcedCells.set(what, entry);
-      }, ({ what }, without, box) => {
-        const left = inkIn(without, box);
-        if (left.ratio > 1.1) leftovers.push(`${scheme}/${theme} ${what}: ${left.ratio}:1 (ink ${left.ink} on ${left.on}) with the element hidden`);
       });
     }
   }
@@ -687,16 +716,17 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await evaluate(`document.documentElement.dataset.theme = "warm"; null`);
   await reset();
-  await check("forced colours, both palettes: every crop is owned — with its element hidden it measures 1.1:1 or less",
-    leftovers.length === 0, leftovers.join("; "));
+  const unowned = [...forcedCells].flatMap(([what, { cells }]) => Object.entries(cells).filter(([, m]) => m.changed < 3).map(([c, m]) => `${c} ${what}: ${m.changed} px change`));
+  await check("forced colours, both palettes: every crop is owned — hiding its element changes 3 pixels or more there",
+    forcedCells.size === SCENES.length && unowned.length === 0, unowned.join("; ") || `${forcedCells.size} of ${SCENES.length} scenes measured`);
   for (const [what, { floor, cells }] of forcedCells) {
     const low = Object.entries(cells).filter(([, m]) => m.ratio < floor).map(([c, m]) => `${c} ${m.ratio} (ink ${m.ink} on ${m.on})`);
-    await check(`forced colours, both palettes x four themes: ${what} reaches ${floor}:1 on what it is painted on`,
+    await check(`forced colours, both palettes x four themes: ${what} reaches ${floor}:1, carried by its own changed pixels`,
       Object.keys(cells).length === 8 && low.length === 0, low.join("; ") || `${Object.keys(cells).length} of 8 cells measured`);
   }
-  // The ring fills most of its crop, so the crop's dominant colour IS the ring.
+  // The ring's colour is the ink its own changed pixels carry.
   const statedRing = forcedCells.get("the stated row under the keys: its focus ring")?.cells ?? {};
-  const notCanvasText = Object.entries(statedRing).filter(([c, m]) => m.on !== canvasText[c.split("/")[0]]).map(([c, m]) => `${c}: ${m.on}, CanvasText is ${canvasText[c.split("/")[0]]}`);
+  const notCanvasText = Object.entries(statedRing).filter(([c, m]) => m.ownInk !== canvasText[c.split("/")[0]]).map(([c, m]) => `${c}: ${m.ownInk}, CanvasText is ${canvasText[c.split("/")[0]]}`);
   await check("forced colours: the stated row's ring under the keys is CanvasText (the lead's ruling for a disabled or stated row)",
     Object.keys(statedRing).length === 8 && notCanvasText.length === 0, notCanvasText.join("; "));
   const statedInk = forcedCells.get("the stated row at rest (text)")?.cells ?? {};

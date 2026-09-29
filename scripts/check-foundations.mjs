@@ -363,6 +363,18 @@ check("html.anim-off stops transitions too", (await cs("fade", "transitionDurati
 check("html.anim-off hides the block cursor", (await cs("cursor", "display")) === "none", await cs("cursor", "display"));
 await evaluate('document.documentElement.classList.remove("anim-off"); null');
 
+// Forced colours stop transitions too (the lead's ruling, tokens.css): a colour in mid-transition is
+// a plain colour, not a system colour, so for .15s a redrawn state would paint the author's palette
+// on the forced page. Measured on an element and a pseudo-element that both declare a transition.
+const fadeDurations = () => evaluate(`[null, "::before"].map((pseudo) =>
+  getComputedStyle(document.getElementById("fade"), pseudo).transitionDuration)`);
+check("precondition: with motion on, #fade and its ::before both declare a transition",
+  (await fadeDurations()).every((d) => d !== "0s"), `measured: ${(await fadeDurations()).join(" / ")}`);
+await send("Emulation.setEmulatedMedia", { media: "", features: [{ name: "forced-colors", value: "active" }] });
+check("forced colours stop transitions: #fade and its ::before compute transition-duration 0s",
+  (await fadeDurations()).every((d) => d === "0s"), `measured: ${(await fadeDurations()).join(" / ")}`);
+await send("Emulation.setEmulatedMedia", { media: "", features: [] });
+
 /* ── F7 · tone ────────────────────────────────────────────────────────────── */
 
 for (const theme of ["warm", "green"]) {
@@ -515,6 +527,13 @@ for (const [id, token, pair] of [["f8-doclink", "--primary", ".doc-link.text-pri
     const p = document.getElementById("probe"); p.style.color = "var(${token})"; return getComputedStyle(p).color; })()]`);
   check(`in the build-free bundle, ${pair} takes the utility's colour`, got === want, `${got} vs ${token} ${want}`);
 }
+// The same rule on a real component: .btn-terminal declares a transition in components.css.
+const ghostDuration = () => evaluate('getComputedStyle(document.getElementById("f8-ghost")).transitionDuration');
+check("precondition: in the bundle, a .btn-terminal declares a transition", (await ghostDuration()) !== "0s", await ghostDuration());
+await send("Emulation.setEmulatedMedia", { media: "", features: [{ name: "forced-colors", value: "active" }] });
+check("forced colours stop a component's transition too (a .btn-terminal in the bundle)", (await ghostDuration()) === "0s",
+  `measured: ${await ghostDuration()}`);
+await send("Emulation.setEmulatedMedia", { media: "", features: [] });
 
 console.log(failures ? `\ncheck-foundations: ${failures} FAILED` : "\ncheck-foundations: all checks passed");
 process.exit(failures ? 1 : 0);

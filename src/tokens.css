@@ -532,6 +532,18 @@ html.anim-off *::after {
 html.anim-off .cursor-block {
   display: none;
 }
+/* Forced colours stop every transition too, the same way (the lead's ruling, 0.60.0). A colour in
+   mid-transition is a plain interpolated colour, not a system colour. Measured: for .15s an opted-out
+   element painted the AUTHOR's palette on the forced page (a segment word at 1.02:1, a beige card
+   block on black), and a forced one showed its old look until the transition ended. It hit every
+   package that transitions something it redraws, so it is answered once, here. */
+@media (forced-colors: active) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}
 
 /*
  * ── `hidden` HIDES — one rule, in the one file every surface loads (0.60.0) ─────

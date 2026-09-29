@@ -343,6 +343,8 @@ html[data-theme="paper"] {
  */
 :root {
   --fs-display: 1.875rem;   /* 30px, below 40rem */
+  --lh-display: 1.2;        /* the display step's leading, danieldeusing.de's: --lh-tight's 1.3 opened
+                               a two-line title into two separate lines */
 }
 @media (min-width: 40rem) {
   :root { --fs-display: 2.25rem; }   /* 36px */
@@ -480,8 +482,11 @@ html[data-theme="paper"] {
  * sets nothing, so the component falls back to its own default instead of to no colour at all.
  *
  * IT INHERITS, deliberately: a component draws its glyph on a pseudo-element, and a pseudo-element
- * only sees the tone by inheriting it. The price is that a component nested in a toned container
- * takes the container's tone unless it sets a data-tone of its own.
+ * only sees the tone by inheriting it. A component whose default is NEUTRAL stops it at its own root:
+ * without a `data-tone` of its own it sets `--tone: initial` (a notice, a tag, a count, a card, a
+ * fold, a choice card: each file says so at the rule), so a neutral tag inside a toned card stays
+ * neutral, and its glyph still takes its own host's tone. A component with no such reset takes its
+ * container's tone.
  *
  * The tone is a TEXT, EDGE and GLYPH colour. Under text it is at most a 6% tint: tone text on a 6%
  * tone tint measures 4.53:1 or better on every theme and surface, and at 8% paper's warning falls
@@ -586,7 +591,7 @@ html.anim-off .cursor-block {
  *     }
  *
  * The second half is not optional. Forced colours (Windows High Contrast) swap every author
- * background for Canvas, and a mask glyph IS a background: without it all 21 glyphs paint nothing.
+ * background for Canvas, and a mask glyph IS a background: without it every glyph paints nothing.
  * `preserve-parent-color` paints the glyph in the colour its parent was forced to — CanvasText in
  * text, LinkText in a link, ButtonText in a button. NOT `forced-color-adjust: none` alone: the
  * glyph then keeps its AUTHOR colour, measured at 1.11-1.78:1 against the forced palette, or
@@ -823,9 +828,8 @@ html.anim-off .cursor-block {
      CanvasText in text, LinkText in a link, ButtonText in a button, GrayText when disabled,
      HighlightText on a selection a component redrew — and the background it paints with is left
      alone. `--tone: currentColor` brings the glyphs that paint `var(--tone, …)` along.
-     NOT `forced-color-adjust: none` alone: forcing happens at used-value time and inheritance
-     carries computed values, so the glyph keeps the AUTHOR's colour — warm's brown measured 1.78:1
-     on a dark palette, and green's and mono's glyphs vanished on a light one.
+     NOT `forced-color-adjust: none` alone, for the reason ICON MASKS gives above: the glyph keeps
+     the author's colour.
      An engine without `preserve-parent-color` gets `none` and a CanvasText background, and no
      `color`. The `none` lets a component's own `@supports not` branch paint `currentColor` (under
      `auto` the mode forces that background to Canvas, and a disabled glyph vanished); leaving
@@ -836,7 +840,13 @@ html.anim-off .cursor-block {
      (unlayered, or a later layer), so it carries that `@supports not` branch itself, as
      controls.css, feedback.css and tags.css do.
      The default reaches every `[data-icon]::before` glyph; one drawn from a named token, on
-     ::after, or painted from a private variable is its own file's to cover. In `base` for the
+     ::after, or painted from a private variable is its own file's to cover (check-icons fails a
+     src file that paints a mask with no fallback of its own).
+     THE FALLBACK PAINTS ANY `[data-icon]::before`, because a selector cannot tell a glyph from
+     text. So `data-icon` goes only on an element whose ::before IS its glyph — never on one whose
+     ::before is a word or a mark (`.prompt`'s `$ `, `.comment`'s `# `, `.tag--bracket`'s `[ `,
+     `.btn-terminal`'s `> `): in an engine without `preserve-parent-color` that text would sit on a
+     CanvasText box. Put a `.ico` child in such an element instead. In `base` for the
      reason the mapping is: a component's own forced-colours rule wins, and since neither branch
      sets `color`, `currentColor` in that rule is still its host's. */
   @media (forced-colors: active) {

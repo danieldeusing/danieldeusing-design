@@ -44,11 +44,15 @@ function minify(css) {
   for (let i = 0; i < css.length; ) {
     const char = css[i];
 
-    // strip comments
+    // strip comments — all but a `/*!` one: that is a licence (lucide's, in tokens.css), and it
+    // travels with the path data it covers into every copy, this one included
     if (char === "/" && css[i + 1] === "*") {
+      const keep = css[i + 2] === "!";
+      const start = i;
       i += 2;
       while (i < css.length && !(css[i] === "*" && css[i + 1] === "/")) i += 1;
       i += 2;
+      if (keep) out += css.slice(start, i) + "\n";
       continue;
     }
 
@@ -100,7 +104,27 @@ await writeFile(join(distDir, "danieldeusing-design.min.css"), banner + minify(b
 
 /* ── 3. Derive tokens.json from tokens.css ──────────────────────────────── */
 
-const tokensCss = await readFile(join(srcDir, "tokens.css"), "utf8");
+// Only the UNCONDITIONAL values. Comments go first: a brace inside one (`(* { margin: 0 })`) ended
+// the layout block's match early, and 0.59.0 shipped a tokens.json without the five tokens after it.
+// Then every at-rule block goes whole, braces counted: a `:root` inside `@media (max-width: 40rem)`
+// is the PHONE value, and read as a default it replaced the real one (--content-pad 1.25rem, not
+// 1.5rem). The `@layer base` mapping and the forced-colours defaults go with them; neither is a token.
+const withoutAtRules = (css) => {
+  let out = "";
+  for (let i = 0; i < css.length; ) {
+    const at = css[i] === "@" && css.slice(i, i + 400).match(/^@(?:media|supports|layer|container)\b[^{;]*\{/);
+    if (!at) { out += css[i]; i += 1; continue; }
+    let depth = 0;
+    let j = i + at[0].length - 1;
+    for (; j < css.length; j += 1) {
+      if (css[j] === "{") depth += 1;
+      if (css[j] === "}" && --depth === 0) break;
+    }
+    i = j + 1;
+  }
+  return out;
+};
+const tokensCss = withoutAtRules((await readFile(join(srcDir, "tokens.css"), "utf8")).replace(/\/\*[\s\S]*?\*\//g, ""));
 const blockRe = /(:root|html\[data-theme="(\w+)"\])\s*\{([^}]*)\}/g;
 const declRe = /--([\w-]+)\s*:\s*([^;]+);/g;
 // MERGED per theme, not assigned. tokens.css declares `:root` TWICE — once for the warm colours,
@@ -113,7 +137,12 @@ const themes = {};
 for (const block of tokensCss.matchAll(blockRe)) {
   const theme = block[2] ?? "warm"; // :root is the warm default
   const values = (themes[theme] ??= {});
-  for (const decl of block[3].matchAll(declRe)) values[decl[1]] = decl[2].trim();
+  for (const decl of block[3].matchAll(declRe)) {
+    // The icon drawings stay out. They are CSS masks — data urls of lucide's licensed path data —
+    // and a native or Figma consumer, which is who reads this file, draws with lucide itself.
+    if (decl[1].startsWith("ico-")) continue;
+    values[decl[1]] = decl[2].trim();
+  }
 }
 
 const tokensJson = {

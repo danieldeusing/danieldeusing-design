@@ -161,27 +161,33 @@ button.tag:disabled { opacity: 0.45; cursor: default; }
 
 /* ── FORCED COLOURS ─────────────────────────────────────────────────────────────────────────────
    A forced palette replaces every background colour with Canvas. A glyph on a tag is a background
-   shown through a mask, so it would vanish: opted out, it takes `currentColor`, which is forced to
-   the word's own colour. And the two fills that MEAN something — a `--solid` tag against a plain
-   one, an overlay count against a plain one — would collapse into their neighbours, so they are
-   redrawn in the palette's own pair, inverted: CanvasText fill, Canvas word. Every other axis is a
-   border style, a weight or a strike, and those survive untouched (a disabled button.tag is
-   GrayText from the browser's own forced-colours sheet). */
+   shown through a mask, so it would vanish: `preserve-parent-color` gives it the forced colour of
+   the tag's own word instead (see the same block in feedback.css for why not `none`), and an
+   engine without that value gets the palette's text colour by name. And the two fills that MEAN
+   something — a `--solid` tag against a plain one, an overlay count against a plain one — would
+   collapse into their neighbours, so they are redrawn in the palette's own pair, inverted:
+   CanvasText fill, Canvas word. Every other axis is a border style, a weight or a strike, and those
+   survive untouched (a disabled button.tag is GrayText from the browser's own forced-colours sheet). */
 @media (forced-colors: active) {
   .tag[data-icon]::before,
   .tag > .ico {
-    forced-color-adjust: none;
+    forced-color-adjust: preserve-parent-color;
     background: currentColor;
   }
   .tag--solid,
   .count--overlay {
-    forced-color-adjust: none;
     color: Canvas;
     background: CanvasText;
   }
   .tag--solid { border-color: CanvasText; }
   /* The overlay keeps its ring in the page colour: it is what cuts the count out of its host's edge. */
   .count--overlay { border-color: Canvas; }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .tag[data-icon]::before,
+    .tag > .ico { background: CanvasText; }
+    .tag--solid[data-icon]::before,
+    .tag--solid > .ico { background: Canvas; }
+  }
 }
 
 @media print {

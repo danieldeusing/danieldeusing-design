@@ -429,10 +429,13 @@ p.state { display: flex; white-space: normal; }
 
 /* ── FORCED COLOURS ─────────────────────────────────────────────────────────────────────────────
    A forced palette replaces every background colour with Canvas, and every glyph here is a
-   background shown through a mask — the dot is nothing but its fill. Left alone they vanish,
-   white on white. Opted out of the palette, each takes `currentColor`, which IS forced — the text
-   colour of the line it sits on — so the glyph shows in exactly the colour of its words. The ring
-   that cuts an overlay dot out of its host takes the forced page colour, Canvas.
+   background shown through a mask — the dot is nothing but its fill. Left alone they vanish, white
+   on white. `preserve-parent-color` is the opt-out that KEEPS the palette: `currentColor` becomes
+   the forced colour of the words the glyph sits with (CanvasText in text, ButtonText in a button,
+   GrayText when disabled), on a light palette and a dark one alike. `none` is not that: measured in
+   Chromium, it hands `currentColor` the page's own unforced colour — warm's dark brown, 1.78:1 on a
+   dark palette's black Canvas. An engine without the value gets the palette's text colour by name.
+   The ring that cuts an overlay dot out of its host takes the forced page colour.
    What is left alone survives on its own: every word (a notice's label is the meaning, the colour
    only sped the scan), the `.state` glyphs, which are text, the fence's dashed frame and a
    callout's rule, which are borders. */
@@ -442,10 +445,17 @@ p.state { display: flex; white-space: normal; }
   .callout[data-icon]::before,
   .spinner,
   .dot {
-    forced-color-adjust: none;
+    forced-color-adjust: preserve-parent-color;
     background: currentColor;
   }
   .dot--overlay { box-shadow: 0 0 0 1px Canvas; }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .empty[data-icon]::before,
+    .notice--lg[data-icon]::before,
+    .callout[data-icon]::before,
+    .spinner,
+    .dot { background: CanvasText; }
+  }
 }
 
 @media print {

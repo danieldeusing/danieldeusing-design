@@ -17,9 +17,9 @@
  *      between the two. A focus ring is asserted in `?bare` only, where base.css's global ring
  *      cannot stand in for a component's own (X2).
  *
- * And the modes a reader can switch on: forced colours (every glyph still drawn, every state pair
- * still two colours — X1), `hidden` (every component gone — X3), print, reduced motion, a coarse
- * pointer. DD_FORBID_STANDINS=1 fails the run while any demo stand-in is still in force, for the
+ * And the modes a reader can switch on: forced colours on a light and a dark palette (every glyph
+ * drawn in the forced colour of its words, every state pair still two looks — X1), `hidden` (every
+ * component gone — X3), print, reduced motion, a coarse pointer. DD_FORBID_STANDINS=1 fails the run while any demo stand-in is still in force, for the
  * integration build, where every one of them must have been replaced by the real thing.
  *
  * WHAT IT READS. examples/feedback.html is the environment: its stylesheets, and stand-ins for the
@@ -780,35 +780,44 @@ const PAIRS = [["#fx-tag", "background-color", "#fx-tag-solid", "background-colo
   ["#fx-tag", "border-top-style", "#fx-tag-dashed", "border-top-style", "--dashed against a plain tag"],
   ["#fx-tag", "font-weight", "#fx-tag-strong", "font-weight", "--strong against a plain tag"],
   ["#fx-tag", "text-decoration-line", "#fx-tag-struck", "text-decoration-line", "--struck against a plain tag"]];
-await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }] });
-await sleep(100);
 const FORCED = String.raw`(() => {
   const W = window.__wp7, probe = document.createElement("div");
   probe.style.cssText = "forced-color-adjust: none; background: Canvas";
   document.body.append(probe);
   const canvas = W.parse(getComputedStyle(probe).backgroundColor);
   probe.remove();
-  // what a colour looks like on the forced page: composited over Canvas
-  const seen = (value) => { const c = W.over(W.parse(value), canvas); return [c.r, c.g, c.b].map((v) => Math.round(v * 255)).join(","); };
-  const isColour = (prop) => /color$/.test(prop);
-  return { seen, isColour };
+  // a colour as it lands on the forced page: composited over Canvas
+  const on = (value) => W.over(W.parse(value), canvas);
+  const key = (c) => [c.r, c.g, c.b].map((v) => Math.round(v * 255)).join(",");
+  return { canvas, on, key, ratio: W.ratio, isColour: (prop) => /color$/.test(prop) };
 })()`;
-await check("X1 forced colours are really on (the emulation took)", () => evaluate(`matchMedia("(forced-colors: active)").matches ? [] : ["forced-colors did not emulate — the two checks below proved nothing"]`));
-await check("X1 forced colours: every glyph is still drawn — none in the Canvas colour", () => evaluate(`(() => {
-  const F = ${FORCED}, canvas = F.seen("rgba(0, 0, 0, 0)"); // nothing, over Canvas: Canvas itself
-  return ${JSON.stringify(GLYPHS)}.flatMap(([sel, pseudo, prop]) => {
-    const value = getComputedStyle(document.querySelector(sel), pseudo || null).getPropertyValue(prop);
-    return F.seen(value) === canvas ? [sel + pseudo + " " + prop + " " + value + " is the Canvas colour — the glyph is gone"] : [];
-  });
-})()`));
-await check("X1 forced colours: every state pair still differs on the part that shows it", () => evaluate(`(() => {
-  const F = ${FORCED};
-  return ${JSON.stringify(PAIRS)}.flatMap(([a, pa, b, pb, what]) => {
-    let va = getComputedStyle(document.querySelector(a)).getPropertyValue(pa), vb = getComputedStyle(document.querySelector(b)).getPropertyValue(pb);
-    if (F.isColour(pa)) { va = F.seen(va); vb = F.seen(vb); }
-    return va === vb ? [what + ": both " + va] : [];
-  });
-})()`));
+/* Both palettes, because the failure shows on only one of them: a glyph drawn in the page's OWN
+   colour is plainly visible on a light forced palette's white Canvas and 1.8:1 on a dark one's
+   black — which is what `forced-color-adjust: none` + `currentColor` does in Chromium. So "not
+   the Canvas colour" is not enough: a glyph must be drawn in the FORCED colour of the words it
+   sits with (its host's, or its parent's for a glyph that is an element), on both palettes. */
+for (const scheme of ["light", "dark"]) {
+  await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
+  await sleep(100);
+  await check(`X1 forced colours are really on (${scheme} palette)`, () => evaluate(`matchMedia("(forced-colors: active)").matches ? [] : ["forced-colors did not emulate — the checks below proved nothing"]`));
+  await check(`X1 forced colours, ${scheme} palette: every glyph is drawn in the forced colour of its words`, () => evaluate(`(() => {
+    const F = ${FORCED};
+    return ${JSON.stringify(GLYPHS)}.flatMap(([sel, pseudo, prop]) => {
+      const el = document.querySelector(sel), words = pseudo ? el : el.parentElement;
+      const got = F.on(getComputedStyle(el, pseudo || null).getPropertyValue(prop)), want = F.on(getComputedStyle(words).color);
+      return F.key(got) === F.key(want) ? [] : [sel + pseudo + " " + prop + " " + F.key(got) + " (" + F.ratio(got, F.canvas).toFixed(2) +
+        ":1 on Canvas " + F.key(F.canvas) + "), its words " + F.key(want)];
+    });
+  })()`));
+  await check(`X1 forced colours, ${scheme} palette: every state pair still differs on the part that shows it`, () => evaluate(`(() => {
+    const F = ${FORCED};
+    return ${JSON.stringify(PAIRS)}.flatMap(([a, pa, b, pb, what]) => {
+      let va = getComputedStyle(document.querySelector(a)).getPropertyValue(pa), vb = getComputedStyle(document.querySelector(b)).getPropertyValue(pb);
+      if (F.isColour(pa)) { va = F.key(F.on(va)); vb = F.key(F.on(vb)); }
+      return va === vb ? [what + ": both " + va] : [];
+    });
+  })()`));
+}
 await send("Emulation.setEmulatedMedia", { features: [] });
 
 /* ── 4. contrast, every new pairing, four themes × three surfaces ────────────────────────────── */

@@ -367,10 +367,13 @@ skills <span class="count">12</span>
   tags and overlay counts print outlined. The page colour on a fill would otherwise print white on
   white once the browser drops background colours.
 - **Forced colours** (Windows high contrast): every glyph here is a background shown through a mask,
-  which a forced palette would paint over with the page colour. Each one opts out and takes the
-  forced text colour of its line, so it stays drawn. `--solid` tags and overlay counts are redrawn
-  as the palette's own pair, inverted, so loud still differs from quiet. Words, `.state` glyphs,
-  dashed and dotted edges, weight and strike survive on their own.
+  which a forced palette would paint over with the page colour. Each one takes
+  `forced-color-adjust: preserve-parent-color`, so it is drawn in the forced colour of its words,
+  on a light palette and a dark one. Not `none` for a glyph of your own: `none` hands
+  `currentColor` the page's unforced colour, which on a dark palette's black Canvas measured
+  1.78:1. `--solid` tags and overlay counts are redrawn as the palette's own pair, inverted, so loud
+  still differs from quiet. Words, `.state` glyphs, dashed and dotted edges, weight and strike
+  survive on their own.
 - **`hidden` hides every one of these**, including those that set their own `display`: tokens.css
   carries the one `[hidden]` rule for the whole system. Do not add a per-class guard.
 - **Framework apps** (seedr, configr, pagr islands) render this markup and never run

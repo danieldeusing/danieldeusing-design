@@ -691,14 +691,16 @@ try {
   await key("Escape");
   await check("the first Escape takes the tip, the second the dialog", () => evaluate(`!__o.$("dlg-default").open`));
   await reset();
-  // A panel left `display: grid` inside a dialog that has since closed: it has no box, and the
-  // Escape guard must see that, or it swallows the next Escape on the page.
-  await evaluate(`(() => { const d = __o.$("dlg-default"); d.append(__o.tip()); __o.tip().style.display = "grid"; })(); null`);
-  await evaluate(`${T("open-drawer")}.click(); null`);
-  await sleep(50);
+  // A panel left `display: grid` inside a dialog that has since closed (hovered, not focused, so no
+  // focusout ever hid it): it has no box, and the Escape guard must see that, or it swallows the
+  // next Escape on the page. Focus stays on <body> throughout — any focus move would hide the panel
+  // and hand this check a pass it did not earn.
+  await evaluate(`(() => { window.__escapes = 0;
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") window.__escapes += 1; });
+    const d = __o.$("dlg-default"); d.append(__o.tip()); __o.tip().style.display = "grid"; })(); null`);
   await key("Escape");
   await check("a tip left inside a dialog that has since closed does not swallow the next Escape",
-    () => evaluate(`!__o.$("dlg-drawer").open`));
+    () => evaluate(`window.__escapes === 1 && document.activeElement === document.body`));
 
   section("tooltip — suppression, and a tip that repeats the name (X4)");
   await reset();

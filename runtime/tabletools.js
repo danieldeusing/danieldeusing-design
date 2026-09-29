@@ -479,7 +479,7 @@ function paintHeaderBadges(inst) {
       continue;
     }
     // A patch of the header takes the badge out with everything else it did not write: the same
-    // node goes back, so a badge that has focus keeps it.
+    // node goes back. Removal drops its focus to <body>; restoreFocus() gives it back.
     if (badge && !col.th.contains(badge)) col.th.appendChild(badge);
     if (!badge) {
       badge = document.createElement("button");
@@ -765,6 +765,7 @@ function ensureChrome(inst) {
         const { field, input } = searchField("search this table", "search this table…", "clear table search");
         inst.searchField = field;
         inst.searchBox = input;
+        watchFocus(inst, field);
       }
       useSearchBox(inst, inst.searchBox);
       let bar = pageBar;
@@ -806,6 +807,7 @@ function ensureChrome(inst) {
   }
   // What it last said, back in place — a patch writing the page's empty count would silence it.
   setText(inst.count, inst.countText);
+  restoreFocus(inst);
 }
 
 /*
@@ -824,15 +826,71 @@ function retire(inst) {
   clearTimeout(inst.countTimer);
   instances.delete(inst.table);
   if (inst.count) countOwners.delete(inst.count);
+  /*
+   * THE ROWS GO BACK FIRST. A filter DETACHES what it withholds, so the body holds only what this
+   * instance chose to show — and the next instance reads the body as the whole table. Measured: an
+   * `aria-label` going from "runs (8)" to "runs (9)" over a search for "L1" re-enhanced one row and
+   * lost seven. So unless a patch has already rewritten the body (then the renderer supplied the rows,
+   * and the ones held here are not resurrected), every row goes back in the order it was read, and the
+   * placeholder goes, before anything reads the body again.
+   */
+  const body = inst.table.tBodies[0];
+  const untouched = !!body && body.rows.length === inst.lastWritten.length && inst.lastWritten.every((row, i) => body.rows[i] === row);
+  if (inst.placeholder && inst.placeholder.hasAttribute(PLACEHOLDER)) inst.placeholder.remove();
+  if (untouched) {
+    const frag = document.createDocumentFragment();
+    for (const row of inst.allRows) {
+      frag.appendChild(row);
+      for (const child of inst.childrenOf.get(row) || []) frag.appendChild(child);
+    }
+    body.appendChild(frag);
+  }
   // What is still unmistakably its own goes with it; a node a patch already rewrote is the page's now.
   if (inst.searchField && inst.searchField.contains(inst.searchBox)) inst.searchField.remove();
   if (inst.ownBar && !inst.ownBar.childElementCount) inst.ownBar.remove();
-  if (inst.placeholder && inst.placeholder.hasAttribute(PLACEHOLDER)) inst.placeholder.remove();
   for (const col of inst.columns) {
     if (col.tools && col.tools.classList.contains("tbl-tools")) col.tools.remove();
     if (col.badge && col.badge.classList.contains("tbl-badge")) col.badge.remove();
     col.th.classList.remove("is-filtered");
   }
+}
+
+/*
+ * TWO TABLES, ONE IDENTITY. The guard above can only tell tables apart by what they are called: two
+ * engine tables with the same `data-table-id` (or the same `aria-label`, or neither) in a mount a
+ * renderer patches by position can still trade nodes unseen. Said once per identity, so a page that
+ * re-renders does not fill the console.
+ */
+const warnedIdentities = new Set();
+function warnShared(inst) {
+  if (warnedIdentities.has(inst.identity)) return;
+  for (const other of document.querySelectorAll("table[data-table-tools]")) {
+    if (other === inst.table || !instances.has(other) || identityOf(other) !== inst.identity) continue;
+    warnedIdentities.add(inst.identity);
+    console.warn(`initTableTools: two tables are both "${inst.identity || "(no data-table-id or aria-label)"}". ` +
+      "Give each a distinct data-table-id: a renderer that patches by position can hand one table's node the other's markup.");
+    return;
+  }
+}
+
+/*
+ * FOCUS SURVIVES A PATCH. A renderer that writes the header (or the bar) back removes what this file
+ * put there, and a focused node that is removed drops focus to <body> — the same node goes back a
+ * moment later, unfocused, and the next Tab starts from the top of the page. So focus inside what this
+ * file owns is remembered, and given back when that node is connected again and nothing else took it.
+ * A focus the reader moved away on purpose is forgotten, so this never pulls focus back.
+ */
+function watchFocus(inst, root) {
+  root.addEventListener("focusin", (event) => { inst.lastFocus = event.target; });
+  root.addEventListener("focusout", (event) => {
+    const node = event.target;
+    queueMicrotask(() => { if (inst.lastFocus === node && node.isConnected && document.activeElement !== node) inst.lastFocus = null; });
+  });
+}
+function restoreFocus(inst) {
+  const node = inst.lastFocus;
+  const lost = !document.activeElement || document.activeElement === document.body;
+  if (lost && node && node.isConnected && document.activeElement !== node) node.focus({ preventScroll: true });
 }
 
 /* true when the node is no longer this instance's table — it has been handed to a fresh one. */
@@ -866,6 +924,8 @@ function enhance(table) {
   };
   instances.set(table, inst);
   inst.view = restore(inst);
+  warnShared(inst);
+  watchFocus(inst, table);
 
   const anchor = table.closest(".tablewrap") || table;
 
@@ -955,6 +1015,7 @@ function enhance(table) {
     if (moved || rewritten) {
       snapshot(inst);
       applyTableView(table);
+      restoreFocus(inst);
       return;
     }
     // THE HEADER, patched: `aria-sort`, `.is-filtered`, the controls, the badge and `aria-checked`
@@ -968,6 +1029,7 @@ function enhance(table) {
       else buildHeaderControls(inst);
       paintHeader(inst);
       paintHeaderBadges(inst);
+      restoreFocus(inst);
     }
   });
   /*
@@ -1054,7 +1116,13 @@ export function initTableTools(root = document) {
       const summary = wrap.querySelector(":scope > summary");
       if (clip && summary) {
         const s = summary.getBoundingClientRect(), c = clip.getBoundingClientRect();
-        if (s.right <= c.left || s.left >= c.right || s.bottom <= c.top || s.top >= c.bottom) { wrap.open = false; continue; }
+        if (s.right <= c.left || s.left >= c.right || s.bottom <= c.top || s.top >= c.bottom) {
+          // Focus inside the panel would be stranded in a closed <details>: it goes to the summary.
+          const held = wrap.querySelector(":scope > .dropdown-panel")?.contains(document.activeElement);
+          wrap.open = false;
+          if (held) summary.focus({ preventScroll: true });
+          continue;
+        }
       }
       placePanel(wrap);
     }

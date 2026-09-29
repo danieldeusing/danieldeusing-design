@@ -440,6 +440,20 @@ await sleep(500);
 const away = await attach();
 await check("fix round 2 — wheeled back until its column is out of the wrapper, the panel is closed, and focus has not moved", async () =>
   away.left === 0 && !away.inWrap && !away.open && (await evaluate("document.activeElement === window.focusedBefore")), JSON.stringify(away));
+// G3: with keyboard focus on an item of the open panel, the same scroll-away close hands focus to the
+// panel's summary rather than stranding it in a closed <details>.
+await evaluate(`(() => { const w = document.querySelector("#scroll-wrap"); w.scrollLeft = w.scrollWidth; })(); null`);
+await sleep(200);
+await evaluate(`document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter > summary").click(); null`);
+await sleep(200);
+await evaluate(`document.querySelector("#scroll-wrap th[data-col=state] .dropdown-item").focus(); null`);
+const itemFocused = await evaluate(`document.activeElement.matches("#scroll-wrap .dropdown-item")`);
+await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: wheelAt[0], y: wheelAt[1], deltaX: -4000, deltaY: 0 });
+await sleep(500);
+const stranded = await evaluate(`JSON.stringify({ open: document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter").open,
+  focus: document.activeElement === document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter > summary") ? "summary" : document.activeElement.tagName })`);
+await check("fix round 3 — focus on a panel item when the reader wheels the column away: the panel closes and focus lands on its summary", () =>
+  itemFocused && stranded === JSON.stringify({ open: false, focus: "summary" }), stranded);
 await evaluate(`(() => { const wrap = document.querySelector("#scroll-wrap"); wrap.previousElementSibling.remove(); wrap.nextElementSibling?.matches("p.result-count") && wrap.nextElementSibling.remove(); wrap.remove(); })(); null`);
 await open("bare&theme=warm");
 const bare = JSON.parse(await snapshot());

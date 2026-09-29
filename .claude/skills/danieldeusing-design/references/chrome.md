@@ -345,7 +345,8 @@ full-width document such as the html-doc template; `initMinimap()` refuses on a 
 - Entries and sections rendered after the call are picked up; `initToc()` returns `{ destroy }`.
   One call per page. Cockpit's spy in `portal.js` and danieldeusing.de's go.
 - **The same list is a series navigator**, in a card, where the current part is a PAGE —
-  `aria-current="page"`, weight and colour, since nothing moves under it:
+  `aria-current="page"`, weight and colour, since nothing moves under it (under forced colours, the
+  Highlight pair as well):
 
   ```html
   <nav class="navlist card-terminal" aria-labelledby="ser-h">
@@ -441,10 +442,22 @@ scrollbar APIs must not be declared together.
 
 ## Forced colours and `hidden`
 
-- Under forced colours two chrome states were drawn only with what Windows repaints (a tint, an
-  inset shadow, a colour): the rail's current row and the TOC's current entry. Both take
-  `Highlight` / `HighlightText`. Everything else the chrome draws is a character or text, which
-  survives: the tick glyphs, `←`, `»`, `/`, `[x]`. Do not redraw a state as a tint alone.
+- Three "you are here" marks were drawn only with what Windows' high-contrast modes repaint (a tint,
+  an inset shadow, a colour): the rail's current row, the TOC's current entry and a series' current
+  part. Each takes the system's selected pair, `HighlightText` on `Highlight`, **on the element that
+  carries the text, with `forced-color-adjust: none`**. Both halves are needed. Without `none` the
+  mode paints a Canvas backplate behind the text, and the word vanishes on its Highlight row. With
+  it, everything inside keeps its author colour, so the rail's name and permissions take the row's
+  colour in this mode, whoever gave the row its pair: components.css opts a menu row under the
+  pointer out the same way.
+- **A glyph never takes `none`**: under it the glyph keeps its author colour, which can pass on one
+  palette and measure under 2:1 on the other. The chrome's own glyphs are characters (the tick
+  states, `←`, `»`, `/`, `▾`), which the mode forces like any text. The burger is an inline `<svg>`
+  painting `currentColor`, which the user agent already gives `preserve-parent-color`. The history
+  buttons' glyphs are `[data-icon]` masks, which `tokens.css` gives `preserve-parent-color`
+  (`references/icons.md`); a new mask glyph in the chrome copies that pattern.
+- Do not redraw a state as a tint alone. The check reads all of this as painted pixels, on a light
+  and a dark forced palette, because the backplate appears in no computed style.
 - `hidden` hides every chrome part whatever `display` its class sets; the one rule that guarantees
   it is in `tokens.css`. Do not add per-class `[hidden]` guards.
 

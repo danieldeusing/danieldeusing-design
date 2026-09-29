@@ -16,7 +16,9 @@
  *     the value, the active state wears --primary, the clear is joined and named, the list has an
  *     "all" row that carries the ✓ when nothing is filtered. Plus the keyboard — the APG
  *     select-only combobox — and the search row, which only a FILTER past twenty options gets
- *     unasked, and which sits OUTSIDE the listbox (asserted in the accessibility tree).
+ *     unasked, which sits OUTSIDE the listbox, and which makes the popup a DIALOG whose box is the
+ *     combobox. Both popup shapes, and an invalid select's error text reaching its trigger, are
+ *     asserted in the accessibility tree — what is announced, not what the attributes say.
  *   · search.js: the clear button tracks the value and the box's disabled state, clears like a
  *     person would (input, then change), Escape clears a filled box WITHOUT reaching the dialog
  *     around it, and the pending line lasts `ms` after the LAST keystroke, not the first.
@@ -28,16 +30,22 @@
  *     focus-ring and forced-colours assertion runs on that page, where no base.css can supply a
  *     ring that the control's own rule has lost (X2).
  *
- * WHAT THIS RUN MEASURES AGAINST. Four things this package reads land with other packages. Until
+ * WHAT THIS RUN MEASURES AGAINST. Five things this package reads land with other packages. Until
  * they do, the harness stands in for each — and says which on every run, because a check measured
- * against a stand-in is a claim about the stand-in:
- *   · the design tokens (WP1: --control-h, --control-edge, --icon-*, --ico-*), declared BEFORE
- *     tokens.css so that tokens.css wins the day it declares them;
- *   · the `[hidden]` rule (WP1, tokens.css), injected only while tokens.css lacks it;
- *   · the `.btn-group` lifts (WP5, controls.css), injected only while there is no src/controls.css;
- *   · an UNPLACED `.select-panel` (WP2, M0), `position: static` only while components.css still
- *     places the panel itself — as 0.59's did, which hid the page scroll that the runtime's
- *     place-before-scroll order exists to prevent.
+ * against a stand-in is a claim about the stand-in. Each is decided by BEHAVIOUR, on a probe page
+ * that loads only the real file, never by how the file spells its rule (a regex once missed WP1's
+ * `[hidden="until-found" i]`, and the suite went on measuring its own shim):
+ *   · the design tokens (WP1: --control-h, --control-edge, --icon-*, --ico-*): does tokens.css
+ *     alone define them?
+ *   · the `[hidden]` rule (WP1): does a `display: flex` element with `hidden`, under tokens.css
+ *     alone, compute `display: none`?
+ *   · the `.btn-group` lifts (WP5): is there a src/controls.css?
+ *   · an UNPLACED `.select-panel` (WP2, M0): under components.css, is a bare panel `static`? 0.59
+ *     placed it itself, which hid the page scroll the place-before-scroll order prevents;
+ *   · the trigger's box (WP2, C8): under components.css, is a plain `.select-trigger` 28px tall?
+ *
+ * DD_FORBID_STANDINS=1 injects none of them: each one the real files still need is a FAIL, and the
+ * run measures the real files as they are.
  *
  * A REAL BROWSER, and no dependency: the headless chromium Playwright caches on these machines,
  * over the DevTools protocol, with Node's own fetch and WebSocket. It skips loudly with no browser;
@@ -50,7 +58,7 @@
  *   node scripts/check-filters.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join } from "node:path";
@@ -129,11 +137,24 @@ const chrome = spawn(CHROME, [
   "--remote-debugging-port=0", "--remote-allow-origins=*", "--headless=new",
   "--no-first-run", "--no-default-browser-check", "--disable-gpu",
   `--user-data-dir=${profile}`, "about:blank",
-], { stdio: "ignore" });
+], { stdio: "ignore", detached: true });
 
+// THE PROFILE GOES WITH THE RUN, a failed or interrupted one included — otherwise every run leaves
+// 2.3 MB of browser state in $TMPDIR. The browser is spawned detached so that it leads a process
+// group, and the whole group is killed first: no renderer is still writing into what is removed.
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); };
+const shutdown = () => {
+  try { socket?.close(); } catch {}
+  try { process.kill(-chrome.pid, "SIGKILL"); } catch {}
+  try {
+    rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  } catch (error) {
+    console.log(`note: the browser profile ${profile} was not removed: ${error.message}`);
+  }
+};
 process.on("exit", shutdown);
+process.on("SIGINT", () => process.exit(130));
+process.on("SIGTERM", () => process.exit(143));
 
 let port = 0;
 for (let i = 0; !port; i += 1) {
@@ -144,9 +165,12 @@ for (let i = 0; !port; i += 1) {
 
 /* ── what this run measures against ───────────────────────────────────────── */
 
+const FORBID = process.env.DD_FORBID_STANDINS === "1";
 const svg = (body) => `url("data:image/svg+xml,${
   `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>${body}</svg>`
     .replace(/</g, "%3C").replace(/>/g, "%3E")}")`;
+const TOKENS = ["--control-h", "--control-edge", "--icon-sm", "--icon-size", "--ico-search", "--ico-filter", "--ico-x",
+  "--ico-check", "--ico-arrow-up", "--ico-arrow-down"];
 // WP1 STAND-IN, declared BEFORE tokens.css: once the foundations package declares these, its values win.
 const TOKEN_SHIM = `<style id="standin-wp1-tokens">:root {
   --control-h: 1.75rem;
@@ -160,20 +184,24 @@ const TOKEN_SHIM = `<style id="standin-wp1-tokens">:root {
   --ico-arrow-down: ${svg("<path d='M12 5v14M19 12l-7 7-7-7'/>")};
 }</style>`;
 
-const HIDDEN_RULE = /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important;?\s*\}/;
-const hiddenFromTokens = HIDDEN_RULE.test(readFileSync(join(root, "src/tokens.css"), "utf8"));
-// WP1 STAND-IN (X3): the one [hidden] rule, only while tokens.css does not carry it yet.
-const HIDDEN_SHIM = hiddenFromTokens ? "" :
-  `<style id="standin-wp1-hidden">[hidden]:not([hidden="until-found"]) { display: none !important; }</style>`;
-
-const controlsFromRepo = existsSync(join(root, "src/controls.css"));
-// WP5 STAND-IN: `.btn-group`'s lifts from controls.css (WP5 controls.css:149-151), only while there is
-// no src/controls.css. Which child of a joined pair is on top is decided there, and nowhere here.
-const CONTROLS = controlsFromRepo ? `<link rel="stylesheet" href="/src/controls.css">` :
-  `<style id="standin-wp5-btn-group">
+// WP1 STAND-IN (X3): the one [hidden] rule, as WP1 spells it.
+const HIDDEN_SHIM = `<style id="standin-wp1-hidden">[hidden]:not([hidden="until-found" i]) { display: none !important; }</style>`;
+// WP5 STAND-IN: `.btn-group`'s join and lifts, copied from WP5's controls.css. Which child of a joined
+// pair is on top is decided there, and nowhere here.
+const BTN_GROUP_SHIM = `<style id="standin-wp5-btn-group">
 .btn-group > * + * { margin-inline-start: -1px; }
 .btn-group > :is(:hover, [aria-pressed="true"], [aria-expanded="true"]) { position: relative; z-index: 1; }
 .btn-group > :focus-within { position: relative; z-index: 2; }</style>`;
+// WP2 STAND-IN (M0): an UNPLACED panel — the only kind that shows what the place-before-scroll order
+// in select.js prevents.
+const PANEL_SHIM = `<style id="standin-wp2-m0">.select-panel { position: static; }</style>`;
+// WP2 STAND-IN (C8): the trigger's block padding as WP2 derives it from --control-h, so its box is 28px.
+const TRIGGER_SHIM = `<style id="standin-wp2-c8">select, .select-trigger {
+  padding-block: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2); }</style>`;
+
+// What each page loads beside the real files: empty until the probes decide (below). A page is built
+// when it is REQUESTED, so every page opened after the probes carries what they decided.
+const load = { tokens: "", hidden: "", controls: "", components: "" };
 
 const HELPERS = `
 window.log = [];
@@ -196,9 +224,20 @@ window.tick = () => new Promise((r) => setTimeout(r, 0));
 `;
 
 const PAGES = {
-  "/main": `<!doctype html><html lang="en"><head><meta charset="utf-8">${TOKEN_SHIM}${HIDDEN_SHIM}
+  // THE PROBES: a real file with nothing of ours in front of it, asked what it DOES.
+  "/probe/tokens": `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="/src/tokens.css"></head><body>
+<div id="flex" style="display: flex" hidden>hidden</div><script>window.ready = true;</script></body></html>`,
+  get "/probe/components"() { return `<!doctype html><html lang="en"><head><meta charset="utf-8">${load.tokens}
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/base.css">
-<link rel="stylesheet" href="/src/components.css">${CONTROLS}<link rel="stylesheet" href="/src/filters.css">
+<link rel="stylesheet" href="/src/components.css"></head><body>
+<ul class="select-panel" id="panel"><li>row</li></ul>
+<span class="select-field"><button type="button" class="select-trigger" id="trigger"><span class="select-value">source</span></button></span>
+<script>window.ready = true;</script></body></html>`; },
+
+  get "/main"() { return `<!doctype html><html lang="en"><head><meta charset="utf-8">${load.tokens}${load.hidden}
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/base.css">
+<link rel="stylesheet" href="/src/components.css">${load.components}${load.controls}<link rel="stylesheet" href="/src/filters.css">
 <style>body { margin: 0; padding: 20px; } body::after { display: none; }
 /* Computed styles are asserted at a state's END. A .15s transition would be sampled mid-flight —
    an edge read as --control-edge a frame after it was told to turn --primary. base.css's smooth
@@ -232,26 +271,27 @@ window.activeRowEl = (el = document.activeElement) => {
   return id ? document.getElementById(id) : null;
 };
 window.ready = true;
-</script></body></html>`,
+</script></body></html>`; },
 
   // filters.css BEFORE components.css: the filter trigger must not depend on which loads last.
-  "/reversed": `<!doctype html><html lang="en"><head><meta charset="utf-8">${TOKEN_SHIM}${HIDDEN_SHIM}
+  get "/reversed"() { return `<!doctype html><html lang="en"><head><meta charset="utf-8">${load.tokens}${load.hidden}
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/filters.css">
-<link rel="stylesheet" href="/src/components.css">
+<link rel="stylesheet" href="/src/components.css">${load.components}
 <style>body { margin: 0; padding: 20px; }</style>
 </head><body>
 <select data-filter aria-label="source" id="rsrc"><option value="">all</option><option value="s">seedr</option></select>
+<select aria-label="kind" id="rkind"><option>agent</option><option>skill</option></select>
 <script type="module">
 import { initSelects } from "/runtime/select.js";
 ${HELPERS}
 window.triggerOf = (id) => document.getElementById(id).parentElement.querySelector(".select-trigger");
 initSelects();
 window.ready = true;
-</script></body></html>`,
+</script></body></html>`; },
 
   // ONLY tokens.css and filters.css — what a tokens + chrome surface like netmon would load. Every
   // focus-ring and forced-colours assertion runs here, where nothing else can draw one.
-  "/bare": `<!doctype html><html lang="en"><head><meta charset="utf-8">${TOKEN_SHIM}${HIDDEN_SHIM}
+  get "/bare"() { return `<!doctype html><html lang="en"><head><meta charset="utf-8">${load.tokens}${load.hidden}
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/filters.css">
 <style>body { margin: 0; padding: 20px; font: 12px/1.5 monospace; } *, *::before, *::after { transition: none !important; }</style>
 </head><body><button id="start" type="button">start</button>
@@ -275,7 +315,7 @@ window.ready = true;
 <script type="module">
 ${HELPERS}
 window.ready = true;
-</script></body></html>`,
+</script></body></html>`; },
 };
 
 const server = createServer((req, res) => {
@@ -425,6 +465,28 @@ const axTree = async (selector) => {
     role: c.role?.value, name: c.name?.value ?? "", children: kids(c).map((g) => g.role?.value) })) });
   return shape(self);
 };
+// ONE NODE as a screen reader is handed it: role, name, description, and every state and relation
+// the tree gives it — a relation (controls, activedescendant) as the ids of the elements it reaches.
+const axNode = async (selector) => {
+  const { root: doc } = await send("DOM.getDocument", { depth: 0 });
+  const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector });
+  if (!nodeId) throw new Error(`ax: no node for ${selector}`);
+  const { node } = await send("DOM.describeNode", { nodeId });
+  const { nodes } = await send("Accessibility.getFullAXTree");
+  const self = nodes.find((n) => n.backendDOMNodeId === node.backendNodeId);
+  if (!self) throw new Error(`ax: ${selector} is not in the accessibility tree`);
+  const idOf = async (backendNodeId) => {
+    const { node: target } = await send("DOM.describeNode", { backendNodeId });
+    const attributes = target.attributes || [];
+    for (let i = 0; i < attributes.length; i += 2) if (attributes[i] === "id") return attributes[i + 1];
+    return `(a ${target.nodeName} with no id)`;
+  };
+  const out = { role: self.role?.value, name: self.name?.value ?? "", description: self.description?.value ?? "" };
+  for (const p of self.properties || []) {
+    out[p.name] = p.value.relatedNodes ? await Promise.all(p.value.relatedNodes.map((r) => idOf(r.backendDOMNodeId))) : p.value.value;
+  }
+  return out;
+};
 
 // WHAT THE COMPOSITOR PAINTED: a screenshot of a clip, decoded, and WCAG contrast between two pixels.
 // The only honest answer to "which of two overlapping things is on top", and to whether a colour
@@ -483,24 +545,46 @@ const shot = async (clip) => {
 };
 const pixel = async (x, y) => `rgb(${(await shot({ x, y, width: 1, height: 1 }))[0].join(", ")})`;
 
+/* ═══ what the real files do — decided before anything of ours is loaded ═══ */
+
+const standins = [];
+// A stand-in the real files NEED: named on every run; with DD_FORBID_STANDINS=1, a FAIL, and not loaded.
+const need = (what, why, shim) => { standins.push([what, why]); return FORBID ? "" : shim; };
+
+await open("/probe/tokens");
+const tokensDo = await evaluate(`(() => { const root = getComputedStyle(document.documentElement);
+  return { hidden: getComputedStyle(document.getElementById("flex")).display,
+    missing: ${JSON.stringify(TOKENS)}.filter((name) => !root.getPropertyValue(name).trim()) }; })()`);
+if (tokensDo.missing.length) {
+  load.tokens = need("design tokens", `tokens.css does not define ${tokensDo.missing.join(" ")} (WP1)`, TOKEN_SHIM);
+}
+if (tokensDo.hidden !== "none") {
+  load.hidden = need("[hidden] rule", `under tokens.css alone, a display:flex element with \`hidden\` computes "${tokensDo.hidden}" (WP1, X3)`, HIDDEN_SHIM);
+}
+load.controls = existsSync(join(root, "src/controls.css")) ? `<link rel="stylesheet" href="/src/controls.css">`
+  : need(".btn-group lifts", "there is no src/controls.css (WP5)", BTN_GROUP_SHIM);
+
+await open("/probe/components");
+const componentsDo = await evaluate(`({ panel: getComputedStyle(document.getElementById("panel")).position,
+  trigger: document.getElementById("trigger").getBoundingClientRect().height })`);
+if (componentsDo.panel !== "static") {
+  load.components += need("an unplaced .select-panel", `components.css places a bare panel itself (position: ${componentsDo.panel}) (WP2 M0)`, PANEL_SHIM);
+}
+if (!near(componentsDo.trigger, 28, 0.01)) {
+  load.components += need("the trigger's 28px box", `a plain .select-trigger under components.css is ${componentsDo.trigger}px (WP2 C8)`, TRIGGER_SHIM);
+}
+
+console.log(`measuring against${FORBID ? " (DD_FORBID_STANDINS=1 — none loaded)" : ""}:`);
+if (!standins.length) console.log("  the real files, and nothing else: no stand-in is needed");
+for (const [what, why] of standins) console.log(`  ${FORBID ? "MISSING " : "STAND-IN"} ${what} — ${why}`);
+console.log("");
+if (FORBID) {
+  for (const [what, why] of standins) await check(`the real files need no stand-in: ${what}`, () => false, why);
+}
+
 /* ═══ popup.js — positionPopup() ═══════════════════════════════════════════ */
 
 await open("/main");
-
-// WP2 STAND-IN, decided by measuring: 0.59's components.css places `.select-panel` itself
-// (position: fixed); 0.60.0's does not. Only an UNPLACED panel shows what the place-before-scroll
-// order in select.js prevents, so while the loaded components.css still places it, it is unplaced here.
-const panelPlaced = await evaluate(`(() => { const p = document.createElement("ul"); p.className = "select-panel";
-  document.body.append(p); const placed = getComputedStyle(p).position !== "static"; p.remove();
-  if (placed) { const s = document.createElement("style"); s.id = "standin-wp2-m0"; s.textContent = ".select-panel { position: static; }";
-    document.head.append(s); }
-  return placed; })()`);
-
-console.log("measuring against:");
-console.log(`  [hidden] rule ........ ${hiddenFromTokens ? "tokens.css's own" : "harness STAND-IN — tokens.css lacks it (WP1)"}`);
-console.log(`  .btn-group lifts ..... ${controlsFromRepo ? "src/controls.css" : "harness STAND-IN — no src/controls.css (WP5)"}`);
-console.log(`  .select-panel ........ ${panelPlaced ? "harness STAND-IN position: static — components.css still places it (WP2 M0)" : "unplaced by components.css itself"}`);
-console.log("");
 
 await evaluate(`window.place = (x, y, w, rows, opts, text = "row") => {
   document.getElementById("pa")?.remove(); document.getElementById("pp")?.remove();
@@ -589,7 +673,8 @@ await evaluate(`mount(\`
     <option value="skills">skills.sh</option><option value="aitmpl" disabled>aitmpl</option></select>
   <select id="req" data-filter aria-label="repository"><option value="vu3">poi/vu3</option><option value="infra">dd/infra</option></select>
   <select id="order" data-filter aria-label="kind"><option value="a">agent</option><option value="">all</option><option value="s">skill</option></select>
-  <select id="bad" aria-label="model" aria-invalid="true"><option data-icon="star">claude</option><option>codex</option></select>
+  <select id="bad" aria-label="model" aria-invalid="true" aria-describedby="bad-err"><option data-icon="star">claude</option><option>codex</option></select>
+  <p class="field-error" id="bad-err">pick a model this host can run</p>
   <select id="dis" data-filter aria-label="host" disabled><option value="">all</option><option value="m" selected>ddmini</option></select>
 \`); initSelects(); null`);
 
@@ -613,6 +698,16 @@ await check("never the OS list: ...placed by positionPopup (position: fixed inli
   async () => (await evaluate("panel().style.position")) === "fixed");
 await check("never the OS list: ...and the trigger's aria-controls names that listbox",
   () => evaluate(`triggerOf("plain").getAttribute("aria-controls") === listbox().id`));
+// With no search row nothing changes (lead ruling): the trigger is the combobox, the popup its listbox.
+let axl = null;
+await check("never the OS list: in the ACCESSIBILITY TREE the trigger pops up a LISTBOX, is expanded, controls it, and points at the highlighted row",
+  async () => {
+    axl = await axNode(`#${await evaluate(`triggerOf("plain").id`)}`);
+    return axl.role === "combobox" && axl.hasPopup === "listbox" && axl.expanded === true &&
+      axl.controls?.join() === (await evaluate("listbox().id")) &&
+      axl.activedescendant?.join() === (await evaluate(`panel().querySelector('[data-active="true"]').id`));
+  },
+  () => JSON.stringify(axl));
 await press("Escape");
 await check("Escape closes it, focus back on the trigger",
   async () => !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement === triggerOf("plain")`)));
@@ -756,9 +851,17 @@ await check("filter: ...and a press on it changes nothing", async () => (await e
 
 await check("select: aria-invalid on the <select> is mirrored onto the trigger the reader sees",
   async () => (await evaluate(`triggerOf("bad").getAttribute("aria-invalid")`)) === "true");
-await evaluate(`document.getElementById("bad").removeAttribute("aria-invalid"); tick()`);
-await check("select: ...and follows it when the page clears it",
-  async () => !(await evaluate(`triggerOf("bad").hasAttribute("aria-invalid")`)));
+// WCAG 1.4.1 / 3.3.1: what is wrong is said in WORDS, and they reach the control the reader is on.
+let axe = null;
+await check("select: ...and so is its aria-describedby — in the ACCESSIBILITY TREE the trigger is invalid AND described by the error's text",
+  async () => {
+    axe = await axNode(`#${await evaluate(`triggerOf("bad").id`)}`);
+    return axe.invalid === "true" && axe.description === "pick a model this host can run";
+  },
+  () => JSON.stringify(axe));
+await evaluate(`document.getElementById("bad").removeAttribute("aria-invalid"); document.getElementById("bad").removeAttribute("aria-describedby"); tick()`);
+await check("select: ...and follows both when the page clears them",
+  async () => !(await evaluate(`triggerOf("bad").hasAttribute("aria-invalid") || triggerOf("bad").hasAttribute("aria-describedby")`)));
 await check("select: an <option data-icon> puts its .ico before the label in the trigger",
   () => evaluate(`(() => { const i = triggerOf("bad").querySelector(".ico");
     return !!i && i.dataset.icon === "star" && i.nextElementSibling.matches(".select-value"); })()`));
@@ -840,10 +943,30 @@ await check("search row: a long filter opens a div.select-panel — the search r
     && panel().children[1].matches("ul.select-list[role=listbox]") && !listbox().querySelector("input")`));
 await check("search row: focus moves INTO its box, so it can be typed into",
   () => evaluate(`document.activeElement === searchBox()`));
-await check("search row: the box is a searchbox, named, pointing at the listbox (aria-controls) — as is the trigger",
+await check("search row: the box keeps type=search, is named, and points at the listbox (aria-controls)",
   async () => (await evaluate(`searchBox().type`)) === "search" &&
     (await evaluate(`searchBox().getAttribute("aria-label")`)) === "search label" &&
-    (await evaluate(`searchBox().getAttribute("aria-controls") === listbox().id && triggerOf("many").getAttribute("aria-controls") === listbox().id`)));
+    (await evaluate(`searchBox().getAttribute("aria-controls") === listbox().id`)));
+// THE DIALOG SHAPE (lead ruling): read off the accessibility tree, since that is what is announced.
+let axd = null;
+await check("search row: in the ACCESSIBILITY TREE the popup is a DIALOG, named for its facet",
+  async () => { axd = await axNode(".select-panel"); return axd.role === "dialog" && axd.name === "label"; },
+  () => JSON.stringify(axd));
+await check("search row: ...the trigger pops up a DIALOG, is expanded, controls the dialog — and points at nothing inside it",
+  async () => {
+    axd = await axNode(`#${await evaluate(`triggerOf("many").id`)}`);
+    return axd.hasPopup === "dialog" && axd.expanded === true && axd.controls?.join() === (await evaluate("panel().id")) &&
+      axd.activedescendant === undefined;
+  },
+  () => JSON.stringify(axd));
+await check("search row: ...and the box in it is the COMBOBOX: expanded, autocompleting a list, controlling the listbox, pointing at the highlighted row",
+  async () => {
+    axd = await axNode(".select-search input");
+    return axd.role === "combobox" && axd.expanded === true && axd.autocomplete === "list" &&
+      axd.controls?.join() === (await evaluate("listbox().id")) &&
+      axd.activedescendant?.join() === (await evaluate(`panel().querySelector('[data-active="true"]').id`));
+  },
+  () => JSON.stringify(axd));
 // Whichever element is the listbox — the panel itself, or a list inside it — is the one measured.
 const LISTBOX = ".select-panel[role=listbox], .select-panel [role=listbox]";
 let ax = null;
@@ -912,6 +1035,13 @@ await press("Tab");
 await check("search row: Tab closes it and moves on from the TRIGGER, not from the end of <body>",
   async () => !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement.id`)) === "after",
   () => evaluate("document.activeElement.id || document.activeElement.tagName"));
+const popupOf = (id) => evaluate(`triggerOf(${JSON.stringify(id)}).getAttribute("aria-haspopup")`);
+await evaluate(`document.getElementById("few").removeAttribute("data-search"); tick()`);
+const withoutRow = await popupOf("few");
+await evaluate(`document.getElementById("few").setAttribute("data-search", ""); tick()`);
+await check("search row: the trigger says which popup it opens BEFORE it opens — `data-search` taken away and put back",
+  async () => withoutRow === "listbox" && (await popupOf("few")) === "dialog",
+  async () => `without: ${withoutRow}, with: ${await popupOf("few")}`);
 
 // <optgroup>: a GROUP holding its rows, named by its heading — never a heading row in the listbox.
 await click(`triggerOf("grouped")`);
@@ -1169,6 +1299,13 @@ await park();
 await check("css: the search box, the filter trigger and its clear are --control-h (28px) tall",
   async () => (await h(`"#bq"`)) === 28 && (await h(`triggerOf("bsrc")`)) === 28 && (await h(`clearOf("bsrc")`)) === 28,
   async () => [await h(`"#bq"`), await h(`triggerOf("bsrc")`), await h(`clearOf("bsrc")`)].join("/"));
+// A filter is the plain trigger with a funnel, not a second box: whatever block padding components.css
+// derives from --control-h is the filter's too. A padding of its own reaches 28px only through the
+// min-block-size floor, so the height alone cannot see one.
+const pads = (id) => evaluate(`["padding-top", "padding-bottom"].map((p) => cs(triggerOf(${JSON.stringify(id)}), p)).join(" ")`);
+await check("css: the filter trigger has no block padding of its own — exactly the plain trigger's",
+  async () => (await pads("bsrc")) === (await pads("bsort")),
+  async () => `filter ${await pads("bsrc")}, plain ${await pads("bsort")}`);
 // The sort pair is one row: its arrow stretches to the field beside it. The FIELD's own height is
 // the plain select's (components.css), so this asserts the join; the arrow's 28px alone is asserted
 // on the bare page below.
@@ -1304,9 +1441,10 @@ await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, dev
 /* ── load order: filters.css FIRST, components.css after it ── */
 
 await open("/reversed");
-await check("css: the filter trigger does not depend on load order — filters.css first, it is still 28px on .3rem",
-  async () => (await evaluate(`box(triggerOf("rsrc")).height`)) === 28 && (await evaluate(`cs(triggerOf("rsrc"), "padding-top")`)) === "4.8px",
-  async () => `${await evaluate(`box(triggerOf("rsrc")).height`)}px, padding-top ${await evaluate(`cs(triggerOf("rsrc"), "padding-top")`)}`);
+const reversed = () => evaluate(`[box(triggerOf("rsrc")).height, cs(triggerOf("rsrc"), "padding-top"), cs(triggerOf("rkind"), "padding-top"), cs(triggerOf("rsrc"), "column-gap")].join(" ")`);
+await check("css: the filter trigger does not depend on load order — filters.css first, it is still 28px, on the plain trigger's padding, with its own gap",
+  async () => { const [height, filter, plain, gap] = (await reversed()).split(" "); return height === "28" && filter === plain && gap === "6px"; },
+  async () => `height, filter padding, plain padding, gap: ${await reversed()}`);
 
 /* ── self-sufficient: tokens.css + filters.css and nothing else ── */
 
@@ -1391,6 +1529,9 @@ await evaluate(`mount(\`
   <div class="chip-set" role="group" aria-label="tags"><button type="button" class="chip" id="chip" aria-pressed="false">agents</button>
     <button type="button" class="chip" id="chip-on" aria-pressed="true">skills <span class="chip-count">3</span></button>
     <a class="chip" id="link" href="#a">#a</a><a class="chip" id="link-on" href="#b" aria-current="page">#b</a></div>
+  <div id="offs"><select data-filter aria-label="kind" id="fx-off" disabled><option value="">all</option><option value="k" selected>skill</option></select>
+    <button type="button" class="chip" id="chip-off" aria-pressed="false" disabled>off</button>
+    <button type="button" class="value-filter" id="vf-off" disabled>official</button></div>
 \`); initSelects(); initSearchFields(); null`);
 const boxOf = (selector) => evaluate(`(() => { const b = $(${JSON.stringify(selector)}).getBoundingClientRect();
   return { x: Math.floor(b.left), y: Math.floor(b.top), width: Math.ceil(b.right) - Math.floor(b.left), height: Math.ceil(b.bottom) - Math.floor(b.top) }; })()`);
@@ -1461,11 +1602,17 @@ const edgePaint = async (selector, canvas) => {
   return strip.reduce((far, p) => (contrast(p, canvas) > contrast(far, canvas) ? p : far)).join(",");
 };
 
+// A DISABLED control keeps its .45 in every palette (lead ruling, estate-wide): its glyph must still
+// paint, and paint differently from an enabled one, but it is exempt from the 3:1 (WCAG 1.4.11).
 const GLYPHS = [["magnifier", "#sf", "::before"], ["search clear ×", "#sclr", "::before"],
   ["filter funnel", "#fx-rest ~ .select-trigger", "::before"], ["filter funnel, filtering", "#fx-on ~ .select-trigger", "::before"],
   ["filter clear ×", ".filter-dd:has(#fx-on) > .filter-clear", "::before"], ["sort arrow", "#dir", "::before"],
   ["remove chip ×", "#rm", "::after"], ["pending line", "#sf-pend", "::after"], ["magnifier, switched-off box", "#sf-off", "::before"],
-  ["search clear ×, disabled", "#sclr-off", "::before"], ["sort arrow, disabled", "#dir-off", "::before"]];
+  ["search clear ×, disabled", "#sclr-off", "::before", "disabled"], ["sort arrow, disabled", "#dir-off", "::before", "disabled"],
+  ["filter funnel, disabled", "#fx-off ~ .select-trigger", "::before", "disabled"]];
+const ENABLED = GLYPHS.filter((g) => !g[3]).length;
+const DIMMED = ["#sf-off input", "#sclr-off", "#fx-off ~ .select-trigger", ".filter-dd:has(#fx-off) > .filter-clear", "#dir-off",
+  "#chip-off", "#vf-off"];
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   const canvas = (await evaluate(`probe("Canvas")`)).match(/\d+/g).slice(0, 3).map(Number);
@@ -1474,10 +1621,10 @@ for (const scheme of ["light", "dark"]) {
   const inks = {};
   for (const theme of ["warm", "green", "mono", "paper"]) {
     await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
-    for (const [name, selector, pseudo] of GLYPHS) {
+    for (const [name, selector, pseudo, disabled] of GLYPHS) {
       const paint = await glyphPaint(selector, pseudo);
       if (paint.changed < 3) faint.push(`${theme} ${name}: its clip holds no ink`);
-      else if (!(paint.ratio >= 3)) faint.push(`${theme} ${name} ${paint.ratio.toFixed(2)}:1`);
+      else if (!disabled && !(paint.ratio >= 3)) faint.push(`${theme} ${name} ${paint.ratio.toFixed(2)}:1`);
       if (theme === "warm") inks[name] = paint.ink;
     }
     for (const [name, selector, before] of [["pressed chip", "#chip-on", "#chip"], ["current link chip", "#link-on", "#link"]]) {
@@ -1488,14 +1635,23 @@ for (const scheme of ["light", "dark"]) {
     }
   }
   await evaluate(`delete document.documentElement.dataset.theme; null`);
-  await check(`forced colours (${scheme}): every glyph PAINTS at >= 3:1 on what it covers — ${GLYPHS.length} glyphs x 4 themes, in pixels`,
+  await check(`forced colours (${scheme}): every glyph PAINTS on what it covers — the ${ENABLED} enabled ones at >= 3:1, the ${GLYPHS.length - ENABLED} disabled ones at all — x 4 themes, in pixels`,
     () => faint.length === 0, () => faint.slice(0, 6).join("; "));
   await check(`forced colours (${scheme}): the focus ring of a chip that opts out (pressed, current) paints at >= 3:1 — 4 themes`,
     () => rings.length === 0, () => rings.slice(0, 6).join("; "));
-  await check(`forced colours (${scheme}): a disabled glyph paints differently from an enabled one (GrayText), at full strength`,
-    async () => inks["sort arrow, disabled"] !== inks["sort arrow"] && inks["search clear ×, disabled"] !== inks["search clear ×"] &&
-      (await evaluate(`cs("#dir-off", "opacity") === "1" && cs("#dir-off", "color") === probe("GrayText")`)),
+  await check(`forced colours (${scheme}): a disabled control keeps its .45 — GrayText AND dimmed, as everywhere in the estate (${DIMMED.length} controls)`,
+    () => evaluate(`${JSON.stringify(DIMMED)}.every((s) => cs(s, "opacity") === "0.45") && cs("#dir-off", "color") === probe("GrayText")`),
+    () => evaluate(`${JSON.stringify(DIMMED)}.map((s) => s + " " + cs(s, "opacity")).join(", ")`));
+  await check(`forced colours (${scheme}): ...and its glyph paints differently from an enabled one`,
+    () => inks["sort arrow, disabled"] !== inks["sort arrow"] && inks["search clear ×, disabled"] !== inks["search clear ×"] &&
+      inks["filter funnel, disabled"] !== inks["filter funnel, filtering"],
     () => `sort arrow ${inks["sort arrow"]} / disabled ${inks["sort arrow, disabled"]}`);
+  // The pixel checks below cannot tell `none` from the browser's own forcing: Chromium 151 kept the
+  // chip's word readable without it (9.94:1). So the opt-out itself is pinned.
+  await check(`forced colours (${scheme}): a pressed chip and the current link chip opt out WHOLE — forced-color-adjust: none, HighlightText on Highlight`,
+    () => evaluate(`["#chip-on", "#link-on"].every((s) => cs(s, "forced-color-adjust") === "none" &&
+      cs(s, "color") === probe("HighlightText") && cs(s, "background-color") === probe("Highlight", "background-color"))`),
+    () => evaluate(`["#chip-on", "#link-on"].map((s) => s + " " + cs(s, "forced-color-adjust") + " " + cs(s, "color") + " on " + cs(s, "background-color")).join("; ")`));
   const fills = { chip: await fillPaint("#chip"), chipOn: await fillPaint("#chip-on"), link: await fillPaint("#link"), linkOn: await fillPaint("#link-on") };
   await check(`forced colours (${scheme}): a PRESSED chip and the current LINK chip paint a fill their neighbours do not`,
     () => fills.chipOn !== fills.chip && fills.linkOn !== fills.link, () => JSON.stringify(fills));
@@ -1532,6 +1688,29 @@ await check("demo: no link carries aria-pressed — a link chip says where it is
   () => evaluate(`!document.querySelector("a[aria-pressed]")`));
 await check("demo: a .filter-bar--sticky example is on the page, and it sticks",
   () => evaluate(`!!$(".filter-bar--sticky") && cs(".filter-bar--sticky", "position") === "sticky"`));
+
+// WCAG 1.4.1 / 3.3.1: every invalid control this package SHOWS says what is wrong in words — the demo
+// as the runtime leaves it (the trigger mirrors its select), and every html example in the reference,
+// each read on its own. An id that resolves to anything but a `.field-error` with text does not count.
+await evaluate(`window.undescribed = (root) => [...root.querySelectorAll('[aria-invalid="true"]')].filter((e) => {
+  const ids = (e.getAttribute("aria-describedby") || "").split(/\\s+/).filter(Boolean);
+  return !ids.some((id) => { const d = root.querySelector("#" + CSS.escape(id)); return !!d && d.matches(".field-error") && d.textContent.trim() !== ""; });
+}).map((e) => e.outerHTML.slice(0, 90)); null`);
+const demoInvalid = await evaluate(`[document.querySelectorAll('[aria-invalid="true"]').length, undescribed(document)]`);
+await check(`demo: every aria-invalid="true" on the page (${demoInvalid[0]}) is described by a .field-error with text`,
+  () => demoInvalid[0] > 0 && demoInvalid[1].length === 0, () => `undescribed: ${demoInvalid[1].join(" | ")}`);
+const EXAMPLES = [...readFileSync(join(root, ".claude/skills/danieldeusing-design/references/filters.md"), "utf8")
+  .matchAll(/```html\n([\s\S]*?)```/g)].map((m) => m[1]);
+const referenceInvalid = await evaluate(`(() => { let count = 0; const bad = [];
+  for (const html of ${JSON.stringify(EXAMPLES)}) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    count += doc.querySelectorAll('[aria-invalid="true"]').length;
+    bad.push(...undescribed(doc));
+  }
+  return [count, bad]; })()`);
+await check(`reference: every aria-invalid="true" in filters.md's ${EXAMPLES.length} html examples (${referenceInvalid[0]}; the search box and the select at least) is described by a .field-error with text in the same example`,
+  () => referenceInvalid[0] >= 2 && referenceInvalid[1].length === 0,
+  () => `${referenceInvalid[0]} found; undescribed: ${referenceInvalid[1].join(" | ")}`);
 
 // M13: the demo's autocomplete, driven through its own handlers — typed into by a real keyboard.
 await evaluate(`$("#cmd").scrollIntoView({ block: "center", behavior: "instant" }); null`);

@@ -1048,6 +1048,28 @@ await typeText("cd");
 await press("Escape");
 await check("search row: a document listener, capture or bubble, hears none of the box's input/change — typed, blurred by Tab, removed by Escape",
   async () => (await evaluate("leaked.length")) === 0, () => evaluate("leaked.join(',')"));
+// ...and it is only the RUNTIME's box that is silenced: a window-capture listener added after
+// initSelects() hears none of it either, while a box a page or framework rendered to the same
+// contract (`.select-panel .select-search`) keeps every one of its events — root, form, document,
+// both phases.
+await evaluate(`window.lateHeard = 0; addEventListener("input", (e) => { if (e.target.closest?.(".select-search")) lateHeard += 1; }, true); null`);
+await click(`triggerOf("many")`);
+await typeText("ef");
+await press("Escape");
+await check("search row: a window-capture listener added AFTER initSelects() hears none of the runtime box's keystrokes",
+  async () => (await evaluate("lateHeard")) === 0, () => evaluate("String(lateHeard)"));
+await evaluate(`document.body.insertAdjacentHTML("beforeend", '<div id="page-root" style="position: fixed; right: 0; bottom: 0"><form id="page-form"><div class="select-panel" id="page-panel">' +
+  '<div class="select-search"><div class="search-field"><input type="search" id="page-box" aria-label="page search"></div></div></div></form></div>');
+  window.pageHeard = new Set();
+  for (const [name, target] of [["root", $("#page-root")], ["form", $("#page-form")], ["document", document]])
+    for (const type of ["input", "change"]) for (const capture of [true, false])
+      target.addEventListener(type, (e) => { if (e.target.id === "page-box") pageHeard.add(name + "/" + type + (capture ? "/capture" : "/bubble")); }, capture);
+  $("#page-box").focus(); null`);
+await typeText("page");
+await evaluate(`$("#page-box").blur(); null`);
+await check("search row: a PAGE-owned box in the same classes reaches its root, form and document listeners — input and change, both phases (12)",
+  async () => (await evaluate("pageHeard.size")) === 12, () => evaluate("[...pageHeard].join(',')"));
+await evaluate(`$("#page-root").remove(); scrollTo(0, 0); null`);
 
 // A POLL THAT SHRINKS AN OPEN DIALOG TO A LISTBOX: the rebuilt popup has no box to hold focus, so
 // focus goes back to the trigger — which carries the highlight again, and the keys still work.
@@ -1624,21 +1646,33 @@ const ringPaint = async (selector, before) => {
     () => evaluate("document.activeElement.blur(); null"));
   return { ...paint, focused };
 };
-// The text's contrast as PAINTED, by the same two shots as a glyph: its line box with the text, and
-// again with the text transparent. Only the text's own pixels change, each measured against what it
-// covers (a backplate included) — so a clip that slid onto a neighbour's words holds no changed pixel
-// and fails, where one shot would have read the neighbour's ink as this text's.
+// The text's contrast as PAINTED. Two shots of its tight text box, with the text and with it gone,
+// only to find WHICH pixels are the text: a clip slid onto a neighbour's words holds none. Their
+// contrast is then read inside the DRAWN shot alone, against its dominant colour — what the word
+// actually sits on. Against the second shot it was against what lies UNDER a backplate, so a word
+// painted Canvas on a Canvas backplate still read as high contrast.
+// `forced-color-adjust: none` in the hiding rule, because a forced palette overrides `transparent`.
 const textPaint = async (selector) => {
   const clip = await evaluate(`(() => { const e = $(${JSON.stringify(selector)});
     const text = [...e.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
     const range = document.createRange(); range.selectNodeContents(text);
     const b = [...range.getClientRects()].filter((x) => x.width > 2).pop();
     return { x: Math.floor(b.left), y: Math.floor(b.top), width: Math.ceil(b.width), height: Math.ceil(b.height) }; })()`);
-  const hide = `<style id="untext">${selector} { color: transparent !important; }</style>`;
-  const paint = await markPaint(clip, async () => {},
-    () => evaluate(`document.head.insertAdjacentHTML("beforeend", ${JSON.stringify(hide)}); null`));
+  const drawn = await shot(clip);
+  const hide = `<style id="untext">${selector} { color: transparent !important; forced-color-adjust: none !important; }</style>`;
+  await evaluate(`document.head.insertAdjacentHTML("beforeend", ${JSON.stringify(hide)}); null`);
+  const bare = await shot(clip);
   await evaluate(`document.getElementById("untext").remove(); null`);
-  return { ratio: paint.ratio, ink: paint.changed };
+  const counts = new Map();
+  for (const p of drawn) counts.set(p.join(","), (counts.get(p.join(",")) || 0) + 1);
+  const ground = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
+  // Not the box's outermost ring: a backplate is exactly the text box, and its anti-aliased edge lands
+  // there (measured: a row of rgb(20,20,20) under a Canvas backplate on CanvasText, read at 19:1 as
+  // "text"). The glyphs sit inside the line box's leading.
+  const inside = (i) => { const x = i % clip.width, y = Math.floor(i / clip.width);
+    return x > 0 && y > 0 && x < clip.width - 1 && y < clip.height - 1; };
+  const text = drawn.filter((p, i) => inside(i) && contrast(p, bare[i]) > 1.05).map((p) => contrast(p, ground));
+  return { ratio: Math.max(1, ...text), ink: text.filter((q) => q >= 1.5).length };
 };
 // A fill, read 3px inside the left edge, halfway down — padding, never text.
 const fillPaint = async (selector) => {
@@ -1696,8 +1730,8 @@ for (const scheme of ["light", "dark"]) {
     () => inks["sort arrow, disabled"] !== inks["sort arrow"] && inks["search clear ×, disabled"] !== inks["search clear ×"] &&
       inks["filter funnel, disabled"] !== inks["filter funnel, filtering"],
     () => `sort arrow ${inks["sort arrow"]} / disabled ${inks["sort arrow, disabled"]}`);
-  // The pixel checks below cannot tell `none` from the browser's own forcing: Chromium 151 kept the
-  // chip's word readable without it (9.94:1). So the opt-out itself is pinned.
+  // The opt-out itself is pinned as well as painted: the painted check once missed its removal (it
+  // measured under the backplate), and a computed value cannot be fooled that way.
   await check(`forced colours (${scheme}): a pressed chip and the current link chip opt out WHOLE — forced-color-adjust: none, HighlightText on Highlight`,
     () => evaluate(`["#chip-on", "#link-on"].every((s) => cs(s, "forced-color-adjust") === "none" &&
       cs(s, "color") === probe("HighlightText") && cs(s, "background-color") === probe("Highlight", "background-color"))`),

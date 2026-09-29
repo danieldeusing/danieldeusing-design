@@ -49,13 +49,18 @@
    The cell selectors are wrapped in `:where()` so each weighs one class and one element (0,1,1). The
    cell vocabulary below is declared AFTER at equal or higher weight, so `.num` and `.pick` win over
    these defaults on source order — and `.stackable` (0,1,2) wins over them on a phone. No cell sets a
-   font-family: `ui-monospace` swapped JetBrains Mono out of cockpit's `when` column. */
+   font-family: `ui-monospace` swapped JetBrains Mono out of cockpit's `when` column.
+
+   `border-box` is stated, not inherited from the reset: the floor and the pick column's width are
+   measured INCLUDING the padding, as cockpit's are, and a tokens-only surface has no reset to say so —
+   without it the same table drew its pick column 13px wider there. */
 table.dense {
   inline-size: 100%;
   border-collapse: collapse;
   font-size: var(--fs-base);
 }
 table.dense :where(th, td) {
+  box-sizing: border-box;
   padding: 0.3rem 0.35rem;
   text-align: start;
   vertical-align: top;
@@ -125,14 +130,16 @@ table.dense :is(th, td).pick:has(> input:disabled) { cursor: default; }
    and a printout both have to carry "this one is waiting". --warning, the colour the row's own state
    tag already wears, so the row and its badge cannot disagree.
 
-   6%, NOT COCKPIT'S 12%. The row's text sits on the tint, and 6% is the step at which tone-coloured
-   text still clears AA on every theme and surface (§0.1): --warning on it measures 4.97-10.31, and at
-   12% paper's falls to 4.58. The bar is an inset shadow so it moves no content; the first cell's
-   .45rem inset above is what it paints into.
+   5%, NOT COCKPIT'S 12% — AND NOT 6%. Every text of the row sits on the tint, not only its tone: the
+   `when` column's stamp is --muted-foreground, and at 6% it measured 4.47 on warm's --card, under AA.
+   At 5% it measures 4.53 there and --warning text 4.59 or better on every theme and surface; 5% is the
+   house step the fence already uses for a --warning band. (On warm's --muted SURFACE the stamp is
+   4.38 at any useful tint — --muted is a menu item's hover fill, and no table sits on it.) The bar is
+   an inset shadow so it moves no content; the first cell's .45rem inset above is what it paints into.
 
    Dense only: a pinned row is the dense table's idea (cockpit's pinFirst), and the base table's first
    cell has no inset for the bar to paint into — it would land on the first glyph again. */
-table.dense tr[data-pin] > * { background: color-mix(in srgb, var(--warning) 6%, transparent); }
+table.dense tr[data-pin] > * { background: color-mix(in srgb, var(--warning) 5%, transparent); }
 table.dense tr[data-pin] > :first-child { box-shadow: inset 3px 0 0 var(--warning); }
 /* A ROW THAT CANNOT BE ACTED ON is muted text, not opacity. Cockpit's .72 dimmed the whole row
    below AA on warm and made it look broken rather than off. The first cell — usually what the row
@@ -205,7 +212,7 @@ table.dense--form :where(th, td) { vertical-align: middle; }
   table.stackable td:empty { display: none; }
   /* A pinned row is one card now: the tint and the bar move from its first cell to the whole card. */
   table.stackable.dense tr[data-pin] {
-    background: color-mix(in srgb, var(--warning) 6%, var(--card));
+    background: color-mix(in srgb, var(--warning) 5%, var(--card));
     box-shadow: inset 3px 0 0 var(--warning);
   }
   table.stackable.dense tr[data-pin] > * {
@@ -230,6 +237,7 @@ table.kv {
   font-size: var(--fs-base);
 }
 table.kv :where(th, td) {
+  box-sizing: border-box;
   padding: 0.45rem 0.85rem;
   text-align: start;
   vertical-align: top;
@@ -245,7 +253,8 @@ table.kv th {
 }
 table.kv td { overflow-wrap: anywhere; }
 /* An aligned label column for a stacked run of definitions; cockpit widens it on the table itself
-   (`style="--field-label-w: 15rem"`). */
+   (`style="--field-label-w: 15rem"`). The width includes the label's end padding (the cells are
+   border-box), so the value starts where a `dl.kv` or `.field-row` value does, near the same edge. */
 @media (min-width: 40rem) {
   table.kv--labels :is(th, td):first-child { inline-size: var(--field-label-w); }
 }
@@ -474,9 +483,10 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
 }
 /* A STATE SUFFIX on a tab — a failed worker stays visible while another tab is being read. In the
    tone's colour on an unselected tab; on the selected one it inherits the fill's text colour, because
-   a tone on the --primary fill measures 1.02-3.41. The word is the meaning, so nothing is lost. */
+   a tone on the --primary fill measures 1.02-3.41 — and under the pointer too, because a tone on the
+   10% hover tint measures 3.87 (paper's --warning). The word is the meaning, so nothing is lost. */
 .tab-status { color: var(--tone, var(--muted-foreground)); }
-.tab[aria-selected="true"] .tab-status { color: inherit; }
+.tab:is([aria-selected="true"], :hover) .tab-status { color: inherit; }
 /* A TAB ROW HAS TWO HALVES. On the left the tabs you go to in order to DO something; on the right
    the ones you go to in order to UNDERSTAND something — conformance, how it works. `.tab--info` on
    the first reference tab pushes it and every sibling after it right (an auto inline-start margin in

@@ -139,10 +139,13 @@
   margin: 0;
   min-inline-size: 0;
 }
+/* border-box, or `block-size: 100%` plus the card's padding and edge overflows the grid row on a
+   surface without a reset. */
 .card-grid > .card-terminal {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  box-sizing: border-box;
   block-size: 100%;
 }
 .card-terminal:has(> .card-title) {
@@ -298,10 +301,12 @@
 .stat-note {
   color: var(--muted-foreground);
 }
+/* No underline at rest, on a span or on a link of its own: the tile's hover (or the link's) draws it. */
 .stat-cta {
   margin-top: auto;
   align-self: flex-end;
   color: var(--primary);
+  text-decoration: none;
 }
 .stat-tile[data-state="idle"] {
   --stat-edge: var(--success);
@@ -1220,8 +1225,11 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   color: var(--muted-foreground);
   white-space: nowrap;
 }
+/* `flex: 1 1 auto`, not `flex: 1`. A zero basis is what a column flexbox sizes the body by, and it
+   ignores block-size: measured, `--console-h: 14rem` rendered at the 12rem floor. An `auto` basis
+   takes --console-h, and the body still grows into a taller console (--fill) and shrinks to 12rem. */
 .console-body {
-  flex: 1;
+  flex: 1 1 auto;
   box-sizing: border-box;
   min-block-size: 12rem;
   block-size: var(--console-h, 55vh);

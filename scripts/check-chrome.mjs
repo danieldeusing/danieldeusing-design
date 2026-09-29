@@ -93,12 +93,12 @@ const server = createServer((req, res) => {
   if (path.includes("..") || !existsSync(file)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "content-type": `${TYPES[extname(path)] || "application/octet-stream"}; charset=utf-8`, "cache-control": "no-store" });
   res.end(readFileSync(file));
-}).listen(0, "127.0.0.1");
+}).listen(Number(process.env.DD_HTTP_PORT) || 0, "127.0.0.1");
 await new Promise((ok) => server.on("listening", ok));
 const BASE = `http://127.0.0.1:${server.address().port}/examples/chrome.html`;
 
 /* ── the browser ──────────────────────────────────────────────────────────────────────────────── */
-const PORT = 19240 + Math.floor(Math.random() * 400);
+const PORT = Number(process.env.DD_CDP_PORT) || 19240 + Math.floor(Math.random() * 400);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const chrome = spawn(CHROME, [
   `--remote-debugging-port=${PORT}`, "--remote-allow-origins=*", "--headless=new",
@@ -377,7 +377,8 @@ await load("nobanner&nomf", { width: 375, height: 812 });
 const crowded = await clearance();
 await check("phone, a footer too full for one row: the controls wrap and NONE is clipped off the screen",
   () => crowded.reach, crowded);
-console.log(`NOTE  …that footer is ${crowded.footer}px against --status-h ${crowded.status}: a third row is not cleared (documented; such a page folds its controls into the burger)`);
+await check("…and the page reserves what that footer really is (a third row), not the token: body and scroll padding = its rendered height",
+  () => crowded.footer > 60 && near(crowded.statusPx, crowded.footer, 0.01) && near(crowded.scrollPad, crowded.footer, 0.01) && crowded.mainBottom <= crowded.footerTop + 0.5, crowded);
 await load("nobanner", { width: 375, height: 812 });
 const folded = await clearance();
 await check("phone, with a .mobile-footer: the footer folds into the burger and reserves nothing",
@@ -636,6 +637,7 @@ const measure = async (items) => {
     await frames(1);
     out[name].holds = shown.some((p, i) => p.join() !== hidden[i].join());
     out[name].rest = paint(hidden).ratio;
+    out[name].groundHidden = paint(hidden).bg;
   }
   return out;
 };
@@ -675,6 +677,10 @@ const TEXT_ON_STATE = [
   ["rail row another rule selects: permissions", ".ls-nav .ls-row.__selected .ls-perm", null, "self"],
   ["TOC current entry", '.toc a[aria-current="true"]', null, ".__ink"],
   ["series current part", '#series a[aria-current="page"]', null, ".__ink"],
+  // The same two words in their OWN box (the wrapped text), where a backplate would be the ground: in
+  // the whole entry the state's fill around the words stays the commonest colour either way.
+  ["TOC current entry: its words", '.toc a[aria-current="true"] .__ink', null, "self"],
+  ["series current part: its words", '#series a[aria-current="page"] .__ink', null, "self"],
 ];
 const PAIRS = [
   ["rail current row", '.ls-nav .ls-row[aria-current="page"]', '.ls-nav .ls-row:not([aria-current]):not(.__selected)'],
@@ -731,6 +737,7 @@ const cells = [];
 // THE COLLECTION RUNS INSIDE A CHECK: a throw anywhere in it (a selector gone, a screenshot refused)
 // is a FAIL naming the error, and the suite still finishes and reports the rest (07-controls).
 await check("forced colours: the measurement pass runs to the end on both palettes", async () => {
+  if (process.env.DD_FORCED_PROBE_THROW === "1") throw new Error("probe: the forced pass threw on purpose");
   for (const scheme of PALETTES) {
     await load("nobanner", { forced: true, scheme });
     await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 450 });
@@ -744,6 +751,8 @@ await check("forced colours: the measurement pass runs to the end on both palett
       await page(`document.getElementById("toc").scrollIntoView({ block: "start", behavior: "instant" }); null`);
       await frames(4);
       const text = await measure(TEXT_ON_STATE);
+      const states = await measure([["rail current row", '.ls-nav .ls-row[aria-current="page"]'], ["rail selected row", ".ls-nav .ls-row.__selected"],
+        ["TOC current entry", '.toc a[aria-current="true"]'], ["series current part", '#series a[aria-current="page"]']]);
       const pairs = {};
       for (const [name, on, off] of PAIRS) {
         const [a, b] = Object.values(await measure([[`${name} (on)`, on], [`${name} (off)`, off]]));
@@ -754,7 +763,7 @@ await check("forced colours: the measurement pass runs to the end on both palett
       const followed = await follows(FOLLOWS);
       const glyphs = await measure(GLYPHS);
       const disabled = Object.values(await measure([["disabled", "#btn-disabled", null, "self"], ["enabled", "#btn-forward", null, "self"]]));
-      cells.push({ scheme, theme, probe, text, glyphs, pairs, rings, followed, disabled });
+      cells.push({ scheme, theme, probe, text, states, glyphs, pairs, rings, followed, disabled });
     }
     await load("nobanner&burger", { forced: true, scheme, width: 375, height: 812 });
     await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 805 });
@@ -764,10 +773,10 @@ await check("forced colours: the measurement pass runs to the end on both palett
       await frames(2);
       const cell = cells.find((c) => c.scheme === scheme && c.theme === theme);
       Object.assign(cell.glyphs, await measure(PHONE_GLYPHS));
+      Object.assign(cell.states, await measure([["burger menu current row", '.site-nav .ls-row[aria-current="page"]']]));
       cell.followed.push(...await follows(PHONE_FOLLOWS));
     }
   }
-  if (process.env.DD_FORCED_PROBE_THROW === "1") throw new Error("probe: the forced pass threw on purpose");
   return cells.length === PALETTES.length * THEMES.length;
 });
 const cellName = (c) => `${c.scheme} ${c.theme}`;
@@ -777,31 +786,48 @@ for (const [group, key] of cells.length ? [["text on a state", "text"], ["glyph"
     console.log(`  ${group.padEnd(15)} ${name.padEnd(44)} ${cells.map((c) => (c[key][name] ? c[key][name].ratio.toFixed(2) : "  —").padStart(6)).join(" ")}`);
   }
 }
+// Every assertion below also needs ALL the cells: over zero cells an `every` is true and a list of
+// failures is empty, so a pass that threw early would otherwise read as green.
+const full = () => cells.length === PALETTES.length * THEMES.length;
 const below = (key, floor) => cells.flatMap((c) => Object.entries(c[key]).filter(([, m]) => !m || m.ratio < floor).map(([n, m]) => `${cellName(c)} ${n}: ${m ? m.ratio : "not found"}`));
 await check("forced colours, the reader can tell: an empty patch paints nothing (1:1), a line of text paints ink (≥ 7:1), and a clip that "
   + "still holds a stranger's ink once its own is hidden is seen, on both palettes",
-  () => cells.every((c) => c.probe["an empty patch"].ratio < 1.1 && c.probe["a line of body text"].ratio >= 7 && c.probe["a clip holding a stranger's ink"].rest >= 7),
+  () => full() && cells.every((c) => c.probe["an empty patch"].ratio < 1.1 && c.probe["a line of body text"].ratio >= 7 && c.probe["a clip holding a stranger's ink"].rest >= 7),
   cells.map((c) => [cellName(c), c.probe]));
 const figures = (c) => ({ ...c.text, ...c.glyphs, "disabled action": c.disabled[0], "enabled action": c.disabled[1] });
 const missed = cells.flatMap((c) => Object.entries(figures(c)).filter(([, m]) => !m || !m.holds || m.rest >= 1.1)
   .map(([n, m]) => `${cellName(c)} ${n}: ${m ? (m.holds ? `${m.rest}:1 left with its ink hidden` : "unchanged with its ink hidden") : "not found"}`));
 await check("…and every clip a figure comes from holds that element's ink and nothing else: hidden, the clip changes and is empty",
-  () => missed.length === 0, missed);
+  () => full() && missed.length === 0, missed);
 await check("forced colours: every piece of text on a drawn state paints at 4.5:1 or better, on both palettes and all four themes",
-  () => below("text", 4.5).length === 0, () => below("text", 4.5));
+  () => full() && below("text", 4.5).length === 0, () => below("text", 4.5));
+// A WORD ON ITS STATE, NOT ON A BACKPLATE. A word that kept the adjustment is drawn on a Canvas
+// backplate the state's fill never shows: the ratio (the word on its own plate) and the ownership
+// proof both still pass. So the ground of each word's own clip must be (a) the same with the word
+// hidden and (b) the ground of the state it belongs to. (a) alone misses a plate that belongs to the
+// LINE rather than to the word (measured on the TOC entry: the plate stays when the words are hidden).
+const WORDS = [["rail current: name", "rail current row"], ["rail current: permissions", "rail current row"], ["rail current: the ← mark", "rail current row"],
+  ["rail row another rule selects: name", "rail selected row"], ["rail row another rule selects: permissions", "rail selected row"],
+  ["TOC current entry: its words", "TOC current entry"], ["series current part: its words", "series current part"],
+  ["burger menu current row: name", "burger menu current row"]];
+const plated = cells.flatMap((c) => WORDS.map(([n, state]) => [n, c.text[n] || c.glyphs[n], c.states[state]])
+  .filter(([, m, st]) => !m || !st || m.bg !== m.groundHidden || m.bg !== st.bg)
+  .map(([n, m, st]) => `${cellName(c)} ${n}: ${m && st ? `drawn on ${m.bg}, ${m.groundHidden} with it hidden, its state ${st.bg}` : "not found"}`));
+await check("…and every such word sits on its state's own ground: the same with the word hidden, and the state's (no backplate)",
+  () => full() && plated.length === 0, plated);
 await check("…every glyph the chrome shows paints at 3:1 or better against what it sits on",
-  () => below("glyphs", 3).length === 0, () => below("glyphs", 3));
+  () => full() && below("glyphs", 3).length === 0, () => below("glyphs", 3));
 const strays = cells.flatMap((c) => c.followed.filter(([, paint, context]) => !paint || paint !== context).map(([n, paint, context]) => `${cellName(c)} ${n}: ${paint} in ${context}`));
 await check("…and every glyph paints its context's forced colour, so it follows a palette the reader chose (never an author colour)",
-  () => strays.length === 0, strays);
+  () => full() && strays.length === 0, strays);
 const untabbed = cells.flatMap((c) => Object.entries(c.rings).filter(([, m]) => !m.tabbed).map(([n]) => `${cellName(c)} ${n}`));
 await check("…a focused element this file opts out, reached with Tab, draws its ring in a system colour, at 3:1 or better against what it covers",
-  () => untabbed.length === 0 && below("rings", 3).length === 0, () => ({ untabbed, below: below("rings", 3) }));
+  () => full() && untabbed.length === 0 && below("rings", 3).length === 0, () => ({ untabbed, below: below("rings", 3) }));
 const same = cells.flatMap((c) => Object.entries(c.pairs).filter(([, p]) => !p || p[0] === p[1]).map(([n, p]) => `${cellName(c)} ${n}: ${p ? p[0] : "not found"}`));
 await check("…each state paints a different background from its neighbour (the rail's row, the TOC's and the series' current entries)",
-  () => same.length === 0, same);
+  () => full() && same.length === 0, same);
 await check("…a disabled text action paints a different colour from an enabled one",
-  () => cells.every((c) => c.disabled[0] && c.disabled[1] && c.disabled[0].ink !== c.disabled[1].ink), cells.map((c) => [cellName(c), c.disabled.map((m) => m && m.ink)]));
+  () => full() && cells.every((c) => c.disabled[0] && c.disabled[1] && c.disabled[0].ink !== c.disabled[1].ink), cells.map((c) => [cellName(c), c.disabled.map((m) => m && m.ink)]));
 
 /* ═══ 13. the rail's boot reveal and print ══════════════════════════════════════════════════════ */
 await load("nobanner");
@@ -906,11 +932,32 @@ for (const [query, instant] of [["bare&nobanner", false], ["nobanner", true]]) {
   await check(`…and an instant scrollTo(0) from the bottom marks the truth there${instant ? " (nothing)" : ""}, never the bottom's entry (${query})`,
     () => top.bottom !== null && top.marked === top.truth && top.marked !== top.bottom && (!instant || top.marked === null), top);
 }
+// Removed WITHOUT anything the observer would report. An IntersectionObserver delivers an entry
+// when a target that intersected the band is removed, and whenever a removal shifts one that does;
+// either would pass whether or not the spy listens for removals. So the section is made the current
+// one while lying wholly ABOVE the band (a tall spacer keeps the next section below the line), lifted
+// out of the flow over a spacer holding its box, and then removed in a mutation that adds nothing:
+// no target changes its intersection, and only the spy's own removal handling can move the mark.
 await load("nobanner");
-await page(`document.getElementById("rail").scrollIntoView({ behavior: "instant" }); null`);
+const held = await page(`(async () => { const r = document.getElementById("rail"), next = r.nextElementSibling;
+  const gap = document.createElement("div"); gap.style.height = "3000px"; r.after(gap);
+  const cs = getComputedStyle(r), hold = document.createElement("div");
+  hold.style.height = r.offsetHeight + "px"; hold.style.margin = cs.margin;
+  const x = r.offsetLeft, y = r.offsetTop, w = r.offsetWidth;
+  r.before(hold);
+  Object.assign(r.style, { position: "absolute", left: x + "px", top: y + "px", width: w + "px", margin: "0" });
+  scrollTo({ top: scrollY + r.getBoundingClientRect().bottom + 40, behavior: "instant" });
+  await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(ok, 60))));
+  const before = next.getBoundingClientRect().top;
+  return { railBottom: r.getBoundingClientRect().bottom, nextTop: before, line: innerHeight * 0.3 }; })()`);
 await frames(4);
+const heldMark = await page(tocMarked);
+const nextBefore = await page(`document.getElementById("rail").nextElementSibling.nextElementSibling.getBoundingClientRect().top`);
 await page(`document.getElementById("rail").remove(); null`);
 await frames(4);
+const nextAfter = await page(`document.querySelector("#rail") ? null : [...document.querySelectorAll(".content > section")].find((e) => e.previousElementSibling && e.previousElementSibling.style.height === "3000px")?.getBoundingClientRect().top`);
+await check("precondition: the removed section was the marked one, wholly above the band with the next section below the line, and nothing moved when it went",
+  () => heldMark === "rail" && held.railBottom < 0 && held.nextTop > held.line && near(nextBefore, nextAfter, 0.5), { held, heldMark, nextBefore, nextAfter });
 await check("a target removed with nothing added is let go: its entry is no longer marked, and the mark is the true one",
   async () => { const [m, t] = [await page(tocMarked), await page(tocTruth)]; return m !== "rail" && m === t; }, async () => [await page(tocMarked), await page(tocTruth)]);
 
@@ -928,6 +975,10 @@ await frames(2);
 await check("a rail toggle whose aria-expanded the page rewrites says collapsed again, and loses aria-pressed",
   () => page(`(() => { const b = document.getElementById("second-rail-toggle"); return b.getAttribute("aria-expanded") === "false" && !b.hasAttribute("aria-pressed"); })()`));
 await press("footer.status .anim-toggle");
+await page(`document.querySelector("footer.status .anim-toggle").setAttribute("aria-pressed", "true"); null`);
+await frames(2);
+await check("an anim toggle whose aria-pressed ALONE is rewritten (its box untouched) says false again",
+  () => page(`document.documentElement.classList.contains("anim-off") && document.querySelector("footer.status .anim-toggle").getAttribute("aria-pressed") === "false"`));
 await page(`(() => { const t = document.querySelector("footer.status .anim-toggle"); t.setAttribute("aria-pressed", "true"); t.querySelector("[data-anim-box]").textContent = "[x]"; })(); null`);
 await frames(2);
 await check("an anim toggle whose state the page rewrites shows the real state again (off: false, [ ])",
@@ -1001,6 +1052,11 @@ await load("nobanner&nomf&nolang", { width: 375, height: 812, coarse: true });
 const phoneCoarse = await targets();
 await check("coarse phone, no .mobile-footer: every footer control is at least 44×44, none clipped, and the body reserves the footer",
   () => phoneCoarse.count >= 3 && phoneCoarse.small.length === 0 && phoneCoarse.clipped === 0 && near(phoneCoarse.status, phoneCoarse.footer, 0.01), phoneCoarse);
+
+await load("nobanner&nomf", { width: 375, height: 812, coarse: true });
+const longest = await clearance();
+await check("coarse phone with the demo's longest footer (four controls, no .mobile-footer): the body reserves the footer's rendered height",
+  () => longest.footer > 100 && near(longest.statusPx, longest.footer, 0.01) && near(longest.scrollPad, longest.footer, 0.01) && longest.mainBottom <= longest.footerTop + 0.5, longest);
 
 // N2: the reveal's step comes from the position, capped at the twelfth row; and no documented markup
 // carries a style attribute (a strict CSP refuses inline style).

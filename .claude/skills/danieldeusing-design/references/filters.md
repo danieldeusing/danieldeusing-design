@@ -228,7 +228,9 @@ in the trigger (configr's option icons).
 tie a `.field-error` (C9) to it with `aria-describedby`. The runtime mirrors BOTH onto the trigger
 (the select itself is transparent and hidden from assistive technology, so anything pinned only to
 it reaches nobody): the trigger's edge turns `--destructive`, and the error text is its description.
-The edge alone is colour alone (WCAG 1.4.1), and it is gone in a forced-colours palette.
+The edge alone is colour alone (WCAG 1.4.1), and it is gone in a forced-colours palette. **Invalid
+beats filtering**: a filter that is both paints `--destructive` edge and text and keeps its funnel
+and clear; in a forced palette it drops the `Highlight` edge, so it never reads as plain filtering.
 
 ```html
 <select aria-label="kind" aria-invalid="true" aria-describedby="kind-err">…</select>

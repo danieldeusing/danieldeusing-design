@@ -27,7 +27,7 @@
  *   node scripts/check-foundations.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize } from "node:path";
@@ -92,17 +92,22 @@ await new Promise((ok) => server.on("listening", ok));
 
 /* ── the browser ─────────────────────────────────────────────────────────── */
 
-const PORT = 19232;
+// Port 0: the browser picks a free port and writes it into its profile, so checks run side by side
+// never collide on a fixed number. The profile is removed at exit.
+const profile = mkdtempSync(join(tmpdir(), "dd-foundations-"));
 const chrome = spawn(CHROME, [
-  `--remote-debugging-port=${PORT}`, "--remote-allow-origins=*", "--headless=new",
+  "--remote-debugging-port=0", "--remote-allow-origins=*", "--headless=new",
   "--no-first-run", "--no-default-browser-check", "--disable-gpu",
-  `--user-data-dir=${mkdtempSync(join(tmpdir(), "dd-foundations-"))}`, "about:blank",
+  `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 let socket;
-process.on("exit", () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); });
+process.on("exit", () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close();
+  rmSync(profile, { recursive: true, force: true, maxRetries: 10 }); });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let PORT = 0;
 for (let i = 0; ; i += 1) {
-  try { await fetch(`http://127.0.0.1:${PORT}/json/version`); break; } catch {}
+  try { PORT = Number(readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]);
+    await fetch(`http://127.0.0.1:${PORT}/json/version`); break; } catch {}
   if (i > 60) throw new Error("headless chromium did not come up");
   await sleep(250);
 }
@@ -131,7 +136,12 @@ const evaluate = async (expression) => {
 
 let failures = 0;
 let lastPassed = "(before the first check)";
+// `condition` may be a thunk: a throw inside it is that check's FAIL, and the suite goes on.
 const check = (label, condition, detail) => {
+  try { condition = typeof condition === "function" ? condition() : condition; } catch (error) {
+    condition = false; detail = `threw: ${String(error?.message || error).split("\n")[0]}`;
+  }
+  if (typeof condition?.then === "function") { condition = false; detail = "handed a promise: await the measurement before the check"; }
   if (condition) { console.log(`PASS  ${label}`); lastPassed = label; return; }
   failures += 1;
   console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${detail}`}`);
@@ -451,35 +461,61 @@ check("the icon list's second column is coloured by its parent: the parent is --
 // keeps its author colour, which is never Canvas, and a Canvas backplate behind text is in no
 // computed style at all.
 //
-// `pixels` screenshots one element's box plus `pad` pixels around it and decodes it in the page:
-// the colour behind it (the clip's corner), how many pixels inside stand out from that by 1.5:1 and
-// the strongest of them, the commonest colour inside and its share, the strongest contrast against
-// THAT colour (text on a fill), and the best-inked row at the box's top edge (a border).
+// OWNERSHIP FIRST: every clip is shot TWICE, as drawn and with ONLY its element hidden, and only the
+// pixels that change between the two are that element's paint. A neighbour's ink is the same in both
+// shots, so it counts for nothing; and where the changed pixels land must be where the element is —
+// inside its box for a glyph, its box edge to edge for a fill or an edge, ±1px — so a clip that slid
+// off its element (a scrollbar, a re-layout, a clip measured before a scroll) reads its ink in the
+// wrong place and fails, rather than passing on whatever it landed on. Each ratio is then read:
+//   · a glyph: from the changed pixels, what each paints against what it covers (drawn vs hidden);
+//   · a word: inside the DRAWN shot, over its box less the outermost 1px ring (where a backplate's
+//     anti-aliased edge lands), changed pixels against the box's commonest colour — what the word
+//     actually sits on. Against the hidden shot it would be what lies UNDER a backplate, and a word
+//     painted in its own background's colour would still read high;
+//   · a fill: the commonest drawn colour over the box, and its share;
+//   · an edge: the best-inked row at the box's top edge, counting changed pixels at 3:1 only.
 await evaluate(`Object.assign(window.M, {
   shot(sel) { const e = document.querySelector(sel); e.scrollIntoView({ block: "center", behavior: "instant" });
     const r = e.getBoundingClientRect(); return { x: r.x + scrollX, y: r.y + scrollY, w: r.width, h: r.height }; },
-  async pixels(png, pad) { const img = new Image(); img.src = "data:image/png;base64," + png; await img.decode();
+  async decode(png) { const img = new Image(); img.src = "data:image/png;base64," + png; await img.decode();
     const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d");
     g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height).data;
-    const at = (i, y) => { const o = (y * c.width + i) * 4; return [d[o], d[o + 1], d[o + 2]]; };
-    const back = at(0, 0), counts = new Map(); let ink = 0, strongest = 1;
-    for (let y = pad; y < c.height - pad; y += 1) for (let i = pad; i < c.width - pad; i += 1) {
-      const px = at(i, y), r = M.ratio(px, back); if (r >= 1.5) ink += 1; if (r > strongest) strongest = r;
-      const k = px.join(","); counts.set(k, (counts.get(k) || 0) + 1); }
-    const [top, n] = [...counts].sort((a, b) => b[1] - a[1])[0], fill = top.split(",").map(Number);
-    let onFill = 1, edge = 0;
-    for (let y = pad; y < c.height - pad; y += 1) for (let i = pad; i < c.width - pad; i += 1) onFill = Math.max(onFill, M.ratio(at(i, y), fill));
-    for (let y = pad - 1; y <= pad + 1; y += 1) { let row = 0;
-      for (let i = pad; i < c.width - pad; i += 1) if (M.ratio(at(i, y), back) >= 3) row += 1;
-      edge = Math.max(edge, row / (c.width - 2 * pad)); }
-    return { back, ink, strongest, fill, share: n / ((c.width - 2 * pad) * (c.height - 2 * pad)), onFill, edge }; },
+    return { w: c.width, h: c.height, at: (i, y) => { const o = (y * c.width + i) * 4; return [d[o], d[o + 1], d[o + 2]]; } }; },
+  async owned(drawnPng, barePng, clip, rect) {
+    const [a, b] = [await M.decode(drawnPng), await M.decode(barePng)];
+    // the element's box in the clip's pixels, as the code believes the clip was placed
+    const L = rect.x - clip.x, T = rect.y - clip.y, R = L + rect.w, B = T + rect.h;
+    const changed = (i, y) => { const p = a.at(i, y), q = b.at(i, y); return Math.max(...p.map((v, k) => Math.abs(v - q[k]))) > 2; };
+    let n = 0, carried = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let y = 0; y < a.h; y += 1) for (let i = 0; i < a.w; i += 1) {
+      if (!changed(i, y)) continue;
+      n += 1; carried = Math.max(carried, M.ratio(a.at(i, y), b.at(i, y)));
+      x0 = Math.min(x0, i); x1 = Math.max(x1, i + 1); y0 = Math.min(y0, y); y1 = Math.max(y1, y + 1); }
+    const inside = n > 0 && x0 >= L - 1 && x1 <= R + 1 && y0 >= T - 1 && y1 <= B + 1;
+    const edgeToEdge = n > 0 && Math.abs(x0 - L) <= 1 && Math.abs(x1 - R) <= 1 && Math.abs(y0 - T) <= 1 && Math.abs(y1 - B) <= 1;
+    // the box's commonest DRAWN colour, and what the changed pixels inside its inner ring reach on it
+    const counts = new Map(), il = Math.ceil(L), it = Math.ceil(T), ir = Math.floor(R), ib = Math.floor(B);
+    for (let y = it; y < ib; y += 1) for (let i = il; i < ir; i += 1) { const k = a.at(i, y).join(","); counts.set(k, (counts.get(k) || 0) + 1); }
+    const [top, most] = [...counts].sort((p, q) => q[1] - p[1])[0] || ["0,0,0", 0], fill = top.split(",").map(Number);
+    let onFill = 1;
+    for (let y = it + 1; y < ib - 1; y += 1) for (let i = il + 1; i < ir - 1; i += 1) if (changed(i, y)) onFill = Math.max(onFill, M.ratio(a.at(i, y), fill));
+    let edge = 0;
+    for (let y = it - 1; y <= it + 1; y += 1) { let row = 0;
+      for (let i = il; i < ir; i += 1) if (changed(i, y) && M.ratio(a.at(i, y), b.at(i, y)) >= 3) row += 1;
+      edge = Math.max(edge, row / Math.max(1, ir - il)); }
+    return { n, carried, inside, edgeToEdge, ink: n ? [x0 - L, y0 - T, x1 - R, y1 - B] : null, fill, share: most / Math.max(1, (ir - il) * (ib - it)), onFill, edge }; },
 }); null`);
-const pixelsOf = async (selector, pad = 3) => {
+const owned = async (selector, pad = 3) => {
   const box = await evaluate(`M.shot(${JSON.stringify(selector)})`);
-  const { data } = await send("Page.captureScreenshot", { format: "png",
-    clip: { x: box.x - pad, y: box.y - pad, width: box.w + 2 * pad, height: box.h + 2 * pad, scale: 1 } });
-  return evaluate(`M.pixels(${JSON.stringify(data)}, ${pad})`);
+  const clip = { x: box.x - pad, y: box.y - pad, width: box.w + 2 * pad, height: box.h + 2 * pad, scale: 1 };
+  const drawn = (await send("Page.captureScreenshot", { format: "png", clip })).data;
+  // the ELEMENT the clip was taken for, not its selector: a selector may match its neighbours too
+  await evaluate(`document.querySelector(${JSON.stringify(selector)}).style.setProperty("visibility", "hidden", "important")`);
+  const bare = (await send("Page.captureScreenshot", { format: "png", clip })).data;
+  await evaluate(`document.querySelector(${JSON.stringify(selector)}).style.removeProperty("visibility")`);
+  return evaluate(`M.owned(${JSON.stringify(drawn)}, ${JSON.stringify(bare)}, ${JSON.stringify(clip)}, ${JSON.stringify(box)})`);
 };
+const where_ = (o) => `${o.n} px changed${o.ink ? `, off its box by [${o.ink.map((v) => Math.round(v)).join(",")}]` : ""}`;
 // One glyph of each kind the recipe draws: plain, listed, coloured by its PARENT (the icon list's
 // second column — the lead's ruling: colour the parent, never the glyph) and spinning.
 const FORCED_GLYPHS = [["the --icon-size glyph", "#ico-md"], ["an icon-list glyph", "#icon-list .demo-ico"],
@@ -493,19 +529,20 @@ for (const theme of ["warm", "green", "mono", "paper"]) for (const palette of ["
   await sleep(100);
   const where = `forced colours, ${theme}, ${palette} palette`;
   check(`${where}: precondition — the mode is on`, forced);
-  const mark = await pixelsOf("#el-mark");
-  check(`${where}: <mark> paints the palette's own Mark over at least half its box, with its text at 4.5:1 or better on it`,
-    String(mark.fill) === String(markColour) && mark.share >= 0.5 && mark.onFill >= 4.5,
-    `measured: rgb(${mark.fill}) over ${Math.round(100 * mark.share)}% (Mark is rgb(${markColour})), text ${r2(mark.onFill)}:1`);
+  const mark = await owned("#el-mark");
+  check(`${where}: <mark> is its own paint (the changed pixels fill its box), the palette's Mark over at least half of it, its text at 4.5:1 or better on it`,
+    () => mark.n >= 3 && mark.edgeToEdge && String(mark.fill) === String(markColour) && mark.share >= 0.5 && mark.onFill >= 4.5,
+    `measured: ${where_(mark)}; rgb(${mark.fill}) over ${Math.round(100 * mark.share)}% (Mark is rgb(${markColour})), text ${r2(mark.onFill)}:1`);
   const glyphs = [];
-  for (const [name, selector] of FORCED_GLYPHS) glyphs.push([name, await pixelsOf(selector)]);
-  const faint = glyphs.filter(([, g]) => !(g.ink > 20 && g.strongest >= 3));
-  check(`${where}: each kind of recipe glyph (plain, listed, coloured by its parent, spinning) paints at 3:1 or better on what it sits on`,
-    faint.length === 0, `measured: ${faint.map(([name, g]) => `${name} ${g.ink} inked px, at best ${r2(g.strongest)}:1 on rgb(${g.back})`).join("; ")}`);
+  for (const [name, selector] of FORCED_GLYPHS) glyphs.push([name, await owned(selector)]);
+  const faint = glyphs.filter(([, g]) => !(g.n > 20 && g.inside && g.carried >= 3));
+  check(`${where}: each kind of recipe glyph (plain, listed, coloured by its parent, spinning) is its own paint, inside its box, at 3:1 or better on what it covers`,
+    faint.length === 0, `measured: ${faint.map(([name, g]) => `${name} ${where_(g)}, at best ${r2(g.carried)}:1`).join("; ")}`);
   const edges = [["inline <code>", "#el-code"], ["the <pre> block", "#el-pre"]];
   const lost = [];
-  for (const [name, selector] of edges) { const e = await pixelsOf(selector); if (e.edge < 0.9) lost.push(`${name}: top edge ${Math.round(100 * e.edge)}% at 3:1`); }
-  check(`${where}: inline code and the code block keep a painted 3:1 edge where their fill is gone`, lost.length === 0, `measured: ${lost.join("; ")}`);
+  for (const [name, selector] of edges) { const e = await owned(selector);
+    if (!(e.n >= 3 && e.edgeToEdge && e.edge >= 0.9)) lost.push(`${name}: ${where_(e)}, top edge ${Math.round(100 * e.edge)}% at 3:1`); }
+  check(`${where}: inline code and the code block keep a painted 3:1 edge, their own and edge to edge, where their fill is gone`, lost.length === 0, `measured: ${lost.join("; ")}`);
 }
 await send("Emulation.setEmulatedMedia", { media: "", features: [] });
 await evaluate('M.theme("warm"); null');

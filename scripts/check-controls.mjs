@@ -148,7 +148,7 @@ const shutdown = () => {
   try { socket?.close(); } catch {}
   chrome.kill("SIGKILL");
   server.close();
-  rmSync(profile, { recursive: true, force: true });
+  rmSync(profile, { recursive: true, force: true, maxRetries: 10 });
 };
 process.on("exit", shutdown);
 
@@ -185,10 +185,14 @@ const evaluate = async (expression) => {
 };
 
 let failures = 0;
-let last = "(before the first check)";
+let last = "(before the first check)"; // the last check to PASS
+// `condition` may be a (synchronous) thunk: a throw inside it is that check's FAIL, and the suite goes on.
 const check = (label, condition, detail) => {
-  last = label;
-  if (condition) { console.log(`PASS  ${label}`); return; }
+  try { condition = typeof condition === "function" ? condition() : condition; } catch (error) {
+    condition = false; detail = `threw: ${String(error?.message || error).split("\n")[0]}`;
+  }
+  if (typeof condition?.then === "function") { condition = false; detail = "handed a promise: await the measurement before the check"; }
+  if (condition) { console.log(`PASS  ${label}`); last = label; return; }
   failures += 1;
   console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${typeof detail === "string" ? detail : JSON.stringify(detail)}`}`);
 };
@@ -972,21 +976,35 @@ const FORCED = `(() => {
 
 // COMPUTED COLOURS CANNOT SEE EVERYTHING. Chromium paints a Canvas backplate behind each line of text in
 // forced colours, over whatever fill the box has: the word computes HighlightText on Highlight and is
-// painted HighlightText on Canvas, a solid block. So the PIXELS are asked too, from one capture of the
-// page per cell: a word on a redrawn state must sit on its fill (most of its own box is the fill
-// colour, which it cannot be under a backplate) and must be painted (some pixels are nearer its ink
-// than its fill); a glyph must be painted where it is drawn.
+// painted HighlightText on Canvas, a solid block. So the PIXELS are asked too.
+//
+// OWNERSHIP FIRST, by a TWO-SHOT DIFF. Each region is captured twice, as drawn and with ONLY its target
+// hidden: a glyph's ::before, or a word's own text (its text nodes wrapped in a `visibility: hidden`
+// span, which takes the word and its backplate and nothing else — `color: transparent` would not do it,
+// a forced palette paints over it). Only the pixels that change are the target's: at least 3 (6 for a
+// glyph), and all of them inside the target's box ±1px, so a clip that landed beside it (a scrollbar, a
+// re-layout, a box measured before a scroll) reads the ink in the wrong place and fails, and a
+// neighbour's ink — the same in both shots — counts for nothing. Then:
+//   · a glyph reaches 3:1 over its changed pixels, drawn against hidden (what it paints on what it covers);
+//   · a word is read in the DRAWN shot, over its text box less the outermost 1px ring (where a
+//     backplate's anti-aliased edge lands): it must sit on its fill (most of the box is the fill colour,
+//     which it cannot be under a backplate), and its changed pixels reach 4.5:1 against the box's
+//     commonest colour — what the word actually sits on. Never against the hidden shot: that is what
+//     lies UNDER a backplate, and a word painted in its backplate's colour would read 21:1.
 const REGIONS = `(() => {
   const { el, cs, parse, over, resolve } = __c;
   const canvas = parse(resolve('Canvas'));
   const rgb = (c) => c.slice(0, 3).map((v) => Math.round(v * 255));
   const fillOf = (n) => over(parse(cs(n).backgroundColor), canvas);
   const page = (r) => ({ x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height });
+  let own = 0;
+  const tag = (n) => { if (!n.hasAttribute('data-dd-own')) n.setAttribute('data-dd-own', ++own); return +n.getAttribute('data-dd-own'); };
   const text = (name, n) => { const range = document.createRange(); range.selectNodeContents(n); const host = n.closest('button'), fill = fillOf(host);
-    return { name, kind: 'text', ...page(range.getBoundingClientRect()), ink: rgb(over(parse(cs(n).color), fill)), under: rgb(fill) }; };
+    return { name, kind: 'text', own: tag(n), ...page(range.getBoundingClientRect()), ink: rgb(over(parse(cs(n).color), fill)), under: rgb(fill) }; };
   const glyph = (name, n, box) => { const fill = fillOf(n), r = n.getBoundingClientRect();
-    return { name, kind: 'glyph', ...page({ left: r.left + box[0], top: r.top + box[1], width: box[2], height: box[3] }), ink: rgb(over(parse(cs(n, '::before').backgroundColor), fill)), under: rgb(fill) }; };
+    return { name, kind: 'glyph', own: tag(n), ...page({ left: r.left + box[0], top: r.top + box[1], width: box[2], height: box[3] }), ink: rgb(over(parse(cs(n, '::before').backgroundColor), fill)), under: rgb(fill) }; };
   const centred = (n, size) => { const r = n.getBoundingClientRect(); return [(r.width - size) / 2, (r.height - size) / 2, size, size]; };
+  for (const n of document.querySelectorAll('[data-dd-own]')) n.removeAttribute('data-dd-own');
   const segOn = el('[data-t="seg-text"] > [aria-pressed="true"]'), chOn = el('[data-t="choice-on"]');
   return [
     text('.segmented pressed: its word', segOn),
@@ -999,28 +1017,62 @@ const REGIONS = `(() => {
     glyph('.choice-card chosen: the glyph', chOn, [17, 13, 24, 24]),
     glyph('.dropzone: the glyph', el('[data-t="dropzone-dragging"]'), [(el('[data-t="dropzone-dragging"]').getBoundingClientRect().width - 24) / 2, 17, 24, 24]),
   ]; })()`;
+// Hide ONLY the target, and put it back: a glyph's ::before, or a word's text nodes.
+const HIDE = (r) => r.kind === "glyph"
+  ? `(() => { const s = document.createElement('style'); s.id = 'dd-unown'; s.textContent = '[data-dd-own="${r.own}"]::before { visibility: hidden !important; }'; document.head.append(s); })()`
+  : `(() => { const n = document.querySelector('[data-dd-own="${r.own}"]');
+      for (const t of [...n.childNodes].filter((c) => c.nodeType === 3)) { const s = document.createElement('span'); s.className = 'dd-unown'; s.style.visibility = 'hidden'; t.replaceWith(s); s.append(t); } })()`;
+const UNHIDE = `(() => { document.getElementById('dd-unown')?.remove(); for (const s of document.querySelectorAll('span.dd-unown')) s.replaceWith(...s.childNodes); })()`;
+const PAD = 3;
 const paint = async () => {
   const regions = await evaluate(REGIONS);
   const shots = [];
   for (const r of regions) {
-    // The clip is the region's box in PAGE coordinates, and that only lands on the region because the
-    // browser runs with --hide-scrollbars (the launch, above). With a scrollbar, the capture is offset
-    // from the page by its width and reads the pixels beside the glyph, which is how X1's first captures
-    // missed. Do not drop the flag.
-    const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: r.x, y: r.y, width: Math.max(1, r.w), height: Math.max(1, r.h), scale: 1 }, captureBeyondViewport: true });
-    shots.push(data);
+    // The clip is the region's box in PAGE coordinates, grown by PAD so ink that lands beside the box can
+    // be seen there. It lands on the region only because the browser runs with --hide-scrollbars (the
+    // launch, above): with a scrollbar, the capture is offset from the page by its width. Do not drop the
+    // flag — and if the capture does land elsewhere, the ownership test below reads the ink off its box.
+    const clip = { x: r.x - PAD, y: r.y - PAD, width: Math.max(1, r.w) + 2 * PAD, height: Math.max(1, r.h) + 2 * PAD, scale: 1 };
+    const drawn = (await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: true })).data;
+    await evaluate(HIDE(r));
+    const bare = (await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: true })).data;
+    await evaluate(UNHIDE);
+    shots.push([drawn, bare]);
   }
-  return evaluate(`(async () => { const regions = ${JSON.stringify(regions)}, shots = ${JSON.stringify(shots)};
-    const d2 = (p, i, q) => (p[i] - q[0]) ** 2 + (p[i + 1] - q[1]) ** 2 + (p[i + 2] - q[2]) ** 2;
+  return evaluate(`(async () => { const regions = ${JSON.stringify(regions)}, shots = ${JSON.stringify(shots)}, PAD = ${PAD};
+    const { ratio } = __c;
+    const decode = async (png) => { const img = new Image(); img.src = 'data:image/png;base64,' + png; await img.decode();
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data; return { w: c.width, h: c.height, at: (x, y) => { const o = (y * c.width + x) * 4; return [d[o], d[o + 1], d[o + 2]]; } }; };
+    const wcag = (p, q) => ratio(p.map((v) => v / 255), q.map((v) => v / 255));
+    const d2 = (p, q) => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
     const out = [];
     for (const [at, r] of regions.entries()) {
-      const img = new Image(); img.src = 'data:image/png;base64,' + shots[at]; await img.decode();
-      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
-      const px = g.getImageData(0, 0, c.width, c.height).data, n = px.length / 4;
-      let inked = 0, onFill = 0;
-      for (let i = 0; i < px.length; i += 4) { if (d2(px, i, r.ink) < d2(px, i, r.under)) inked += 1; if (d2(px, i, r.under) <= 3 * 12 * 12) onFill += 1; }
-      const share = Math.round((onFill / n) * 100) / 100;
-      out.push({ name: r.name, ok: r.kind === 'text' ? share >= 0.4 && inked >= 4 : inked >= 6, got: 'ink ' + r.ink + ' on ' + r.under + ': ' + inked + ' px nearer the ink, ' + share + ' of ' + n + ' px the fill' });
+      const [a, b] = [await decode(shots[at][0]), await decode(shots[at][1])];
+      // the target's box in the clip's pixels, where the code believes the clip was placed
+      const L = PAD, T = PAD, R = PAD + r.w, B = PAD + r.h;
+      const changed = (x, y) => { const p = a.at(x, y), q = b.at(x, y); return Math.max(...p.map((v, k) => Math.abs(v - q[k]))) > 2; };
+      let n = 0, carried = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let y = 0; y < a.h; y += 1) for (let x = 0; x < a.w; x += 1) {
+        if (!changed(x, y)) continue;
+        n += 1; carried = Math.max(carried, wcag(a.at(x, y), b.at(x, y)));
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x + 1); y0 = Math.min(y0, y); y1 = Math.max(y1, y + 1); }
+      const inside = n > 0 && x0 >= L - 1 && x1 <= R + 1 && y0 >= T - 1 && y1 <= B + 1;
+      const where = n + ' px changed' + (n ? ', off its box by [' + [x0 - L, y0 - T, x1 - R, y1 - B].map((v) => Math.round(v)).join(',') + ']' : '');
+      if (r.kind === 'glyph') {
+        out.push({ name: r.name, ok: n >= 6 && inside && carried >= 3, got: where + ', ' + (Math.round(carried * 100) / 100) + ':1' });
+        continue;
+      }
+      const il = Math.ceil(L), it = Math.ceil(T), ir = Math.floor(R), ib = Math.floor(B), counts = new Map();
+      let all = 0, onFill = 0;
+      for (let y = it; y < ib; y += 1) for (let x = il; x < ir; x += 1) { const p = a.at(x, y), k = p.join(',');
+        counts.set(k, (counts.get(k) || 0) + 1); all += 1; if (d2(p, r.under) <= 3 * 12 * 12) onFill += 1; }
+      const ground = [...counts].sort((p, q) => q[1] - p[1])[0][0].split(',').map(Number);
+      let word = 1;
+      for (let y = it + 1; y < ib - 1; y += 1) for (let x = il + 1; x < ir - 1; x += 1) if (changed(x, y)) word = Math.max(word, wcag(a.at(x, y), ground));
+      const share = Math.round((onFill / Math.max(1, all)) * 100) / 100;
+      out.push({ name: r.name, ok: n >= 3 && inside && share >= 0.4 && word >= 4.5,
+        got: where + '; ' + share + ' of the box the fill ' + r.under + ', the word ' + (Math.round(word * 100) / 100) + ':1 on ' + ground });
     }
     return out; })()`);
 };
@@ -1036,7 +1088,7 @@ const forcedCells = async (engine) => {
       if (!active) { check(`precondition: forced colours are active (${cell})`, false, active); continue; }
       const bad = (await evaluate(FORCED)).filter((row) => !row.ok);
       check(`forced colours (${cell}): every state pair differs and every glyph, mark, knob and word on a state reaches its ratio`, bad.length === 0, bad.map((row) => `${row.name}: ${row.got}`).join("\n        "));
-      const unpainted = (await paint()).filter((row) => !row.ok);
+      const unpainted = (await paint().catch((error) => [{ name: "the pixel read", ok: false, got: `threw: ${error.message}` }])).filter((row) => !row.ok);
       check(`forced colours (${cell}): PIXELS: each word on a redrawn state sits on its fill, not a Canvas backplate, and each glyph is painted`, unpainted.length === 0, unpainted.map((row) => `${row.name}: ${row.got}`).join("\n        "));
       const rings = [];
       for (const sel of [`${T("seg-text")} > [aria-pressed="true"]`, T("choice-on")]) {

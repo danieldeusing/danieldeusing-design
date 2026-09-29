@@ -139,7 +139,9 @@ surface still loading the plugin the two would merge into a look nobody wrote.
   configr). pagr's 1.75 and its `em` gaps are corrected. It holds **at any depth**: two paragraphs in
   a list item or a blockquote are .5rem apart, the first block in a container starts flush, and no
   block carries the user agent's margins, with or without base.css. A `ul.plain`, `ol.steps` or
-  `ul.dash` inside a body is spaced like any other block.
+  `ul.dash` inside a body is spaced like any other block. The gap goes only where text flows — the
+  body and the `li`, `blockquote`, `details` and `dd` in it — so a flex row or a grid inside a body
+  keeps its items level, and a nested `hr` has .5rem each side.
 - **Links are the accent and underlined at rest**, so they are never told apart by colour alone.
   List markers are `--muted-foreground`; `del` is muted with the browser's line-through.
 - Images and video stay inside the column with a `--border` edge. **A figure is full width** —

@@ -216,18 +216,24 @@
    two paragraphs in a list item or a blockquote are spaced like two paragraphs in the body.
    Direct children only (the first cut) left a nested paragraph with the user agent's 1em on a
    tokens-only surface and flush on a full one, so the rhythm depended on where the text landed.
-   The block list is `:where()` so the rules stay at (0,1,0); `.markdown > *` keeps any direct child
-   the list does not name (a `div.code-block`, an `.eli5`) in the same rhythm. */
+   The block list is `:where()` so the reset stays at (0,1,0); `.markdown > *` keeps any direct child
+   the list does not name (a `div.code-block`, an `.eli5`) in the same rhythm.
+
+   THE GAP GOES ONLY WHERE TEXT FLOWS: the body itself, and the four containers markdown nests blocks
+   in — `li`, `blockquote`, `details`, `dd`. A sibling selector at any depth also matched the second
+   item of a flex row or a grid inside the body and sat it 8px below the first (measured); a row and
+   a grid lay their own items out, so the rhythm stays out of them. A nested `hr` takes the same .5rem
+   each side, as any block does there. */
 .markdown :where(p, ul, ol, dl, pre, blockquote, figure, table, hr, details, h1, h2, h3, h4, h5, h6),
 .markdown > * {
   margin-block: 0;
 }
-.markdown :where(p, ul, ol, dl, pre, blockquote, figure, table, details, div, h1, h2, h3, h4, h5, h6)
-  + :where(p, ul, ol, dl, pre, blockquote, figure, table, details, div),
-.markdown > * + * {
+.markdown > * + *,
+.markdown :where(li, blockquote, details, dd) > * + * {
   margin-block-start: 0.5rem;
 }
-.markdown * + :is(h1, h2, h3, h4, h5, h6) {
+.markdown > * + :is(h1, h2, h3, h4, h5, h6),
+.markdown :where(li, blockquote, details, dd) > * + :is(h1, h2, h3, h4, h5, h6) {
   margin-block-start: 0.75rem;
 }
 .markdown :is(h1, h2, h3, h4, h5, h6) {
@@ -340,7 +346,8 @@ ul.dash > li {
 ul.dash > li + li {
   margin-block-start: 0.375rem;
 }
-.markdown * + :is(ul.plain, ol.steps, ul.dash) {
+.markdown > * + :is(ul.plain, ol.steps, ul.dash),
+.markdown :where(li, blockquote, details, dd) > * + :is(ul.plain, ol.steps, ul.dash) {
   margin-block-start: 0.5rem;
 }
 ul.dash > li::before {

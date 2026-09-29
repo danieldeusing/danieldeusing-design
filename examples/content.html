@@ -133,10 +133,18 @@
       .btn-icon:is(:disabled, [aria-disabled="true"]) { opacity: 0.45; cursor: default; }
       @media (pointer: coarse) { .btn-icon { min-inline-size: 44px; min-block-size: 44px; } }
       @media print { .btn-icon { display: none !important; } }
-      /* Forced colours (X1, corrected 2026-09-29): nothing of its own. The glyph takes WP4's
-         [data-icon]::before default, which the WP4 stand-in carries while tokens.css does not:
-         preserve-parent-color, so it paints the button's FORCED colour even while a state rule
-         (content.css's copied / failed) has given the button an author one. */
+      /* Forced colours: WP5's own unlayered rule (controls.css, wp5-controls 465bc4b), cut down to the
+         icon button. With preserve-parent-color the glyph paints the button's FORCED colour even while
+         a state rule (content.css's copied / failed) has given the button an author one; without it,
+         `none` and a CanvasText fill. check-content runs the page down both branches. */
+      @media (forced-colors: active) {
+        @supports (forced-color-adjust: preserve-parent-color) {
+          .btn-icon:is([data-icon], [aria-busy="true"])::before { forced-color-adjust: preserve-parent-color; background: currentColor; }
+        }
+        @supports not (forced-color-adjust: preserve-parent-color) {
+          .btn-icon:is([data-icon], [aria-busy="true"])::before { forced-color-adjust: none; background: CanvasText; }
+        }
+      }
     </style>
 
     <style>
@@ -166,6 +174,9 @@
       .demo-intro { margin: 0 0 0.75rem; color: var(--muted-foreground); max-width: 80ch; }
       .demo-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr)); }
       .demo-cell { border: 1px solid var(--border); padding: 0.75rem; min-width: 0; }
+      /* A flex row and a two-column grid inside a markdown body: they lay their own items out. */
+      .nest-row { display: flex; gap: 1rem; align-items: flex-start; }
+      .nest-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
       /* :where() — zero specificity, so this page's own spacing never outranks a class under test. */
       :where(.demo-cell > * + *) { margin-top: 0.6rem; }
       .demo-cap { margin: 0 0 0.35rem; color: var(--muted-foreground); font-style: italic; }
@@ -424,6 +435,9 @@
               <ol class="steps" id="nest-steps"><li>one step</li></ol>
               <p id="nest-before-dash">Before a dash list:</p>
               <ul class="dash" id="nest-dash"><li>one dash item</li></ul>
+              <blockquote><p id="nest-hr-p1">Before a rule inside a quote.</p><hr id="nest-hr"><p id="nest-hr-p2">After it.</p></blockquote>
+              <div class="nest-row" id="nest-row"><div id="nest-row-a">a flex row's first item</div><div id="nest-row-b">its second</div></div>
+              <div class="nest-grid2" id="nest-grid"><figure id="nest-fig-a"><figcaption>a figure in a grid</figcaption></figure><figure id="nest-fig-b"><figcaption>its neighbour</figcaption></figure></div>
             </article>
           </div>
         </div>

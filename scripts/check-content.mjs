@@ -440,7 +440,12 @@ const NESTED_GAPS = [
   ["#nest-bq-p1", "#nest-bq-p2", "two paragraphs in a quote"],
   ["#nest-before-plain", "#nest-plain", "a paragraph, then ul.plain"],
   ["#nest-before-dash", "#nest-dash", "a paragraph, then ul.dash"],
+  ["#nest-hr-p1", "#nest-hr", "a paragraph, then a rule, in a quote"],
+  ["#nest-hr", "#nest-hr-p2", "a rule, then a paragraph, in a quote"],
 ];
+// A flex row and a grid inside the body lay out their own items: the rhythm must not push the
+// second one down.
+const LEVEL = [["#nest-row-a", "#nest-row-b", "a flex row's two items"], ["#nest-fig-a", "#nest-fig-b", "two figures in a two-column grid"]];
 const nestedRhythm = () => evaluate(`(() => {
   const out = [];
   for (const [a, b, what] of ${JSON.stringify(NESTED_GAPS)}) {
@@ -452,17 +457,21 @@ const nestedRhythm = () => evaluate(`(() => {
     const m = getComputedStyle(__t.el(sel)).marginTop;
     if (m !== "8px") out.push(sel + " margin-top " + m + ", want 8px — the list class sits flush against the paragraph");
   }
+  for (const [a, b, what] of ${JSON.stringify(LEVEL)}) {
+    const off = __t.el(b).getBoundingClientRect().top - __t.el(a).getBoundingClientRect().top;
+    if (Math.abs(off) > 0.5) out.push(what + ": the second sits " + off.toFixed(1) + "px lower, want level");
+  }
   for (const sel of ["#nest-li-p1", "#nest-bq-p1"]) {
     const m = getComputedStyle(__t.el(sel)).marginTop;
     if (m !== "0px") out.push(sel + " is first in its container and has margin-top " + m);
   }
-  for (const e of __t.el("#md-nested").querySelectorAll("p, pre, ul, ol, blockquote")) {
+  for (const e of __t.el("#md-nested").querySelectorAll("p, pre, ul, ol, blockquote, hr, figure")) {
     const m = getComputedStyle(e).marginBottom;
     if (m !== "0px") out.push((e.id ? "#" + e.id : e.tagName.toLowerCase()) + " keeps a margin-bottom of " + m);
   }
   return out;
 })()`);
-await check("P4 .markdown spaces every block at any depth: .5rem after a block, flush first, nothing from the user agent", nestedRhythm);
+await check("P4 .markdown spaces every block at any depth: .5rem after a block, flush first, nothing from the user agent; a row and a grid stay level", nestedRhythm);
 await check("P4 a link is the accent AND underlined at rest (never colour alone); del is muted", () => expectAll([
   ["#md-article a", null, { color: { token: "--primary" }, "text-decoration-line": "underline", "text-underline-offset": "4px" }],
   ["#md-article del", null, { color: { token: "--muted-foreground" } }],
@@ -844,7 +853,7 @@ const focusRings = async () => {
 };
 // The yield, printed once after every cell has run: how many captures decoded, and the lowest ratio
 // of each kind. A pass says nothing fell under the bar; this says what the pixels actually were.
-const paintedYield = { captures: 0, owned: 0, glyph: Infinity, text: Infinity };
+const paintedYield = { captures: 0, owned: 0, hiddenMax: 0, glyph: Infinity, text: Infinity };
 const painted = async () => {
   const problems = [];
   for (const [sel, kind, min] of PAINTED) {
@@ -873,12 +882,14 @@ const painted = async () => {
     paintedYield.captures += 1;
     paintedYield[kind] = Math.min(paintedYield[kind], ratio);
     if (!(ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${ratio.toFixed(2)}:1, wants ${min}`);
-    // CLIP OWNERSHIP (X1): the same clip with the element hidden must read differently, or the pixels
-    // measured above were somebody else's — a neighbour's border, a fill the clip slid onto.
+    // CLIP OWNERSHIP (X1): with the element hidden the same clip must be ONE flat colour — the ground
+    // alone, ~1:1. Merely "different" is not enough: a clip slid onto a neighbour's border or fill
+    // still changes when the element goes, and would bank that neighbour's contrast as the glyph's.
     await evaluate(`__t.el(${JSON.stringify(sel)}).style.visibility = "hidden"; null`);
-    const hidden = (await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data;
+    const hidden = decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data, "base64"));
     await evaluate(`__t.el(${JSON.stringify(sel)}).style.removeProperty("visibility"); null`);
-    if (hidden === data) problems.push(`${sel} (${kind}): hiding it leaves the clip unchanged — the pixels measured are not its own`);
+    paintedYield.hiddenMax = Math.max(paintedYield.hiddenMax, hidden.ratio);
+    if (!(hidden.ratio <= 1.1)) problems.push(`${sel} (${kind}): hidden, the clip still reads ${hidden.ratio.toFixed(2)}:1, want <= 1.1 — the pixels measured are not only its own`);
     else paintedYield.owned += 1;
   }
   return problems;
@@ -931,9 +942,57 @@ for (const theme of THEMES) {
   await send("Emulation.setEmulatedMedia", { features: [] });
 }
 console.log(`painted under forced colours: ${paintedYield.captures} of ${PAINTED.length * THEMES.length * 2} captures decoded, ` +
-  `${paintedYield.owned} proven to hold their own element's ink; ` +
+  `${paintedYield.owned} proven to hold their own element's ink (hidden, the least flat clip reads ${paintedYield.hiddenMax.toFixed(2)}:1); ` +
   `lowest glyph ${paintedYield.glyph.toFixed(2)}:1, lowest state word ${paintedYield.text.toFixed(2)}:1; ` +
   `focus rings: ${ringYield.captures} of ${FOCUSABLE.length * THEMES.length * 2 * 2} captures, lowest ${ringYield.lowest.toFixed(2)}:1`);
+
+// THE FALLBACK BRANCH. Chromium supports preserve-parent-color, so every run above measured only
+// that branch, and the `@supports not` one — `none` and a CanvasText fill — would ship unmeasured.
+// So every `@supports` rule that asks about it, in every sheet the page loads (the real files and the
+// stand-ins alike), is swapped for one asking about a value no engine knows: the supporting branch
+// turns off, the other on. The count is reported, and zero fails — then this measured nothing.
+const FORCE_FALLBACK = `(() => {
+  let swapped = 0;
+  const walk = (list) => {
+    for (let i = 0; i < list.cssRules.length; i += 1) {
+      const r = list.cssRules[i];
+      if (r instanceof CSSImportRule) { if (r.styleSheet) walk(r.styleSheet); continue; }
+      if (r instanceof CSSSupportsRule && r.conditionText.includes("preserve-parent-color")) {
+        const text = r.cssText, at = text.indexOf("{");
+        list.deleteRule(i);
+        list.insertRule(text.slice(0, at).replaceAll("preserve-parent-color", "preserve-parent-colour-x") + text.slice(at), i);
+        swapped += 1;
+      } else if (r.cssRules) walk(r);
+    }
+  };
+  for (const sheet of document.styleSheets) walk(sheet);
+  return swapped;
+})()`;
+const fallbackYield = { swapped: [], captures: 0 };
+for (const theme of THEMES) {
+  await load(`?theme=${theme}`);
+  const swapped = await evaluate(FORCE_FALLBACK);
+  fallbackYield.swapped.push(swapped);
+  for (const scheme of ["light", "dark"]) {
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
+    await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
+    await evaluate(`document.documentElement.classList.add("anim-off"); null`);
+    await check(`forced colours, ${theme}, ${scheme} palette, FALLBACK (no preserve-parent-color): every glyph 3:1, every state word 4.5:1 (pixels read back)`, async () => {
+      if (!swapped) return ["no @supports (forced-color-adjust: preserve-parent-color) rule found to swap — the fallback branch was not measured"];
+      const adjust = await evaluate(`getComputedStyle(__t.el("#states-icon .btn-icon:not(.btn-icon--bare)[data-state=copied]"), "::before").forcedColorAdjust`);
+      if (adjust !== "none") return [`the copy glyph is forced-color-adjust: ${adjust} after the swap, want none — still on the supporting branch`];
+      const before = paintedYield.captures;
+      const problems = await painted();
+      fallbackYield.captures += paintedYield.captures - before;
+      return problems;
+    });
+    await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
+    await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+  await send("Emulation.setEmulatedMedia", { features: [] });
+}
+console.log(`forced colours down the fallback branch: @supports rules swapped per load ${fallbackYield.swapped.join(" / ")}; ` +
+  `${fallbackYield.captures} of ${PAINTED.length * THEMES.length * 2} captures decoded`);
 await load("?theme=warm");
 
 /* ── the same classes on tokens.css alone ───────────────────────────────────────────────────── */
@@ -1016,7 +1075,7 @@ await check("?bare: every content.css class computes exactly what it computes on
 });
 
 await check("?bare: hidden still hides every component — tokens.css is all that is left", hiddenHides);
-await check("?bare: the markdown rhythm holds at any depth with no user-agent margin leaking in", nestedRhythm);
+await check("?bare: the markdown rhythm holds at any depth with no user-agent margin leaking in; a row and a grid stay level", nestedRhythm);
 // X2: base.css draws a global :focus-visible ring, so on the full page these would pass with the
 // component's own rule deleted. Here nothing but content.css can draw them.
 await check("?bare: a scrollable .code-block takes the --ring focus ring from a real Tab", () => ringByTab("#code-plain"));

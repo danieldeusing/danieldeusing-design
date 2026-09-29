@@ -373,7 +373,7 @@ const HIDE = ["#page-tabs", "#tab-queue", "#dense-table", "#kv-table", "#kv-list
   "#trend", "#sec-activity", "#tickers"];
 const shownWhenHidden = await evaluate(`${JSON.stringify(HIDE)}.filter((sel) => { const el = document.querySelector(sel); el.hidden = true;
   const d = getComputedStyle(el).display; el.hidden = false; return d !== "none"; })`);
-await check(`X3 — \`hidden\` hides each of ${HIDE.length} components whatever display it sets (tokens.css's rule; a marked stand-in until WP1 lands)`,
+await check(`X3 — \`hidden\` hides each of ${HIDE.length} components whatever display it sets (tokens.css's rule, WP1)`,
   () => shownWhenHidden.length === 0, JSON.stringify(shownWhenHidden));
 
 /* ── X1 · forced colours: two palettes, PAINTED pixels ───────────────────────────────────────────

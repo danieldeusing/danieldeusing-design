@@ -1,8 +1,8 @@
 # Content: titles, labels, markdown, code, commands, copy, the meta line, the error page
 
 Reference for the `danieldeusing-design` skill. Read it before a page gets a title, a label over a
-block, rendered markdown, a code block, a command someone will copy, a meta line, a series
-navigator, the boot banner or an error page. The classes are `src/content.css`, the copy button's
+block, rendered markdown, a code block, a command someone will copy, a meta line, the boot banner
+or an error page. The classes are `src/content.css`, the copy button's
 behaviour is `runtime/copy.js`, and the error page is `templates/error-page.html`. Inline `code` and
 `kbd` take no class: they are element defaults in `base.css` (see `foundations.md`).
 
@@ -16,7 +16,7 @@ Contents:
 - `.cmd` — a command to copy (P6)
 - The copy button: `data-copy` and `initCopyButtons()` (P7)
 - `.meta`, and nothing is quieter than muted (P8)
-- `.seq-nav` — "in this series" (P9)
+- Series navigation (P9) is `.navlist`, in `chrome.md`
 - `.boot-log` (P10)
 - The error page: `templates/error-page.html` (S9)
 - Where it works: tokens-only, Tailwind, print, forced colours, `hidden`
@@ -333,24 +333,10 @@ opacity step: pagr's faint text and configr's neutral-600 tertiary become `--mut
 Only decoration that carries no information may sit lower — the `# ` of `.comment`, `.ls-perm` — and
 never an option or a control.
 
-## `.seq-nav` — "in this series" (P9)
+## Series navigation (P9) is `.navlist`
 
-```html
-<nav class="seq-nav card-terminal" aria-labelledby="seq-label">
-  <p class="eyebrow" id="seq-label">in this series</p>
-  <ol class="seq-list">
-    <li><span class="seq-num">part 1</span><a href="/articles/a">…</a></li>
-    <li><span class="seq-num">part 2</span><a href="/articles/b" aria-current="page">…</a></li>
-  </ol>
-</nav>
-```
-
-danieldeusing.de's series card. **The current part is a link with `aria-current="page"`**, like the
-rail's current row — pagr rendered it as a bare span, so a screen reader heard one item without a
-link and no word for why. It is `--primary` **and bold**: the weight is what survives for a reader
-who cannot see the colour. The part numbers are muted (pagr's faint /70 is corrected), the links are
-muted and warm to `--primary` under the pointer, and each is a 44px target under a coarse pointer.
-The card is static, so it has no hover. The page's table of contents is `.navlist` in `chrome.md`.
+An "in this series" card is `.navlist` with `aria-current="page"` on the current part: see
+`chrome.md`, "A table of contents".
 
 ## `.boot-log` (P10)
 
@@ -429,10 +415,11 @@ and `main` keeps its landmark. The markup is in the template, in a comment after
   exist on paper), and the page title loses its glow.
 - **Forced colours**: the marks this file draws — the dash, `[ ok ]`, the line numbers — are text,
   so they survive with no rule. Every colour goes, so nothing may depend on one: the copy states
-  are glyph SHAPES (copy, check, x), the current series part is bold, and links stay underlined. A
-  glyph paints its parent's forced colour (`preserve-parent-color`, the icon system's default), so
-  a state colour belongs on the button or the text, **never on the glyph itself**; a `--cat-*`
-  tint goes through `--tone` (P8). `scripts/check-content.mjs` measures what is painted against
-  what it sits on, four themes by both palettes.
+  are glyph SHAPES (copy, check, x), and links stay underlined. A glyph paints its parent's forced
+  colour (`preserve-parent-color`, the icon system's default), so a state colour belongs on the
+  button or the text, **never on the glyph itself**; a `--cat-*` tint goes through `--tone` (P8).
+  Nothing here opts out with `forced-color-adjust: none`, so every focus ring stays forced too.
+  `scripts/check-content.mjs` measures what is painted against what it sits on — glyphs, state
+  words and focused rings — four themes by both palettes.
 - **`hidden` hides every one of these**, flex and grid rows included. `tokens.css` answers that once
   for the whole system; never add a `[hidden]` rule for one class.

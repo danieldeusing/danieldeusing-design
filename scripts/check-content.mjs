@@ -8,12 +8,14 @@
  * every page that happens to load base.css and wrong on the tokens-only surface nobody opens. So
  * every one of those is asserted by measuring it:
  *
- *   · computed metrics of every class, P1–P10, against the spec's numbers
+ *   · computed metrics of every class, P1–P8 and P10, against the spec's numbers (P9's series
+ *     navigator is WP3's `.navlist`, by the lead's ruling)
  *   · the same values on ?bare — tokens.css + content.css and nothing else — as on the full page
  *   · contrast of every text and glyph colour the file introduces, from the browser's own computed
  *     colours, on four themes and the three surfaces (--background, --card, --muted); code on the
  *     --muted it always sits on. The table is printed so it can be held against the comments.
- *   · hover, keyboard focus, print, a coarse pointer, the animation switch, a phone width
+ *   · forced colours on both palettes: glyphs, state words and focus rings, read back as pixels
+ *   · hover, keyboard focus, print, a phone width
  *   · no border-radius anywhere
  *   · the error-page template: its structure, and its title rendering at the display step
  *
@@ -585,23 +587,6 @@ await check("P8 .meta-stat: glyph + tabular count; the glyph is 12px whatever cl
   ["#meta-stats .meta-stat:last-child > .ico", null, { width: "12px", height: "12px", "background-color": { token: "--cat-violet" } }],
 ]));
 
-/* ── P9 series navigation ───────────────────────────────────────────────────────────────────── */
-
-await check("P9 .seq-list: a grid .375rem apart; rows flex on the baseline; numbers muted", () => expectAll([
-  ["#seq .seq-list", null, { display: "grid", "row-gap": "6px", "margin-top": "12px", "padding-left": "0px", "list-style-type": "none" }],
-  ["#seq .seq-list > li", null, { display: "flex", "column-gap": "8px", "align-items": "baseline" }],
-  ["#seq .seq-num", null, { color: { token: "--muted-foreground" }, "flex-shrink": "0" }],
-]));
-await check("P9 links are muted and undecorated; the current part is --primary AND bold", () => expectAll([
-  ["#seq li:first-child a", null, { color: { token: "--muted-foreground" }, "text-decoration-line": "none" }],
-  ["#seq a[aria-current=page]", null, { color: { token: "--primary" }, "font-weight": "700" }],
-]));
-await check("P9 a link warms to --primary under the pointer", async () => {
-  await hover("#seq li:first-child a");
-  await sleep(200);
-  return expectAll([["#seq li:first-child a", null, { color: { token: "--primary" } }]]);
-});
-
 /* ── P10 boot log ───────────────────────────────────────────────────────────────────────────── */
 
 await check("P10 .boot-log: muted rows .375rem apart; 14rem step column; [ ok ] bold --primary with no alt text", () => expectAll([
@@ -633,7 +618,7 @@ await check("S9 crash: the same title, and the body is an alert", async () => {
 /* ── nothing is rounded ─────────────────────────────────────────────────────────────────────── */
 
 await check("no border-radius on any element or pseudo-element content.css styles", () => evaluate(`(() => {
-  const sel = ".page-title, .lede, .eyebrow, .section-head, .subhead, .markdown, .markdown *, ol.steps, ol.steps > li, ul.plain, ul.dash, ul.dash > li, .code-block, .code-view .line, .cmd, .cmd-text, [data-copy], .meta, .meta-stat, .seq-list, .seq-list a, .boot-log, .boot-line, .boot-step";
+  const sel = ".page-title, .lede, .eyebrow, .section-head, .subhead, .markdown, .markdown *, ol.steps, ol.steps > li, ul.plain, ul.dash, ul.dash > li, .code-block, .code-view .line, .cmd, .cmd-text, [data-copy], .meta, .meta-stat, .boot-log, .boot-line, .boot-step";
   const out = [];
   for (const e of document.querySelectorAll(sel)) for (const pseudo of [null, "::before"]) {
     const s = getComputedStyle(e, pseudo);
@@ -643,18 +628,8 @@ await check("no border-radius on any element or pseudo-element content.css style
   return out.slice(0, 8);
 })()`));
 
-/* ── states: the animation switch, print, a coarse pointer ──────────────────────────────────── */
+/* ── print ──────────────────────────────────────────────────────────────────────────────────── */
 
-await check("html.anim-off stops the link transition (WP1's switch reaching this file's rule)", async () => {
-  const before = await evaluate(`getComputedStyle(__t.el("#seq li:first-child a")).transitionDuration`);
-  await evaluate(`document.documentElement.classList.add("anim-off"); null`);
-  const after = await evaluate(`getComputedStyle(__t.el("#seq li:first-child a")).transitionDuration`);
-  await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
-  const out = [];
-  if (before !== "0.15s") out.push(`at rest the transition is ${before}, want 0.15s`);
-  if (after !== "0s") out.push(`under anim-off it is ${after}`);
-  return out;
-});
 await send("Emulation.setEmulatedMedia", { media: "print" });
 await check("print: copy buttons are gone, code and commands wrap uncapped, the title loses its glow", async () => {
   const out = await evaluate(`[...document.querySelectorAll("[data-copy]")].filter((b) => getComputedStyle(b).display !== "none").map((b) => "a [data-copy] button still displays: " + (b.getAttribute("aria-label") || b.textContent))`);
@@ -667,19 +642,6 @@ await check("print: copy buttons are gone, code and commands wrap uncapped, the 
   return out;
 });
 await send("Emulation.setEmulatedMedia", { media: "" });
-await check("a coarse pointer makes each series link a 44px target", async () => {
-  // Touch emulation is what flips (pointer: coarse) in Chromium; the media-feature override is tried first.
-  try { await send("Emulation.setEmulatedMedia", { features: [{ name: "pointer", value: "coarse" }] }); } catch {}
-  if (!(await evaluate(`matchMedia("(pointer: coarse)").matches`))) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
-  if (!(await evaluate(`matchMedia("(pointer: coarse)").matches`))) return ["could not emulate (pointer: coarse) — this check proved nothing"];
-  // inline-flex, blockified to flex because the li is a flex row
-  const out = await expectAll([["#seq li:first-child a", null, { "min-height": "44px", display: { re: "^(inline-)?flex$" }, "align-items": "center" }]]);
-  const h = (await rect("#seq li:first-child a")).h;
-  if (h < 44) out.push(`the link is ${h}px tall`);
-  return out;
-});
-try { await send("Emulation.setEmulatedMedia", { features: [] }); } catch {}
-await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 
 /* ── `hidden` hides every component (X3: tokens.css answers it once) ─────────────────────────── */
 
@@ -689,7 +651,7 @@ await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 const HIDDEN = ["#p1-app .page-title", "#p1-app .lede", "#p1-glyph .page-title > .ico", "#eyebrow-plain", "#head-link",
   "#subheads .subhead", "#md-article", "#list-steps", "#list-plain", "#list-dash", "#code-plain", "#code-div",
   "#code-view .line", "#cmd-one", "#cmd-one .cmd-text", "#cmd-one > button", "#states-text [data-state=copied]",
-  "#meta-article", "#meta-stats .meta-stat", "#seq", "#seq .seq-list", "#seq .seq-list > li", "#boot", "#boot .boot-line"];
+  "#meta-article", "#meta-stats .meta-stat", "#boot", "#boot .boot-line"];
 const hiddenHides = () => evaluate(`${JSON.stringify(HIDDEN)}.flatMap((sel) => {
   const e = __t.el(sel); e.hidden = true; const d = getComputedStyle(e).display; e.hidden = false;
   return d === "none" ? [] : [sel + " is display:" + d + " with hidden set"];
@@ -732,18 +694,58 @@ const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.cap
       out[y * stride + x] = (raw[line + x] + [0, a, b, (a + b) >> 1, paeth][filter]) & 255;
     }
   }
-  const lum = (i) => [0, 1, 2].map((k) => out[i + k] / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+  const lum = (i, px = out) => [0, 1, 2].map((k) => px[i + k] / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
     .reduce((sum, v, k) => sum + v * [0.2126, 0.7152, 0.0722][k], 0);
   let lo = 1, hi = 0;
-  for (let i = 0; i < out.length; i += bpp) { const l = lum(i); lo = Math.min(lo, l); hi = Math.max(hi, l); }
-  return { width, height, ratio: (hi + 0.05) / (lo + 0.05) };
+  const counts = new Map();
+  for (let i = 0; i < out.length; i += bpp) {
+    const l = lum(i); lo = Math.min(lo, l); hi = Math.max(hi, l);
+    const key = out.readUIntBE(i, 3); counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const [top] = [...counts].sort((p, q) => q[1] - p[1])[0];
+  const mode = [top >> 16, (top >> 8) & 255, top & 255];
+  // `mode`: the colour most of the capture is painted in, and its relative luminance
+  return { width, height, ratio: (hi + 0.05) / (lo + 0.05), mode, modeLum: lum(0, Buffer.from(mode)) };
 };
 const PAINTED = [
   ...["#states-icon .btn-icon:not(.btn-icon--bare):not([data-state])", "#states-icon .btn-icon:not(.btn-icon--bare)[data-state=copied]",
     "#states-icon .btn-icon:not(.btn-icon--bare)[data-state=failed]", "#states-icon .btn-icon--bare[data-state=copied]", "#cmd-one > button",
     "#p1-glyph .page-title > .ico", "#meta-stats .meta-stat:first-child > .ico", "#meta-stats .meta-stat:last-child > .ico"].map((sel) => [sel, "glyph", 3]),
-  ...["#states-text [data-state=copied]", "#states-text [data-state=failed]", "#seq a[aria-current=page]"].map((sel) => [sel, "text", 4.5]),
+  ...["#states-text [data-state=copied]", "#states-text [data-state=failed]"].map((sel) => [sel, "text", 4.5]),
 ];
+// A FOCUS RING IS PAINTED TOO (X1). An element that opts out with forced-color-adjust: none stops
+// having its outline-color forced and keeps the author's --ring (WP7 measured 1.00-2.94:1 that way).
+// Nothing content.css draws opts out, and this is where one that did would show: each focusable
+// element's ring, read in pixels, against what it sits on. The strip is the middle of the ring's
+// left side, taken from the element's FOCUSED outline; captured blurred it is the backdrop, focused
+// it is the ring, and the two most-painted colours must reach 3:1.
+const FOCUSABLE = ["#code-plain", "#md-article a", "#cmd-one > button", "#states-text [data-state=copied]"];
+const ringYield = { captures: 0, lowest: Infinity };
+const focusRings = async () => {
+  const problems = [];
+  for (const sel of FOCUSABLE) {
+    await focusByKeyboard(sel);
+    const clip = await evaluate(`(() => {
+      const el = __t.el(${JSON.stringify(sel)});
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+      const r = el.getClientRects()[0], cs = getComputedStyle(el);
+      const w = parseFloat(cs.outlineWidth), off = parseFloat(cs.outlineOffset);
+      if (!(w > 0)) return null;
+      return { x: r.left - off - w / 2 - 0.5 + scrollX, y: r.top + 2 + scrollY, width: 1, height: Math.max(1, r.height - 4), scale: 1 };
+    })()`);
+    if (!clip) { problems.push(`${sel}: no outline when focused from the keyboard`); continue; }
+    const shot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data, "base64"));
+    const ring = await shot();
+    await evaluate(`document.activeElement?.blur(); null`);
+    const ground = await shot();
+    ringYield.captures += 2;
+    const [hi, lo] = [ring.modeLum, ground.modeLum].sort((p, q) => q - p);
+    const ratio = (hi + 0.05) / (lo + 0.05);
+    ringYield.lowest = Math.min(ringYield.lowest, ratio);
+    if (!(ratio >= 3)) problems.push(`${sel}: the focused ring is rgb(${ring.mode}) on rgb(${ground.mode}), ${ratio.toFixed(2)}:1, wants 3`);
+  }
+  return problems;
+};
 // The yield, printed once after every cell has run: how many captures decoded, and the lowest ratio
 // of each kind. A pass says nothing fell under the bar; this says what the pixels actually were.
 const paintedYield = { captures: 0, glyph: Infinity, text: Infinity };
@@ -800,9 +802,9 @@ for (const theme of THEMES) {
           const r = paint === "rgba(0, 0, 0, 0)" ? 1 : __t.ratio(paint, under);
           if (r < 3) out.push(sel + (pseudo || "") + " glyph " + paint + " is " + r.toFixed(2) + ":1 on " + under);
         }
-        // Text that carries a state (the copy button's words, the current series part) and text drawn as a mark.
+        // Text that carries a state (the copy button's words) and text drawn as a mark.
         const TEXT = [["#list-dash > li", "::before"], ["#list-steps > li", "::before"], ["#boot .boot-step", "::before"], ["#code-view .line", "::before"],
-          ["#md-article a", null], ["#seq a[aria-current=page]", null], ["#states-text [data-state=copied]", null], ["#states-text [data-state=failed]", null]];
+          ["#md-article a", null], ["#states-text [data-state=copied]", null], ["#states-text [data-state=failed]", null]];
         for (const [sel, pseudo] of TEXT) {
           const e = __t.el(sel);
           const under = __t.backdrop(e);
@@ -812,8 +814,6 @@ for (const theme of THEMES) {
         const mask = (sel) => { const st = getComputedStyle(__t.el(sel), "::before"); return st.maskImage || st.webkitMaskImage; };
         const [rest, copied, failed] = [":not([data-state])", "[data-state=copied]", "[data-state=failed]"].map((x) => mask(ICON + x));
         if (rest === copied || rest === failed || copied === failed) out.push("two of copy / copied / failed draw the same glyph");
-        if (getComputedStyle(__t.el("#seq a[aria-current=page]")).fontWeight === getComputedStyle(__t.el("#seq li:first-child a")).fontWeight)
-          out.push("the current series part is told by colour alone");
         if (getComputedStyle(__t.el("#md-article a")).textDecorationLine !== "underline") out.push("the markdown link lost its underline");
         return out;
       })()`);
@@ -821,13 +821,15 @@ for (const theme of THEMES) {
     await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
     await evaluate(`document.documentElement.classList.add("anim-off"); null`);
     await check(`forced colours, ${theme}, ${scheme} palette, PAINTED: every glyph reaches 3:1 and every state word 4.5:1 (pixels read back)`, painted);
+    await check(`forced colours, ${theme}, ${scheme} palette, FOCUS: every focused ring reaches 3:1 on what it sits on (pixels read back)`, focusRings);
     await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
     await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   }
   await send("Emulation.setEmulatedMedia", { features: [] });
 }
 console.log(`painted under forced colours: ${paintedYield.captures} of ${PAINTED.length * THEMES.length * 2} captures decoded; ` +
-  `lowest glyph ${paintedYield.glyph.toFixed(2)}:1, lowest state word ${paintedYield.text.toFixed(2)}:1`);
+  `lowest glyph ${paintedYield.glyph.toFixed(2)}:1, lowest state word ${paintedYield.text.toFixed(2)}:1; ` +
+  `focus rings: ${ringYield.captures} of ${FOCUSABLE.length * THEMES.length * 2 * 2} captures, lowest ${ringYield.lowest.toFixed(2)}:1`);
 await load("?theme=warm");
 
 /* ── the same classes on tokens.css alone ───────────────────────────────────────────────────── */
@@ -874,8 +876,6 @@ const IDENTITY = [
   ["#states-icon .btn-icon--bare[data-state=copied]", null, ["color", "--ico"]],
   ["#meta-article", null, ["font-family", "font-size", "display", "flex-wrap", "row-gap", "column-gap", "color", "margin-top"]],
   ["#meta-stats .meta-stat:first-child > .ico", null, ["width", "height"]],
-  ["#seq .seq-list", null, ["display", "row-gap", "margin-top", "padding-left", "list-style-type"]],
-  ["#seq a[aria-current=page]", null, ["font-family", "font-size", "color", "font-weight"]],
   ["#boot", null, ["display", "row-gap", "color"]],
   ["#boot .boot-line", null, ["grid-template-columns", "column-gap", "margin-top"]],
   ["#boot .boot-step", null, ["font-family", "font-size"]],
@@ -914,10 +914,6 @@ await check("?bare: a scrollable .code-block takes the --ring focus ring from th
 await check("?bare: a .markdown link takes the --ring focus ring from the keyboard", async () => {
   await focusByKeyboard("#md-article a");
   return ring("#md-article a");
-});
-await check("?bare: a .seq-list link takes the --ring focus ring from the keyboard", async () => {
-  await focusByKeyboard("#seq li:first-child a");
-  return ring("#seq li:first-child a");
 });
 
 /* ── a phone ────────────────────────────────────────────────────────────────────────────────── */
@@ -958,8 +954,6 @@ const ON_SURFACES = [
   ["ul.dash dash", "#list-dash > li", "::before", 4.5],
   ["meta (muted)", "#meta-article", null, 4.5],
   ["meta-val", "#meta-kv .meta-val", null, 4.5],
-  ["seq number / link (muted)", "#seq .seq-num", null, 4.5],
-  ["seq current part", "#seq a[aria-current=page]", null, 4.5],
   ["boot step / note (muted)", "#boot .boot-step", null, 4.5],
   ["boot [ ok ]", "#boot .boot-step", "::before", 4.5],
   ["boot value", "#boot .boot-val", null, 4.5],

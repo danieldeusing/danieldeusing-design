@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>data: tables, time, charts, tabs</title>
+
+    <!-- Theme pre-paint: ?theme= wins (screenshots, checks), then the stored choice. -->
+    <script>
+      (() => {
+        const themes = ["warm", "green", "mono", "paper"];
+        let theme = new URLSearchParams(location.search).get("theme");
+        if (!themes.includes(theme)) {
+          try { theme = localStorage.getItem("theme"); } catch {}
+        }
+        document.documentElement.dataset.theme = themes.includes(theme) ? theme : "warm";
+      })();
+    </script>
+
+    <!-- tokens + chrome + data.css is the tokens-only surface (netmon's): `?bare` keeps exactly those.
+         The `data-full` links are what a page usually has beside them — reset, base, components and
+         the tooltip — and data.css must render the same with or without them. -->
+    <link rel="stylesheet" href="../src/reset.css" data-full />
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" data-full />
+    <link rel="stylesheet" href="../src/components.css" data-full />
+    <link rel="stylesheet" href="../src/chrome.css" />
+    <link rel="stylesheet" href="../src/tooltip.css" data-full />
+    <link rel="stylesheet" href="../src/data.css" />
+
+    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
+         STAND-INS — NOT PART OF THIS PACKAGE, AND NOT IN src/.
+         Other work packages of 0.60.0 own these and land in parallel. Each block is DISABLED
+         (media="not all") and the script at the top of <body> switches it on only when the real
+         thing is missing, so once WP1 / WP4 / WP7 / WP3 are integrated this page renders the real
+         tokens and classes, not these copies. The header says which are in force.
+         ══════════════════════════════════════════════════════════════════════════════════════════ -->
+    <style id="standin-wp1" media="not all">
+      /* WP1 · F1 sizes, F2 categorical colours, F7 tone, F6 motion */
+      :root {
+        --control-h: 1.75rem;
+        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
+        --icon-sm: 0.75rem; --icon-size: 0.875rem; --icon-lg: 1rem; --icon-xl: 1.5rem;
+        --dot-size: 0.5rem;
+        --cat-l: 0.45; --cat-c: 0.075;
+        --cat-red: oklch(var(--cat-l) var(--cat-c) 25);
+        --cat-orange: oklch(var(--cat-l) var(--cat-c) 50);
+        --cat-amber: oklch(var(--cat-l) var(--cat-c) 80);
+        --cat-lime: oklch(var(--cat-l) var(--cat-c) 125);
+        --cat-green: oklch(var(--cat-l) var(--cat-c) 150);
+        --cat-teal: oklch(var(--cat-l) var(--cat-c) 185);
+        --cat-cyan: oklch(var(--cat-l) var(--cat-c) 210);
+        --cat-blue: oklch(var(--cat-l) var(--cat-c) 255);
+        --cat-indigo: oklch(var(--cat-l) var(--cat-c) 275);
+        --cat-violet: oklch(var(--cat-l) var(--cat-c) 295);
+        --cat-purple: oklch(var(--cat-l) var(--cat-c) 315);
+        --cat-pink: oklch(var(--cat-l) var(--cat-c) 350);
+      }
+      html[data-theme="green"],
+      html[data-theme="mono"] { --cat-l: 0.74; --cat-c: 0.12; }
+      [data-tone="primary"] { --tone: var(--primary); }
+      [data-tone="success"] { --tone: var(--success); }
+      [data-tone="warning"] { --tone: var(--warning); }
+      [data-tone="destructive"] { --tone: var(--destructive); }
+      [data-tone="info"] { --tone: var(--info); }
+      [data-tone="pending"] { --tone: var(--pending); }
+      [data-tone="muted"] { --tone: var(--muted-foreground); }
+      html.anim-off *, html.anim-off *::before, html.anim-off *::after {
+        animation: none !important; transition: none !important;
+      }
+    </style>
+    <!-- WP4 · I1 glyphs: the --ico-<word> masks, the [data-icon] → --ico mapping and .ico. The
+         script fills in ONLY the missing pieces, and names them in the header. -->
+    <style id="standin-i1" media="not all"></style>
+    <!-- WP7 · T1 .tag — only what the state-tag vocabulary (D10) renders -->
+    <style id="standin-wp7" media="not all">
+      .tag:not([data-tone]) { --tone: initial; }
+      .tag {
+        --tag-c: var(--tag-color, var(--tone, var(--muted-foreground)));
+        display: inline-flex; align-items: center; gap: 0.25rem; vertical-align: middle; box-sizing: border-box;
+        min-block-size: 1.25rem; padding: 0 0.375rem; font: inherit; font-size: var(--fs-base); font-weight: 600;
+        line-height: 1; white-space: nowrap; color: var(--tag-c); background: transparent;
+        border: 1px solid color-mix(in srgb, var(--tag-c) 50%, transparent);
+      }
+      .tag--off { --tag-c: var(--muted-foreground); border-style: dotted; }
+      .tag--dashed { border-style: dashed; }
+      .tag--strong { border-color: var(--tag-c); font-weight: 700; }
+      .tag--struck { text-decoration: line-through; }
+      .tag--solid { color: var(--background); background: var(--tag-c); border-color: var(--tag-c); font-weight: 700; }
+    </style>
+    <!-- WP3 · chrome.css edits this package hands over (D1's sticky-header line, D9's tickstrip).
+         The exact CSS is in the WP11 report, "for WP3". -->
+    <style id="standin-wp3" media="not all">
+      .tablewrap thead th { background: var(--tablewrap-fade, var(--background)); }
+      .ticktable thead th { padding: 0; border: 0; }
+      .tick-dot { font-size: inherit; }
+      .tick--ok .tick-dot::before,
+      .tick--running .tick-dot::before { content: "\25CF"; content: "\25CF" / ""; }
+      .tick--stale .tick-dot::before { content: "\2715"; content: "\2715" / ""; }
+      .tick--never .tick-dot::before { content: "\25CB"; content: "\25CB" / ""; }
+      .tick--running .tick-dot { color: var(--info); border-left-color: color-mix(in srgb, var(--info) 45%, transparent); }
+      .tick-next { opacity: 1; }
+      .tick-sep { color: var(--border); opacity: 1; }
+    </style>
+    <!-- WP1 · X3: `hidden` hides everything, answered once in tokens.css. -->
+    <style id="standin-x3" media="not all">
+      [hidden]:not([hidden="until-found"]) { display: none !important; }
+    </style>
+    <!-- WP5 · C6 the drawn checkbox — only what the pick column shows -->
+    <style id="standin-wp5" media="not all">
+      input[type="checkbox"] {
+        -webkit-appearance: none; appearance: none; display: inline-grid; place-content: center; flex: none;
+        box-sizing: border-box; inline-size: 0.875rem; block-size: 0.875rem; margin: 0; padding: 0;
+        vertical-align: middle; background: transparent; border: 1px solid var(--control-edge); cursor: pointer;
+      }
+      input[type="checkbox"]::before { content: ""; inline-size: 0.625rem; block-size: 0.625rem; }
+      input[type="checkbox"]:checked { background: var(--primary); border-color: var(--primary); }
+      input[type="checkbox"]:checked::before {
+        background: var(--primary-foreground);
+        -webkit-mask: var(--ico-check) center / contain no-repeat; mask: var(--ico-check) center / contain no-repeat;
+      }
+      input[type="checkbox"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+      input[type="checkbox"]:disabled { opacity: 0.45; cursor: default; }
+    </style>
+
+    <style>
+      /* Page-only layout; nothing here is under test. It sets the body font and colours because in
+         ?bare mode base.css is not loaded — which is what a tokens-only surface does for itself. */
+      body {
+        margin: 0; font-family: var(--font-mono); font-size: var(--fs-base); line-height: var(--lh-base);
+        background: var(--background); color: var(--foreground);
+      }
+      .wrap { max-width: 64rem; margin-inline: auto; padding: 1.5rem 1.5rem 6rem; }
+      .demo-head {
+        position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center;
+        gap: 0.5rem 1rem; padding: 0.6rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border);
+      }
+      .demo-head h1 { margin: 0; font-size: var(--fs-base); font-weight: 700; }
+      .demo-head .spacer { flex: 1; }
+      .demo-btn {
+        font: inherit; padding: 0.2rem 0.5rem; color: var(--muted-foreground); background: none;
+        border: 1px solid var(--border); cursor: pointer;
+      }
+      .demo-btn[aria-pressed="true"] { color: var(--primary); border-color: var(--primary); }
+      .demo-note { color: var(--muted-foreground); }
+      main > section { margin-top: 2.25rem; }
+      main > section > h2 { margin: 0 0 0.25rem; font-size: var(--fs-lg); }
+      main > section h3 { margin: 1.25rem 0 0.5rem; font-size: var(--fs-base); color: var(--muted-foreground); font-weight: 600; }
+      .lede { margin: 0 0 0.75rem; color: var(--muted-foreground); max-width: 72ch; }
+      .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+      .demo-card { padding: 0.75rem; background: var(--card); border: 1px solid var(--border); }
+      .demo-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr)); }
+      .strip-host {
+        display: flex; block-size: 2.25rem; background: var(--card); border: 1px solid var(--border);
+        border-block-end: 2px solid color-mix(in srgb, var(--border) 80%, transparent);
+      }
+      .strip-host > .tabs { flex: 1; }
+      .strip-host .tab { max-inline-size: 11rem; }
+      #tab-log { min-height: 1.5em; }
+      /* What the examples below once set in style attributes. A page under style-src 'self' (seedr's)
+         drops every style attribute, so the examples a page copies from carry none: a variable or a
+         spacing a page needs goes in its stylesheet, on a class or an id. */
+      .demo-pad { padding: 0.75rem; }
+      .demo-flush { margin: 0; }
+      .demo-card { --chart-bg: var(--card); }
+      .card-fade { --tablewrap-fade: var(--card); }
+      #card-wrap { --tablewrap-max-h: 8.5rem; }
+      #kv-labels { --field-label-w: 15rem; }
+      #bars { --chart-h: 9rem; }
+      #when .demo-card > p { margin: 0 0 0.4rem; }
+      #when .demo-card > p:last-child { margin: 0; }
+      div[role="tabpanel"] > p { margin: 0.6rem 0 0; }
+      html[data-bare] .doc-link--forward { color: var(--primary); }
+    </style>
+  </head>
+  <body>
+    <script>
+      /* Switch on each stand-in only where the real thing is missing, and say which are in force.
+         `?bare` first drops the data-full stylesheets. */
+      (() => {
+        const root = document.documentElement;
+        if (new URLSearchParams(location.search).has("bare")) {
+          document.querySelectorAll("link[data-full]").forEach((link) => link.remove());
+          root.dataset.bare = "";
+        }
+        const token = (name) => getComputedStyle(root).getPropertyValue(name).trim() !== "";
+        const probe = (html, test, pseudo) => {
+          const host = document.createElement("div");
+          host.innerHTML = html;
+          document.body.append(host);
+          const el = host.querySelector("[data-probe]") || host.firstElementChild;
+          const ok = test(getComputedStyle(el, pseudo || null));
+          host.remove();
+          return ok;
+        };
+        const ICONS = {
+          clock: "<path d='M12 6v6l4 2'/><circle cx='12' cy='12' r='10'/>",
+          mail: "<path d='m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7'/><rect x='2' y='4' width='20' height='16' rx='2'/>",
+          github: "<path d='M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4'/><path d='M9 18c-4.51 2-5-2-7-2'/>",
+          package: "<path d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/><path d='M12 22V12'/><polyline points='3.29 7 12 12 20.71 7'/><path d='m7.5 4.27 9 5.15'/>",
+          check: "<path d='M20 6 9 17l-5-5'/>",
+        };
+        const svg = (body) => "url(\"data:image/svg+xml," + encodeURIComponent(
+          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' " +
+          "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" + body + "</svg>") + "\")";
+        const inForce = [];
+        const use = (id, missing) => {
+          if (!missing) return;
+          document.getElementById(id).media = "all";
+          inForce.push(id.replace("standin-", ""));
+        };
+        use("standin-wp1", !token("--icon-size"));
+
+        const absent = Object.keys(ICONS).filter((n) => !token("--ico-" + n));
+        const unmapped = Object.keys(ICONS).filter((n) =>
+          !probe('<span data-icon="' + n + '"></span>', (s) => s.getPropertyValue("--ico").trim() !== ""));
+        const drawn = probe('<span class="ico"></span>', (s) => s.display !== "inline");
+        const glyphs = [];
+        let css = "";
+        if (absent.length) {
+          css += ":root {" + absent.map((n) => "--ico-" + n + ": " + svg(ICONS[n]) + ";").join("") + "}";
+          glyphs.push("tokens " + absent.join(" "));
+        }
+        if (unmapped.length) {
+          css += unmapped.map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
+          glyphs.push("mapping " + unmapped.join(" "));
+        }
+        if (!drawn) {
+          css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
+            " vertical-align: -0.125em; background: var(--tone, currentColor);" +
+            " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
+            " .ico--sm { inline-size: var(--icon-sm); block-size: var(--icon-sm); }" +
+            // X1 as corrected: a mask glyph paints its parent's forced text colour.
+            " @media (forced-colors: active) { .ico { forced-color-adjust: preserve-parent-color; } }" +
+            " @supports not (forced-color-adjust: preserve-parent-color) { @media (forced-colors: active) { .ico { background: CanvasText; } } }";
+          glyphs.push(".ico");
+        }
+        if (css) {
+          const block = document.getElementById("standin-i1");
+          block.textContent = css;
+          block.media = "all";
+          inForce.push("i1 (" + glyphs.join("; ") + ")");
+        }
+        use("standin-wp7", !probe('<span class="tag">x</span>', (s) => s.display === "inline-flex"));
+        use("standin-wp3", !probe('<table class="ticktable"><tbody><tr class="tick tick--stale"><td class="tick-dot" data-probe></td></tr></tbody></table>',
+          (s) => s.content !== "none" && s.content !== "normal", "::before"));
+        // X3 is missing when an author display still beats `hidden`; WP5 when a checkbox is still native.
+        use("standin-x3", !probe('<span class="tabs" hidden></span>', (s) => s.display === "none"));
+        use("standin-wp5", !probe('<input type="checkbox">', (s) => s.appearance === "none"));
+        root.dataset.standins = inForce.join(" ") || "none";
+      })();
+    </script>
+
+    <header class="demo-head">
+      <h1>WP11 · data: tables, time, charts, tabs</h1>
+      <span class="spacer"></span>
+      <span class="row" role="group" aria-label="theme">
+        <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
+        <button type="button" class="demo-btn" data-theme-pick="green">green</button>
+        <button type="button" class="demo-btn" data-theme-pick="mono">mono</button>
+        <button type="button" class="demo-btn" data-theme-pick="paper">paper</button>
+      </span>
+      <button type="button" class="demo-btn" id="anim-btn" aria-pressed="true">anim</button>
+      <a class="demo-btn" id="bare-link" href="?bare">tokens + chrome only</a>
+      <span class="demo-note">stand-ins in force: <span id="standins"></span></span>
+    </header>
+
+    <main class="wrap">
+      <p class="lede">
+        Every element of spec entries D1 and D3–D10 in every state. The page loads tokens.css,
+        chrome.css and data.css; reset, base, components and tooltip only for what the examples
+        borrow (<code>.btn-terminal</code>, <code>.card-terminal</code>, the tooltip). Open it with
+        <code>?bare</code> for the tokens + chrome rendering, and at a phone width to see the tables stack.
+      </p>
+
+      <!-- ── D1 ─────────────────────────────────────────────────────────────────────────── -->
+      <section id="dense">
+        <h2>D1 · table.dense and the cell vocabulary</h2>
+        <p class="lede">A pinned row (<code>data-pin</code>), a disabled row
+          (<code>aria-disabled</code>), a pick column, a number column, the when column and one
+          actions cell per row. <code>.stackable</code>: below 40rem each row is a card and each
+          cell a <code>data-label</code> line.</p>
+        <div class="tablewrap">
+          <table class="dense stackable" id="dense-table" data-table-id="demo-activity">
+            <thead>
+              <tr>
+                <th class="pick" scope="col"><input type="checkbox" aria-label="select every row" /></th>
+                <th scope="col">when</th>
+                <th scope="col">repository</th>
+                <th scope="col">state</th>
+                <th class="num" scope="col">findings</th>
+                <th scope="col">links</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-pin id="row-pinned">
+                <td class="pick"><input type="checkbox" aria-label="select poi/vu3 !3302" checked /></td>
+                <td data-label="when" data-when="-180"></td>
+                <td data-label="repository">poi/vu3 !3302</td>
+                <td data-label="state"><span class="tag" data-tone="warning">asked</span></td>
+                <td class="num" data-label="findings">12</td>
+                <td class="actions" data-label="links"><a class="doc-link doc-link--forward" href="#dense">log →</a><a class="doc-link doc-link--forward" href="#dense">forge →</a><button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">approve</button></td>
+              </tr>
+              <tr>
+                <td class="pick"><input type="checkbox" aria-label="select danieldeusing-design #214" /></td>
+                <td data-label="when" data-when="-7300"></td>
+                <td data-label="repository">danieldeusing-design #214</td>
+                <td data-label="state"><span class="tag" data-tone="success">ok</span></td>
+                <td class="num" data-label="findings">3</td>
+                <td class="actions" data-label="links"><a class="doc-link doc-link--forward" href="#dense">log →</a><a class="doc-link doc-link--forward" href="#dense">forge →</a></td>
+              </tr>
+              <tr aria-disabled="true" id="row-disabled">
+                <td class="pick"><input type="checkbox" aria-label="select kabinenfunk #9" disabled /></td>
+                <td data-label="when" data-when="-345600"></td>
+                <td data-label="repository">kabinenfunk #9</td>
+                <td data-label="state"><span class="tag tag--off">excluded</span></td>
+                <td class="num" data-label="findings">0</td>
+                <td class="actions" data-label="links"><a class="doc-link doc-link--forward" href="#dense">log →</a></td>
+              </tr>
+              <tr>
+                <td class="pick"><input type="checkbox" aria-label="select seedr #88" /></td>
+                <td data-label="when" data-when="-34560000"></td>
+                <td data-label="repository">seedr #88</td>
+                <td data-label="state"><span class="tag tag--strong" data-tone="destructive">failed</span></td>
+                <td class="num" data-label="findings">1,204</td>
+                <td class="actions" data-label="links"><a class="doc-link doc-link--forward" href="#dense">log →</a></td>
+              </tr>
+              <tr>
+                <td class="pick"><input type="checkbox" aria-label="select an unreadable stamp" /></td>
+                <td data-label="when" data-when="junk">2026-13-45 junk</td>
+                <td data-label="repository">a stored value nobody can parse</td>
+                <td data-label="state"><span class="tag tag--dashed" data-tone="muted">unknown</span></td>
+                <td class="num" data-label="findings"></td>
+                <td class="actions" data-label="links"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>a dense table on a card — the sticky header paints the card (WP3's line)</h3>
+        <div class="card-terminal demo-pad card-fade">
+          <div class="tablewrap" id="card-wrap">
+            <table class="dense">
+              <thead><tr><th scope="col">container</th><th scope="col">image</th><th class="num" scope="col">restarts</th></tr></thead>
+              <tbody>
+                <tr><td>dd-infra-cockpit</td><td>cockpit:2.325.0</td><td class="num">0</td></tr>
+                <tr><td>dd-infra-netmon</td><td>netmon:2.7.0</td><td class="num">2</td></tr>
+                <tr><td>dd-infra-docs</td><td>docs:1.40.1</td><td class="num">0</td></tr>
+                <tr><td>dd-infra-review-claude</td><td>review-worker:0.19</td><td class="num">14</td></tr>
+                <tr><td>dd-infra-review-copilot</td><td>review-worker:0.19</td><td class="num">3</td></tr>
+                <tr><td>dd-apps-seedr</td><td>seedr:0.8.0</td><td class="num">0</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h3>table.dense--form — rows of controls centre vertically</h3>
+        <table class="dense dense--form" id="form-table">
+          <thead><tr><th class="pick" scope="col"><span class="visually-hidden">on</span></th><th scope="col">agent</th><th scope="col">model</th><th scope="col">effort</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="pick"><input type="checkbox" aria-label="enable claude" checked /></td>
+              <td>claude</td>
+              <td><select aria-label="claude model"><option>claude-opus-5-5</option><option>claude-sonnet-5</option></select></td>
+              <td><select aria-label="claude effort"><option>high</option><option>max</option></select></td>
+            </tr>
+            <tr aria-disabled="true">
+              <td class="pick"><input type="checkbox" aria-label="enable codex" /></td>
+              <td>codex</td>
+              <td><select aria-label="codex model" disabled><option>gpt-5.5</option></select></td>
+              <td><select aria-label="codex effort" disabled><option>medium</option></select></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ── D3 ─────────────────────────────────────────────────────────────────────────── -->
+      <section id="kv">
+        <h2>D3 · table.kv and dl.kv</h2>
+        <p class="lede">The label is <code>--primary</code> 700, the value <code>--foreground</code>;
+          the label column is <code>--field-label-w</code>. A long value breaks anywhere.</p>
+        <div class="demo-grid">
+          <table class="kv" id="kv-table">
+            <tbody>
+              <tr><th scope="row">host</th><td>ddstudio</td></tr>
+              <tr><th scope="row">ssh</th><td>ssh ddstudio</td></tr>
+              <tr><th scope="row">docker context</th><td>ssh://daniel@ddstudio.mellori-ide.ts.net</td></tr>
+              <tr><th scope="row">url</th><td>https://cockpit.internal.danieldeusing.de/automation/review#sec-activity</td></tr>
+            </tbody>
+          </table>
+          <dl class="kv" id="kv-list">
+            <dt><span class="ico" data-icon="mail" aria-hidden="true"></span>email</dt>
+            <dd>hello@example.org</dd>
+            <dt><span class="ico" data-icon="github" aria-hidden="true"></span>github</dt>
+            <dd>danieldeusing</dd>
+            <dt>stack</dt>
+            <dd>Astro, Tailwind, the terminal design system</dd>
+          </dl>
+        </div>
+        <h3>table.kv.kv--labels — a 15rem label column, set on the table</h3>
+        <table class="kv kv--labels" id="kv-labels">
+          <tbody>
+            <tr><th scope="row">review type</th><td>public — posts on the pull request</td></tr>
+            <tr><th scope="row">comments</th><td>agent info, ELI5</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ── D4 / D5 ────────────────────────────────────────────────────────────────────── -->
+      <section id="when">
+        <h2>D4 · .when · D5 · the stamp formatters</h2>
+        <p class="lede">The when column above is <code>whenHtml()</code>; the age re-ticks every 30 s
+          (<code>initRelativeTimes()</code>). On a card the inline form carries both stamps on its tip.
+          The table below is the formatters' own output, in this browser's zone.</p>
+        <div class="demo-grid">
+          <div class="demo-card">
+            <p>review — reviews the current diff</p>
+            <p id="when-inline"></p>
+          </div>
+          <table class="kv" id="stamps"><tbody></tbody></table>
+        </div>
+      </section>
+
+      <!-- ── D6 / D7 ────────────────────────────────────────────────────────────────────── -->
+      <section id="charts">
+        <h2>D6 · line chart · D7 · bar chart</h2>
+        <p class="lede">Drawn at the plot's measured size, so every label is 12px at any width. Resize the
+          window: the charts redraw; the text does not scale.</p>
+        <figure class="chart">
+          <div class="chart-plot" id="trend"></div>
+          <figcaption>mistakes per graded review, per week · a hollow week has too few graded reviews and is kept out of the line · dashed: the grader model changed · floor tick: rules were added</figcaption>
+        </figure>
+        <div class="demo-card">
+          <figure class="chart demo-flush" data-hue="blue">
+            <div class="chart-plot" id="balance"></div>
+            <figcaption>balance through the month, in euros · area and gridlines</figcaption>
+          </figure>
+        </div>
+        <figure class="chart">
+          <div class="chart-plot" id="bars"></div>
+          <figcaption>findings posted per week — peak <span id="bars-peak"></span></figcaption>
+        </figure>
+        <figure class="chart" id="flow-fig">
+          <div class="chart-plot" id="flow"></div>
+          <ul class="chart-key">
+            <li data-hue="green">income</li>
+            <li data-hue="red">expenses</li>
+            <li data-hue="blue">net</li>
+          </ul>
+          <figcaption>monthly income, expenses and what was left, in euros · solid, outlined, hatched: each series has a shape as well as a hue</figcaption>
+        </figure>
+      </section>
+
+      <!-- ── D8 ─────────────────────────────────────────────────────────────────────────── -->
+      <section id="tabs">
+        <h2>D8 · .tabs and initTabs()</h2>
+        <p class="lede">←/→ with wrap, Home/End, the disabled tab skipped. This row writes the hash
+          (<code>data-tabs-hash</code>); the nested row opens its ancestor on a deep link — try
+          <a class="doc-link doc-link--forward" href="#sec-retros">#sec-retros →</a>. The stats tab is lazy: its chart is drawn when
+          <code>tab-activated</code> first fires, and redrawn when the hidden panel is shown.</p>
+        <div class="tabs" role="tablist" aria-label="review sections" data-tabs-hash id="page-tabs">
+          <button type="button" class="tab" role="tab" id="tab-activity" aria-controls="sec-activity" aria-selected="true">activity</button>
+          <button type="button" class="tab" role="tab" id="tab-workers" aria-controls="sec-workers" aria-selected="false" tabindex="-1">workers <span class="tab-status" data-tone="destructive">failed</span></button>
+          <button type="button" class="tab" role="tab" id="tab-queue" aria-controls="sec-queue" aria-selected="false" tabindex="-1">queue <span class="tab-status" data-tone="pending">3 waiting</span></button>
+          <button type="button" class="tab" role="tab" id="tab-stats" aria-controls="sec-stats" aria-selected="false" tabindex="-1">stats</button>
+          <button type="button" class="tab" role="tab" id="tab-modes" aria-controls="sec-modes" aria-selected="false" tabindex="-1" disabled>modes</button>
+          <button type="button" class="tab tab--info" role="tab" id="tab-how" aria-controls="sec-how" aria-selected="false" tabindex="-1">how it works</button>
+        </div>
+        <section class="doc tab-panel" id="sec-activity" role="tabpanel" aria-labelledby="tab-activity">
+          <div class="tabs tabs--compact" role="tablist" aria-label="learnings" data-tabs-hash id="nested-tabs">
+            <button type="button" class="tab" role="tab" id="tab-learn" aria-controls="sec-learn" aria-selected="true">learn list</button>
+            <button type="button" class="tab" role="tab" id="tab-retros" aria-controls="sec-retros" aria-selected="false" tabindex="-1">retrospectives</button>
+          </div>
+          <div id="sec-learn" role="tabpanel" aria-labelledby="tab-learn"><p>the learn list — a nested panel.</p></div>
+          <div id="sec-retros" role="tabpanel" aria-labelledby="tab-retros" hidden><p>retrospectives — reached by a deep link, its ancestor opens first.</p></div>
+        </section>
+        <section class="doc tab-panel" id="sec-workers" role="tabpanel" aria-labelledby="tab-workers" hidden><p>workers: copilot-poi failed to update.</p></section>
+        <section class="doc tab-panel" id="sec-queue" role="tabpanel" aria-labelledby="tab-queue" hidden><p>three reviews are waiting on a worker.</p></section>
+        <section class="doc tab-panel" id="sec-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
+          <figure class="chart"><div class="chart-plot" id="lazy-chart"><p class="demo-note">loading…</p></div><figcaption>drawn on first activation, at the size the panel has when it is shown</figcaption></figure>
+        </section>
+        <section class="doc tab-panel" id="sec-modes" role="tabpanel" aria-labelledby="tab-modes" hidden><p>unreachable: the tab is disabled.</p></section>
+        <section class="doc tab-panel" id="sec-how" role="tabpanel" aria-labelledby="tab-how" hidden><p>how it works — the reference half of the row.</p></section>
+        <p class="demo-note" id="tab-log" aria-live="off"></p>
+
+        <h3>.tabs--compact inside a card, and .tabs--strip in a fixed-height strip</h3>
+        <div class="demo-grid">
+          <div class="card-terminal demo-pad">
+            <div class="tabs tabs--compact" role="tablist" aria-label="file view">
+              <button type="button" class="tab" role="tab" id="tab-plain" aria-controls="sec-plain" aria-selected="true">plain</button>
+              <button type="button" class="tab" role="tab" id="tab-formatted" aria-controls="sec-formatted" aria-selected="false" tabindex="-1">formatted</button>
+              <button type="button" class="tab" role="tab" id="tab-syntax" aria-controls="sec-syntax" aria-selected="false" tabindex="-1" aria-disabled="true">syntax</button>
+            </div>
+            <div id="sec-plain" role="tabpanel" aria-labelledby="tab-plain"><p>the plain view.</p></div>
+            <div id="sec-formatted" role="tabpanel" aria-labelledby="tab-formatted" hidden><p>the formatted view.</p></div>
+            <div id="sec-syntax" role="tabpanel" aria-labelledby="tab-syntax" hidden><p>not for this file.</p></div>
+            <div class="tabs tabs--compact" role="tablist" aria-label="review view" id="stale-tabs">
+              <button type="button" class="tab" role="tab" id="tab-stale" aria-controls="sec-stale" aria-selected="true" aria-disabled="true">diff (gone)</button>
+              <button type="button" class="tab" role="tab" id="tab-log" aria-controls="sec-log" aria-selected="false" tabindex="-1">log</button>
+            </div>
+            <div id="sec-stale" role="tabpanel" aria-labelledby="tab-stale"><p>selected AND disabled: the diff this view was opened on is gone.</p></div>
+            <div id="sec-log" role="tabpanel" aria-labelledby="tab-log" hidden><p>the log.</p></div>
+          </div>
+          <div>
+            <div class="strip-host">
+              <div class="tabs tabs--strip" role="tablist" aria-label="agents" id="strip-tabs">
+                <button type="button" class="tab" role="tab" id="tab-a1" aria-controls="sec-a1" aria-selected="true" data-tip="claude — claude-opus-5-5 at high effort"><span class="ico" data-icon="package" aria-hidden="true"></span><span class="tab-label">claude — claude-opus-5-5 at high effort</span></button>
+                <button type="button" class="tab" role="tab" id="tab-a2" aria-controls="sec-a2" aria-selected="false" tabindex="-1" data-tip="copilot-poi — the VU3 Copilot through the official CLI"><span class="ico" data-icon="package" aria-hidden="true"></span><span class="tab-label">copilot-poi — the VU3 Copilot through the official CLI</span></button>
+                <button type="button" class="tab" role="tab" id="tab-a3" aria-controls="sec-a3" aria-selected="false" tabindex="-1"><span class="tab-label">codex</span></button>
+              </div>
+            </div>
+            <div id="sec-a1" role="tabpanel" aria-labelledby="tab-a1"><p>claude's settings.</p></div>
+            <div id="sec-a2" role="tabpanel" aria-labelledby="tab-a2" hidden><p>copilot-poi's settings.</p></div>
+            <div id="sec-a3" role="tabpanel" aria-labelledby="tab-a3" hidden><p>codex's settings.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── D9 ─────────────────────────────────────────────────────────────────────────── -->
+      <section id="ticks">
+        <h2>D9 · the ticker strip</h2>
+        <p class="lede">ok · running (a run in flight is never red) · stale (older than three intervals) ·
+          never run. Re-rendered from memory every second, patched row by row; the review poll's
+          refresher re-reads its heartbeat every 30 s.</p>
+        <div class="tickstrip" id="tickers" data-label="pollers"></div>
+      </section>
+
+      <!-- ── D10 ────────────────────────────────────────────────────────────────────────── -->
+      <section id="states">
+        <h2>D10 · state tags — cockpit's vocabulary on .tag</h2>
+        <p class="lede">No CSS of this package's: T1's <code>.tag</code> carries every state through
+          <code>data-tone</code> and one modifier axis. The words stay cockpit's.</p>
+        <table class="dense" id="state-tags">
+          <thead><tr><th scope="col">cockpit class</th><th scope="col">.tag</th><th scope="col">markup</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="module">
+      import { initTabs } from "../runtime/tabs.js";
+      import { initRelativeTimes, whenHtml, stampParts, formatStamp, formatAgo, formatDuration } from "../runtime/time.js";
+      import { renderLineChart, renderBarChart } from "../runtime/charts.js";
+      import { initTickStrips } from "../runtime/tickstrip.js";
+      import { initTableScroll } from "../runtime/tablescroll.js";
+      import { initSelects } from "../runtime/select.js";
+      import { initTooltips } from "../runtime/tooltip.js";
+      import { initPickCells } from "../runtime/pick.js";
+
+      const root = document.documentElement;
+      const bare = root.hasAttribute("data-bare");
+      document.getElementById("standins").textContent = root.dataset.standins;
+      if (bare) document.getElementById("bare-link").href = "?";
+
+      /* ── page chrome: theme and anim ── */
+      const pickTheme = (theme) => {
+        root.dataset.theme = theme;
+        try { localStorage.setItem("theme", theme); } catch {}
+        for (const b of document.querySelectorAll("[data-theme-pick]")) b.setAttribute("aria-pressed", String(b.dataset.themePick === theme));
+      };
+      for (const b of document.querySelectorAll("[data-theme-pick]")) b.addEventListener("click", () => pickTheme(b.dataset.themePick));
+      pickTheme(root.dataset.theme);
+      document.getElementById("anim-btn").addEventListener("click", (e) => {
+        const off = root.classList.toggle("anim-off");
+        e.currentTarget.setAttribute("aria-pressed", String(!off));
+      });
+
+      const now = Date.now();
+      const iso = (offsetSeconds) => new Date(now + offsetSeconds * 1000).toISOString();
+
+      /* ── D1 / D4: the when column ── */
+      for (const cell of document.querySelectorAll("td[data-when]")) {
+        const offset = Number(cell.dataset.when);
+        cell.innerHTML = whenHtml(Number.isFinite(offset) ? iso(offset) : cell.textContent);
+      }
+      document.getElementById("when-inline").innerHTML = whenHtml(iso(-3 * 86400 - 600), { inline: true });
+
+      /* ── D5: the formatters' own output ── */
+      const sample = iso(-180);
+      const rows = [
+        ["formatStamp()", formatStamp(sample)],
+        ["stampParts().zone", stampParts(sample).zone],
+        ["stampParts().utc", stampParts(sample).utc],
+        ["a future stamp", formatAgo(iso(600))],
+        ["59 s / 60 s", formatAgo(now - 59e3, { now }) + " · " + formatAgo(now - 60e3, { now })],
+        ["59 min / 60 min", formatAgo(now - 3599e3, { now }) + " · " + formatAgo(now - 3600e3, { now })],
+        ["6 d / 7 d", formatAgo(now - 6 * 864e5, { now }) + " · " + formatAgo(now - 7 * 864e5, { now })],
+        ["29 d / 30 d", formatAgo(now - 29 * 864e5, { now }) + " · " + formatAgo(now - 30 * 864e5, { now })],
+        ["364 d / 365 d", formatAgo(now - 364 * 864e5, { now }) + " · " + formatAgo(now - 365 * 864e5, { now })],
+        ["formatDuration() short / long", [48e3, 180e3, 125 * 864e5].map((ms) => formatDuration(ms)).join(" · ") + " / " + formatDuration(365 * 864e5, { style: "long" })],
+        ["garbage in", JSON.stringify(formatStamp("2026-13-45 junk"))],
+        ["nothing in", JSON.stringify(formatStamp(null))],
+      ];
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+      document.querySelector("#stamps tbody").innerHTML = rows.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join("");
+
+      /* ── D6 / D7: charts ── */
+      const weeks = [
+        ["07-06", 1.4, 12], ["07-13", 1.9, 3], ["07-20", 1.1, 15], ["07-27", 0.9, 14], ["08-03", 1.2, 11],
+        ["08-10", 0.7, 16], ["08-17", 0.8, 13], ["08-24", 2.5, 2], ["08-31", 0.6, 18], ["09-07", 0.5, 17],
+        ["09-14", 0.55, 21], ["09-21", 0.4, 19],
+      ].map(([bucket, rate, graded]) => ({ bucket, rate, graded, thin: graded < 5 }));
+      renderLineChart(document.getElementById("trend"), weeks, {
+        label: "mistakes per graded review, per week of review",
+        x: (w) => w.bucket, value: (w) => w.rate, solid: (w) => !w.thin, sub: (w) => "n " + w.graded,
+        tip: (w) => w.bucket + ": " + w.rate + " mistakes per graded review over " + w.graded + " graded" + (w.thin ? " — too few to trust, kept out of the line" : ""),
+        markers: [{ at: 4, kind: "line", tip: "08-03: the grader model changed" }, { at: 7, kind: "tick", tip: "08-24: 3 rules added" }],
+        format: (v) => String(Math.round(v * 100) / 100),
+      });
+      const euro = new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+      const days = Array.from({ length: 20 }, (_, i) => ({ day: String(i + 1).padStart(2, "0"), balance: 4200 + Math.round(Math.sin(i / 3) * 900 - i * 35) }));
+      renderLineChart(document.getElementById("balance"), days, {
+        label: "balance through the month, in euros", x: (d) => d.day, value: (d) => d.balance,
+        area: true, grid: true, format: (v) => euro.format(v), tip: (d) => d.day + ": " + euro.format(d.balance),
+      });
+      const findings = [7, 12, 9, 23, 4, 0, 11, 15, 8, 19, 6, 14, 10, 17].map((n, i) => ({ week: "w" + (27 + i), n }));
+      document.getElementById("bars-peak").textContent = Math.max(...findings.map((f) => f.n));
+      renderBarChart(document.getElementById("bars"), findings, {
+        label: "findings posted per week", x: (f) => f.week, series: [{ key: "findings", value: (f) => f.n }],
+        tip: (f) => f.week + ": " + f.n + " findings posted",
+      });
+      const months = [["apr", 5200, 4100], ["may", 5200, 5600], ["jun", 6100, 4300], ["jul", 5200, 3900], ["aug", 5400, 6200], ["sep", 5200, 4700]]
+        .map(([month, income, expenses]) => ({ month, income, expenses }));
+      renderBarChart(document.getElementById("flow"), months, {
+        label: "monthly income, expenses and net, in euros", x: (m) => m.month, grid: true, format: (v) => euro.format(v),
+        series: [
+          { key: "income", label: "income", value: (m) => m.income, hue: "green" },
+          { key: "expenses", label: "expenses", value: (m) => m.expenses, hue: "red" },
+          { key: "net", label: "net", value: (m) => m.income - m.expenses, hue: "blue" },
+        ],
+        tip: (m, s) => m.month + " " + s.label + ": " + euro.format(s.value(m)),
+      });
+
+      /* ── D8: tabs, and a lazy panel that listens to the one event ── */
+      const log = document.getElementById("tab-log");
+      document.addEventListener("tab-activated", (event) => {
+        log.textContent = "tab-activated: " + event.target.id + " → " + (event.detail.panel ? "#" + event.detail.panel.id : "no panel");
+      });
+      let statsDrawn = false;
+      document.getElementById("tab-stats").addEventListener("tab-activated", () => {
+        if (statsDrawn) return;
+        statsDrawn = true;
+        renderBarChart(document.getElementById("lazy-chart"), findings.slice(-6), {
+          label: "findings posted per week, last six", x: (f) => f.week, series: [{ value: (f) => f.n }],
+        });
+      });
+      initTabs();
+
+      /* ── D9: the ticker strip ── */
+      const ticks = (window.__ddTicks ||= []);
+      ticks.push(
+        { mount: "tickers", key: "review-poll", order: 1, label: "review poll", lastAt: iso(-12), intervalMs: 60000, stats: [[3, "queued"], [1, "running"]], hint: "polls the forges for pull requests to review" },
+        { mount: "tickers", key: "executor", order: 2, label: "executor loop", lastAt: iso(-420), intervalMs: 60000, stats: [[1, "lap in flight"]], busy: { since: iso(-185) }, hint: "a run is in flight, so its age cannot mean stalled" },
+        { mount: "tickers", key: "cicd", order: 3, label: "cicd supervisor", lastAt: iso(-600), intervalMs: 60000, stats: [[0, "runners idle"]], hint: "no heartbeat for ten intervals" },
+        { mount: "tickers", key: "learn", order: 4, label: "learn poll", lastAt: null, intervalMs: 300000, stats: [], hint: "has not run since it was deployed" },
+      );
+      (window.__ddTickRefreshers ||= []).push(() => {
+        // A narrow refresher: re-read one heartbeat, never re-render a form.
+        (window.__ddTicks ||= []).push({ ...ticks.find((t) => t.key === "review-poll"), lastAt: new Date().toISOString() });
+        window.__ddTickRender?.();
+      });
+      initTickStrips();
+
+      /* ── D10: the state vocabulary, rendered live ── */
+      const STATES = [
+        ["st-ok, st-ready, tag-public, lstat-applied, v-PASS", "ok", 'data-tone="success"'],
+        ["st-failed, st-error, st-unreachable, lstat-invalid, lstat-error, v-FAIL", "failed", 'data-tone="destructive"'],
+        ["st-not-credentialed, tag-stranded", "stranded", 'data-tone="destructive"', "tag--strong"],
+        ["st-asked, st-credentialed, st-misconfigured, lstat-pending, v-INCONCLUSIVE", "asked", 'data-tone="warning"'],
+        ["st-warn", "warn", 'data-tone="warning"', "tag--strong"],
+        ["st-gated, tag-silent, tag-manual, ty-review, st-issue-plan", "gated", 'data-tone="info"'],
+        ["tag-auto, v-BLOCKED, st-review-fix", "auto", 'data-tone="pending"'],
+        ["st-timed_out", "timed out", 'data-tone="pending"', "tag--dashed tag--strong"],
+        ["ty-plan, st-issue-impl", "plan", 'data-tone="primary"'],
+        ["st-disabled, st-excluded", "excluded", "", "tag--off"],
+        ["st-not-actionable, tag-unknown, ty-unknown, lstat-dismissed, v-SKIPPED", "skipped", 'data-tone="muted"', "tag--dashed"],
+        ["lstat-retired", "retired", 'data-tone="muted"', "tag--struck"],
+        ["lstat-no-action, ty-ticket", "no action", 'data-tone="muted"'],
+        ["the verdict families .lstat, .v, .mx-chip", "PASS", 'data-tone="success"', "tag--strong"],
+        ["scope-global, .surface-public .surface-badge", "global", 'data-tone="primary"', "tag--solid"],
+        ["scope-repo, .surface-internal .surface-badge", "repo", 'data-tone="muted"'],
+        ["unreachable (containers page)", "unreachable", 'data-tone="destructive"', "tag--strong"],
+      ];
+      document.querySelector("#state-tags tbody").innerHTML = STATES.map(([from, word, tone, mods = ""]) => {
+        const markup = `<span class="tag${mods ? " " + mods : ""}"${tone ? " " + tone : ""}>${word}</span>`;
+        return `<tr><td>${esc(from)}</td><td>${markup}</td><td><code>${esc(markup)}</code></td></tr>`;
+      }).join("");
+
+      initRelativeTimes();
+      initTableScroll();
+      initPickCells();
+      if (!bare) {
+        initSelects();
+        initTooltips();
+      }
+      root.dataset.ready = "";
+    </script>
+  </body>
+</html>

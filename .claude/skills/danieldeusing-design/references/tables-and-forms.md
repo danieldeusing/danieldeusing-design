@@ -9,6 +9,8 @@ Contents:
 
 - A `td` has no colour: the Tailwind-typography trapdoor
 - Authoring a plain table: column widths and cell content
+- A dashboard table is `table.dense`: the cell vocabulary, row states, a phone (0.60.0)
+- Pairs: `table.kv` and `dl.kv` (0.60.0)
 - A `<select>` is enhanced automatically (0.21.0)
 - A wide table scrolls itself (0.23.0)
 - A long table pages to 20 (0.22.0)
@@ -47,13 +49,19 @@ because only the page knows which column carries the prose — use a `<colgroup>
 wide one from eating the table:
 
 ```html
-<table>
-  <colgroup><col style="width:4rem" /><col /><col style="width:9rem" /></colgroup>
+<table class="findings">
+  <colgroup><col class="findings-sev" /><col /><col class="findings-when" /></colgroup>
 ```
 
-Give the sentence column no width and let it take the remainder. Without this a
-three-sentence cell sizes the column to its longest line and squeezes every other column
-into a vertical stack of single words.
+```css
+.findings-sev { width: 4rem; }
+.findings-when { width: 9rem; }
+```
+
+The widths go in the page's stylesheet, never in a style attribute: a page under a
+`style-src 'self'` policy (seedr's) drops every one. Give the sentence column no width and let
+it take the remainder. Without this a three-sentence cell sizes the column to its longest line
+and squeezes every other column into a vertical stack of single words.
 
 A long inline-code value or a cell holding more than one item forces the table wider than its
 column; without a scrolling wrapper the browser scrolls the whole page horizontally — the header
@@ -65,6 +73,132 @@ needs to list several items, join them with `<br />` so they stack instead of ru
 Never set a font-size on a table. 0.7.0 gave `table` one size for the whole estate (`--fs-md`
 until 0.27.0, `--fs-base` since), which exists because cockpit's doc tables sat at 15px and its
 dashboard tables at 12px. A local size only reintroduces that.
+
+## A dashboard table is `table.dense`: the cell vocabulary, row states, a phone (0.60.0)
+
+```html
+<div class="tablewrap">
+  <table class="dense stackable" data-table-id="review-activity">
+    <thead><tr>
+      <th class="pick" scope="col"><input type="checkbox" aria-label="select every row" /></th>
+      <th scope="col">when</th>
+      <th scope="col">repository</th>
+      <th class="num" scope="col">findings</th>
+      <th scope="col">links</th>
+    </tr></thead>
+    <tbody>
+      <tr data-pin>
+        <td class="pick"><input type="checkbox" aria-label="select poi/vu3 !3302" /></td>
+        <td data-label="when">…whenHtml(row.at)…</td>
+        <td data-label="repository">poi/vu3 !3302</td>
+        <td class="num" data-label="findings">12</td>
+        <td class="actions" data-label="links"><a class="doc-link doc-link--forward" href="…">log →</a><a class="doc-link doc-link--forward" href="…">forge →</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+```
+
+The plain `<table>` above serves documents: a sentence per cell, generous padding. A table that is
+scanned column by column, twenty rows at a time — an activity log, a queue, a roster — is
+**`table.dense`**, cockpit's activity table. Cockpit declared it four times as `table.act`, each copy
+a little different (the first-cell inset lived in one, the column floors in another), so the same
+table looked different on each page; it is one class in `data.css` now, which needs `tokens.css`
+alone. The `when` cell is `whenHtml()` (`references/data.md`).
+
+- **The cell box** is `.3rem .35rem` on both sides, so a column gap is cockpit's .7rem and a
+  right-aligned number needs no extra inset. One row rule for every table: `--border` at 55%. The
+  header is muted 600 over a full-strength rule; the last row draws none.
+- **The first cell always keeps .45rem for the pin bar**, on every row and the header — give it only
+  to a pinned row and the whole column jumps sideways the moment a row pins.
+- **A column has a floor of 3.5rem**, so a narrow window scrolls the table inside its `.tablewrap`
+  rather than breaking a repository path over four lines (Daniel, 2026-08-21).
+- **No cell sets a font.** `ui-monospace` swapped JetBrains Mono out of cockpit's `when` column. A
+  quieter cell is `.text-muted-foreground`, never an opacity.
+
+| class | on | does |
+| --- | --- | --- |
+| `.num` | `th` / `td`, any table | right-aligned on the last digit, in tabular figures, so a column of counts reads as a column |
+| `.actions` | `td`, any table | one row action per line, each only as wide as itself |
+| `.pick` | `th` / `td` in `table.dense` | the row's selection checkbox, in a narrow centred column |
+
+**Every action of a row goes in ONE `td.actions`** (Daniel, 2026-09-12: *"always one link in one
+line (all tables)"*). Actions sharing a line wrap wherever the cell runs out and strand an arrow on
+the next line; actions in separate columns cannot be stacked by any stylesheet, because separate
+cells are side by side by construction.
+
+**The pick cell is the target, not the box.** A table's checkbox has no `.check` label to grow
+through, and growing the box itself would put a 44px square in every row. So under a coarse pointer
+the CELL becomes 44px and the box stays 14px, and `initPickCells()` (`runtime/pick.js`, once per
+page, delegated, so rows rendered later need nothing) turns a press anywhere in the cell into a
+click on its checkbox. It goes through the box's own activation: `input` and `change` fire exactly
+as for a direct press, a disabled box stays as it is, and a press on the box itself is left alone,
+or it would toggle twice. The keyboard is unchanged — the checkbox is the one focusable thing in the
+cell. A framework app wires the same press on the cell: call the checkbox's `click()` unless the
+event came from a control inside the cell. Name each box after its row (`aria-label="select poi/vu3
+!3302"`); the header's box names the set.
+
+**Row states** are attributes, never classes:
+
+- **`tr[data-pin]`** — waiting on a decision, sorted to the top by the page. A 5% `--warning` tint
+  AND a 3px `--warning` bar down the left edge, because a tint is the first thing a monochrome
+  rendering loses. 5%, not cockpit's 12%: every text of the row sits on the tint, and at 6% the
+  `when` stamp (`--muted-foreground`) measured 4.47 on warm's `--card`; at 5% it is 4.53 and a
+  `--warning` tag 4.59 or better on every theme and surface. Under forced colours the bar becomes a
+  `CanvasText` border, and in print a real one.
+- **`tr[aria-disabled="true"]`** — a row that cannot be acted on. Its text is `--muted-foreground`
+  except the first cell, which keeps its ink so the reader still sees WHICH row is off. Never
+  opacity: cockpit's .72 dimmed the row under AA on warm and made it look broken rather than off.
+- **`table.dense.dense--form`** — rows of controls, such as an agent roster with a model select per
+  row: the cells centre on the controls, and under a coarse pointer each row is 44px.
+
+**`.stackable` — the same table on a phone.** Below 40rem each row is a `--card` card and each cell
+a `label value` line, the label taken from the cell's **`data-label`**. Cockpit's `kv--stack` made
+the card but dropped the column names, so a stacked row was a column of values with nothing saying
+which was which. Give every cell a `data-label` except the pick cell. An empty cell is dropped
+rather than printed as "findings —"; the actions stay one per line down the value edge; a pinned row
+is one card carrying the tint and the bar. A row the pager or a filter has hidden stays hidden: an
+author `display` beats the browser's `[hidden]`, and `tokens.css` answers that once for every
+element — do not add a guard of your own.
+
+**The header row is not shown on a phone**, and everything in it goes with it. A stackable table with
+a select-all checkbox carries that control OUTSIDE the table — beside its count or its bulk actions —
+so a phone can still select every row.
+
+**On a card or in a dialog**, set `--tablewrap-fade: var(--card)` on the container: the scroll fade
+and the sticky header then paint the card rather than the page.
+
+## Pairs: `table.kv` and `dl.kv` (0.60.0)
+
+```html
+<table class="kv"><tbody>
+  <tr><th scope="row">host</th><td>ddstudio</td></tr>
+  <tr><th scope="row">docker context</th><td>ssh://daniel@ddstudio.mellori-ide.ts.net</td></tr>
+</tbody></table>
+
+<dl class="kv">
+  <dt><span class="ico" data-icon="mail" aria-hidden="true"></span>email</dt>
+  <dd>hello@example.org</dd>
+</dl>
+```
+
+A table of pairs and a list of pairs look the same, so choose by meaning: `table.kv` for a record's
+fields (a screen reader announces each value with its row header), `dl.kv` for a short run of
+definitions such as contact details.
+
+- **The label is `--primary` 700; the VALUE is `--foreground`** — the text the reader came for.
+  danieldeusing.de and seedr's studio muted the value, which made the one thing on the line that
+  mattered the quietest thing on it. Cockpit, danieldeusing.de and studio already agreed on the
+  label.
+- **A long value breaks anywhere** — a URL or a path is a payload, and truncating it would lie.
+  The label never wraps, except on a phone, where a nowrap label pushes the value off the screen.
+- **The label column is `--field-label-w`**, the system's one label width, so a block of pairs lines
+  up with a `.field-row` form beside it; the 140px, 220px and 9rem chosen per page go. `dl.kv` always
+  has the column; `table.kv` takes it with `.kv--labels`, widened on the table itself by the page's
+  stylesheet (`.settings-kv { --field-label-w: 15rem }`, never a style attribute, which a
+  `style-src 'self'` page drops), the label's end padding included.
+- Below 40rem `dl.kv` is one column. `table.kv` restates the base cell box, so it renders the same on
+  a surface that loads `tokens.css` + `data.css` only. A `dt` may lead with a glyph from the icon set.
 
 ## A `<select>` is enhanced automatically (0.21.0) — write plain HTML, add nothing
 

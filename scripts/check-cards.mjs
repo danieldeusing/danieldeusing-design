@@ -1138,7 +1138,11 @@ await check(`\`hidden\` hides every element this file styles, whatever display i
 // Captured in the viewport (the element scrolled into view first), never with
 // captureBeyondViewport: that re-lays the page without its scrollbar and a clip measured before it
 // lands up to ~7.5px off.
+// Two animation frames before EVERY capture (RULES-CROSSCUT X1): a capture taken as soon as a theme,
+// a palette, a hidden mark or a focus changed can read the frame before that paint landed. Under
+// load a strict full run once read the current console line black on black.
 const clipInk = async (b) => {
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: b.x, y: b.y, width: b.w, height: b.h, scale: 3 } });
   return W(`W.ink(${JSON.stringify(data)})`);
 };
@@ -1155,9 +1159,10 @@ const inkOf = async (sel, { lead = false, inset = 0, hide = "" } = {}) => {
   await setHide("");
   return { ...ink, blank: blank.strongest };
 };
-// The estate's form: with the mark hidden, no pixel of the clip may stand out from the rest by more
-// than 1.1:1. A count of stray pixels let a clip that grazed a neighbour pass.
-const owns = (ink) => ink.blank <= 1.1;
+// The estate's form: with the mark hidden, no pixel of the clip may stand out from the rest by
+// 1.25:1 or more. Below that is compositor noise (about 1.1:1 under load), not ink; a mark's own ink
+// stands out by 3:1 or more, so a clip that grazed a neighbour still fails.
+const owns = (ink) => ink.blank < 1.25;
 // [what, selector, how to clip it and what to hide to take its mark away]
 const CHEVRON = { lead: true, hide: "::before" }, LINE = { inset: 2, hide: "::before" };
 const FORCED_GLYPHS = [
@@ -1233,7 +1238,7 @@ const forcedCell = async (label, theme, palette) => {
       if (was === "") el.removeAttribute("tabindex"); else el.setAttribute("tabindex", was); })(); null`);
     rings.push(...landed.map((l) => `${what}: ${l}`));
     if (!(on.n >= 30 && on.strongest >= 3)) rings.push(`${what}: its ring reaches ${on.strongest.toFixed(2)}:1 (${on.mark} on ${on.bg}), ${on.n} px`);
-    if (off.strongest > 1.1) rings.push(`${what}: the strip holds a ${off.strongest.toFixed(2)}:1 pair unfocused — it reads something else`);
+    if (off.strongest >= 1.25) rings.push(`${what}: the strip holds a ${off.strongest.toFixed(2)}:1 pair unfocused — it reads something else`);
   }
   await check(`${where}: a focused row draws its ring at 3:1 on its own fill, chosen rows included (${FORCED_RINGS.length}, from pixels)`, () => rings);
   await check(`${where}: every clip holds its element's ink — hidden, the mark takes its ink with it (${FORCED_GLYPHS.length + 2 * FORCED_STATES.length + 1} clips)`, () => foreign);

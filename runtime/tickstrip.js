@@ -57,6 +57,7 @@ import { formatAgo, formatDuration, parseInstant } from "./time.js";
 
 const COLUMNS = ["state", "poller", "last run", "next run", "figures"];
 
+const written = new WeakMap(); // figures cell -> the markup last written into it
 const esc = (value) =>
   String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -101,7 +102,12 @@ function patchRow(row, item, view) {
   setText(name, String(item.label ?? ""));
   setText(last, view.last);
   setText(next, view.next);
-  if (stats.innerHTML !== view.stats) stats.innerHTML = view.stats;
+  // Compared with what was last WRITTEN, not read back: esc() writes &#39; and innerHTML serialises it
+  // as a bare apostrophe, so a read-back comparison rebuilt the figures on every 1 s tick.
+  if (written.get(stats) !== view.stats) {
+    stats.innerHTML = view.stats;
+    written.set(stats, view.stats);
+  }
 }
 
 /**

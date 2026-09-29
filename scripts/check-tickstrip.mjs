@@ -150,6 +150,13 @@ await check("the 1 s clock re-renders from memory: the row now reads stale, its 
 await check("...by PATCHING: the same table, the same row and the same cells — a tip open over the row survives",
   () => evaluate(`document.querySelector("#tickers table") === keep.table && row("ok") === keep.row && Array.from(row("ok").cells).every((c, i) => c === keep.cells[i])`));
 await check("...and a hint that went away takes its data-tip with it", () => evaluate(`!row("ok").hasAttribute("data-tip")`));
+// esc() writes an apostrophe as &#39; and innerHTML reads it back as a bare apostrophe, so comparing the
+// two serialisations said "changed" on every tick and rebuilt the figures once a second.
+await evaluate(`window.__ddTicks.push({ mount: "tickers", key: "ok", order: 1, label: "ok poller", lastAt: ago(200), intervalMs: 60000,
+  stats: [[2, "reviewer's \\"queue\\""]] }); window.fire(1000); window.keep.fig = row("ok").cells[4].firstChild; window.fire(1000); window.fire(1000); null`);
+await check("figures with an apostrophe or a quote are written once, not rebuilt on every 1 s tick",
+  () => evaluate(`row("ok").cells[4].firstChild === keep.fig && row("ok").cells[4].textContent === "2 reviewer's \\"queue\\""`),
+  () => evaluate(`row("ok").cells[4].innerHTML`));
 await evaluate(`window.keep.due = row("due"); window.__ddTicks.push({ mount: "tickers", key: "fresh", order: 1.5, label: "added later", lastAt: ago(2), intervalMs: 60000 });
   window.__ddTickRender(); null`);
 await check("a key added later is inserted in its `order` position, and the rows already there are untouched",

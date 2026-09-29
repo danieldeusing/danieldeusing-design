@@ -579,8 +579,11 @@ try {
       await centre("row-app");
       await evaluate(`${T("row-app")}.focus(); null`);
       await key("F10", { shift: true });
-      const boxes = await evaluate(`(() => { const m = __o.menu(); return { stated: __o.textBox(m.querySelector('[aria-disabled="true"]')),
-        plain: __o.textBox(m.querySelectorAll(".dropdown-item")[1]), lit: __o.textBox(document.activeElement) }; })()`);
+      // statedEdge: a strip down the row's left edge, inside it — where the inset focus ring is drawn
+      // and nothing else is (the row's text and its ✓ column start .5rem in).
+      const boxes = await evaluate(`(() => { const m = __o.menu(), s = m.querySelector('[aria-disabled="true"]'), r = s.getBoundingClientRect();
+        return { stated: __o.textBox(s), statedEdge: { x: r.left, y: r.top + 4, w: 3, h: r.height - 8 },
+          plain: __o.textBox(m.querySelectorAll(".dropdown-item")[1]), lit: __o.textBox(document.activeElement) }; })()`);
       await sleep(40);
       const menuShot = await screenshot();
       record("a context-menu row under the keys (text on its highlight)", 4.5, cell, inkIn(menuShot, boxes.lit));
@@ -588,7 +591,9 @@ try {
       record("an action row at rest (text) — the stated row's pair", 4.5, cell, inkIn(menuShot, boxes.plain));
       await whileForced('.context-menu [aria-disabled="true"]', ["focus-visible"], async () => {
         await sleep(40);
-        record("the stated row under the keys (text)", 4.5, cell, inkIn(await screenshot(), boxes.stated));
+        const shot = await screenshot();
+        record("the stated row under the keys (text)", 4.5, cell, inkIn(shot, boxes.stated));
+        record("the stated row under the keys: its focus ring", 3, cell, inkIn(shot, boxes.statedEdge));
       });
       await key("Escape");
     }

@@ -363,7 +363,8 @@ document.addEventListener("pointerdown", (e) => {            // a press outside
 - **A row that states something is `aria-disabled`, not `disabled`, and it wraps.** configr's menus
   say why a section is empty or an action unavailable in a sentence; the row stays in the arrow-key
   walk so a screen reader hears it, does nothing when activated, and wraps instead of truncating the
-  half that explains. It is `--muted-foreground` (4.84:1 at worst), meant to be read.
+  half that explains. It is `--muted-foreground` (4.84:1 at worst), meant to be read, and `GrayText`
+  under forced colours.
 - A danger row is `.dropdown-item--danger`; a section heading is `.dropdown-label`; a rule is
   `.dropdown-sep` with `role="separator"`.
 - Shift+F10 and the Menu key make it reachable from the keyboard. An action a reader needs often
@@ -465,10 +466,10 @@ what this replaces).
   scroll under it, Escape closes it and focus goes back to the opener.
 - **Inside:** the wheel zooms about the pointer, a drag pans, `+` `-` `0` and the bar's buttons do
   the same, and a click on the empty stage closes it — a click, not the end of a pan.
-- **The hint is always drawn** — the portal is read from a phone, where nothing can be revealed on
-  hover — as the `maximize-2` mask at `--icon-sm`, in `--muted-foreground` at full strength and
-  `--primary` under the pointer and the keyboard. It is the only visual sign that the figure is a
-  control, so it is held to a control graphic's 3:1 (4.67:1 at worst).
+- **The opener is `components.css`'s, the view is this file's.** The opener's class is
+  `.dgm-zoomable`, and its always-drawn corner hint (the `maximize-2` glyph) and its focus ring are
+  specified with it in `components.md`: it sits in the page's content. `overlays.css` draws only
+  what floats — the `<dialog class="dgm-overlay">`, its bar and its stage.
 - The artwork is cloned into the view, never moved: mermaid re-runs against the nodes it rendered,
   and a moved diagram silently stops updating. A canvas is copied with its picture.
 
@@ -487,6 +488,15 @@ what this replaces).
   `controls.css` (`.btn-icon`, `.form-actions`), the zoom bar's buttons are `.btn-terminal`
   (`components.css`), and the context menu's rows are the popup look in `components.css`; a
   tokens-only app reproduces that look on its own classes until it loads the component CSS.
-- **Forced colours** (Windows high contrast) repaint every background in `Canvas`, and a mask glyph
-  is a background: the zoom hint opts out and draws in `CanvasText`, with `Highlight` for hover and
-  focus. The dialog, the tip and the menu are text and borders, which the forcing keeps.
+- **Forced colours** (Windows high contrast) paint every background `Canvas` and lay a `Canvas`
+  backplate behind text. The dialog, the tip and the menu are text and borders, which survive. The
+  glyphs they show are drawn by the files that own them — the X and the back arrow by
+  `controls.css`, the alert glyph by `icons.css` — and a glyph shows only while nothing hands it an
+  author colour. So **the X's ink is `--btn-icon-color`, never `color`**: a `color` on `.dialog-close`
+  outranked the icon button's forced system colour and its opted-out glyph painted the theme's ink,
+  1.27–1.78:1 in four of the eight theme × palette cells. The one row this file colours, the stated
+  context-menu row, is `GrayText` there; without it the row read like an action and, under the keys,
+  painted the theme's muted ink at 3.00–3.52:1. Its focus ring is `Highlight`: the popup row's ring
+  is `HighlightText`, drawn for a `Highlight` fill, and a disabled row has no fill — `HighlightText`
+  is the `Canvas` colour on both palettes, so the keys vanished on it (1:1). `scripts/check-overlays.mjs`
+  reads all of these back as painted pixels, on a light and a dark forced palette.

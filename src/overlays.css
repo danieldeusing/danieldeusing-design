@@ -146,7 +146,8 @@ dialog.dialog--fit { inline-size: max-content; max-inline-size: 90vw; }
    THE CUSTOM PROPERTY, NEVER `color`. Under forced colours controls.css hands the icon button a
    system colour and its glyph paints that. A `color` here — as deep as controls.css's forced rule
    and later in the bundle — would win over it, and the glyph, opted out of forcing so that it shows
-   at all, would paint this author ink on the forced Canvas instead. */
+   at all, would paint this author ink on the forced Canvas instead: measured in painted pixels,
+   1.27-1.78:1 in four of the eight theme x palette cells. */
 .dialog-close,
 .dialog-back {
   --btn-icon-color: var(--foreground);
@@ -278,12 +279,21 @@ dialog.dialog.dialog--drawer {
    outranks components.css's rows by a class. There a forced palette draws a disabled row in GrayText,
    and a HIGHLIGHTED row opts out of forcing altogether (`forced-color-adjust: none`, so the Canvas
    backplate cannot swallow its text). So without this rule the stated row read exactly like an
-   action at rest, and under the arrow keys — opted out, holding the author ink — it painted the
-   theme's muted colour on the forced Canvas. GrayText is what a forced palette says "not available"
-   with, and a system colour stays what it is whether the row is forced or opted out. */
+   action at rest (the same ink in all eight theme x palette cells), and under the arrow keys —
+   opted out, holding the author ink — it painted the theme's muted colour on the forced Canvas,
+   3.00-3.52:1 in four of them. GrayText is what a forced palette says "not available" with, and a
+   system colour stays what it is whether the row is forced or opted out.
+   ITS FOCUS RING, TOO. The keys walk onto this row (it is focusable so a screen reader hears it),
+   and components.css inks a highlighted row's inset ring HighlightText — right on a Highlight fill,
+   but a disabled row loses the fill, and HighlightText IS the Canvas colour on both forced palettes:
+   the ring measured 1:1 in all eight cells, so the reader could not see where the keys were.
+   Highlight is the system's own mark for "here", and it stands 8.7:1 or more off Canvas. */
 @media (forced-colors: active) {
   .context-menu .dropdown-item[aria-disabled="true"] {
     color: GrayText;
+  }
+  .context-menu .dropdown-item[aria-disabled="true"]:focus-visible {
+    outline-color: Highlight;
   }
 }
 

@@ -339,6 +339,12 @@ check("`hidden` beats a table row a narrow-screen rule restacks as display: bloc
   (await cs("hid-row", "display")) === "none", await cs("hid-row", "display"));
 check('`hidden="until-found"` is NOT forced to display: none — find-in-page must be able to reveal it',
   (await cs("hid-until", "display")) !== "none", await cs("hid-until", "display"));
+// And on paper: the rule is not scoped to a medium, so a print-only reveal of a `hidden` element
+// cannot work (cockpit's `.case-details[hidden]` did). Something to reveal in print carries a class.
+await send("Emulation.setEmulatedMedia", { media: "print" });
+check("`hidden` hides on paper as well: the rule is not scoped to the screen",
+  (await cs("hid-class", "display")) === "none", await cs("hid-class", "display"));
+await send("Emulation.setEmulatedMedia", { media: "" });
 
 /* ── F6 · motion ──────────────────────────────────────────────────────────── */
 
@@ -450,7 +456,10 @@ const pixelsOf = async (selector, pad = 3) => {
     clip: { x: box.x - pad, y: box.y - pad, width: box.w + 2 * pad, height: box.h + 2 * pad, scale: 1 } });
   return evaluate(`M.pixels(${JSON.stringify(data)}, ${pad})`);
 };
-const FORCED_GLYPHS = [["the --icon-size glyph", "#ico-md"], ["an icon-list glyph", "#icon-list .demo-ico"], ["the spinner", "#spin"]];
+// One glyph of each kind the recipe draws: plain, listed, coloured by its PARENT (the icon list's
+// second column — the lead's ruling: colour the parent, never the glyph) and spinning.
+const FORCED_GLYPHS = [["the --icon-size glyph", "#ico-md"], ["an icon-list glyph", "#icon-list .demo-ico"],
+  ["a glyph coloured by its parent", "#icon-list li:first-child > :nth-child(2)"], ["the spinner", "#spin"]];
 for (const theme of ["warm", "green", "mono", "paper"]) for (const palette of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { media: "", features: [
     { name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: palette }] });
@@ -461,18 +470,18 @@ for (const theme of ["warm", "green", "mono", "paper"]) for (const palette of ["
   const where = `forced colours, ${theme}, ${palette} palette`;
   check(`${where}: precondition — the mode is on`, forced);
   const mark = await pixelsOf("#el-mark");
-  check(`${where}: <mark> paints the palette's own Mark (rgb ${markColour}) over ${Math.round(100 * mark.share)}% of its box, its text ${r2(mark.onFill)}:1 on it`,
+  check(`${where}: <mark> paints the palette's own Mark over at least half its box, with its text at 4.5:1 or better on it`,
     String(mark.fill) === String(markColour) && mark.share >= 0.5 && mark.onFill >= 4.5,
-    `painted rgb(${mark.fill}) over ${Math.round(100 * mark.share)}%, text ${r2(mark.onFill)}:1`);
+    `measured: rgb(${mark.fill}) over ${Math.round(100 * mark.share)}% (Mark is rgb(${markColour})), text ${r2(mark.onFill)}:1`);
   const glyphs = [];
   for (const [name, selector] of FORCED_GLYPHS) glyphs.push([name, await pixelsOf(selector)]);
   const faint = glyphs.filter(([, g]) => !(g.ink > 20 && g.strongest >= 3));
-  check(`${where}: every glyph the recipe draws paints at 3:1 or better on what it sits on (${glyphs.map(([, g]) => r2(g.strongest)).join(", ")})`,
-    faint.length === 0, faint.map(([name, g]) => `${name}: ${g.ink}px, ${r2(g.strongest)}:1 on rgb(${g.back})`).join("; "));
+  check(`${where}: each kind of recipe glyph (plain, listed, coloured by its parent, spinning) paints at 3:1 or better on what it sits on`,
+    faint.length === 0, `measured: ${faint.map(([name, g]) => `${name} ${g.ink} inked px, at best ${r2(g.strongest)}:1 on rgb(${g.back})`).join("; ")}`);
   const edges = [["inline <code>", "#el-code"], ["the <pre> block", "#el-pre"]];
   const lost = [];
   for (const [name, selector] of edges) { const e = await pixelsOf(selector); if (e.edge < 0.9) lost.push(`${name}: top edge ${Math.round(100 * e.edge)}% at 3:1`); }
-  check(`${where}: inline code and the code block keep a painted 3:1 edge where their fill is gone`, lost.length === 0, lost.join("; "));
+  check(`${where}: inline code and the code block keep a painted 3:1 edge where their fill is gone`, lost.length === 0, `measured: ${lost.join("; ")}`);
 }
 await send("Emulation.setEmulatedMedia", { media: "", features: [] });
 await evaluate('M.theme("warm"); null');

@@ -196,7 +196,7 @@ did not change):
 What a consumer sees move, measured by the WP1 review (2026-09-29): pagr's own Tailwind 4.3.0
 rebuilt its CSS against 0.59.0 and against this entry, and 14 pages were compared at 1280 and 375px
 (warm theme, a Tab walk, state probes). It includes the element defaults below. What each site does
-about each row is the 0.60.0 migration map's (`MIGRATION.md`); this is only what moves.
+about each row is the 0.60.0 migration map's (`docs/migrations/0.60.0.md`); this is only what moves.
 
 | # | danieldeusing.de (pagr) | where | kind |
 |---|---|---|---|
@@ -302,6 +302,10 @@ Rules for a Tailwind author:
   !important }` answers it once, for every element, on every surface that loads `tokens.css`.
 - `hidden="until-found"` is left alone: find-in-page must be able to reveal it.
 - To show an element, remove the attribute. Never add a `[hidden]` guard of your own.
+- **It hides on paper too.** The rule is not scoped to the screen, so a print-only reveal like
+  `@media print { .details[hidden] { display: block } }` no longer shows anything. Something to
+  reveal only in print carries a class, not `hidden`, or its reveal is `!important` at a higher
+  specificity, as `data.css`'s print rule for tab panels is.
 
 ## `data-tone`: one attribute colours every state (0.60.0)
 
@@ -332,7 +336,11 @@ configr's tone prop, seedr's per-component switch).
 `.text-foreground` `.text-muted-foreground` `.text-primary` `.text-success` `.text-warning`
 `.text-destructive` `.text-info` `.text-pending` — one declaration each, `color: var(--token)`.
 
-- The names are Tailwind's own, so the same markup works in a build-free page and a Tailwind app.
+- The names are Tailwind's own, so the same markup works in a build-free page and a Tailwind app
+  — at equal specificity. Against a component rule of HIGHER specificity
+  (`.dropdown > summary.text-primary`, `header.bar .brand.text-primary`) the two differ: the bundle
+  keeps the component's colour, a Tailwind app applies the utility (its layer beats components).
+  Where the colour must hold in both, colour a wrapper, or write the component's own variant.
 - **They ship in `utilities.css`, which the bundle imports after every component file** (only
   `print.css` follows). A utility is written on a component — `.doc-link.text-primary`,
   `.btn-terminal--ghost.text-destructive` — and at equal specificity the later rule wins, so the
@@ -391,7 +399,7 @@ whole recipe, its forced-colours half included:
   mask: var(--ico-check) center / contain no-repeat;
 }
 @media (forced-colors: active) {
-  .glyph { forced-color-adjust: preserve-parent-color; color: inherit; }
+  .glyph { forced-color-adjust: preserve-parent-color; }
   @supports not (forced-color-adjust: preserve-parent-color) {
     .glyph { forced-color-adjust: none; background: CanvasText; }
   }
@@ -424,10 +432,16 @@ pencil were masks before any of this existed. The class and `data-icon` layer th
 - **The forced-colours half is not optional.** Windows High Contrast swaps every author
   background for Canvas, and a mask glyph IS a background: without it all 21 glyphs paint nothing.
   `preserve-parent-color` paints the glyph in the colour its parent was forced to (CanvasText in
-  text, LinkText in a link, ButtonText in a button), so the glyph declares no colour of its own
-  there. Not `forced-color-adjust: none` alone: the glyph keeps its author colour, measured at
-  1.11–1.78:1 against the forced palette, or nothing at all. CanvasText is the fallback for an
-  engine without the value.
+  text, LinkText in a link, ButtonText in a button). Not `forced-color-adjust: none` alone: the
+  glyph keeps its author colour, measured at 1.11–1.78:1 against the forced palette, or nothing at
+  all. CanvasText is the fallback for an engine without the value.
+- **Colour the parent, never the glyph.** `preserve-parent-color` takes over only while the glyph
+  has no colour of its own. A class or an inline style on the glyph itself —
+  `<span class="glyph text-primary">` — makes it act like `none`: measured at 2.94:1 on a dark
+  palette and at nothing on three other theme × palette pairs. Write
+  `<span class="text-primary"><span class="glyph"></span></span>`, or put the glyph inside the
+  link, button or toned element whose colour it should wear. Nothing on the glyph enforces this: a
+  `color: inherit` there would lose to any more specific colour, and there is no `!important` guard.
 - **The glyph is decoration.** An icon-only control is named by its `aria-label`, which names the
   target ("remove shot-1.png"), not the glyph.
 - **Adding one:** one declaration in the icon block of `tokens.css`, generated from lucide rather

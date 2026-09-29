@@ -567,7 +567,7 @@ html.anim-off .cursor-block {
  *       mask: var(--ico-check) center / contain no-repeat;
  *     }
  *     @media (forced-colors: active) {
- *       .glyph { forced-color-adjust: preserve-parent-color; color: inherit; }
+ *       .glyph { forced-color-adjust: preserve-parent-color; }
  *       @supports not (forced-color-adjust: preserve-parent-color) {
  *         .glyph { forced-color-adjust: none; background: CanvasText; }
  *       }
@@ -576,10 +576,16 @@ html.anim-off .cursor-block {
  * The second half is not optional. Forced colours (Windows High Contrast) swap every author
  * background for Canvas, and a mask glyph IS a background: without it all 21 glyphs paint nothing.
  * `preserve-parent-color` paints the glyph in the colour its parent was forced to — CanvasText in
- * text, LinkText in a link, ButtonText in a button — which is why the glyph must not keep a colour
- * of its own there (`color: inherit`). NOT `forced-color-adjust: none` alone: the glyph then keeps
- * its AUTHOR colour, measured at 1.11-1.78:1 against the forced palette, or nothing at all.
- * CanvasText is the fallback for an engine without the value.
+ * text, LinkText in a link, ButtonText in a button. NOT `forced-color-adjust: none` alone: the
+ * glyph then keeps its AUTHOR colour, measured at 1.11-1.78:1 against the forced palette, or
+ * nothing at all. CanvasText is the fallback for an engine without the value.
+ *
+ * COLOUR THE PARENT, NEVER THE GLYPH. `preserve-parent-color` takes over only while the glyph has
+ * no colour of its own: a class or an inline style that colours the glyph itself makes it act like
+ * `none`, and the glyph keeps that colour — measured at 2.94:1 on a dark palette and at nothing on
+ * three other theme × palette pairs. Put the colour (a `.text-*`, a tone, a link) on the element
+ * around the glyph. Nothing on the glyph enforces this, by ruling: a `color: inherit` there would
+ * lose to any more specific colour, and the system adds no `!important` guard for it.
  *
  * A mask keeps only the shape and paints it in currentColor, so one token is right on all four
  * themes and in every state colour with no fill declared per theme — the reason the bin and the

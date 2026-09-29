@@ -102,10 +102,12 @@
       .demo-popup { max-inline-size: 16rem; padding: 0.25rem 0; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--control-edge); box-shadow: var(--elev-float); }
       .demo-popup p { padding: 0.3rem 0.75rem; }
       .demo-popup p:first-child { background: var(--muted); }
-      .demo-spin { background: currentColor; mask: var(--ico-loader-circle) center / contain no-repeat; inline-size: var(--icon-lg); block-size: var(--icon-lg); animation: dd-spin 1s linear infinite; color: var(--primary); }
+      .demo-spin { background: currentColor; mask: var(--ico-loader-circle) center / contain no-repeat; inline-size: var(--icon-lg); block-size: var(--icon-lg); animation: dd-spin 1s linear infinite; }
+      /* Colour the PARENT, never the glyph: a glyph coloured directly keeps that colour in forced colours. */
+      .demo-tinted { display: inline-flex; color: var(--primary); }
       /* The recipe's forced-colours half (tokens.css, ICON MASKS): without it every glyph paints Canvas. */
       @media (forced-colors: active) {
-        .demo-ico, .demo-spin { forced-color-adjust: preserve-parent-color; color: inherit; }
+        .demo-ico, .demo-spin { forced-color-adjust: preserve-parent-color; }
         @supports not (forced-color-adjust: preserve-parent-color) {
           .demo-ico, .demo-spin { forced-color-adjust: none; background: CanvasText; }
         }
@@ -286,7 +288,7 @@
         <p class="demo-lede">dd-spin and dd-pulse, a .15s transition and the block cursor. "motion off" sets html.anim-off, which
           stops keyframes AND transitions and hides the cursor.</p>
         <div class="demo-row">
-          <span class="demo-spin" id="spin" role="img" aria-label="spinning"></span>
+          <span class="demo-tinted"><span class="demo-spin" id="spin" role="img" aria-label="spinning"></span></span>
           <span><span class="demo-dot demo-pulse" id="pulse"></span> live</span>
           <span class="demo-fade" id="fade">hover fades .15s</span>
           <span>wordmark<span class="cursor-block demo-cursor" id="cursor"></span></span>
@@ -333,7 +335,7 @@
       <section id="icons">
         <h2>Icon masks</h2>
         <p class="demo-lede">Every --ico-* token, drawn as a mask in currentColor at --icon-size. The second glyph is the same token in
-          --primary, the third at --icon-xl.</p>
+          --primary, set on its parent, the third at --icon-xl.</p>
         <ul class="demo-icons" id="icon-list"></ul>
       </section>
     </main>
@@ -348,7 +350,7 @@
 
       document.getElementById("icon-list").innerHTML = ICONS.map((n) =>
         `<li><span class="demo-ico" style="--i: var(--ico-${n})"></span>` +
-        `<span class="demo-ico" style="--i: var(--ico-${n}); color: var(--primary)"></span>` +
+        `<span class="demo-tinted"><span class="demo-ico" style="--i: var(--ico-${n})"></span></span>` +
         `<span class="demo-ico" data-size="xl" style="--i: var(--ico-${n})"></span><code>--ico-${n}</code></li>`).join("");
       document.getElementById("cats").innerHTML = CATS.map((n) =>
         `<div class="demo-swatch" id="cat-${n}" style="--c: var(--cat-${n})">` +

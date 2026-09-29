@@ -28,12 +28,25 @@
       })();
     </script>
 
+    <!-- reset.css first, as index.css imports it: every page on the bundle has it. -->
+    <link rel="stylesheet" href="../src/reset.css" data-bare-off />
     <link rel="stylesheet" href="../src/tokens.css" />
-    <link rel="stylesheet" href="../src/base.css" />
+    <link rel="stylesheet" href="../src/base.css" data-bare-off />
     <!-- components.css for what the chrome HOLDS (the dropdown menus, .dd-dot, .anim-toggle, the
          card, .prompt); nothing in chrome.css reads it. -->
-    <link rel="stylesheet" href="../src/components.css" />
+    <link rel="stylesheet" href="../src/components.css" data-bare-off />
     <link rel="stylesheet" href="../src/chrome.css" />
+    <!-- print.css last, as index.css imports it: the toolbar, the stack and the body's clearance
+         have print rules there. -->
+    <link rel="stylesheet" href="../src/print.css" data-bare-off />
+    <!-- ?bare: tokens.css + chrome.css and nothing else — the surface netmon is. base.css draws a
+         global :focus-visible ring, so a focus check that passes WITH it proves nothing about
+         chrome.css's own rules (RULES-CROSSCUT X2). -->
+    <script>
+      if (new URLSearchParams(location.search).has("bare")) {
+        for (const link of document.querySelectorAll("link[data-bare-off]")) link.disabled = true;
+      }
+    </script>
 
     <!--
       ═══ STAND-INS — DELETE THIS WHOLE BLOCK AT INTEGRATION (WP13) ═══════════════════════════════
@@ -42,7 +55,9 @@
         · WP1 (tokens.css): --control-h, --status-h, --dot-size, --icon-*, the phone --content-pad,
           [data-tone] -> --tone (F1, F7)
         · WP4 (icons): the three --ico-* masks the header uses, [data-icon] -> --ico (I1)
-        · WP5 (controls.css): .btn-icon, .btn-icon--bare (C2)       · WP7 (feedback.css): .dot (S8)
+        · WP5 (controls.css): .btn-icon, .btn-icon--bare (C2)
+        · WP7 (feedback.css): .dot (S8), .banner (S4)
+        · WP1 (tokens.css): `[hidden]` hides whatever display a class sets (RULES-CROSSCUT X3)
         · WP2 (components.css + theme.js): M0's ✓ column on a chosen theme row, and theme.js
           marking theme rows menuitemradio/aria-checked in a menu, aria-pressed elsewhere (N5)
       Everything is wrapped in :where(), so the day the real declarations arrive they win on
@@ -67,6 +82,8 @@
       :where([data-tone="success"]) { --tone: var(--success); }
       :where([data-tone="pending"]) { --tone: var(--pending); }
       :where([data-tone="destructive"]) { --tone: var(--destructive); }
+      :where([data-tone="warning"]) { --tone: var(--warning); }
+      :where([hidden]:not([hidden="until-found"])) { display: none !important; }
       :where([data-icon="chevron-left"]) { --ico: var(--ico-chevron-left); }
       :where([data-icon="chevron-right"]) { --ico: var(--ico-chevron-right); }
       :where([data-icon="history"]) { --ico: var(--ico-history); }
@@ -85,6 +102,13 @@
       :where(.btn-icon--bare) { --btn-icon-color: var(--muted-foreground); border-color: transparent; }
       :where(.btn-icon--bare:not(:disabled):hover, .btn-icon--bare[aria-expanded="true"]) { --btn-icon-color: var(--primary); background: var(--muted); }
       :where(.btn-icon:disabled) { opacity: 0.45; cursor: default; }
+      :where(.banner) {
+        padding-block: 0.5rem; padding-inline: 1.25rem; line-height: var(--lh-base);
+        color: var(--tone, var(--destructive));
+        background: color-mix(in srgb, var(--tone, var(--destructive)) 6%, var(--background));
+        border-block-end: 1px solid var(--tone, var(--destructive));
+      }
+      :where(.banner > *) { margin: 0; }
       :where(.dot) {
         display: inline-block; flex: none; inline-size: var(--dot-size); block-size: var(--dot-size);
         border-radius: 50%; background: var(--tone, currentColor);
@@ -120,6 +144,11 @@
   <body>
     <a href="#top" class="skip-link">skip to content</a>
 
+    <!-- .bar-stack: the banner and the header stick as ONE layer, banner first. -->
+    <div class="bar-stack">
+    <div class="banner" data-tone="warning" id="demo-banner">
+      <p><b>control is frozen</b> — automation is paused until 18:00. <button type="button" class="doc-link doc-link--forward" id="banner-dismiss">dismiss</button></p>
+    </div>
     <header class="bar">
       <div class="bar-side">
         <a href="#top" class="brand"><span class="glow">danieldeusing</span><span class="cursor-block" aria-hidden="true"></span></a>
@@ -192,6 +221,7 @@
         </nav>
       </div>
     </header>
+    </div>
 
     <main class="wrap" id="top" style="padding-block: 1.1rem 2.5rem">
       <div class="page-toolbar">
@@ -443,11 +473,17 @@
       //   ?nolang     no language menu in the footer (seedr's footer: its controls fit one phone row)
       //   ?notoolbar  no page toolbar (--sticky-top is the header alone)
       //   ?burger     the burger open with both accordions open (the phone screenshot)
+      //   ?nobanner   no banner in the stack (the header alone)
+      //   ?bare       tokens.css + chrome.css only (see the <head>)
       const params = new URLSearchParams(location.search);
       if (params.has("norail")) document.querySelectorAll(".ls-nav, .ls-nav-head, [data-ls-nav-toggle]").forEach((el) => el.remove());
       if (params.has("nomf")) document.querySelector(".mobile-footer")?.remove();
       if (params.has("nolang")) document.querySelectorAll("[data-demo-lang]").forEach((el) => el.remove());
       if (params.has("notoolbar")) document.querySelector(".page-toolbar")?.remove();
+      if (params.has("nobanner")) document.getElementById("demo-banner")?.remove();
+      // Dismissing the banner shrinks the stack with no scroll and no resize: initLsNav() must
+      // notice on its own (a ResizeObserver) or the rail and the TOC stay parked under nothing.
+      document.getElementById("banner-dismiss")?.addEventListener("click", () => document.getElementById("demo-banner")?.remove());
 
       // STAND-IN for WP2's theme.js (N5): a theme row is a menuitemradio with aria-checked inside a
       // menu, a toggle button with aria-pressed anywhere else. Delete with the stand-in block.

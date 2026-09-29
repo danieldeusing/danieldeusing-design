@@ -376,11 +376,16 @@ function enhance(select) {
       // one — and keep what the reader had typed into its search, which a poll
       // landing mid-word would otherwise throw away.
       const query = instance.search ? instance.search.value : "";
+      const focused = instance.panel.contains(document.activeElement);
       close(instance, false);
       open(instance);
       if (query && instance.search) {
         instance.search.value = query;
         filterRows(instance);
+      } else if (focused && !instance.search) {
+        // The rebuilt list lost its search row (the options fell to twenty or fewer), so the box
+        // that held focus is gone. The trigger takes it back, and with it the highlight.
+        instance.trigger.focus();
       }
     }
   });
@@ -438,15 +443,7 @@ function buildPanel(instance) {
     input.setAttribute("autocomplete", "off");
     input.setAttribute("spellcheck", "false");
     input.setAttribute("data-1p-ignore", "");
-    // THE BOX IS THE LIST'S OWN MACHINERY, and its events are not the page's. Left to bubble, a
-    // page listening for `input`/`change` on the document would hear every keystroke of the query —
-    // and a `change` the browser fires as the edited box leaves focus when the list closes, carrying
-    // the query as if it were a value. The <select> announces the pick; nothing else should.
-    input.addEventListener("input", (event) => {
-      event.stopPropagation();
-      filterRows(instance);
-    });
-    input.addEventListener("change", (event) => event.stopPropagation());
+    // Its `input` and `change` are stopped, and the query filtered, in installGlobals().
     input.addEventListener("keydown", (event) => onSearchKeydown(instance, event));
     field.appendChild(input);
     row.appendChild(field);
@@ -849,6 +846,20 @@ function installGlobals() {
     if (openInstance.field.contains(event.target) || openInstance.panel.contains(event.target)) return;
     close(openInstance, false);
   });
+  // THE SEARCH BOX IS THE LIST'S OWN MACHINERY, and its events are not the page's: a page listening
+  // for `input`/`change` would hear every keystroke of the query, and the `change` the browser fires
+  // as the edited box blurs or leaves the page, carrying the query as if it were a value. The
+  // <select> announces the pick; nothing else should. Stopped on the WINDOW, in capture: stopped on
+  // the box, they still reached every capturing listener on the document. So the box's own filtering
+  // runs here too — once stopped, the event reaches no listener on the box.
+  // ponytail: a page's own window-capture listener registered before initSelects() still hears them.
+  for (const type of ["input", "change"]) {
+    addEventListener(type, (event) => {
+      if (!event.target.closest?.(".select-panel .select-search")) return;
+      event.stopPropagation();
+      if (type === "input" && openInstance && event.target === openInstance.search) filterRows(openInstance);
+    }, true);
+  }
   // The trigger moves when the page or a scroll container moves under it. Capture,
   // because most of these selects sit in a `.tablewrap` that scrolls on its own and
   // a scroll event there does not bubble. A list scrolling ITSELF moves nothing,

@@ -497,11 +497,6 @@ button.link-quiet:disabled { opacity: 0.45; cursor: default; color: var(--muted-
   color: var(--primary);
 }
 
-/* `.filter-ctl`, `.filter-set` and `.filter-set-label` (0.58.0-0.59.0) are gone in 0.60.0. A
-   filter is not a text toggle wearing `[x]`: a single choice is `<select data-filter>`, a boolean is
-   `.switch`, a multi-select is `.chip-set` of `button.chip[aria-pressed]`. See references/filters.md
-   and references/controls.md. */
-
 /* ─────────────────────────────────────────────────────────────────────────
    Settings-control icons — centralized so every consuming site shares ONE
    source. These were hardcoded per-site (a half-circle glyph, emoji flags),

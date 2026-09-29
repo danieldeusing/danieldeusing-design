@@ -430,6 +430,20 @@ await sleep(500);
 const away = await attach();
 await check("fix round 2 — wheeled back until its column is out of the wrapper, the panel is closed, and focus has not moved", async () =>
   away.left === 0 && !away.inWrap && !away.open && (await evaluate("document.activeElement === window.focusedBefore")), JSON.stringify(away));
+// G3: with keyboard focus on an item of the open panel, the same scroll-away close hands focus to the
+// panel's summary rather than stranding it in a closed <details>.
+await evaluate(`(() => { const w = document.querySelector("#scroll-wrap"); w.scrollLeft = w.scrollWidth; })(); null`);
+await sleep(200);
+await evaluate(`document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter > summary").click(); null`);
+await sleep(200);
+await evaluate(`document.querySelector("#scroll-wrap th[data-col=state] .dropdown-item").focus(); null`);
+const itemFocused = await evaluate(`document.activeElement.matches("#scroll-wrap .dropdown-item")`);
+await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: wheelAt[0], y: wheelAt[1], deltaX: -4000, deltaY: 0 });
+await sleep(500);
+const stranded = await evaluate(`JSON.stringify({ open: document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter").open,
+  focus: document.activeElement === document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter > summary") ? "summary" : document.activeElement.tagName })`);
+await check("fix round 3 — focus on a panel item when the reader wheels the column away: the panel closes and focus lands on its summary", () =>
+  itemFocused && stranded === JSON.stringify({ open: false, focus: "summary" }), stranded);
 await evaluate(`(() => { const wrap = document.querySelector("#scroll-wrap"); wrap.previousElementSibling.remove(); wrap.nextElementSibling?.matches("p.result-count") && wrap.nextElementSibling.remove(); wrap.remove(); })(); null`);
 await open("bare&theme=warm");
 const bare = JSON.parse(await snapshot());
@@ -533,6 +547,9 @@ const shoot = async (sel) => {
     // every px() below would read its neighbour's paint (the ownership proof found 2.5px on a tab).
     const x = Math.floor(q.left + scrollX - 6), y = Math.floor(q.top + scrollY - 6);
     return { x, y, width: Math.ceil(q.right + scrollX + 6) - x, height: Math.ceil(q.bottom + scrollY + 6) - y, scale: 1 }; })()`);
+  // Two animation frames first: a capture taken while the compositor is still settling the last change
+  // (a scroll, a hidden target) can read a stale frame — the race WP2 closed in check-components.
+  await evaluate("new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))))");
   const { data } = await send("Page.captureScreenshot", { format: "png", clip });
   await evaluate(`(async () => {
     const img = await createImageBitmap(await (await fetch("data:image/png;base64,${data}")).blob());
@@ -594,10 +611,16 @@ const owns = async (clip, target, kind) => {
     let n = 0, carried = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (let row = 0; row < A.h; row += 1) for (let col = 0; col < A.w; col += 1) {
       const i = (row * A.w + col) * 4;
-      // The two shots differ in nothing but the target, so ANY change is its paint — including the
-      // light palette's 80% Highlight over the tab row's black rule, which moves less than 1.2:1.
+      // For a mark or a word, a pixel is the target's paint only if the two shots differ by a real
+      // contrast step, 1.25:1 or more. Below that it is compositor noise: two pixels of a neighbouring
+      // edge re-rastered 122 to 114 grey (about 1.1:1) between the shots stretched the ink box 900px
+      // and failed a correct target, 3 runs in 41. A glyph's own ink moves at 3:1 or more, so a slid
+      // clip still shows. A FILL keeps every change: its box must match to the pixel, and the light
+      // palette's 80% Highlight over the tab row's black rule moves less than 1.2:1 — measured, a
+      // 1.25 floor cut both tabs' bottom edge off and failed them.
       if (Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2])) <= 2) continue;
       const q = M.ratio([A.d[i], A.d[i + 1], A.d[i + 2]], [B.d[i], B.d[i + 1], B.d[i + 2]]);
+      if (${JSON.stringify(kind)} !== "fill" && q < 1.25) continue;
       n += 1; carried = Math.max(carried, q);
       x0 = Math.min(x0, col); x1 = Math.max(x1, col + 1); y0 = Math.min(y0, row); y1 = Math.max(y1, row + 1);
     }
@@ -613,7 +636,7 @@ const owns = async (clip, target, kind) => {
     const fits = !!ink && (${JSON.stringify(kind)} === "fill"
       ? edges.every((e) => Math.abs(ink[e] - rect[e]) <= 1)
       : ink.left >= rect.left - 1 && ink.right <= rect.right + 1 && ink.top >= rect.top - 1 && ink.bottom <= rect.bottom + 1);
-    return { target: ${sel}, kind: ${JSON.stringify(kind)}, n, carried, ink, rect, ok: n >= 3 && carried >= 1.5 && fits };`);
+    return { target: ${JSON.stringify(target)}, kind: ${JSON.stringify(kind)}, n, carried, ink, rect, ok: n >= 3 && carried >= 1.5 && fits };`);
 };
 
 /* ── Q6 · a series is never told apart by colour alone ──────────────────────────────────────────

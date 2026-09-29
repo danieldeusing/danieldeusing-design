@@ -523,6 +523,78 @@ await check("fix round 2 — the page renames a table node and gives it other ro
   renamedByHand === JSON.stringify([["B", "b1 b2 b3 b4", ""]]), renamedByHand);
 await evaluate(`document.getElementById("later").replaceChildren(); null`);
 
+/* ── fix round 3 · G1: re-enhancing never loses the rows the old instance withheld ───────────────────
+   A filter DETACHES what it withholds. A table whose identity changes is enhanced again from its body —
+   which, under a search, held only what the old instance showed: an aria-label going from "runs (8)" to
+   "runs (9)" over a search for "L1" came back with one row and seven were gone. Both triggers here; the
+   rows must all be there, in the default view. */
+const rowsOf = (n) => Array.from({ length: n }, (_, i) => `<tr><td>L${i + 1}</td></tr>`).join("");
+const labelled = (attrs, n) => `<table data-table-tools ${attrs}><thead><tr><th data-col="v">v</th></tr></thead><tbody>${rowsOf(n)}</tbody></table>`;
+const ALL8 = "L1 L2 L3 L4 L5 L6 L7 L8";
+for (const [trigger, attrs, label, change] of [
+  ["aria-label", 'aria-label="runs (8)"', "runs (8)", 't.setAttribute("aria-label", "runs (9)")'],
+  ["data-table-id", 'data-table-id="g1-a" aria-label="g1"', "g1", 't.setAttribute("data-table-id", "g1-b")'],
+]) {
+  await evaluate(`localStorage.clear(); document.getElementById("later").innerHTML = ${JSON.stringify(labelled(attrs, 8))}; null`);
+  await sleep(100);
+  await searchIn(label, "L1");
+  await sleep(100);
+  const narrowed = await tablesNow();
+  await evaluate(`(() => { const t = document.querySelector("#later table"); ${change}; })(); null`);
+  await sleep(200);
+  const renewedRows = JSON.parse(await tablesNow());
+  await check(`fix round 3 — the ${trigger} changes under a search for "L1": re-enhanced, the table has all 8 rows back, in the default view`, async () =>
+    JSON.parse(narrowed)[0][1] === "L1" && renewedRows.length === 1 && renewedRows[0][1] === ALL8 && renewedRows[0][2] === "" &&
+      (await evaluate(`!document.querySelector("#later tr[data-table-placeholder]")`)), JSON.stringify({ narrowed, renewedRows }));
+}
+await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
+/* ── fix round 3 · G2: a header re-render keeps keyboard focus where it was ──────────────────────────
+   Removing a focused node drops focus to <body>; the engine puts the same node back, and must put the
+   focus back on it. The sort button, the badge, the filter summary and an item of an OPEN pick menu. */
+const FOCUS_TARGETS = [
+  ["the sort button", '#mount th[data-col="name"] .tbl-sort', ""],
+  ["the badge", "#mount .tbl-badge", ""],
+  ["the filter summary", '#mount th[data-col="team"] .tbl-filter > summary', ""],
+  ["an item of the open pick menu", '#mount th[data-col="team"] .dropdown-item[data-pick="core"]', 'document.querySelector(\'#mount th[data-col="team"] .tbl-filter\').open = true;'],
+];
+const focusKept = async (strip) => {
+  const out = [];
+  for (const [name, sel, prep] of FOCUS_TARGETS) {
+    await evaluate(`localStorage.clear(); window.build(); window.pick("team", "ops"); ${prep} window.held = document.querySelector('${sel}'); window.held.focus(); null`);
+    await sleep(50);
+    const before = await evaluate("document.activeElement === window.held");
+    await evaluate(`${strip}; null`);
+    await sleep(100);
+    out.push([name, before, await evaluate(`document.activeElement === window.held ? "same node" : document.activeElement.tagName`)]);
+  }
+  return out;
+};
+const byHand = await focusKept(`for (const t of document.querySelectorAll("#mount th")) for (const c of [...t.children]) c.remove()`);
+await check("fix round 3 — the page strips the header by hand: focus stays on the sort button, the badge, the summary and an open menu's item", async () =>
+  byHand.every(([, before, after]) => before && after === "same node"), JSON.stringify(byHand));
+
+// ...and a focus the reader moved away on purpose is not pulled back by the next re-render.
+await evaluate(`localStorage.clear(); window.build(); document.querySelector('#mount th[data-col="name"] .tbl-sort').focus(); null`);
+await sleep(50);
+await evaluate(`document.activeElement.blur(); null`);
+await sleep(50);
+await evaluate(`for (const t of document.querySelectorAll("#mount th")) for (const c of [...t.children]) c.remove(); null`);
+await sleep(100);
+const leftAlone = await evaluate("document.activeElement.tagName");
+await check("...and after the reader blurs the sort button on purpose, a header re-render leaves focus where the reader put it", async () => leftAlone === "BODY", leftAlone);
+
+/* ── fix round 3 · G4: two tables with one identity are named, once ─────────────────────────────── */
+await evaluate(`window.warned = []; if (!window.warnWrapped) { window.warnWrapped = true; const warn = console.warn; console.warn = (...args) => { window.warned.push(args.join(" ")); warn.apply(console, args); }; }
+  document.getElementById("later").innerHTML = ${JSON.stringify(labelled('data-table-id="twin" aria-label="twin one"', 2) + labelled('data-table-id="twin" aria-label="twin two"', 2))}; null`);
+await sleep(100);
+await evaluate(`document.getElementById("later").insertAdjacentHTML("beforeend", ${JSON.stringify(labelled('data-table-id="twin" aria-label="twin three"', 2))}); null`);
+await sleep(100);
+const twinWarnings = await evaluate(`JSON.stringify(window.warned.filter((w) => w.includes('"twin"')))`);
+await check("fix round 3 — two engine tables sharing data-table-id \"twin\" draw one console.warn naming it, and a third twin draws no second one", async () =>
+  JSON.parse(twinWarnings).length === 1 && JSON.parse(twinWarnings)[0].includes("data-table-id"), twinWarnings);
+await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
 const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
 const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
   .find((path) => path && existsSync(path));
@@ -582,6 +654,63 @@ if (!DOM_PATCH) {
   await check("...and when the renderer draws them itself, its patch keeps its box (the same node, holding the query) and its count still says it", async () =>
     adoptedPatched === WHOLE && (await evaluate(`document.querySelector("#mount search input[type=search]") === window.theirBox`)),
     adoptedPatched);
+
+  // G1, the renderer's way: it writes the new label AND the rows. The body is then the renderer's, so
+  // the rows the old instance held are not put back on top of it.
+  // A page bar first, so the patch lines up: the SAME table node is patched, and retire() runs over a body
+  // the renderer has rewritten.
+  const PAGE_BAR = '<search class="filter-bar" data-table-bar><span class="filter-bar-spacer"></span></search>';
+  await evaluate(`localStorage.clear(); document.getElementById("later").innerHTML = ${JSON.stringify(PAGE_BAR + labelled('aria-label="runs (8)"', 8))};
+    window.keepTable = document.querySelector("#later table"); null`);
+  await sleep(100);
+  await searchIn("runs (8)", "L1");
+  await sleep(100);
+  await evaluate(`window.cockpitPatch(document.getElementById("later"), ${JSON.stringify(PAGE_BAR + labelled('aria-label="runs (9)"', 9))}); null`);
+  await sleep(300);
+  const patchedNine = await tablesNow();
+  await check("fix round 3 — cockpitPatch writes \"runs (9)\" and nine rows over a search: nine rows, once each, in the default view", async () =>
+    JSON.parse(patchedNine).length === 1 && JSON.parse(patchedNine)[0][1] === ALL8 + " L9" && JSON.parse(patchedNine)[0][2] === "" &&
+      (await evaluate(`document.querySelector("#later table") === window.keepTable`)), patchedNine);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
+  const byPatch = await focusKept(`window.cockpitPatch(document.querySelector("#mount thead"), '<tr><th data-col="name">name</th><th data-col="team" data-filter="pick">team</th><th data-col="score" data-sort-type="num">score</th></tr>')`);
+  await check("fix round 3 — cockpitPatch re-renders the header: focus stays on the sort button, the badge, the summary and an open menu's item", async () =>
+    byPatch.every(([, before, after]) => before && after === "same node"), JSON.stringify(byPatch));
+
+  // H1: the contract. With the engine's OWN bar before the wrapper, a mount patch rebuilds the table on
+  // every poll, and the engine says so once. With the page's bar, the same table node survives and the
+  // engine says nothing. A page that simply clears its mount is not warned either.
+  const WRAPPED = (id) => `<div class="tablewrap"><table data-table-tools data-table-id="${id}" aria-label="${id}"><thead><tr><th data-col="v">v</th></tr></thead><tbody>${rowsOf(4)}</tbody></table></div>`;
+  const H1_BAR = '<search class="filter-bar" data-table-bar><span class="filter-bar-spacer"></span></search>';
+  const barWarnings = () => evaluate(`JSON.stringify(window.warned.filter((w) => w.includes("data-table-bar")))`);
+  const threePolls = (source) => evaluate(`(async () => { for (let i = 0; i < 3; i += 1) {
+    window.cockpitPatch(document.getElementById("later"), ${JSON.stringify("SOURCE")}.replace("SOURCE", source)); await new Promise((r) => setTimeout(r, 150)); } })()`.replace("source", JSON.stringify(source)));
+  await evaluate(`localStorage.clear(); window.warned = []; document.getElementById("later").innerHTML = ${JSON.stringify(WRAPPED("h1-own"))}; null`);
+  await sleep(100);
+  await threePolls(WRAPPED("h1-own"));
+  const ownBarWarned = await barWarnings();
+  await check("fix round 4 — H1: the engine's own bar under three cockpitPatch polls of the mount draws exactly one console.warn naming <search data-table-bar>", async () =>
+    JSON.parse(ownBarWarned).length === 1 && JSON.parse(ownBarWarned)[0].includes('"h1-own"'), ownBarWarned);
+  await evaluate(`localStorage.clear(); window.warned = []; document.getElementById("later").innerHTML = ${JSON.stringify(H1_BAR + WRAPPED("h1-page"))};
+    window.keepTable = document.querySelector("#later table"); null`);
+  await sleep(100);
+  await searchIn("h1-page", "L2");
+  await sleep(100);
+  await threePolls(H1_BAR + WRAPPED("h1-page"));
+  const pageBarState = await evaluate(`JSON.stringify({ same: document.querySelector("#later table") === window.keepTable,
+    rows: [...document.querySelectorAll("#later tbody tr:not([data-table-placeholder])")].map((r) => r.cells[0].textContent).join(" "),
+    box: document.querySelector("#later search input").value, warned: window.warned.filter((w) => w.includes("data-table-bar")).length })`);
+  await check("...and with the page's own <search data-table-bar>, three polls keep the same table node, its view and its box, and nothing is warned", async () =>
+    pageBarState === JSON.stringify({ same: true, rows: "L2", box: "L2", warned: 0 }), pageBarState);
+  await evaluate(`window.warned = []; document.getElementById("later").innerHTML = ${JSON.stringify(WRAPPED("h1-clear"))}; null`);
+  await sleep(100);
+  await evaluate(`document.getElementById("later").innerHTML = ${JSON.stringify(WRAPPED("h1-other"))}; null`);
+  await sleep(100);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
+  await sleep(100);
+  const clearWarned = await barWarnings();
+  await check("...and a page that fills its mount with a different table, then clears it, is not warned", async () => JSON.parse(clearWarned).length === 0, clearWarned);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
 }
 
 /* ── fix round 1 · a count belongs to one table ────────────────────────────────────────────────────

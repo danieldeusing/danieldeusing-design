@@ -77,7 +77,10 @@ What the runtime adds to the platform, and why each one:
   lands on a control. **An `[autofocus]` control inside wins** — a dialog whose point is one field
   starts in it.
 - **Focus comes back** to what held it when the dialog opened, or else to the opener. The "or else"
-  is Safari, where a mouse click does not focus a button.
+  is Safari, where a mouse click does not focus a button. When both are gone — the page re-rendered
+  the row the opener sat in while the dialog was open, as cockpit's approvals do — it goes to a
+  connected `[data-dialog-open="<this dialog's id>"]` if there is one. **A page that re-renders its
+  opener as something else, or somewhere else, hands focus back itself**, in the dialog's `close`.
 - **A dialog with no name gets its title's.** Every cockpit dialog was unnamed: "dialog" was all a
   screen reader said. Write `aria-labelledby` yourself when you can; the runtime links an unnamed
   dialog to its `.dialog-title` when you did not.
@@ -126,8 +129,9 @@ Cockpit's own primitives are the system's now: `.dlg-x` → `.dialog-close`, `.d
 `.dlg-label` → the eyebrow, `.dlg-field` → `.field-row--stacked`, `.dlg-hint` → `.field-desc`.
 
 A table inside a dialog needs nothing: the dialog sets `--tablewrap-fade` and `--clamp-fade` to its
-`--card`, and a sticky table header is painted `--card` there instead of the page's `--background`
-(cockpit painted both `--background`, a stripe of page showing through the box).
+`--card`, and chrome.css paints a sticky table header in `--tablewrap-fade`, so it is `--card` there
+instead of the page's `--background` (cockpit painted both `--background`, a stripe of page showing
+through the box).
 
 **The edge is `--control-edge`, and it is what separates the box on the dark themes.** The scrim
 (`--backdrop`) dims the page; on green and mono no scrim can separate a near-black card from a
@@ -215,7 +219,8 @@ go.addEventListener("click", async () => {
   The runtime ignores Escape, the backdrop and every `[data-dialog-close]` — each would walk away
   from a write that is still running, and the page would have nowhere left to say how it ended.
   Close it with `closeDialog()` when the write returns. A region in the BODY that is `aria-busy`
-  (content loading) does not lock anything.
+  (content loading) does not lock anything. The runtime marks the closers it is ignoring (the X)
+  `aria-disabled="true"` while that lasts, and takes the mark off after — only its own mark.
 
 ## An alert — `.dialog--alert`
 
@@ -245,6 +250,9 @@ confirmation (that is `--confirm`, which Escape cancels) and not for news (that 
   once per user activation, and Escape is not an activation, so the SECOND Escape closed the alert
   regardless (measured on HeadlessChrome 151). The runtime also cancels the Escape key itself, after
   any menu or list inside the alert has had it. Do not "simplify" it back to the `cancel` listener.
+- Both guards sit on the ROOT (`initDialogs()`), so an alert a page opened with its own
+  `showModal()` is covered too, and they act on the topmost modal — the one holding focus. A native
+  dialog a page puts on top of an alert still closes on Escape.
 
 ## A drawer — `.dialog--drawer`
 
@@ -400,9 +408,14 @@ read name "refresh catalog", description "refresh catalog".
 - **Write a tip that says something the name does not, or leave it off.** On an icon button:
   `aria-label="download the log"`, `data-tip="the last 1 000 lines · as plain text"`. Never a tip
   that names the glyph ("download icon").
-- As a safety net the runtime does not wire up a tip equal to the host's name (its `aria-label`, its
-  `aria-labelledby` or its text, case and spacing aside): the tip still shows, and is not read twice.
+- As a safety net the runtime does not wire up a tip equal to the host's accessible name, computed
+  in accname's order — `aria-labelledby`, then `aria-label`, then a `<label for>`, then the rendered
+  text (an `<img>` by its alt; `display: none` and `aria-hidden` children left out) — and compared
+  without case, runs of spaces or trailing punctuation. The tip still shows, and is not read twice.
   Do not rely on the net — a sighted reader still sees the same words twice.
+- **A description the page wrote is kept.** The tip adds its id to `aria-describedby` as one token
+  and takes back only that token, so a select trigger pointing at its `.field-error` keeps it while
+  the tip shows and after it goes.
 
 ### There is no marker — discovery is by hover (0.45.0, Daniel)
 
@@ -427,11 +440,12 @@ and see if there is a tooltip coming or not."*
   every popup is edged with, the `--elev-float` glow, no radius. Parts separated by ` · ` or a line
   break become rows, the first one bold; a `(parenthetical)` is muted; `key<TAB>value` rows line up
   as a table.
-- **It never covers an open list.** No tip while any `.select-panel` exists (a listbox, a filter
-  dropdown, an autocomplete list, a context menu) or a `details.dropdown` is open, and none on a
-  control whose own popup is open (`[aria-haspopup][aria-expanded="true"]`). A tip already showing
-  goes when one opens. Do not raise a list's `z-index` to "win": while a list is open the choices are
-  the content.
+- **It never covers an open list.** No tip for anything OUTSIDE an open list while any
+  `.select-panel` exists (a listbox, a filter dropdown, an autocomplete list, a context menu) or a
+  `details.dropdown` is open, and none on a control whose own popup is open
+  (`[aria-haspopup][aria-expanded="true"]`). A tip already showing goes when one opens. Do not raise
+  a list's `z-index` to "win": while a list is open the choices are the content. **A row of the open
+  list shows its own tip** — an option explaining itself, which `select.js` copies onto its rows.
 - **Escape hides it** (WCAG 1.4.13), and only it: the first Escape takes the tip, the second the
   dialog or menu it sits in. It returns when the pointer leaves and comes back, or focus moves.
 - **Inside an open `<dialog>` it goes into the dialog**, so it renders in the top layer.
@@ -459,13 +473,19 @@ the viewport, then zoomable and pannable. **The markup contract is nothing**; do
 lightbox (pagr's `.88` scrim, with no dialog semantics and an image the keyboard could not reach, is
 what this replaces).
 
-- **The opener says what it opens:** "zoom: network map" for an image with that alt text, "zoom
-  image" for one without, "zoom diagram" otherwise. The view takes the same name. So write the
-  image's alt text: it is now the name of a control, not only of a picture.
+- **The opener says what it opens:** "zoom: network map" for an image with that alt text or an svg
+  with that `aria-label` (or `<title>`), "zoom image" for an image with neither, "zoom diagram"
+  otherwise. An `aria-label` you wrote on the opener is kept. The view takes the opener's name. So
+  write the alt text: it is now the name of a control, not only of a picture.
+- An opener you already marked `.dgm-zoomable` in the markup is wired like any other.
 - **The view is a modal `<dialog>`:** the page is inert, Tab stays in the view, the page does not
   scroll under it, Escape closes it and focus goes back to the opener.
-- **Inside:** the wheel zooms about the pointer, a drag pans, `+` `-` `0` and the bar's buttons do
-  the same, and a click on the empty stage closes it — a click, not the end of a pan.
+- **Inside:** the wheel zooms about the pointer, a drag pans, the arrow keys pan (40px a press),
+  `+` `-` `0` and the bar's buttons zoom, and a click on the empty stage closes it — a click that
+  began there, not the end of a pan and not a click on the picture.
+- **Touch is the view's own:** the stage is `touch-action: none` (the browser's pinch would zoom
+  the page behind a modal), so one finger pans and two fingers zoom about their midpoint. Under a
+  coarse pointer the bar's buttons are 44×44 at least.
 - **The opener is `components.css`'s, the view is this file's.** The opener's class is
   `.dgm-zoomable`, and its always-drawn corner hint (the `maximize-2` glyph) and its focus ring are
   specified with it in `components.md`: it sits in the page's content. `overlays.css` draws only
@@ -497,7 +517,9 @@ what this replaces).
   cells. (Its ink is set through `--btn-icon-color`, never `color`, which would tie with
   `.btn-icon`'s own on specificity.) The one row this file colours, the stated
   context-menu row, is `GrayText` there; without it the row read like an action and, under the keys,
-  painted the theme's muted ink at 3.00–3.52:1. Its focus ring is `Highlight`: the popup row's ring
-  is `HighlightText`, drawn for a `Highlight` fill, and a disabled row has no fill — `HighlightText`
-  is the `Canvas` colour on both palettes, so the keys vanished on it (1:1). `scripts/check-overlays.mjs`
-  reads all of these back as painted pixels, on a light and a dark forced palette.
+  painted the theme's muted ink at 3.00–3.52:1. Its focus ring is `CanvasText`, the estate's ring
+  for a focused row that is disabled or states something: the popup row's ring is `HighlightText`,
+  drawn for a `Highlight` fill, and a disabled row has no fill — `HighlightText` is the `Canvas`
+  colour on both palettes, so the keys vanished on it (1:1). `scripts/check-overlays.mjs` reads all
+  of these back as painted pixels, on a light and a dark forced palette, with real keyboard focus,
+  and hides each element and shoots again to prove the ink it measured was that element's.

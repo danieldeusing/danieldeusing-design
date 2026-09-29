@@ -172,6 +172,7 @@ const KEYS = {
   Escape: { code: "Escape", vk: 27 }, Tab: { code: "Tab", vk: 9 }, Enter: { code: "Enter", vk: 13, text: "\r" },
   ArrowDown: { code: "ArrowDown", vk: 40 }, ArrowUp: { code: "ArrowUp", vk: 38 }, Home: { code: "Home", vk: 36 },
   End: { code: "End", vk: 35 }, F10: { code: "F10", vk: 121 }, ContextMenu: { code: "ContextMenu", vk: 93 },
+  ArrowLeft: { code: "ArrowLeft", vk: 37 }, ArrowRight: { code: "ArrowRight", vk: 39 },
   "+": { code: "Equal", vk: 187, text: "+", shift: true }, "-": { code: "Minus", vk: 189, text: "-" },
   "0": { code: "Digit0", vk: 48, text: "0" },
 };
@@ -576,83 +577,109 @@ try {
      icons.css's, the popup rows are components.css's — so what it can get wrong is what it adds on
      top: an opt-out of its own, an author colour, and the one row whose colour it sets.
 
-     CAPTURED IN THE VIEWPORT, never with captureBeyondViewport (which re-lays the page without its
-     scrollbar and moves every box measured beforehand), in a browser started with
-     --hide-scrollbars. And before any ratio is trusted, every crop is shown to hold its element: the
-     same scenes run once in normal colours, where each crop must contain the colour its element
-     itself paints there. */
+     WHOSE PIXELS. Screenshots are taken in the viewport of a browser started with --hide-scrollbars,
+     never with captureBeyondViewport (which re-lays the page without its scrollbar and moves every
+     box measured beforehand). Every crop is shown to hold its element twice over: once in normal
+     colours, where it must contain the colour its element itself paints there; and on each forced
+     palette, where the element is hidden and the shot retaken — whatever ink is still in the crop
+     then was never the element's (a neighbour a forced palette makes visible, a glyph drawn by
+     something else), and the ratio read from it proves nothing.
+
+     REAL FOCUS. Every ring is drawn by focus the keyboard put there — a Tab into the dialog, the
+     arrow keys down the menu — never by a forced pseudo-class, which draws a ring no reader gets. */
   section("forced colours — painted pixels on a light and a dark forced palette, four themes (X1)");
   const FORCED_THEMES = ["warm", "green", "mono", "paper"];
   const STATED = `__o.menu().querySelector('[aria-disabled="true"]')`;
-  const ACTION = `__o.menu().querySelectorAll(".dropdown-item")[1]`;
-  const STATED_SEL = '.context-menu [aria-disabled="true"]';
-  // [what, floor, the dialog it is in (null: the context menu), a selector whose :focus-visible is
-  //  forced for the shot (null: none), its crop, the colour the element itself paints in that crop]
+  const ITEM = (i) => `__o.menu().querySelectorAll(".dropdown-item")[${i}]`;
+  // Each scene: what, its floor, the state it is shot in, the element, its crop and its own paint.
   const SCENES = [
-    ["the X (glyph)", 3, "dlg-default", null, `__o.inner("default-x")`, `__o.cs("default-x", "::before").backgroundColor`],
-    ["the X under the keys: its focus ring", 3, "dlg-default", '[data-t="default-x"]', `__o.ringBand("default-x")`, `__o.cs("default-x").outlineColor`],
-    ["the back arrow (glyph)", 3, "dlg-rich", null, `__o.inner("rich-back")`, `__o.cs("rich-back", "::before").backgroundColor`],
-    ["the alert glyph (glyph)", 3, "dlg-alert", null, `__o.inner("alert-glyph")`, `__o.cs("alert-glyph").backgroundColor`],
-    ["a context-menu row under the keys (text on its highlight)", 4.5, null, null, `__o.textBox(document.activeElement)`, `getComputedStyle(document.activeElement).color`],
-    ["a context-menu row under the keys: its focus ring", 3, null, null, `__o.ringBand(document.activeElement)`, `getComputedStyle(document.activeElement).outlineColor`],
-    ["the stated row at rest (text)", 4.5, null, null, `__o.textBox(${STATED})`, `getComputedStyle(${STATED}).color`],
-    ["an action row at rest (text) — the stated row's pair", 4.5, null, null, `__o.textBox(${ACTION})`, `getComputedStyle(${ACTION}).color`],
-    ["the stated row under the keys (text)", 4.5, null, STATED_SEL, `__o.textBox(${STATED})`, `getComputedStyle(${STATED}).color`],
-    ["the stated row under the keys: its focus ring", 3, null, STATED_SEL, `__o.ringBand(${STATED})`, `getComputedStyle(${STATED}).outlineColor`],
+    { what: "the X (glyph)", floor: 3, state: "dlg:dlg-default", el: T("default-x"), crop: "inner", paint: "glyph" },
+    { what: "the X under a real Tab: its focus ring", floor: 3, state: "tab:open-default", el: T("default-x"), crop: "ring", paint: "ring" },
+    { what: "the back arrow (glyph)", floor: 3, state: "dlg:dlg-rich", el: T("rich-back"), crop: "inner", paint: "glyph" },
+    { what: "the alert glyph (glyph)", floor: 3, state: "dlg:dlg-alert", el: T("alert-glyph"), crop: "inner", paint: "fill" },
+    { what: "a context-menu row under the keys (text on its highlight)", floor: 4.5, state: "menu:0", el: ITEM(0), crop: "text", paint: "text" },
+    { what: "a context-menu row under the keys: its focus ring", floor: 3, state: "menu:0", el: ITEM(0), crop: "ring", paint: "ring" },
+    { what: "the stated row at rest (text)", floor: 4.5, state: "menu:0", el: STATED, crop: "text", paint: "text" },
+    { what: "an action row at rest (text) — the stated row's pair", floor: 4.5, state: "menu:0", el: ITEM(1), crop: "text", paint: "text" },
+    { what: "the stated row under the keys (text)", floor: 4.5, state: "menu:3", el: STATED, crop: "text", paint: "text" },
+    { what: "the stated row under the keys: its focus ring", floor: 3, state: "menu:3", el: STATED, crop: "ring", paint: "ring" },
   ];
-  const measureScene = async (scene, shot, onShot) => {
-    const { box, paint } = await evaluate(`({ box: ${scene[4]}, paint: ${scene[5]} })`);
-    onShot(scene, shot, box, paint);
+  const CROP = { inner: (e) => `__o.inner(${e})`, ring: (e) => `__o.ringBand(${e})`, text: (e) => `__o.textBox(${e})` };
+  const PAINT = {
+    glyph: (e) => `getComputedStyle(${e}, "::before").backgroundColor`, fill: (e) => `getComputedStyle(${e}).backgroundColor`,
+    ring: (e) => `getComputedStyle(${e}).outlineColor`, text: (e) => `getComputedStyle(${e}).color`,
   };
-  // One pass over every scene: open what it needs, take the shot, hand each crop on.
-  const shootScenes = async (onShot) => {
-    for (const scene of SCENES.filter((sc) => sc[2])) {
-      const [, , dlg, force] = scene;
-      await evaluate(`(() => { __o.$("${dlg}").showModal(); document.activeElement?.blur?.(); })()`);
-      const take = async () => { await sleep(40); await measureScene(scene, await screenshot(), onShot); };
-      if (force) await whileForced(force, ["focus-visible"], take); else await take();
-      await evaluate(`__o.$("${dlg}").close(); null`);
+  const enter = async (state) => {
+    await reset();
+    const [kind, arg] = state.split(":");
+    if (kind === "dlg") {
+      await evaluate(`(() => { __o.$("${arg}").showModal(); document.activeElement?.blur?.(); })()`);
+    } else if (kind === "tab") {
+      await evaluate(`${T(arg)}.click(); null`); // the runtime focuses the dialog; one Tab reaches its X
+      await key("Tab");
+    } else {
+      await centre("row-app");
+      await evaluate(`${T("row-app")}.focus(); null`);
+      await key("F10", { shift: true });
+      for (let i = 0; i < Number(arg); i += 1) await key("ArrowDown");
+    }
+    await sleep(40);
+  };
+  // One pass: every state entered once, one shot, every crop handed on; with `removal`, each
+  // element is then hidden in turn (the focused one last: hiding it drops its focus) and retaken.
+  const shootScenes = async (onShot, removal) => {
+    for (const state of [...new Set(SCENES.map((sc) => sc.state))]) {
+      const group = SCENES.filter((sc) => sc.state === state);
+      await enter(state);
+      const shot = await screenshot();
+      const boxes = new Map();
+      for (const sc of group) {
+        const { box, paint } = await evaluate(`({ box: ${CROP[sc.crop](sc.el)}, paint: ${PAINT[sc.paint](sc.el)} })`);
+        boxes.set(sc, box);
+        onShot(sc, shot, box, paint);
+      }
+      if (!removal) continue;
+      const els = [...new Set(group.map((sc) => sc.el))];
+      const focused = await evaluate(`[${els.join(", ")}].map((n) => n === document.activeElement)`);
+      for (const e of els.filter((_, i) => !focused[i]).concat(els.filter((_, i) => focused[i]))) {
+        await evaluate(`${e}.style.setProperty("visibility", "hidden", "important"); null`);
+        await sleep(40);
+        const without = await screenshot();
+        await evaluate(`${e}.style.removeProperty("visibility"); null`);
+        for (const sc of group.filter((g) => g.el === e)) removal(sc, without, boxes.get(sc));
+      }
     }
     await reset();
-    await centre("row-app");
-    await evaluate(`${T("row-app")}.focus(); null`);
-    await key("F10", { shift: true });
-    await sleep(40);
-    const atRest = await screenshot();
-    for (const scene of SCENES.filter((sc) => !sc[2] && !sc[3])) await measureScene(scene, atRest, onShot);
-    const forcedOnes = SCENES.filter((sc) => !sc[2] && sc[3]);
-    for (const selector of new Set(forcedOnes.map((sc) => sc[3]))) {
-      await whileForced(selector, ["focus-visible"], async () => {
-        await sleep(40);
-        const shot = await screenshot();
-        for (const scene of forcedOnes.filter((sc) => sc[3] === selector)) await measureScene(scene, shot, onShot);
-      });
-    }
-    await key("Escape");
   };
 
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: DPR, mobile: false });
   await reset();
   const misses = [];
-  await shootScenes((scene, shot, box, paint) => {
-    if (!holdsColour(shot, box, paint)) misses.push(`${scene[0]}: no ${paint} in ${JSON.stringify(box)}`);
+  await shootScenes((sc, shot, box, paint) => {
+    if (!holdsColour(shot, box, paint)) misses.push(`${sc.what}: no ${paint} in ${JSON.stringify(box)}`);
   });
   await check("every crop lands on its element: in normal colours each holds the colour its element paints there",
     misses.length === 0, misses.join("; "));
 
   const forcedCells = new Map(); // what -> { floor, cells: { "light/warm": { ratio, ink, on } } }
+  const leftovers = []; // ink still in a crop once its element is hidden
+  const canvasText = {};
   for (const scheme of ["light", "dark"]) {
     await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
     await sleep(100);
     await check(`forced colours really are on, ${scheme} palette (a check under no forcing would pass by default)`,
       () => evaluate(`matchMedia("(forced-colors: active)").matches && matchMedia("(prefers-color-scheme: ${scheme})").matches`));
+    canvasText[scheme] = parseCss(await evaluate(`(() => { const i = document.createElement("i"); i.style.cssText = "forced-color-adjust: none; color: CanvasText";
+      document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; })()`)).slice(0, 3).map(Math.round).join(",");
     for (const theme of FORCED_THEMES) {
-      await reset();
       await evaluate(`document.documentElement.dataset.theme = "${theme}"; null`);
-      await shootScenes(([what, floor], shot, box) => {
+      await shootScenes(({ what, floor }, shot, box) => {
         const entry = forcedCells.get(what) || { floor, cells: {} };
         entry.cells[`${scheme}/${theme}`] = inkIn(shot, box);
         forcedCells.set(what, entry);
+      }, ({ what }, without, box) => {
+        const left = inkIn(without, box);
+        if (left.ratio >= 1.5) leftovers.push(`${scheme}/${theme} ${what}: ${left.ratio}:1 (ink ${left.ink} on ${left.on}) with the element hidden`);
       });
     }
   }
@@ -660,11 +687,18 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await evaluate(`document.documentElement.dataset.theme = "warm"; null`);
   await reset();
+  await check("forced colours, both palettes: every crop's ink is its element's — hidden, the element takes it with it",
+    leftovers.length === 0, leftovers.join("; "));
   for (const [what, { floor, cells }] of forcedCells) {
     const low = Object.entries(cells).filter(([, m]) => m.ratio < floor).map(([c, m]) => `${c} ${m.ratio} (ink ${m.ink} on ${m.on})`);
     await check(`forced colours, both palettes x four themes: ${what} reaches ${floor}:1 on what it is painted on`,
       Object.keys(cells).length === 8 && low.length === 0, low.join("; ") || `${Object.keys(cells).length} of 8 cells measured`);
   }
+  // The ring fills most of its crop, so the crop's dominant colour IS the ring.
+  const statedRing = forcedCells.get("the stated row under the keys: its focus ring")?.cells ?? {};
+  const notCanvasText = Object.entries(statedRing).filter(([c, m]) => m.on !== canvasText[c.split("/")[0]]).map(([c, m]) => `${c}: ${m.on}, CanvasText is ${canvasText[c.split("/")[0]]}`);
+  await check("forced colours: the stated row's ring under the keys is CanvasText (the lead's ruling for a disabled or stated row)",
+    Object.keys(statedRing).length === 8 && notCanvasText.length === 0, notCanvasText.join("; "));
   const statedInk = forcedCells.get("the stated row at rest (text)")?.cells ?? {};
   const actionInk = forcedCells.get("an action row at rest (text) — the stated row's pair")?.cells ?? {};
   const alike = Object.keys(statedInk).filter((c) => statedInk[c].ink === actionInk[c]?.ink);
@@ -717,6 +751,14 @@ try {
   await mouse("mouseReleased", edge.x, edge.y + 30, { button: "left", clickCount: 1 });
   await sleep(80);
   await check("...nor one that starts on the backdrop and ends inside", () => evaluate(`__o.$("dlg-default").open`));
+  await evaluate(`__o.$("dlg-default").close(); null`);
+  await clickT("open-default");
+  const rim = await evaluate(`(() => { const r = __o.$("dlg-default").getBoundingClientRect(); return { x: r.left + 0.5, y: r.top + r.height / 2 }; })()`);
+  await mouse("mouseMoved", rim.x, rim.y);
+  await mouse("mousePressed", rim.x, rim.y, { button: "left", clickCount: 1 });
+  await mouse("mouseReleased", 12, 890, { button: "left", clickCount: 1 });
+  await sleep(80);
+  await check("...nor one that starts on the dialog's 1px edge and is released on the scrim", () => evaluate(`__o.$("dlg-default").open`));
   await reset();
   await clickT("open-inactive");
   await check("an aria-disabled opener opens nothing", () => evaluate(`__o.open().length === 0`));
@@ -728,6 +770,24 @@ try {
     () => evaluate(`(() => { const id = __o.$("dlg-unnamed").getAttribute("aria-labelledby"); return !!id && document.getElementById(id) === __o.$("unnamed-title"); })()`));
   await check("...which the accessibility tree reads as its name",
     async () => (await axOf('[data-t="dlg-unnamed"]')).name === "named by its title");
+
+  // FOCUS RETURN, the branches Chromium does not cover by itself. With <body> focused at open the
+  // platform restores nothing, so only the opener passed in brings focus back — and it is a plain
+  // page button here, not a [data-dialog-open], so the last fallback cannot stand in for it. Then a
+  // page that re-renders its opener while the dialog is open: both remembered elements are gone.
+  await reset();
+  await evaluate(`(async () => { const m = await import("/runtime/dialog.js"); document.activeElement?.blur?.(); m.openDialog("dlg-default", ${T("after-rows")}); })()`);
+  await key("Escape");
+  await check("opened from code with <body> focused, focus goes back to the opener it was given",
+    () => evaluate(`document.activeElement === ${T("after-rows")}`));
+  await reset();
+  await clickT("open-default");
+  await evaluate(`(() => { const old = ${T("open-default")}, again = old.cloneNode(true); again.dataset.t = "open-default-again"; old.replaceWith(again); })(); null`);
+  await key("Escape");
+  const cameBack = await evaluate(`document.activeElement?.dataset?.t ?? document.activeElement?.tagName`);
+  await evaluate(`document.querySelector('[data-t="open-default-again"]').dataset.t = "open-default"; null`);
+  await check("an opener the page re-rendered while the dialog was open gets focus back (the dialog's [data-dialog-open])",
+    cameBack === "open-default-again", cameBack);
 
   section("dialog.js — a stack, the answer reset, a committing footer, the alert");
   await reset();
@@ -785,9 +845,14 @@ try {
   await reset();
   await clickT("open-default");
   await evaluate(`${T("default-join")}.setAttribute("aria-busy", "true"); null`);
+  await sleep(30);
+  const xLocked = await evaluate(`${T("default-x")}.getAttribute("aria-disabled")`);
   await clickT("default-x");
   const xWhileBusy = await evaluate(`__o.$("dlg-default").open`);
   await evaluate(`${T("default-join")}.removeAttribute("aria-busy"); null`);
+  await sleep(30);
+  const xUnlocked = await evaluate(`${T("default-x")}.getAttribute("aria-disabled")`);
+  await check("...and it says so: aria-disabled while the footer commits, not once it is done", xLocked === "true" && xUnlocked === null, { xLocked, xUnlocked });
   await clickT("default-x");
   await check("the X of a dialog whose footer is committing does nothing either — and closes once it is done",
     xWhileBusy && await evaluate(`!__o.$("dlg-default").open`), { xWhileBusy });
@@ -803,6 +868,22 @@ try {
   await check("...and so does the backdrop", () => evaluate(`__o.$("dlg-alert").open`));
   await clickT("alert-send");
   await check("its answer closes it: \"send\"", () => evaluate(`!__o.$("dlg-alert").open && __o.$("dlg-alert").returnValue === "send"`));
+  await reset();
+  await evaluate(`(() => { const d = document.createElement("dialog"); d.id = "bare-alert"; d.className = "dialog dialog--alert";
+    d.innerHTML = '<div class="dialog-body"><p>a page opened this with its own showModal()</p><button type="button">ok</button></div>';
+    document.body.append(d); d.showModal(); })(); null`);
+  await key("Escape"); await key("Escape"); await key("Escape");
+  const bareHeld = await evaluate(`document.getElementById("bare-alert").open`);
+  await evaluate(`document.getElementById("bare-alert").remove(); null`);
+  await check("an alert a page opened with a bare showModal() holds against Escape too (the guard is the root's)", bareHeld, { bareHeld });
+  await evaluate(`(async () => { const m = await import("/runtime/dialog.js"); m.openDialog("dlg-alert");
+    const d = document.createElement("dialog"); d.id = "native-top"; d.innerHTML = '<button type="button">ok</button>'; document.body.append(d);
+    d.showModal(); d.querySelector("button").focus(); })()`);
+  await key("Escape");
+  const overAlert = await evaluate(`({ native: document.getElementById("native-top").open, alert: __o.$("dlg-alert").open })`);
+  await evaluate(`document.getElementById("native-top").remove(); __o.$("dlg-alert").close(); null`);
+  await check("a native dialog a page put on top of an alert closes on Escape; the alert under it stays",
+    !overAlert.native && overAlert.alert, overAlert);
 
   await check("openDialog / closeDialog from code: the answer comes back, an open dialog is returned as is",
     () => evaluate(`(async () => { const m = await import("/runtime/dialog.js");
@@ -927,10 +1008,17 @@ try {
   await evaluate(`(() => { const host = document.createElement("div"); host.id = "x4"; host.innerHTML =
     '<button type="button" id="x4-same" aria-label="refresh catalog" data-tip="refresh catalog">r</button>' +
     '<button type="button" id="x4-text" data-tip=" Refresh   now">refresh now</button>' +
-    '<button type="button" id="x4-diff" aria-label="download the log" data-tip="the last 1 000 lines">d</button>';
+    '<button type="button" id="x4-diff" aria-label="download the log" data-tip="the last 1 000 lines">d</button>' +
+    '<span id="x4-lb">reload the plan</span>' +
+    '<button type="button" id="x4-lbl" aria-labelledby="x4-lb" aria-label="refresh" data-tip="reload the plan">r</button>' +
+    '<button type="button" id="x4-lbl-diff" aria-labelledby="x4-lb" aria-label="refresh" data-tip="refresh">r</button>' +
+    '<label for="x4-input">search the log</label><input id="x4-input" data-tip="Search the log">' +
+    '<button type="button" id="x4-img" data-tip="refresh"><img alt="refresh" width="8" height="8" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></button>' +
+    '<button type="button" id="x4-hidden" data-tip="save">save<span style="display: none"> draft</span><span aria-hidden="true"> ✓</span></button>' +
+    '<button type="button" id="x4-punct" aria-label="Refresh catalog." data-tip="refresh catalog">r</button>';
     document.querySelector("main").prepend(host); })()`);
   const x4 = {};
-  for (const id of ["x4-same", "x4-text", "x4-diff"]) {
+  for (const id of ["x4-same", "x4-text", "x4-diff", "x4-lbl", "x4-lbl-diff", "x4-input", "x4-img", "x4-hidden", "x4-punct"]) {
     await evaluate(`document.getElementById("${id}").focus(); null`);
     await sleep(40);
     x4[id] = { attr: await evaluate(`document.getElementById("${id}").getAttribute("aria-describedby")`), shown: await evaluate("__o.tipShown()"), ax: await axOf(`#${id}`) };
@@ -940,6 +1028,28 @@ try {
     x4["x4-same"].attr === null && x4["x4-same"].shown && x4["x4-same"].ax.name === "refresh catalog" && x4["x4-same"].ax.description === "", x4["x4-same"]);
   await check("...nor one equal to the element's own text, case and spacing aside", x4["x4-text"].attr === null && x4["x4-text"].ax.description === "", x4["x4-text"]);
   await check("a tip that says something else IS the description", x4["x4-diff"].attr === "ddtip" && x4["x4-diff"].ax.description === "the last 1 000 lines", x4["x4-diff"]);
+  const named = (id) => x4[id].attr === null && x4[id].shown;
+  await check("the name is accname's: aria-labelledby before aria-label — a tip equal to the labelledby text is not a description",
+    named("x4-lbl") && x4["x4-lbl"].ax.name === "reload the plan", x4["x4-lbl"]);
+  await check("...and a tip equal to the aria-label a labelledby overrides IS one", x4["x4-lbl-diff"].attr === "ddtip", x4["x4-lbl-diff"]);
+  await check("...a <label for> names an input, an <img alt> names its button, hidden children and trailing punctuation do not count",
+    named("x4-input") && named("x4-img") && named("x4-hidden") && named("x4-punct"),
+    { input: x4["x4-input"], img: x4["x4-img"], hidden: x4["x4-hidden"], punct: x4["x4-punct"] });
+  // A description the page already wrote survives the tip: the tip is one token of the list.
+  await reset();
+  const errAt = await evaluate(`(() => { const host = document.createElement("p"); host.id = "x4-err-host";
+    host.innerHTML = '<button type="button" id="x4-err" aria-describedby="x4-err-msg" data-tip="checked every 5 minutes">run</button> <span id="x4-err-msg">the last run failed</span>';
+    document.querySelector("main").prepend(host); const b = document.getElementById("x4-err"); b.scrollIntoView({ block: "center" });
+    const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+  await mouse("mouseMoved", errAt.x, errAt.y);
+  await sleep(60);
+  const errWhile = await evaluate(`({ attr: document.getElementById("x4-err").getAttribute("aria-describedby"), shown: __o.tipShown() })`);
+  await mouse("mouseMoved", 2, 2);
+  await sleep(60);
+  const errAfter = await evaluate(`document.getElementById("x4-err").getAttribute("aria-describedby")`);
+  await evaluate(`document.getElementById("x4-err-host").remove(); null`);
+  await check("a description the page wrote survives the tip: both ids while it shows, exactly the page's once it goes",
+    errWhile.shown && errWhile.attr === "x4-err-msg ddtip" && errAfter === "x4-err-msg", { errWhile, errAfter });
 
   /* ── the context menu ──────────────────────────────────────────────────────────────────────── */
   section("context menu — the keyboard (page code on attachMenuKeys + positionPopup)");
@@ -955,6 +1065,13 @@ try {
   await check("...under the row, focus on its first item", !!opened && Math.abs(opened.top - opened.rowBottom - 4) < 1.5 && Math.abs(opened.left - opened.rowLeft) < 1.5 && opened.active === "open in editor", opened);
   await check("...fixed, above the page's own popups (z 60), and 12-20rem wide whoever placed it",
     !!opened && opened.position === "fixed" && opened.z === "60" && opened.w >= 192 && opened.w <= 322, opened);
+  const rowTipAt = await evaluate(`(() => { const r = __o.menu().querySelector('[data-action="reveal"]').getBoundingClientRect(); return { x: Math.round(r.left + 30), y: Math.round(r.top + r.height / 2) }; })()`);
+  await mouse("mouseMoved", rowTipAt.x, rowTipAt.y);
+  await sleep(60);
+  const rowTip = await evaluate(`({ shown: __o.tipShown(), text: __o.tip().textContent })`);
+  await mouse("mouseMoved", 2, 2);
+  await sleep(40);
+  await check("a row of the open list shows its own tip — only what is outside the list waits", rowTip.shown && rowTip.text.includes("opens the folder"), rowTip);
   const stated = await evaluate(`(() => { const b = __o.menu().querySelector('[aria-disabled="true"]'), s = getComputedStyle(b);
     return { ws: s.whiteSpace, muted: __o.same(s.color, __o.resolve("var(--muted-foreground)")), lines: Math.round(b.getBoundingClientRect().height / parseFloat(s.lineHeight || 15)) }; })()`);
   await check("a row that states something wraps, in --muted-foreground", stated.ws === "normal" && stated.muted && stated.lines >= 2, stated);
@@ -1011,7 +1128,7 @@ try {
   const openers = await evaluate(`["dgm-background", "dgm-figure", "dgm-canvas"].map((t) => { const n = __o.$(t);
     return [n.getAttribute("role"), n.tabIndex, n.classList.contains("dgm-zoomable"), n.getAttribute("aria-label")].join("|"); })`);
   await check("every opener is a button named by what it opens",
-    openers.join(" ; ") === "button|0|true|zoom diagram ; button|0|true|zoom: network map ; button|0|true|zoom diagram", openers);
+    openers.join(" ; ") === "button|0|true|zoom: request flow ; button|0|true|zoom: network map ; button|0|true|zoom diagram", openers);
   await centre("dgm-figure");
   await evaluate(`${T("dgm-figure")}.focus(); null`);
   await key("Enter");
@@ -1027,6 +1144,10 @@ try {
     view.box === "0,0,1280,900" && view.frame === "0px 0px 0px" && view.backdrop === "rgba(0, 0, 0, 0)", view);
   await check("...its bar the system's: three compact ghost buttons and the dialog's X, and the page is locked",
     view.bar === "ghost ghost ghost icon:x:close" && view.locked === "hidden", view);
+  const onArt = await evaluate(`(() => { const r = document.querySelector(".dgm-art > img").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+  await click(onArt.x, onArt.y);
+  await check("a click on the picture itself does not close the view (capture retargets its end to the stage)",
+    () => evaluate(`document.querySelector("dialog.dgm-overlay").open`));
   const scaleOf = () => evaluate(`Number(/scale\\(([\\d.]+)\\)/.exec(document.querySelector(".dgm-art").style.transform)?.[1] ?? NaN)`);
   const fitted = await scaleOf();
   await key("+");
@@ -1048,6 +1169,12 @@ try {
     !!beforePan && !!afterPan && Math.abs(afterPan[0] - beforePan[0] - 120) < 2 && Math.abs(afterPan[1] - beforePan[1] - 60) < 2, { beforePan, afterPan });
   await check("...and the click that ends the pan does NOT close the view (0.59.0 closed it after every pan)",
     () => evaluate(`document.querySelector("dialog.dgm-overlay").open`));
+  const beforeKeys = await translateOf();
+  await key("ArrowRight");
+  await key("ArrowDown");
+  const afterKeys = await translateOf();
+  await check("the arrow keys pan it, 40px a press",
+    !!beforeKeys && !!afterKeys && Math.abs(afterKeys[0] - beforeKeys[0] + 40) < 0.5 && Math.abs(afterKeys[1] - beforeKeys[1] + 40) < 0.5, { beforeKeys, afterKeys });
   await click(20, 880);
   await check("a click on the empty stage closes it, and focus goes back to the opener",
     () => evaluate(`!document.querySelector("dialog.dgm-overlay").open && document.activeElement === __o.$("dgm-figure")`));
@@ -1061,6 +1188,53 @@ try {
   await check("a <canvas> opens with its picture (it used to clone empty)",
     () => evaluate(`(() => { const c = document.querySelector(".dgm-art canvas"); return !!c && c.getContext("2d").getImageData(40, 40, 1, 1).data[3] === 255; })()`));
   await key("Escape");
+  await evaluate(`(() => { const d = document.createElement("div"); d.id = "fx-authored"; d.className = "dgm-zoomable"; d.setAttribute("aria-label", "zoom: the pipeline");
+    d.innerHTML = '<svg viewBox="0 0 10 10" width="100" height="100"><rect width="10" height="10"/></svg>'; document.querySelector("main").append(d); })(); null`);
+  await evaluate(`(async () => { const m = await import("/runtime/diagramzoom.js"); m.initDiagramZoom("#fx-authored"); })()`);
+  const authored = await evaluate(`(() => { const d = document.getElementById("fx-authored"); return [d.getAttribute("role"), d.tabIndex, d.getAttribute("aria-label")].join("|"); })()`);
+  await evaluate(`document.getElementById("fx-authored").focus(); null`);
+  await key("Enter");
+  await sleep(120);
+  const authoredView = await evaluate(`[...document.querySelectorAll("dialog.dgm-overlay")].find((v) => v.open)?.getAttribute("aria-label") ?? null`);
+  await key("Escape");
+  await evaluate(`document.getElementById("fx-authored").remove(); null`);
+  await check("an opener the author already marked .dgm-zoomable is wired too, and keeps the name the author gave it",
+    authored === "button|0|zoom: the pipeline" && authoredView === "zoom: the pipeline", { authored, authoredView });
+
+  /* TOUCH, as raw CDP touch points on a phone-sized page with a coarse pointer. The stage is
+     `touch-action: none`, so the browser's own pinch never happens there: the view does its own. */
+  await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await load();
+  await evaluate(`${T("dgm-figure")}.click(); null`);
+  await sleep(200);
+  const coarse = await evaluate(`({ coarse: matchMedia("(pointer: coarse)").matches, bar: [...document.querySelectorAll("dialog.dgm-overlay .dgm-bar button:not(.btn-icon)")].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + "x" + Math.round(r.height); }) })`);
+  await check("under a coarse pointer the bar's zoom out, fit and zoom in are 44x44 at least",
+    coarse.coarse && coarse.bar.length === 3 && coarse.bar.every((wh) => wh.split("x").every((v) => Number(v) >= 44)), coarse);
+  const artState = `(() => { const s = document.querySelector(".dgm-stage").getBoundingClientRect(), a = document.querySelector(".dgm-art").getBoundingClientRect();
+    const mx = s.left + s.width / 2, my = s.top + s.height / 2, m = /scale\\(([\\d.]+)\\)/.exec(document.querySelector(".dgm-art").style.transform);
+    return { mx, my, fx: (mx - a.left) / a.width, fy: (my - a.top) / a.height, scale: Number(m?.[1] ?? NaN), open: document.querySelector("dialog.dgm-overlay").open }; })()`;
+  const beforePinch = await evaluate(artState);
+  const fingers = (d) => [{ x: beforePinch.mx - d, y: beforePinch.my, id: 1 }, { x: beforePinch.mx + d, y: beforePinch.my, id: 2 }];
+  await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: fingers(40) });
+  for (let d = 46; d <= 100; d += 6) { await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: fingers(d) }); await sleep(16); }
+  await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sleep(120);
+  const afterPinch = await evaluate(artState);
+  const pinchRatio = afterPinch.scale / beforePinch.scale;
+  await check("two fingers spread 80px -> 200px apart zoom it x2.5, about their midpoint, and it stays open",
+    Math.abs(pinchRatio - 2.5) < 0.1 && Math.abs(afterPinch.fx - beforePinch.fx) < 0.02 && Math.abs(afterPinch.fy - beforePinch.fy) < 0.02 && afterPinch.open,
+    { pinchRatio, beforePinch, afterPinch });
+  const beforeSwipe = await translateOf();
+  await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: beforePinch.mx, y: beforePinch.my, id: 3 }] });
+  for (let d = 10; d <= 80; d += 10) { await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: beforePinch.mx + d, y: beforePinch.my, id: 3 }] }); await sleep(16); }
+  await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sleep(120);
+  const afterSwipe = await translateOf();
+  await check("one finger pans it by the whole drag, and lifting it does not close the view",
+    !!beforeSwipe && !!afterSwipe && Math.abs(afterSwipe[0] - beforeSwipe[0] - 80) < 2 && await evaluate(`document.querySelector("dialog.dgm-overlay").open`), { beforeSwipe, afterSwipe });
+  await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
   /* ── a tokens-only page ────────────────────────────────────────────────────────────────────── */
   section("tokens + overlays.css + tooltip.css alone (?bare): the same box and face as with everything loaded (X2)");

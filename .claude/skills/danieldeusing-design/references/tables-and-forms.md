@@ -123,7 +123,10 @@ every `required` select.
   on (warm binds, at 3.26 on `--muted`). Focus adds the `--primary` edge to the `--ring` outline;
   `aria-invalid="true"` on the `<select>` gives the trigger the `--destructive` edge. It is the
   height of the text field and the compact button beside it ("One control height" in
-  `components.md`).
+  `components.md`). A disabled select keeps its edge under the pointer: it does not answer it at all.
+- **Under forced colours the caret is text.** The mode drops the gradient that draws it, so the
+  trigger draws its ▾ as a glyph instead; a bare `<select>` that no runtime enhanced has no caret
+  there — one more reason every page calls `initSelects()`.
 
 ## A wide table scrolls itself (0.23.0) — including one you render after the page loads
 

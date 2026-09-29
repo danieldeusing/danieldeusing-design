@@ -21,6 +21,7 @@ Contents:
 - `.card-terminal` (0.60.0)
 - The minimap: a TOC or a minimap, never both (0.60.0)
 - The diagram zoom opens a `<dialog>` (0.60.0)
+- Forced colours: a contrast theme keeps every glyph and every state (0.60.0)
 - The rail marks the current page on `aria-current="page"` (0.19.0)
 - `.ls-perm` is deliberately dimmer than muted (0.20.0)
 - A hover is `data-tip`, never the native `title` (0.26.0)
@@ -118,7 +119,7 @@ system whose `--radius` has been `0` since its first release.
 
 ```html
 <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact"><span class="ico" data-icon="refresh-cw"></span>refresh</button>
-<button type="button" class="btn-terminal btn-terminal--compact" aria-busy="true" disabled>saving</button>
+<button type="button" class="btn-terminal btn-terminal--compact" aria-busy="true" aria-disabled="true">saving</button>
 <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success">approve</button>
 <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger">deny</button>
 ```
@@ -130,10 +131,12 @@ system whose `--radius` has been `0` since its first release.
   filled button, a transparent 1px border, so a `<button>` on a Tailwind page or a tokens-only page
   is the same box as the `<a>` beside it. Before 0.60.0 a filled compact `<button>` wore the
   browser's 2px outset border and stood 30px tall beside a 28px ghost.
-- **Busy is `aria-busy="true"` plus `disabled`, both set by the page, both cleared by it.** Busy is
-  the reason and disabled is what stops the second press. The `> ` prefix (or the ghost's empty
-  slot) becomes a turning `loader-circle`; on the bin and the pencil the spinner replaces the glyph.
-  Reduced motion and `html.anim-off` stop the turning; the glyph stays.
+- **Busy is `aria-busy="true"` plus `aria-disabled="true"` — never `disabled`.** The page sets both,
+  ignores a press while they stand, and clears both. `disabled` would throw keyboard focus to
+  `<body>` in the middle of the action and dim a control that is working, not unavailable: a busy
+  button keeps focus and full strength. The `> ` prefix (or the ghost's empty slot) becomes a
+  turning `loader-circle`; on the bin and the pencil the spinner replaces the glyph. Reduced motion
+  and `html.anim-off` stop the turning; the glyph stays.
 - **`--success` and `--danger` are verdict words, composed with `--ghost`** — never a second filled
   button beside the primary. The edge is the colour mixed 60% into `--border` at rest and the full
   colour, with a 10% tint, under the pointer. The text measures 5.16:1 (`--success`) and 5.68:1
@@ -142,6 +145,9 @@ system whose `--radius` has been `0` since its first release.
   icon-only removal stays the bin, and a word never borrows it. **Resetting a view** (filters,
   sort) is not destructive and never red: that is `button.doc-link--forward` (`chrome.md`).
 - **Under a coarse pointer every variant is 44px tall**, and the bin and pencil 44px square.
+- **Disabled is `.45` and does not answer the pointer** — no lift, no tint, no edge. Every hover
+  rule in the family carries `:where(:not(:disabled))`, which adds no weight, so an override
+  written against 0.59.0's selectors still wins.
 - **Tailwind:** the classes sit in the `components` layer, so a utility on the same element wins —
   a `px-3` on a `.btn-terminal` is a local fork. Leave the padding to the class.
 
@@ -186,11 +192,12 @@ height on every surface, as seedr's and configr's `h-7` rows already were.
   and in focus too.
 - **The placeholder** is `--muted-foreground` at full opacity, and it is never the label: a
   `<label>` or an `aria-label`, always.
-- **Disabled** is `opacity: .45`, as on every control.
+- **Disabled** is `opacity: .45`, as on every control, and a disabled field does not change under
+  the pointer.
 - **No spinners, no search decorations**: `type="number"` and `type="search"` render as plain fields.
 - **A `textarea`** is at least 4rem tall, at `--lh-base`, and resizes vertically only.
 - `examples/components.html` measures every single-line control on the page, rendered and with its
-  floor removed; `scripts/check-control-height.mjs` asserts it in all four themes and at a 20px root.
+  floor removed; `scripts/check-components.mjs` asserts it in all four themes and at a 20px root.
 - A field with its label, description and error is a `.field-row` — see `tables-and-forms.md`.
 
 ## One popup look: every dropdown list is the system's list (0.60.0)
@@ -384,9 +391,11 @@ of the name. A note inside is `.text-muted-foreground`; the way to where the sta
 ## The minimap: a TOC or a minimap, never both (0.60.0)
 
 `initMinimap({ sections: "section.doc" })` draws one 2px bar per section in the left gutter from
-64rem, each a button named by its section's heading and carrying it as its `data-tip`. The current
-section's bar has `aria-current="true"`, and the stylesheet draws it from that attribute — there is
-no state class. No radius.
+64rem, each a button named by its section's heading. The heading is its `data-tip` too — the one
+place a tip repeats a name, because the bar shows no words at all, and the tooltip does not
+announce a tip that equals the name (O3), so a screen reader hears it once. The current section's
+bar has `aria-current="true"`, and the stylesheet draws it from that attribute — there is no state
+class. No radius.
 
 **A page shows a TOC or a minimap, never both**: `initMinimap()` returns `null` on a page that has a
 `[data-toc-link]`. The TOC belongs where there is room for its column (cockpit, danieldeusing.de),
@@ -401,6 +410,27 @@ lucide's `maximize-2`, a mask at `--icon-sm` in place of the `⤢` character siz
 its focus ring is the 2px `--ring`. The view it opens is a `<dialog class="dgm-overlay">`, specified
 with the other dialogs in `overlays.css`; `html.dgm-locked`, `.dgm-btn` and `.dgm-close` are gone —
 its bar is `.btn-terminal` buttons and the dialog's own close button.
+
+## Forced colours: a contrast theme keeps every glyph and every state (0.60.0)
+
+A contrast theme — forced colours — repaints every background as `Canvas` and replaces every author
+colour; only a system colour is kept as written. Everything drawn by a background vanishes: the
+mask glyphs (the ✓, the bin, the pencil, the spinner, the zoom hint, the theme dot), the states that
+are only a fill (the highlighted row, the minimap's current bar) and the select's caret, a gradient
+the mode drops outright. `components.css` redraws all of it in one `@media (forced-colors: active)`
+block, and a surface adds nothing.
+
+- The row under the pointer or the keys is `Highlight` under `HighlightText`, a row that is off is
+  `GrayText`, where you are in a navigation list is `Highlight` text, the minimap's bars are
+  `CanvasText` with the current one `Highlight`, and the trigger's caret is a ▾ drawn as text.
+- **Writing a glyph of your own: give its control a system colour first.** A pseudo-element that
+  opts out (`forced-color-adjust: none`) and paints `currentColor` paints the colour its element was
+  *given*, not the one the mode shows. Measured here, with only the opt-out: the spinner on the
+  filled button came out `--primary-foreground` at 1.11:1 on the white Canvas, and the ✓ at 1.78:1
+  on the black one. So the controls that carry a glyph are `ButtonText`, `CanvasText`,
+  `HighlightText` or `GrayText` inside the block, and the glyph inherits that.
+- `scripts/check-components.mjs` emulates the mode, light and dark, and asserts that every glyph
+  stands 3:1 off what it sits on and that every state still differs from its neighbour.
 
 ## The rail marks the current page on `aria-current="page"` (0.19.0) — an attribute, not a class
 

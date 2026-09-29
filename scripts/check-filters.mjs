@@ -1035,6 +1035,42 @@ await press("Tab");
 await check("search row: Tab closes it and moves on from the TRIGGER, not from the end of <body>",
   async () => !(await evaluate("!!panel()")) && (await evaluate(`document.activeElement.id`)) === "after",
   () => evaluate("document.activeElement.id || document.activeElement.tagName"));
+// THE BOX'S EVENTS ARE THE LIST'S OWN: a page listening on the document, in either phase, hears none
+// of them — not a keystroke, not the `change` the browser fires as the edited box blurs (Tab) or
+// leaves the page (Escape). The <select>'s own input/change on a pick are asserted above.
+await evaluate(`window.leaked = []; for (const type of ["input", "change"]) for (const capture of [true, false])
+  document.addEventListener(type, (e) => { if (e.target.closest?.(".select-panel")) leaked.push(type + (capture ? "/capture" : "/bubble")); }, capture); null`);
+await click(`triggerOf("many")`);
+await typeText("ab");
+await press("Tab");
+await click(`triggerOf("many")`);
+await typeText("cd");
+await press("Escape");
+await check("search row: a document listener, capture or bubble, hears none of the box's input/change — typed, blurred by Tab, removed by Escape",
+  async () => (await evaluate("leaked.length")) === 0, () => evaluate("leaked.join(',')"));
+
+// A POLL THAT SHRINKS AN OPEN DIALOG TO A LISTBOX: the rebuilt popup has no box to hold focus, so
+// focus goes back to the trigger — which carries the highlight again, and the keys still work.
+await evaluate(`document.getElementById("many").value = ""; document.getElementById("many").dispatchEvent(new Event("change")); null`);
+await click(`triggerOf("many")`);
+await typeText("1");
+await evaluate(`(() => { const s = document.getElementById("many"); while (s.options.length > 6) s.lastElementChild.remove(); })(); tick()`);
+const shrunk = () => evaluate(`({ panel: panel()?.getAttribute("role") ?? null, focus: document.activeElement === triggerOf("many")
+  ? "trigger" : document.activeElement.tagName, row: activeRow(triggerOf("many")) })`);
+await check("search row: when a poll shrinks the open dialog to a plain listbox, focus goes to the TRIGGER, which points at a row",
+  async () => { const s = await shrunk(); return s.panel === "listbox" && s.focus === "trigger" && s.row !== null; },
+  async () => JSON.stringify(await shrunk()));
+const before = await evaluate(`activeRow(triggerOf("many"))`);
+// Pressed only where the reader's focus is on the trigger: with focus lost to <body> (the bug) the key
+// scrolls the page instead, and left the page in a state that aborted a later section.
+if (await evaluate(`document.activeElement === triggerOf("many")`)) await press("ArrowDown");
+await check("search row: ...and ArrowDown moves the highlight there",
+  async () => { const after = await evaluate(`activeRow(triggerOf("many"))`); return !!before && !!after && after !== before; },
+  async () => `${before} -> ${await evaluate(`activeRow(triggerOf("many"))`)}`);
+// Closed by a press outside, not by Escape: with focus lost to <body> (the bug) Escape reaches
+// nothing, and a list left open would take every later section down with it.
+await click(`$("#after")`);
+
 const popupOf = (id) => evaluate(`triggerOf(${JSON.stringify(id)}).getAttribute("aria-haspopup")`);
 await evaluate(`document.getElementById("few").removeAttribute("data-search"); tick()`);
 const withoutRow = await popupOf("few");
@@ -1572,8 +1608,9 @@ const glyphPaint = async (selector, pseudo) => {
   return paint;
 };
 // A FOCUS RING, on and off: its left band, 2-4px outside the control, halfway down. REAL keyboard
-// focus — Tab from the control before it — because a :focus-visible forced through DevTools computes
-// the outline and paints nothing (measured: 0 changed pixels around the chip).
+// focus — Tab from the control before it — because a pseudo-state forced through DevTools is not a
+// reliable stand-in for real focus across browser builds: it once painted nothing here, and did not
+// reproduce for the reviewer. Real focus is what a reader's Tab produces.
 const ringPaint = async (selector, before) => {
   const b = await evaluate(`box(${JSON.stringify(selector)})`);
   const clip = { x: Math.floor(b.left) - 6, y: Math.floor(b.top + b.height / 2) - 2, width: 6, height: 4 };
@@ -1587,21 +1624,21 @@ const ringPaint = async (selector, before) => {
     () => evaluate("document.activeElement.blur(); null"));
   return { ...paint, focused };
 };
-// The text's contrast as PAINTED: the commonest colour in its line box is what it sits on (a backplate
-// included); the pixel furthest from that is the text's own ink. Ink is counted, so a clip that caught
-// no glyph cannot pass.
+// The text's contrast as PAINTED, by the same two shots as a glyph: its line box with the text, and
+// again with the text transparent. Only the text's own pixels change, each measured against what it
+// covers (a backplate included) — so a clip that slid onto a neighbour's words holds no changed pixel
+// and fails, where one shot would have read the neighbour's ink as this text's.
 const textPaint = async (selector) => {
   const clip = await evaluate(`(() => { const e = $(${JSON.stringify(selector)});
     const text = [...e.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
     const range = document.createRange(); range.selectNodeContents(text);
     const b = [...range.getClientRects()].filter((x) => x.width > 2).pop();
     return { x: Math.floor(b.left), y: Math.floor(b.top), width: Math.ceil(b.width), height: Math.ceil(b.height) }; })()`);
-  const px = await shot(clip);
-  const counts = new Map();
-  for (const p of px) counts.set(p.join(","), (counts.get(p.join(",")) || 0) + 1);
-  const ground = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
-  const ratios = px.map((p) => contrast(p, ground));
-  return { ratio: Math.max(...ratios), ink: ratios.filter((q) => q >= 1.5).length };
+  const hide = `<style id="untext">${selector} { color: transparent !important; }</style>`;
+  const paint = await markPaint(clip, async () => {},
+    () => evaluate(`document.head.insertAdjacentHTML("beforeend", ${JSON.stringify(hide)}); null`));
+  await evaluate(`document.getElementById("untext").remove(); null`);
+  return { ratio: paint.ratio, ink: paint.changed };
 };
 // A fill, read 3px inside the left edge, halfway down — padding, never text.
 const fillPaint = async (selector) => {

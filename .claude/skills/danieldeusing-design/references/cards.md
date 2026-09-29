@@ -283,8 +283,8 @@ tree's selected row is the same marker.
 
 - On the tint, `--muted-foreground` falls to 4.08:1 (warm, over `--card`), so **the lead, the meta
   and the description turn `--foreground`** on the current row (8.07). A `.tag` or `.count` inside
-  keeps its own colour, and a muted one measures 3.95–4.08:1 on that tint: in a row that can become
-  current, put words in the meta slot, not a muted tag.
+  keeps its own colour, and a muted one measures 3.95–4.37:1 on that tint (warm, the three
+  surfaces): in a row that can become current, put words in the meta slot, not a muted tag.
 - **The rail's trailing `←` is not copied.** It points from the right-hand rail back at the content;
   a list or a tree sits on the content's left, where the same arrow points away from what it
   describes.

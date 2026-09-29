@@ -36,9 +36,9 @@
          tokens and classes, not these copies. The header names the ones in force.
          ══════════════════════════════════════════════════════════════════════════════════════════ -->
     <style id="standin-wp1-tokens" media="not all">
-      /* WP1 · the display title step (lead ruling on P1): 30px, 36px from 48rem */
+      /* WP1 · the display title step (lead ruling on P1): 30px, 36px from 40rem */
       :root { --fs-display: 1.875rem; }
-      @media (min-width: 48rem) { :root { --fs-display: 2.25rem; } }
+      @media (min-width: 40rem) { :root { --fs-display: 2.25rem; } }
       /* WP1 · F1 control and glyph sizes */
       :root {
         --control-h: 1.75rem;
@@ -278,9 +278,9 @@
 
     <main class="demo-main">
       <p class="demo-intro">
-        Every element of spec entries P1–P10 and S9 in every state it has at rest. The page loads
-        tokens.css and content.css; reset, base, components and chrome only for the surrounding markup
-        the examples borrow. Open it with <code>?bare</code> for the tokens-only rendering. Hover,
+        Every element of spec entries P1–P8, P10 and S9 in every state it has at rest (P9 is WP3's
+        <code>.navlist</code>). The page loads tokens.css and content.css; reset, base, components and
+        chrome only for the surrounding markup the examples borrow. Open it with <code>?bare</code> for the tokens-only rendering. Hover,
         focus, print and a coarse pointer are asserted by <code>scripts/check-content.mjs</code>, the
         copy runtime by <code>scripts/check-copy.mjs</code>.
       </p>
@@ -289,7 +289,7 @@
       <section class="demo-section" id="p1">
         <h2>P1 · .page-title and .lede</h2>
         <p class="demo-intro">An app view title is <code>--fs-2xl</code> at every width; a public site's
-          page title is <code>.page-title--display</code>, 30px and 36px from 48rem (lead ruling).</p>
+          page title is <code>.page-title--display</code>, 30px and 36px from 40rem on a 1.2 leading (lead ruling).</p>
         <div class="demo-grid">
           <div class="demo-frame" id="p1-app">
             <p class="demo-cap">app view — .page-title</p>
@@ -331,6 +331,10 @@
           <div class="demo-cell">
             <h2 class="eyebrow comment" id="eyebrow-comment">overview</h2>
             <p>With <code>.comment</code>, the <code># </code> prefix in <code>--border</code> precedes it.</p>
+          </div>
+          <div class="demo-cell" data-tone="destructive">
+            <p class="eyebrow" id="eyebrow-in-tone">inside a toned container</p>
+            <p>The cell carries <code>data-tone="destructive"</code>; an eyebrow with no tone of its own stays muted.</p>
           </div>
         </div>
       </section>
@@ -401,6 +405,23 @@
               and <strong>headings and strong</strong> return to the foreground colour.</p>
             <ul><li>one</li><li>two</li></ul>
             <p><a href="#p4">a link</a> is still the accent, underlined at rest.</p>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">what a renderer emits — a loose list, code in a list item, a two-paragraph quote — and list classes inside a body</p>
+            <article class="markdown" id="md-nested">
+              <p>Intro paragraph.</p>
+              <ul>
+                <li><p id="nest-li-p1">First item, first paragraph.</p><p id="nest-li-p2">First item, second paragraph.</p></li>
+                <li><p id="nest-li-p3">Second item.</p><pre id="nest-li-pre"><code>npm run build</code></pre></li>
+              </ul>
+              <blockquote><p id="nest-bq-p1">A quote's first paragraph.</p><p id="nest-bq-p2">Its second paragraph.</p></blockquote>
+              <p id="nest-before-plain">Before a plain list:</p>
+              <ul class="plain" id="nest-plain"><li>a plain list inside the body</li></ul>
+              <p id="nest-before-steps">Before the steps:</p>
+              <ol class="steps" id="nest-steps"><li>one step</li></ol>
+              <p id="nest-before-dash">Before a dash list:</p>
+              <ul class="dash" id="nest-dash"><li>one dash item</li></ul>
+            </article>
           </div>
         </div>
         <div class="demo-grid" style="margin-top: 0.75rem">

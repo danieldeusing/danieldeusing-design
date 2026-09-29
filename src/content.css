@@ -36,10 +36,12 @@
    TWO SIZES, AND WHICH ONE IS NOT A MATTER OF TASTE (lead ruling, 2026-09-28). An app surface —
    cockpit, configr, seedr's registry — titles its views at --fs-2xl (24px) at every width: a view
    title sits above a table or a form, and a larger one only pushes the content down. A PUBLIC SITE's
-   page title is `--display`, --fs-display: 30px, 36px from 48rem. danieldeusing.de is a source of
+   page title is `--display`, --fs-display: 30px, 36px from 40rem. danieldeusing.de is a source of
    truth and titles its pages that way; the spec had ruled it down to 24px, and the ruling was
    overturned because the site is the reference, not the thing being corrected. The display step
-   lives in tokens.css so the breakpoint is decided once; this file only reads it.
+   lives in tokens.css so the breakpoint is decided once; this file only reads it. The display title
+   is set at 1.2, pagr's `leading-tight`-at-display value (36px on 43.2px): --lh-tight's 1.3 opens a
+   two-line display title into two separate lines. `--lh-display` if tokens.css names it, else 1.2.
 
    THE GAPS COME FROM THE SOURCES. 1.5rem under the prompt is seedr's and pagr's `mt-6`. The lede
    sits .5rem under the title — the DS template's own gap; pagr's 1rem and configr's .25rem disagree
@@ -61,6 +63,7 @@
 }
 .page-title--display {
   font-size: var(--fs-display);
+  line-height: var(--lh-display, 1.2);
 }
 .prompt + .page-title {
   margin-block-start: 1.5rem;
@@ -98,6 +101,10 @@
    to be right in all of them. `data-tone` colours it (the tone map is in tokens.css); with no tone
    it is --muted-foreground, 4.67:1 at worst.
 
+   `--tone` INHERITS (F7), so an untoned eyebrow inside a toned container — a destructive dialog, a
+   warning fence — would take the container's tone and say something it was not asked to. An eyebrow
+   without its own `data-tone` resets it at its root and is muted wherever it lands.
+
    Write the words in lower case. CSS upper case is a rendering; a screen reader reads the source,
    and an upper-case SOURCE is spelled out letter by letter by some of them. */
 .eyebrow {
@@ -108,6 +115,9 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--tone, var(--muted-foreground));
+}
+.eyebrow:not([data-tone]) {
+  --tone: initial;
 }
 
 
@@ -202,16 +212,22 @@
   line-height: 1.625;
   overflow-wrap: break-word;
 }
-/* Every direct child gets its gap from the one above it, and nothing from the user agent: without
-   a reset, a paragraph's 1em margins would stack on top of the .5rem and the rhythm would depend on
-   which surface the text landed on. */
+/* Every block gets its gap from the one above it, AT ANY DEPTH, and nothing from the user agent:
+   two paragraphs in a list item or a blockquote are spaced like two paragraphs in the body.
+   Direct children only (the first cut) left a nested paragraph with the user agent's 1em on a
+   tokens-only surface and flush on a full one, so the rhythm depended on where the text landed.
+   The block list is `:where()` so the rules stay at (0,1,0); `.markdown > *` keeps any direct child
+   the list does not name (a `div.code-block`, an `.eli5`) in the same rhythm. */
+.markdown :where(p, ul, ol, dl, pre, blockquote, figure, table, hr, details, h1, h2, h3, h4, h5, h6),
 .markdown > * {
   margin-block: 0;
 }
+.markdown :where(p, ul, ol, dl, pre, blockquote, figure, table, details, div, h1, h2, h3, h4, h5, h6)
+  + :where(p, ul, ol, dl, pre, blockquote, figure, table, details, div),
 .markdown > * + * {
   margin-block-start: 0.5rem;
 }
-.markdown > :is(h1, h2, h3, h4, h5, h6):not(:first-child) {
+.markdown * + :is(h1, h2, h3, h4, h5, h6) {
   margin-block-start: 0.75rem;
 }
 .markdown :is(h1, h2, h3, h4, h5, h6) {
@@ -264,7 +280,9 @@
 /* ── LISTS OUTSIDE MARKDOWN (P4) ──────────────────────────────────────────────────────────────
    Three list shapes a hand-written page uses, promoted out of the templates and pages that each
    carried a copy. Declared AFTER the markdown rules on purpose: they tie with `.markdown ul` on
-   specificity, so a `ul.plain` inside a markdown body is still a plain list.
+   specificity, so a `ul.plain` inside a markdown body is still a plain list. Their `margin: 0`
+   (0,1,1) outranks the markdown gap (0,1,0), so the gap is restated for them at the end of this
+   section — a plain list after a paragraph in a body is spaced like any other block, not flush.
 
    `ol.steps` — numbered steps, the number in --primary in a 1.5rem gutter. cockpit's and the DS
    template's rule, unchanged. */
@@ -321,6 +339,9 @@ ul.dash > li {
 }
 ul.dash > li + li {
   margin-block-start: 0.375rem;
+}
+.markdown * + :is(ul.plain, ol.steps, ul.dash) {
+  margin-block-start: 0.5rem;
 }
 ul.dash > li::before {
   content: "-";
@@ -589,7 +610,8 @@ ul.dash > li::before {
    could say "ok" over a step that failed is exactly the green-when-broken this estate keeps
    finding. Drawn with empty alt text, so a screen reader hears the step and its value.
 
-   Two columns from 40rem — the step at --boot-step-w (14rem, pagr's `sm:w-56`) and the value — and
+   Two columns from 40rem (`width < 40rem` is one column, so 640px is already two, like the display
+   title's step) — the step at --boot-step-w (14rem, pagr's `sm:w-56`) and the value — and
    one below it, where 14rem is most of a phone. A control may stand in the value's place (the rail
    toggle, the animation toggle, a theme picker); it keeps its own class. The notes above and below
    are muted — pagr's faint first line at /70 is corrected (P8). */
@@ -622,7 +644,7 @@ ul.dash > li::before {
   min-inline-size: 0;
   color: var(--foreground);
 }
-@media (max-width: 40rem) {
+@media (width < 40rem) {
   .boot-line {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0.125rem;

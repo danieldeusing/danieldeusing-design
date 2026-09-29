@@ -26,12 +26,13 @@
  *
  * A REAL BROWSER, and no dependency — the headless chromium Playwright caches, over the DevTools
  * protocol with Node's own fetch and WebSocket. With no browser it SKIPS loudly; DD_REQUIRE_BROWSER=1
- * makes that skip a failure.
+ * makes that skip a failure. DD_FORBID_STANDINS=1 makes every stand-in in force a failure too — for
+ * the run after integration, when a green result must stand on the real files alone.
  *
  *   node scripts/check-content.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, sep } from "node:path";
@@ -70,17 +71,25 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
 // The template pins a published release, which predates content.css. Served here, its stylesheet is
-// this checkout's bundle source plus content.css, and its runtime is this checkout's — so what is
-// measured is the template's markup under the code that will ship with it. If tokens.css does not
-// declare --fs-display yet (WP1 lands it), the same stand-in the demo uses is injected and REPORTED.
+// this checkout's bundle source and its runtime is this checkout's — so what is measured is the
+// template's markup under the code that will ship with it. Two pieces of that code may not be in the
+// bundle yet, and each is injected ONLY while it is missing, and NAMED as a stand-in when it is: the
+// content.css import (WP13 adds it to index.css) and --fs-display (WP1 adds it to tokens.css). Once
+// both land, the template is measured on src/index.css alone.
 const tokensHaveDisplay = /--fs-display\s*:/.test(readFileSync(join(root, "src/tokens.css"), "utf8"));
-const DISPLAY_STANDIN = "<style data-standin>:root{--fs-display:1.875rem}@media (min-width:48rem){:root{--fs-display:2.25rem}}</style>";
+const indexImportsContent = /@import\s+(url\()?["']\.\/content\.css["']/.test(readFileSync(join(root, "src/index.css"), "utf8"));
+const DISPLAY_STANDIN = "<style data-standin>:root{--fs-display:1.875rem}@media (min-width:40rem){:root{--fs-display:2.25rem}}</style>";
+const TEMPLATE_STANDINS = [
+  ...(indexImportsContent ? [] : ["content.css beside index.css (index.css does not import it yet)"]),
+  ...(tokensHaveDisplay ? [] : ["--fs-display (tokens.css does not declare it yet)"]),
+];
 const templateHtml = () => {
   const cdn = `https://cdn.jsdelivr.net/npm/@danieldeusing/design@${pkg.version}`;
   let html = readFileSync(join(root, "templates/error-page.html"), "utf8");
   html = html.replace(/<link\s+rel="stylesheet"\s+href="[^"]*fonts\.css"[^>]*>/, "");
   html = html.replace(/<link\s+rel="stylesheet"\s+href="[^"]*danieldeusing-design\.min\.css"[^>]*>/,
-    '<link rel="stylesheet" href="/src/index.css"><link rel="stylesheet" href="/src/content.css">' +
+    '<link rel="stylesheet" href="/src/index.css">' +
+    (indexImportsContent ? "" : '<link rel="stylesheet" href="/src/content.css" data-standin>') +
     (tokensHaveDisplay ? "" : DISPLAY_STANDIN));
   return html.split(`${cdn}/runtime/index.js`).join("/runtime/index.js");
 };
@@ -110,7 +119,14 @@ const chrome = spawn(CHROME, [
   "--window-size=1280,900", `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+// The profile goes with the browser, on every exit path, a failed or aborted run included: each one
+// is 2.5MB, and 91 of them had piled up in the temp directory before this line existed.
+const shutdown = () => {
+  try { socket?.close(); } catch {}
+  chrome.kill("SIGKILL");
+  server.close();
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch {}
+};
 process.on("exit", shutdown);
 
 let port = 0;
@@ -175,6 +191,13 @@ process.on("uncaughtException", (error) => {
   console.log("\ncheck-content: ABORTED");
   process.exit(1);
 });
+// Every stand-in in force is printed; under DD_FORBID_STANDINS=1 each one is also a failure.
+const standins = async (where, list) => {
+  console.log(`stand-ins in force (${where}): ${list}`);
+  if (process.env.DD_FORBID_STANDINS === "1") {
+    await check(`DD_FORBID_STANDINS=1: nothing stands in for the real files (${where})`, () => (list === "none" ? [] : [`in force: ${list}`]));
+  }
+};
 
 /* ── in the page: computed-style assertions and colour maths ────────────────────────────────── */
 
@@ -264,20 +287,41 @@ const expectAll = async (list) => (await Promise.all(list.map(([sel, pseudo, wan
 const rect = (sel) => evaluate(`__t.rect(${JSON.stringify(sel)})`);
 const center = async (sel) => evaluate(`(() => { const e = __t.el(${JSON.stringify(sel)}); e.scrollIntoView({ block: "center", behavior: "instant" }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
 const hover = async (sel) => { const p = await center(sel); await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: p.x, y: p.y }); await sleep(250); };
-// :focus-visible follows the last input modality, so a key goes down before the focus moves.
-const focusByKeyboard = async (sel) => {
-  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16 });
-  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16 });
-  await evaluate(`__t.el(${JSON.stringify(sel)}).focus(); null`);
-  await sleep(50);
+// Focus the way a keyboard reader gets there: the element before it in tab order takes focus, then a
+// REAL Tab moves it on. Returns whether the Tab landed on the element — a ring measured on an element
+// that focus never reached would prove nothing, so every caller fails on false.
+const focusByTab = async (sel) => {
+  const ready = await evaluate(`(() => {
+    const target = __t.el(${JSON.stringify(sel)});
+    const tabbable = [...document.querySelectorAll('a[href], button, input, select, textarea, summary, [tabindex]')]
+      .filter((e) => !e.disabled && e.tabIndex >= 0 && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden");
+    const i = tabbable.indexOf(target);
+    if (i < 1) return false;
+    target.scrollIntoView({ block: "center", behavior: "instant" });
+    tabbable[i - 1].focus({ preventScroll: true });
+    return true;
+  })()`);
+  if (!ready) return false;
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+  await sleep(80);
+  return evaluate(`document.activeElement === __t.el(${JSON.stringify(sel)})`);
 };
 const ring = (sel) => expect(sel, null, { "outline-style": "solid", "outline-width": { px: 2 }, "outline-color": { token: "--ring" }, "outline-offset": { px: 2 } });
+const ringByTab = async (sel) => ((await focusByTab(sel)) ? ring(sel) : [`a real Tab did not land on ${sel}`]);
+// The name Chromium's accessibility tree computes — what a screen reader is given.
+const axName = async (sel) => {
+  const { result } = await send("Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(sel)})` });
+  if (!result.objectId) return null;
+  const { nodes } = await send("Accessibility.getPartialAXTree", { objectId: result.objectId, fetchRelatives: false });
+  return nodes[0]?.name?.value ?? null;
+};
 
 /* ═════════════════════════════════════════════════════════════════════════════════════════════ */
 
 await load("?theme=warm");
-console.log(`stand-ins in force (full page): ${await evaluate("document.documentElement.dataset.standins")}`);
-console.log(tokensHaveDisplay ? "--fs-display: declared by tokens.css" : "--fs-display: NOT in tokens.css yet — the template check injects the demo's stand-in");
+await standins("full page", await evaluate("document.documentElement.dataset.standins"));
+await standins("template", TEMPLATE_STANDINS.join(" · ") || "none");
 
 /* ── P1 page title and lede ─────────────────────────────────────────────────────────────────── */
 
@@ -288,9 +332,24 @@ await check("P1 .page-title: 24px, 700, tight, -0.025em, --primary, the large gl
     "margin-top": "24px", "margin-bottom": "0px", "margin-left": "0px", "margin-right": "0px",
   }],
 ]));
-await check("P1 .page-title--display is --fs-display: 36px from 48rem", () => expectAll([
-  ["#p1-display .page-title", null, { "font-size": "36px", "line-height": { px: 46.8 }, "letter-spacing": { px: -0.9 } }],
+// pagr's display titles lead at 1.2 (Tailwind's text-3xl/4xl, and ArticlePostPage's leading-[1.2]).
+await check("P1 .page-title--display is --fs-display at pagr's 1.2 leading: 36px on 43.2px from 40rem", () => expectAll([
+  ["#p1-display .page-title", null, { "font-size": "36px", "line-height": { px: 43.2 }, "letter-spacing": { px: -0.9 } }],
 ]));
+// The step and the boot log's one-column switch both turn at 40rem (WP1's breakpoint, the site's sm:),
+// so they are pinned on both sides of it: 639px is below, 640px is the step.
+await check("40rem, pinned: at 639px the display title is 30px and a boot line one column; at 640px 36px and two", async () => {
+  const out = [];
+  for (const [width, size, cols] of [[639, "30px", 1], [640, "36px", 2]]) {
+    await load("?theme=warm", { width, height: 900 });
+    const got = await evaluate(`[getComputedStyle(__t.el("#p1-display .page-title")).fontSize,
+      getComputedStyle(__t.el("#boot .boot-line")).gridTemplateColumns.split(" ").length]`);
+    if (got[0] !== size) out.push(`at ${width}px the display title is ${got[0]}, want ${size}`);
+    if (got[1] !== cols) out.push(`at ${width}px a boot line has ${got[1]} column(s), want ${cols}`);
+  }
+  await load("?theme=warm");
+  return out;
+});
 await check("P1 .lede: muted, .5rem under the title, no other margin", () => expectAll([
   ["#p1-app .lede", null, { color: { token: "--muted-foreground" }, "margin-top": "8px", "margin-bottom": "0px" }],
 ]));
@@ -317,6 +376,10 @@ await check("P2 data-tone colours an eyebrow (warning, primary)", () => expectAl
 ]));
 await check("P2 an h2.eyebrow.comment still reads at body size (the class beats the heading step)", () => expectAll([
   ["#eyebrow-comment", null, { "font-size": "12px", "font-weight": "500" }],
+]));
+// F7: --tone inherits, so a component that is neutral by default resets it at its root.
+await check("P2 an eyebrow with no tone of its own stays muted inside a toned container", () => expectAll([
+  ["#eyebrow-in-tone", null, { color: { token: "--muted-foreground" } }],
 ]));
 
 /* ── P3 section head and sub-head ───────────────────────────────────────────────────────────── */
@@ -367,6 +430,39 @@ await check("P4 lists: disc / decimal at 1rem, .25rem between items, muted marke
   ["#md-article > ul > li > ul", null, { "margin-top": "4px" }],
   ["#md-article > ul > li", "::marker", { color: { token: "--muted-foreground" } }],
 ]));
+// marked and remark put paragraphs inside list items and quotes, and code inside a list item, and a
+// hand-written body can hold a list class. Every block in that flow, at any depth, starts flush and
+// sits .5rem under the block before it — on the full page, and on tokens.css alone, where the user
+// agent's 12px would otherwise leak (seedr and configr space a paragraph anywhere: `[&_p]:mb-2`).
+const NESTED_GAPS = [
+  ["#nest-li-p1", "#nest-li-p2", "two paragraphs in one list item"],
+  ["#nest-li-p3", "#nest-li-pre", "a paragraph, then code, in a list item"],
+  ["#nest-bq-p1", "#nest-bq-p2", "two paragraphs in a quote"],
+  ["#nest-before-plain", "#nest-plain", "a paragraph, then ul.plain"],
+  ["#nest-before-dash", "#nest-dash", "a paragraph, then ul.dash"],
+];
+const nestedRhythm = () => evaluate(`(() => {
+  const out = [];
+  for (const [a, b, what] of ${JSON.stringify(NESTED_GAPS)}) {
+    const gap = __t.el(b).getBoundingClientRect().top - __t.el(a).getBoundingClientRect().bottom;
+    if (Math.abs(gap - 8) > 0.5) out.push(what + ": " + gap.toFixed(1) + "px apart, want 8");
+  }
+  // ol.steps' first item carries its own .6rem, which collapses through the list's top margin
+  for (const sel of ["#nest-plain", "#nest-steps", "#nest-dash"]) {
+    const m = getComputedStyle(__t.el(sel)).marginTop;
+    if (m !== "8px") out.push(sel + " margin-top " + m + ", want 8px — the list class sits flush against the paragraph");
+  }
+  for (const sel of ["#nest-li-p1", "#nest-bq-p1"]) {
+    const m = getComputedStyle(__t.el(sel)).marginTop;
+    if (m !== "0px") out.push(sel + " is first in its container and has margin-top " + m);
+  }
+  for (const e of __t.el("#md-nested").querySelectorAll("p, pre, ul, ol, blockquote")) {
+    const m = getComputedStyle(e).marginBottom;
+    if (m !== "0px") out.push((e.id ? "#" + e.id : e.tagName.toLowerCase()) + " keeps a margin-bottom of " + m);
+  }
+  return out;
+})()`);
+await check("P4 .markdown spaces every block at any depth: .5rem after a block, flush first, nothing from the user agent", nestedRhythm);
 await check("P4 a link is the accent AND underlined at rest (never colour alone); del is muted", () => expectAll([
   ["#md-article a", null, { color: { token: "--primary" }, "text-decoration-line": "underline", "text-underline-offset": "4px" }],
   ["#md-article del", null, { color: { token: "--muted-foreground" } }],
@@ -719,12 +815,12 @@ const PAINTED = [
 // element's ring, read in pixels, against what it sits on. The strip is the middle of the ring's
 // left side, taken from the element's FOCUSED outline; captured blurred it is the backdrop, focused
 // it is the ring, and the two most-painted colours must reach 3:1.
-const FOCUSABLE = ["#code-plain", "#md-article a", "#cmd-one > button", "#states-text [data-state=copied]"];
+const FOCUSABLE = ["#code-plain", "#code-view", "#md-article a", "#cmd-one > button", "#states-text [data-state=copied]"];
 const ringYield = { captures: 0, lowest: Infinity };
 const focusRings = async () => {
   const problems = [];
   for (const sel of FOCUSABLE) {
-    await focusByKeyboard(sel);
+    if (!(await focusByTab(sel))) { problems.push(`${sel}: a real Tab did not land on it`); continue; }
     const clip = await evaluate(`(() => {
       const el = __t.el(${JSON.stringify(sel)});
       el.scrollIntoView({ block: "center", behavior: "instant" });
@@ -748,7 +844,7 @@ const focusRings = async () => {
 };
 // The yield, printed once after every cell has run: how many captures decoded, and the lowest ratio
 // of each kind. A pass says nothing fell under the bar; this says what the pixels actually were.
-const paintedYield = { captures: 0, glyph: Infinity, text: Infinity };
+const paintedYield = { captures: 0, owned: 0, glyph: Infinity, text: Infinity };
 const painted = async () => {
   const problems = [];
   for (const [sel, kind, min] of PAINTED) {
@@ -777,6 +873,13 @@ const painted = async () => {
     paintedYield.captures += 1;
     paintedYield[kind] = Math.min(paintedYield[kind], ratio);
     if (!(ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${ratio.toFixed(2)}:1, wants ${min}`);
+    // CLIP OWNERSHIP (X1): the same clip with the element hidden must read differently, or the pixels
+    // measured above were somebody else's — a neighbour's border, a fill the clip slid onto.
+    await evaluate(`__t.el(${JSON.stringify(sel)}).style.visibility = "hidden"; null`);
+    const hidden = (await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data;
+    await evaluate(`__t.el(${JSON.stringify(sel)}).style.removeProperty("visibility"); null`);
+    if (hidden === data) problems.push(`${sel} (${kind}): hiding it leaves the clip unchanged — the pixels measured are not its own`);
+    else paintedYield.owned += 1;
   }
   return problems;
 };
@@ -827,7 +930,8 @@ for (const theme of THEMES) {
   }
   await send("Emulation.setEmulatedMedia", { features: [] });
 }
-console.log(`painted under forced colours: ${paintedYield.captures} of ${PAINTED.length * THEMES.length * 2} captures decoded; ` +
+console.log(`painted under forced colours: ${paintedYield.captures} of ${PAINTED.length * THEMES.length * 2} captures decoded, ` +
+  `${paintedYield.owned} proven to hold their own element's ink; ` +
   `lowest glyph ${paintedYield.glyph.toFixed(2)}:1, lowest state word ${paintedYield.text.toFixed(2)}:1; ` +
   `focus rings: ${ringYield.captures} of ${FOCUSABLE.length * THEMES.length * 2 * 2} captures, lowest ${ringYield.lowest.toFixed(2)}:1`);
 await load("?theme=warm");
@@ -858,6 +962,13 @@ const IDENTITY = [
   ["#md-article a", null, ["color", "text-decoration-line", "text-underline-offset"]],
   ["#md-article del", null, ["color"]],
   ["#md-article > hr", null, ["margin-top", "margin-bottom"]],
+  ["#nest-li-p1", null, ["margin-top", "margin-bottom"]],
+  ["#nest-li-p2", null, ["margin-top", "margin-bottom"]],
+  ["#nest-li-pre", null, ["margin-top", "margin-bottom"]],
+  ["#nest-bq-p2", null, ["margin-top", "margin-bottom"]],
+  ["#nest-plain", null, ["margin-top"]],
+  ["#nest-steps", null, ["margin-top"]],
+  ["#nest-dash", null, ["margin-top"]],
   ["#list-steps > li", null, ["padding-left", "margin-top"]],
   ["#list-steps > li", "::before", ["color", "font-weight", "width", "text-align", "position"]],
   ["#list-plain", null, ["list-style-type", "padding-left", "margin-top"]],
@@ -890,7 +1001,7 @@ const snapshot = () => evaluate(`${JSON.stringify(IDENTITY)}.map(([sel, pseudo, 
 }))`);
 const full = await snapshot();
 await load("?theme=warm&bare");
-console.log(`stand-ins in force (?bare):     ${await evaluate("document.documentElement.dataset.standins")}`);
+await standins("?bare", await evaluate("document.documentElement.dataset.standins"));
 await check("?bare: reset, base, components and chrome dropped — the page really lost them", async () => {
   const n = await evaluate(`[...document.styleSheets].map((s) => (s.href || "").split("/").pop()).filter((f) => /^(reset|base|components|chrome)\\.css$/.test(f)).length`);
   return n === 0 ? [] : [`${n} of those stylesheets are still loaded`];
@@ -905,22 +1016,17 @@ await check("?bare: every content.css class computes exactly what it computes on
 });
 
 await check("?bare: hidden still hides every component — tokens.css is all that is left", hiddenHides);
+await check("?bare: the markdown rhythm holds at any depth with no user-agent margin leaking in", nestedRhythm);
 // X2: base.css draws a global :focus-visible ring, so on the full page these would pass with the
 // component's own rule deleted. Here nothing but content.css can draw them.
-await check("?bare: a scrollable .code-block takes the --ring focus ring from the keyboard", async () => {
-  await focusByKeyboard("#code-plain");
-  return ring("#code-plain");
-});
-await check("?bare: a .markdown link takes the --ring focus ring from the keyboard", async () => {
-  await focusByKeyboard("#md-article a");
-  return ring("#md-article a");
-});
+await check("?bare: a scrollable .code-block takes the --ring focus ring from a real Tab", () => ringByTab("#code-plain"));
+await check("?bare: a .markdown link takes the --ring focus ring from a real Tab", () => ringByTab("#md-article a"));
 
 /* ── a phone ────────────────────────────────────────────────────────────────────────────────── */
 
 await load("?theme=warm", { width: 375, height: 812 });
-await check("375px: the display title steps down to 30px; the app title stays 24px", () => expectAll([
-  ["#p1-display .page-title", null, { "font-size": "30px" }],
+await check("375px: the display title steps down to 30px on a 36px line (1.2); the app title stays 24px", () => expectAll([
+  ["#p1-display .page-title", null, { "font-size": "30px", "line-height": { px: 36 } }],
   ["#p1-app .page-title", null, { "font-size": "24px" }],
 ]));
 await check("375px: a boot line is one column, the value under its step", async () => {
@@ -1041,10 +1147,47 @@ await check("template: noindex, one h1 at the display step with an aria-hidden c
   if (t.home !== "cd ~") out.push("no cd ~ link home");
   if (!t.chrome) out.push("header.bar / footer.status missing");
   out.push(...(await expectAll([
-    ["main h1", null, { "font-size": "36px", "margin-top": "24px", color: { token: "--primary" } }],
+    ["main h1", null, { "font-size": "36px", "line-height": { px: 43.2 }, "margin-top": "24px", color: { token: "--primary" } }],
     ["main .lede", null, { "margin-top": "8px", color: { token: "--muted-foreground" } }],
     ["main .lede + p", null, { "margin-top": "24px" }],
   ])));
+  return out;
+});
+const openTemplate = async (width, height = 900) => {
+  await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: `${ORIGIN}/__template/error-page.html` });
+  await sleep(800);
+};
+await check("template: its display step turns at 40rem too — 30px at 639px, 36px at 640px", async () => {
+  const out = [];
+  for (const [width, size] of [[639, "30px"], [640, "36px"]]) {
+    await openTemplate(width);
+    const got = await evaluate(`getComputedStyle(document.querySelector("main h1")).fontSize`);
+    if (got !== size) out.push(`at ${width}px the title is ${got}, want ${size}`);
+  }
+  return out;
+});
+// S9 says "page chrome from page-chrome.html", and 0.60.0's is WP3's (matched at wp3-chrome 0d65016):
+// the header's two .bar-side slots, a footer nav that is a NAMED landmark, and a phone theme menu that
+// says what it is. WP13 re-checks the template against page-chrome.html if WP3 changes it later.
+await check("template: it wears 0.60.0's page chrome — two .bar-side slots, the footer nav named \"page settings\", the phone theme menu \"theme warm\"", async () => {
+  const out = [];
+  await openTemplate(1280);
+  const sides = await evaluate(`[...document.querySelectorAll("header.bar > .bar-side")].map((s) => ({
+    right: s.classList.contains("bar-right"), brand: !!s.querySelector(":scope > .brand"), nav: !!s.querySelector(":scope > #site-nav"), burger: !!s.querySelector(":scope > .nav-burger") }))`);
+  if (sides.length !== 2) out.push(`${sides.length} .bar-side slots in the header, want 2`);
+  else {
+    if (!(sides[0].brand && !sides[0].right)) out.push(`the first slot does not hold the brand: ${JSON.stringify(sides[0])}`);
+    if (!(sides[1].right && sides[1].nav && sides[1].burger)) out.push(`the second slot is not .bar-right with the burger and the site nav: ${JSON.stringify(sides[1])}`);
+  }
+  const footer = await axName("footer.status nav");
+  if (footer !== "page settings") out.push(`the footer nav is named ${JSON.stringify(footer)}, want "page settings"`);
+  await openTemplate(375, 812);
+  // On a phone the footer's controls live in the burger: open it, as a reader has to.
+  await evaluate(`document.querySelector(".nav-burger").click(); null`);
+  await sleep(200);
+  const phone = await axName(".mobile-footer .mobile-theme > summary");
+  if (phone !== "theme warm") out.push(`the phone theme menu is named ${JSON.stringify(phone)}, want "theme warm"`);
   return out;
 });
 await check("template: the prompt is filled from the address bar, as text", async () => {

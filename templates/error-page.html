@@ -2,7 +2,8 @@
 <!--
   danieldeusing-design — the error page: a 404, or the page an app shows when it has crashed.
 
-  One file, the standard chrome (templates/page-chrome.html has the reasoning for every piece of it),
+  One file, the standard chrome (templates/page-chrome.html has the reasoning for every piece of it,
+  and this header, rail and footer are its markup: the two `.bar-side` columns, the named footer nav),
   and a body of four lines. Fill the {{PLACEHOLDERS}}; the CDN urls are PINNED for the reason
   documentation.html gives — this page ships the system's chrome MARKUP, so it pins the release that
   styles it, and a release bumps every template pin in the same commit (check-release fails otherwise).
@@ -19,9 +20,10 @@
   "Go home" button, a "cat" prefix); this is the one version.
 
   ── THE TITLE IS THE DISPLAY STEP (lead ruling, 2026-09-28) ──
-  `.page-title--display`: 30px, 36px from 48rem — the size danieldeusing.de titles its pages at, and
-  the site is the source of truth. The spec had brought the 404 down to the 24px app title; the ruling
-  put the display step back for public page titles and named the error page's status line as one.
+  `.page-title--display`: 30px, 36px from 40rem, on a 1.2 leading — the size danieldeusing.de titles
+  its pages at, and the site is the source of truth. The spec had brought the 404 down to the 24px
+  app title; the ruling put the display step back for public page titles and named the error page's
+  status line as one.
   The crash variant below uses the same title so the two error pages read as one page.
 
   ── THE PROMPT IS FILLED FROM THE ADDRESS BAR ──
@@ -94,50 +96,55 @@
   <body>
     <a href="#main" class="skip-link">skip to content</a>
     <header class="bar">
-      <a href="/" class="brand"
-        ><span class="glow">{{SURFACE}}</span><span class="cursor-block" aria-hidden="true"></span
-      ></a>
+      <div class="bar-side">
+        <a href="/" class="brand"
+          ><span class="glow">{{SURFACE}}</span><span class="cursor-block" aria-hidden="true"></span
+        ></a>
+      </div>
 
-      <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
-      </button>
+      <div class="bar-side bar-right">
+        <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        </button>
 
-      <nav aria-label="site" id="site-nav" class="site-nav">
-        <!-- KEEP YOUR SURFACE'S RAIL. A reader who followed a dead link has one next move, which is
-             to go somewhere else, and the rail is the list of places. A surface with no rail deletes
-             the .ls-nav-head and the .ls-nav and NOTHING ELSE: the burger and the .mobile-footer stay,
-             because below 48rem they are the only way to the theme picker (page-chrome.html). -->
-        <div class="ls-nav-head">
-          <span class="ls-nav-title prompt">ls -l</span>
-          <button type="button" class="ls-nav-toggle" data-ls-nav-toggle aria-controls="nav" aria-expanded="true" aria-label="show or hide navigation"></button>
-        </div>
-        <div class="ls-nav" id="nav">
-          <ul class="ls-panel" role="list">
-            <li><a class="dropdown-item ls-row ls-row--dir" href="{{NAV_1_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_1_LABEL}}</span></a></li>
-            <li><a class="dropdown-item ls-row" href="{{NAV_2_HREF}}"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
-          </ul>
-        </div>
-        <div class="mobile-footer">
-          <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
-          <details class="mobile-theme">
-            <summary>
-              <span class="dd-dot" aria-hidden="true"></span>
-              <span data-theme-label>warm</span>
-              <span class="mf-chev" aria-hidden="true">▾</span>
-            </summary>
-            <div class="mf-panel">
-              <button type="button" class="dropdown-item" data-theme-value="warm">warm</button>
-              <button type="button" class="dropdown-item" data-theme-value="green">green</button>
-              <button type="button" class="dropdown-item" data-theme-value="mono">mono</button>
-              <button type="button" class="dropdown-item" data-theme-value="paper">paper</button>
-            </div>
-          </details>
-          <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
-            <span data-anim-box aria-hidden="true">[x]</span>
-            <span>anim</span>
-          </button>
-        </div>
-      </nav>
+        <nav aria-label="site" id="site-nav" class="site-nav">
+          <!-- KEEP YOUR SURFACE'S RAIL. A reader who followed a dead link has one next move, which is
+               to go somewhere else, and the rail is the list of places. A surface with no rail deletes
+               the .ls-nav-head and the .ls-nav and NOTHING ELSE: the burger and the .mobile-footer stay,
+               because below 48rem they are the only way to the theme picker (page-chrome.html). -->
+          <div class="ls-nav-head">
+            <span class="ls-nav-title prompt">ls -l</span>
+            <button type="button" class="ls-nav-toggle" data-ls-nav-toggle aria-controls="nav" aria-expanded="true" aria-label="show or hide navigation"></button>
+          </div>
+          <div class="ls-nav" id="nav">
+            <ul class="ls-panel" role="list">
+              <li><a class="dropdown-item ls-row ls-row--dir" href="{{NAV_1_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_1_LABEL}}</span></a></li>
+              <li><a class="dropdown-item ls-row" href="{{NAV_2_HREF}}"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
+            </ul>
+          </div>
+          <div class="mobile-footer">
+            <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+            <details class="mobile-theme">
+              <summary>
+                <span class="visually-hidden">theme </span>
+                <span class="dd-dot" aria-hidden="true"></span>
+                <span data-theme-label>warm</span>
+                <span class="mf-chev" aria-hidden="true">▾</span>
+              </summary>
+              <div class="mf-panel">
+                <button type="button" class="dropdown-item" data-theme-value="warm">warm</button>
+                <button type="button" class="dropdown-item" data-theme-value="green">green</button>
+                <button type="button" class="dropdown-item" data-theme-value="mono">mono</button>
+                <button type="button" class="dropdown-item" data-theme-value="paper">paper</button>
+              </div>
+            </details>
+            <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
+              <span data-anim-box aria-hidden="true">[x]</span>
+              <span>anim</span>
+            </button>
+          </div>
+        </nav>
+      </div>
     </header>
 
     <!-- THE 404. The gap under the lede is danieldeusing.de's (1.5rem, as between the prompt and the
@@ -165,7 +172,7 @@
 
     <footer class="status">
       <span class="status-left"><span class="glow">[{{SURFACE}}]</span> not found</span>
-      <nav class="status-right">
+      <nav class="status-right" aria-label="page settings">
         <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
         <span class="sep" aria-hidden="true"></span>
         <!-- A multilingual surface adds its language menu here (details.dropdown with one link per

@@ -34,14 +34,16 @@ Contents:
 | the page | write | size |
 |---|---|---|
 | a view in an app — cockpit, configr, seedr's registry | `h1.page-title` | `--fs-2xl`, 24px at every width |
-| a page of a public site — danieldeusing.de, an article | `h1.page-title.page-title--display` | `--fs-display`: 30px, 36px from 48rem |
+| a page of a public site — danieldeusing.de, an article | `h1.page-title.page-title--display` | `--fs-display`: 30px, 36px from 40rem, on a 1.2 leading |
 | the error page's status line | `.page-title--display` | as above |
 
 An app title sits above a table or a form, and a larger one only pushes the content down. The
 public site titles its pages at 30/36px and is a source of truth, so the system got one display
 step instead of the site being shrunk to fit the scale. **Nothing else takes the display step** — not
 a section heading, not a card title, not a stat. The breakpoint lives in the token, so the class
-needs no media query and neither does your page.
+needs no media query and neither does your page. The display title is set at **1.2** (pagr's
+leading; `--lh-display` when tokens.css names it): 36px on 43.2px, where `--lh-tight`'s 1.3 opened a
+two-line title into two separate lines.
 
 - **It is lit**: `--primary` with the large glow, as seedr and danieldeusing.de draw it. Do not add
   `.glow-lg` or a colour — the class already has both. Cockpit's unlit `h1.title` and configr's
@@ -74,7 +76,9 @@ nine labels over five spacings from .05 to .1em, and those move to `.05em`.
 - **It sets no margin.** The block it heads spaces it: a card's gap, a list's own margin. An eyebrow
   sits in too many containers for one margin to be right in all of them.
 - **`data-tone` colours it** (the tone map is in `tokens.css`): `warning` for "untrusted",
-  `primary` for configr's settings sections.
+  `primary` for configr's settings sections. **Without its own `data-tone` it is muted wherever it
+  lands** — `--tone` inherits, so the class resets it, and an eyebrow in a destructive dialog does
+  not turn red by accident.
 - **Write the words in lower case.** The upper case is CSS; a screen reader reads the source, and
   some spell an upper-case source out letter by letter.
 - **A label that heads a region is a heading element** (`h3`, `h4`), so it is in the outline.
@@ -132,7 +136,10 @@ surface still loading the plugin the two would merge into a look nobody wrote.
   body size; all bold and `--foreground`. A document's `# Title` is its h1, and it must not be as
   loud as the page's own title. They are not `--primary`: the page title is the lit line.
 - **The rhythm** is 1.625 line height, .5rem between blocks, .75rem above a heading (seedr and
-  configr). pagr's 1.75 and its `em` gaps are corrected.
+  configr). pagr's 1.75 and its `em` gaps are corrected. It holds **at any depth**: two paragraphs in
+  a list item or a blockquote are .5rem apart, the first block in a container starts flush, and no
+  block carries the user agent's margins, with or without base.css. A `ul.plain`, `ol.steps` or
+  `ul.dash` inside a body is spaced like any other block.
 - **Links are the accent and underlined at rest**, so they are never told apart by colour alone.
   List markers are `--muted-foreground`; `del` is muted with the browser's line-through.
 - Images and video stay inside the column with a `--border` edge. **A figure is full width** —
@@ -268,14 +275,16 @@ second call installs nothing.
 
 - **What is copied**: a non-empty `data-copy` exactly as written; otherwise the `data-copy-from`
   element's `textContent` exactly; otherwise the `.cmd-text`, **trimmed** — a command copied with a
-  trailing newline runs the moment it is pasted into a shell. With no source at all the press
-  fails; it never writes an empty string over the clipboard.
+  trailing newline runs the moment it is pasted into a shell. With no source, or one with nothing in
+  it (a whitespace-only `.cmd-text`), the press fails with **"nothing to copy"** and selects nothing;
+  it never writes an empty string over the clipboard.
 - **The result is shown and said.** For 2000ms the button carries `data-state="copied"` (the glyph
   becomes a check, `--success`) or `"failed"` (an x, `--destructive`); a text button reads "copied"
   or "copy failed". Another press restarts the 2000ms. The glyph changes **shape**, so colour is
-  never the only signal. The same words go to one visually hidden `role="status"` region — made on
-  the first press, moved into an open modal `<dialog>` when the button is inside one, because
-  everything outside a modal is inert and an inert region is never read.
+  never the only signal. The same words go to one visually hidden `role="status"` region — made by
+  `initCopyButtons()` before any press, so the first result is heard at once, and moved into an open
+  modal `<dialog>` when the button is inside one, because everything outside a modal is inert and an
+  inert region is never read.
 - **The accessible name never changes.** seedr and configr swapped the name to "Copied", which a
   screen reader announces inconsistently on a focused button. The live region reports instead; a
   text button's label is pinned into `aria-label` for the length of the state and released after.
@@ -358,8 +367,9 @@ surface may reuse the idiom.
   empty alt text, so a screen reader hears the step and its value.
 - **A control may stand in the value's place**, keeping its own class: the rail toggle
   (`[data-ls-nav-toggle]`), the animation toggle, the theme or language picker.
-- Two columns from 40rem — the step at `--boot-step-w` (14rem) and the value — and one below it,
-  where 14rem is most of a phone. The notes are muted (pagr's faint first line is corrected).
+- Two columns from 40rem — the step at `--boot-step-w` (14rem) and the value — and one below it
+  (`width < 40rem`, so 640px is already two, the same step as the display title), where 14rem is most
+  of a phone. The notes are muted (pagr's faint first line is corrected).
 
 ## The error page: `templates/error-page.html` (S9)
 
@@ -394,6 +404,9 @@ and the way home. **Start from the template**; it carries the standard chrome
   `404.html`; a single-page app that renders its not-found view answers 200, and the robots meta is
   the one statement that survives the wrong status.
 - **Keep the surface's rail.** A reader who followed a dead link has one next move.
+- **The chrome is `templates/page-chrome.html`'s markup**: the brand in the first `.bar-side`, the
+  burger and `nav#site-nav` in `.bar-side.bar-right`, the footer's `nav.status-right` named "page
+  settings", and each theme summary saying "theme" to a screen reader.
 - A multilingual surface's language menu links each locale's **home** on a 404 — the page asked for
   exists in none of them.
 

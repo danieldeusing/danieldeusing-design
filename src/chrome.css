@@ -278,6 +278,10 @@
 }
 .ticktable { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .ticktable td { padding: 0.5rem 0.75rem; vertical-align: baseline; border: 0; white-space: nowrap; }
+/* The runtime's header row (state · poller · last run · next run · figures) is for a screen reader:
+   its words are visually hidden, so its cells take no box. base.css would pad each th and rule it,
+   a blank band across the top of the strip (measured 14.9px). */
+.ticktable thead th { padding: 0; border: 0; }
 /* Only the last column may grow, so the four fixed columns keep the same width on every row.
 
    RIGHT-ALIGNED (0.18.0). Daniel, on the ci/cd strip: "We should make the '42 runs · 55% pass
@@ -316,16 +320,16 @@
    AT THE TEXT SIZE. It was `.7em` — a glyph sized by font-size, which the one-text-size rule
    forbids — and the smaller dot was the one state marker a reader had to squint at.
 
-   A row that is RUNNING a job keeps the ok dot: `lastAt` is when the last run finished, and a run
-   in flight is the poller working, not stalling — never red. */
+   A row that is RUNNING a job keeps the ok glyph, in --info: `lastAt` is when the last run finished,
+   and a run in flight is the poller working, not stalling — never red, and not the idle ok either. */
 .tick-dot::before { content: "\25CF"; content: "\25CF" / ""; }
 .tick--stale .tick-dot::before { content: "\2715"; content: "\2715" / ""; }
 .tick--never .tick-dot::before { content: "\25CB"; content: "\25CB" / ""; }
 /* --success is per-theme and AA-measured (0.3.0). `ok` used to borrow --primary — the BRAND
    colour — so a healthy poller and the page heading were the same ink, and "everything is fine"
    had to be read rather than seen. */
-.tick--ok      .tick-dot,
-.tick--running .tick-dot { color: var(--success); border-left-color: color-mix(in srgb, var(--success) 45%, transparent); }
+.tick--ok .tick-dot { color: var(--success); border-left-color: color-mix(in srgb, var(--success) 45%, transparent); }
+.tick--running .tick-dot { color: var(--info); border-left-color: color-mix(in srgb, var(--info) 45%, transparent); }
 .tick--stale .tick-dot { color: var(--destructive); border-left-color: var(--destructive); }
 .tick--never .tick-dot { color: var(--muted-foreground); border-left-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent); }
 /* The NAME is an identifier, not an accent. Making it --primary put brand colour on every row of
@@ -347,8 +351,11 @@
    renderer marks it aria-hidden. An opacity on the muted ink was an unmeasured alpha. */
 .tick-sep { font-style: normal; color: var(--border); margin: 0 0.5rem; }
 /* A stale row earns the only background tint in the strip — an all-tinted strip is one the eye
-   stops reading. */
-.tick--stale { background: color-mix(in srgb, var(--destructive) 8%, transparent); }
+   stops reading. 6%, the house step for a background that carries tone text (it was 8%). The row's
+   muted cells read --foreground on it: --muted-foreground on the tint measured 4.29:1 on warm at 8%
+   and 4.42:1 at 6% (WP11), and the row that has stopped is the one a reader must be able to read. */
+.tick--stale { background: color-mix(in srgb, var(--destructive) 6%, transparent); }
+.tick--stale :is(.tick-next, .tick-stats) { color: var(--foreground); }
 @media (max-width: 40rem) {
   .ticktable, .ticktable tbody, .tick, .ticktable td { display: block; }
   .tick { padding: 0.4rem 0.5rem; }
@@ -1096,8 +1103,13 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
    mode paints a Canvas backplate behind the text, and the word vanishes on its Highlight row. With
    it, everything inside keeps its AUTHOR colour, because the property is inherited: so the rail's
    name and permissions take the row's colour, whoever gave the row its pair. That includes
-   components.css, which opts a `.dropdown-item` under the pointer out the same way; the name's muted
-   colour on that Highlight measured 1.25–2.82:1 in pixels. A disabled text action is GrayText.
+   components.css, which opts a `.dropdown-item` under the pointer out the same way; the row's own
+   name and permission colours on that Highlight measured 1.25–2.82:1 in pixels. A disabled text
+   action is GrayText.
+
+   `none` stops forcing the outline too, so each of them owns its focus ring: inset, in the pair's
+   text colour, on its own Highlight (the author --ring on Highlight measured 1.59–2.97:1). Inset is
+   the house ring for a flush row, and the one components.css gives a `.dropdown-item`.
 
    Every glyph the chrome draws is a character (the tick states, `←`, `»`, `/`, `▾`), which the mode
    forces like any text, and the burger is an inline <svg>, which the user agent already gives
@@ -1107,5 +1119,7 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   .ls-panel .ls-row :is(.ls-name, .ls-perm),
   .ls-panel .ls-row[aria-current="page"]::after { color: inherit; text-shadow: none; }
   .navlist a:is([aria-current="true"], [aria-current="page"]) { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  .ls-row[aria-current="page"]:focus-visible,
+  .navlist a:is([aria-current="true"], [aria-current="page"]):focus-visible { outline: 2px solid HighlightText; outline-offset: -2px; }
   button:is(.doc-link, .doc-link--forward):disabled { color: GrayText; }
 }

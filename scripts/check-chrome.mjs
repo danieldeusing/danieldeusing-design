@@ -502,11 +502,14 @@ await check("a sticky table header inside a --card card paints the card, not a b
 const ticks = await page(`(() => { const g = (s) => T.cs(s, "content", "::before");
   return { ok: g(".tick--ok .tick-dot"), running: g(".tick--running .tick-dot"), stale: g(".tick--stale .tick-dot"), never: g(".tick--never .tick-dot"),
     size: [T.cs(".tick-dot", "fontSize"), T.cs(".tickstrip", "fontSize")], next: [T.cs(".tick-next", "opacity"), T.cs(".tick-next", "color")], muted: T.colour("var(--muted-foreground)"),
-    sep: T.cs(".tick-sep", "color"), border: T.colour("var(--border)"), runningColour: T.cs(".tick--running .tick-dot", "color"), success: T.colour("var(--success)") }; })()`);
+    sep: T.cs(".tick-sep", "color"), border: T.colour("var(--border)"), runningInk: [T.cs(".tick--running .tick-dot", "color"), T.cs(".tick--ok .tick-dot", "color")], info: T.colour("var(--info)"),
+    head: T.rect(".ticktable thead").height, tint: [T.cs(".tick--stale", "backgroundColor"), T.colour("color-mix(in srgb, var(--destructive) 6%, transparent)")] }; })()`);
 await check("tick glyphs come from the state class, with empty alt text: ● ok and running, ✕ stale, ○ never",
   () => ticks.ok === '"●" / ""' && ticks.running === '"●" / ""' && ticks.stale === '"✕" / ""' && ticks.never === '"○" / ""', ticks);
 await check("…at the text size, not .7em", () => ticks.size[0] === ticks.size[1], ticks.size);
-await check("…a running row keeps the ok colour (never red)", () => ticks.runningColour === ticks.success, ticks);
+await check("…a running row is --info: never red, and not the idle ok either", () => ticks.runningInk[0] === ticks.info && ticks.runningInk[0] !== ticks.runningInk[1], ticks.runningInk);
+await check("the runtime's visually hidden header row takes no box (base.css would pad its cells and rule them)", () => ticks.head === 0, ticks.head);
+await check("a stale row's tint is the house 6% step for a background that carries tone text", () => ticks.tint[0] === ticks.tint[1], ticks.tint);
 await check(".tick-next reads like .tick-last: muted, no opacity", () => ticks.next[0] === "1" && ticks.next[1] === ticks.muted, ticks.next);
 await check(".tick-sep is decoration in the rule colour", () => ticks.sep === ticks.border, ticks);
 const flat = await page(`T.qa("header.bar, .bar-stack, footer.status, .page-toolbar, .toc-inner, .crumbs, .ls-nav, .navlist a, button.doc-link, .ls-nav-toggle").filter((e) => T.cs(e, "borderTopLeftRadius") !== "0px").map((e) => e.className || e.tagName)`);
@@ -563,14 +566,19 @@ const decodePng = (buffer) => {
 };
 const luminance = (rgb) => rgb.map((v) => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
 const ratioOf = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-// What a region PAINTS: its commonest colour is what the ink sits on, and the ink is the pixel that
-// stands out from it most (a stem reaches the glyph's full colour; anti-aliasing only fades it).
-const paint = async (clip) => {
-  const { data } = await send("Page.captureScreenshot", { format: "png", clip: { ...clip, scale: 1 } });
-  const pixels = decodePng(Buffer.from(data, "base64"));
+// One page clip, captured IN the viewport. `captureBeyondViewport` re-lays the page without its
+// scrollbar, and a clip computed beforehand then reads pixels up to ~7.5px off (RULES-CROSSCUT X1).
+const shoot = async (clip) => decodePng(Buffer.from((await send("Page.captureScreenshot",
+  { format: "png", clip: { ...clip, scale: 1 }, captureBeyondViewport: false })).data, "base64"));
+const commonest = (pixels) => {
   const counts = new Map();
   for (const p of pixels) counts.set(p.join(), (counts.get(p.join()) || 0) + 1);
-  const bg = [...counts].sort((x, y) => y[1] - x[1])[0][0].split(",").map(Number);
+  return [...counts].sort((x, y) => y[1] - x[1])[0][0].split(",").map(Number);
+};
+// What a region PAINTS: its commonest colour is what the ink sits on, and the ink is the pixel that
+// stands out from it most (a stem reaches the glyph's full colour; anti-aliasing only fades it).
+const paint = (pixels) => {
+  const bg = commonest(pixels);
   let ink = bg, ratio = 1;
   for (const p of pixels) { const r = ratioOf(p, bg); if (r > ratio) { ratio = r; ink = p; } }
   return { bg: bg.join(), ink: ink.join(), ratio: Math.round(ratio * 100) / 100 };
@@ -578,6 +586,8 @@ const paint = async (clip) => {
 // The regions, as page clips: each element's CONTENT box (a border is ink too, and would pass a
 // glyph that is not there). Only an element outside the viewport is scrolled to: the sticky layers
 // are always on screen, and scrolling for them would move the TOC's current entry mid-measurement.
+// INK hides just the ink a figure is about (the element, one of its pseudo-elements, or a child), so
+// the clip can be shown to hold it: a clip that reads the same with its ink hidden read nothing.
 const REGIONS = `window.R = (selector, part) => {
   const e = document.querySelector(selector);
   if (!e) return null;
@@ -588,29 +598,62 @@ const REGIONS = `window.R = (selector, part) => {
     top: b.top + n("borderTopWidth") + n("paddingTop"), bottom: b.bottom - n("borderBottomWidth") - n("paddingBottom") };
   if (part === "after-name") r.left = e.querySelector(".ls-name").getBoundingClientRect().right + 1;
   if (part === "before-child") r.right = e.firstElementChild.getBoundingClientRect().left - 1;
+  if (part === "ring") Object.assign(r, { left: Math.max(0, b.left - 4), right: Math.min(document.documentElement.clientWidth, b.right + 4),
+    top: Math.max(0, b.top - 4), bottom: Math.min(innerHeight, b.bottom + 4) });
   const x = Math.ceil(r.left + scrollX), y = Math.ceil(r.top + scrollY);
   return { x, y, width: Math.floor(r.right + scrollX) - x, height: Math.floor(r.bottom + scrollY) - y };
+};
+window.INK = (selector, ink, on) => {
+  const e = document.querySelector(selector);
+  const target = ink === "self" || ink === "before" || ink === "after" ? e : e.querySelector(ink);
+  target.classList.toggle(ink === "before" ? "__hide-before" : ink === "after" ? "__hide-after" : "__hide", on);
 }; null`;
 const measure = async (items) => {
   await evaluate(REGIONS);
   const out = {};
-  for (const [name, selector, part] of items) {
+  for (const [name, selector, part, ink] of items) {
     const region = await evaluate(`R(${JSON.stringify(selector)}, ${JSON.stringify(part || null)})`);
     await frames(1);
-    out[name] = region && region.width > 0 && region.height > 0 ? await paint(region) : null;
+    if (!region || region.width <= 0 || region.height <= 0) { out[name] = null; continue; }
+    const shown = await shoot(region);
+    out[name] = paint(shown);
+    if (!ink) continue;
+    await evaluate(`INK(${JSON.stringify(selector)}, ${JSON.stringify(ink)}, true)`);
+    await frames(1);
+    const hidden = await shoot(region);
+    await evaluate(`INK(${JSON.stringify(selector)}, ${JSON.stringify(ink)}, false)`);
+    await frames(1);
+    out[name].holds = shown.some((p, i) => p.join() !== hidden[i].join());
   }
   return out;
 };
+// A focused ring, as painted: the pixels focusing changes, and what they were before. An element
+// opted out of the adjustment keeps its author outline colour unless it names a system one.
+const ringOf = async (selector) => {
+  await evaluate(REGIONS);
+  const clip = await evaluate(`R(${JSON.stringify(selector)}, "ring")`);
+  await frames(1);
+  const before = await shoot(clip);
+  await evaluate(`document.querySelector(${JSON.stringify(selector)}).focus({ focusVisible: true, preventScroll: true }); null`);
+  await frames(1);
+  const focused = await shoot(clip);
+  await evaluate(`document.activeElement.blur(); null`);
+  await frames(1);
+  const changed = before.map((p, i) => [p, focused[i]]).filter(([p, q]) => p.join() !== q.join());
+  if (!changed.length) return { ratio: 1, changed: 0 };
+  const ring = commonest(changed.map(([, q]) => q)), under = commonest(changed.map(([p]) => p));
+  return { ring: ring.join(), under: under.join(), ratio: Math.round(ratioOf(ring, under) * 100) / 100, changed: changed.length };
+};
 const PALETTES = ["light", "dark"], THEMES = ["warm", "green", "mono", "paper"];
-// [name, selector, part] — text on a state (4.5:1), a glyph (3:1), a state's neighbour (must differ)
+// [name, selector, part, ink] — text on a state (4.5:1), a glyph (3:1), a state's neighbour (must differ)
 const TEXT_ON_STATE = [
-  ["rail current: name", '.ls-nav .ls-row[aria-current="page"] .ls-name'],
-  ["rail current: permissions", '.ls-nav .ls-row[aria-current="page"] .ls-perm'],
-  ["rail current: the ← mark", '.ls-nav .ls-row[aria-current="page"]', "after-name"],
-  ["rail row another rule selects: name", ".ls-nav .ls-row.__selected .ls-name"],
-  ["rail row another rule selects: permissions", ".ls-nav .ls-row.__selected .ls-perm"],
-  ["TOC current entry", '.toc a[aria-current="true"]'],
-  ["series current part", '#series a[aria-current="page"]'],
+  ["rail current: name", '.ls-nav .ls-row[aria-current="page"] .ls-name', null, "self"],
+  ["rail current: permissions", '.ls-nav .ls-row[aria-current="page"] .ls-perm', null, "self"],
+  ["rail current: the ← mark", '.ls-nav .ls-row[aria-current="page"]', "after-name", "after"],
+  ["rail row another rule selects: name", ".ls-nav .ls-row.__selected .ls-name", null, "self"],
+  ["rail row another rule selects: permissions", ".ls-nav .ls-row.__selected .ls-perm", null, "self"],
+  ["TOC current entry", '.toc a[aria-current="true"]', null, ".__ink"],
+  ["series current part", '#series a[aria-current="page"]', null, ".__ink"],
 ];
 const PAIRS = [
   ["rail current row", '.ls-nav .ls-row[aria-current="page"]', '.ls-nav .ls-row:not([aria-current]):not(.__selected)'],
@@ -618,27 +661,57 @@ const PAIRS = [
   ["series current part", '#series a[aria-current="page"]', "#series a:not([aria-current])"],
 ];
 const GLYPHS = [
-  ["tick ● ok", ".tick--ok .tick-dot"], ["tick ● running", ".tick--running .tick-dot"],
-  ["tick ✕ stale", ".tick--stale .tick-dot"], ["tick ○ never", ".tick--never .tick-dot"],
-  ["rail toggle »", ".ls-nav-toggle"], ["crumbs /", "#bar-crumbs li + li", "before-child"],
-  ["history ‹ (WP4 mask, stand-in)", '.bar-history [data-icon="chevron-left"]'], ["history ⟲ (WP4 mask, stand-in)", '.bar-history [data-icon="history"]'],
+  ["tick ● ok", ".tick--ok .tick-dot", null, "before"], ["tick ● running", ".tick--running .tick-dot", null, "before"],
+  ["tick ✕ stale", ".tick--stale .tick-dot", null, "before"], ["tick ○ never", ".tick--never .tick-dot", null, "before"],
+  ["rail toggle »", ".ls-nav-toggle", null, "after"], ["crumbs /", "#bar-crumbs li + li", "before-child", "before"],
+  ["history ‹ (WP4 mask, stand-in)", '.bar-history [data-icon="chevron-left"]', null, "before"],
+  ["history ⟲ (WP4 mask, stand-in)", '.bar-history [data-icon="history"]', null, "before"],
 ];
-const PHONE_GLYPHS = [["burger (inline svg)", ".nav-burger svg"], ["accordion ▾", ".mobile-footer .mf-chev"],
-  ["burger menu current row: name", '.site-nav .ls-row[aria-current="page"] .ls-name']];
+const PHONE_GLYPHS = [["burger (inline svg)", ".nav-burger svg", null, "self"], ["accordion ▾", ".mobile-footer .mf-chev", null, "self"],
+  ["burger menu current row: name", '.site-nav .ls-row[aria-current="page"] .ls-name', null, "self"]];
+// Every element this file opts out of the adjustment, and so owns the colour of its focus ring.
+const FOCUSED = [["rail current row", '.ls-nav .ls-row[aria-current="page"]'], ["TOC current entry", '.toc a[aria-current="true"]'],
+  ["series current part", '#series a[aria-current="page"]']];
+// A glyph is its context's forced colour ([name, selector, pseudo, the property it paints with,
+// the context if not its host]). Pixels prove it can be seen on these two palettes; this proves it
+// follows whatever palette the reader chose — `none` would keep an author colour that clears 3:1 here
+// by luck (the burger's --muted-foreground measured 3.00:1 on dark paper).
+const FOLLOWS = [
+  ["tick ● ok", ".tick--ok .tick-dot", "::before", "color"], ["tick ● running", ".tick--running .tick-dot", "::before", "color"],
+  ["tick ✕ stale", ".tick--stale .tick-dot", "::before", "color"], ["tick ○ never", ".tick--never .tick-dot", "::before", "color"],
+  ["rail toggle »", ".ls-nav-toggle", "::after", "color"], ["crumbs /", "#bar-crumbs li + li", "::before", "color"],
+  ["rail current ←", '.ls-nav .ls-row[aria-current="page"]', "::after", "color"],
+  ["history ‹ (stand-in)", '.bar-history [data-icon="chevron-left"]', "::before", "backgroundColor"],
+  ["history ⟲ (stand-in)", '.bar-history [data-icon="history"]', "::before", "backgroundColor"],
+];
+const PHONE_FOLLOWS = [["burger (inline svg)", ".nav-burger svg path", null, "stroke", "button"], ["accordion ▾", ".mobile-footer .mf-chev", null, "color", "summary"]];
+const follows = (items) => page(`(${JSON.stringify(items)}).map(([name, selector, pseudo, prop, context]) => {
+  const e = document.querySelector(selector);
+  if (!e) return [name, null, "not found"];
+  const host = context ? e.closest(context) : pseudo ? e : e.parentElement;
+  return [name, getComputedStyle(e, pseudo)[prop], getComputedStyle(host).color]; })`);
+// The page each forced load measures: the pointer parked in the left gutter (a hovered row would be
+// another state), what components.css does to a menu row under the pointer applied to one rail row
+// (opted out and given the selected pair: its name and permissions must follow it), the TOC's and the
+// series' link text wrapped so it can be hidden apart from its background, and the reader's probes.
+const PREPARE = `(() => {
+  const s = document.createElement("style");
+  s.textContent = "@media (forced-colors: active) { .ls-row.__selected { forced-color-adjust: none; background: Highlight; color: HighlightText; } }"
+    + " .__hide, .__hide-before::before, .__hide-after::after { visibility: hidden !important; }";
+  document.head.append(s);
+  document.querySelector('.ls-nav .ls-row:not([aria-current])').classList.add("__selected");
+  for (const a of document.querySelectorAll(".toc a, #series a")) a.innerHTML = '<span class="__ink">' + a.innerHTML + "</span>";
+  for (const [id, text] of [["__blank", ""], ["__ink", "MMMM"]]) {
+    const e = document.createElement("div"); e.id = id; e.textContent = text;
+    e.style.cssText = "position:fixed;left:8px;top:" + (id === "__blank" ? 300 : 340) + "px;width:60px;height:24px;font:16px monospace;background:white;z-index:99";
+    document.body.append(e);
+  } })(); null`;
 const cells = [];
 for (const scheme of PALETTES) {
   await load("nobanner", { forced: true, scheme });
-  // The pointer parks in the page's left gutter: a hovered row would be measured as another state.
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 450 });
-  // What components.css does to a menu row under the pointer, on a rail row: opt it out and give it
-  // the selected pair. The row's name and permissions must follow it, whoever set the pair.
-  await page(`(() => { const s = document.createElement("style");
-    s.textContent = "@media (forced-colors: active) { .ls-row.__selected { forced-color-adjust: none; background: Highlight; color: HighlightText; } }";
-    document.head.append(s); document.querySelector('.ls-nav .ls-row:not([aria-current])').classList.add("__selected");
-    for (const [id, text] of [["__blank", ""], ["__ink", "MMMM"]]) { const e = document.createElement("div"); e.id = id; e.textContent = text;
-      e.style.cssText = "position:fixed;left:8px;top:" + (id === "__blank" ? 300 : 340) + "px;width:60px;height:24px;font:16px monospace;background:white;z-index:99";
-      document.body.append(e); } })()`);
-  const probe = await measure([["an empty patch", "#__blank"], ["a line of body text", "#__ink"]]);
+  await page(PREPARE);
+  const probe = await measure([["an empty patch", "#__blank"], ["a line of body text", "#__ink", null, "self"]]);
   for (const theme of THEMES) {
     await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
     // Parked on the TOC's own section: the TOC has a current entry (nothing is current above the
@@ -651,21 +724,27 @@ for (const scheme of PALETTES) {
       const [a, b] = Object.values(await measure([[`${name} (on)`, on], [`${name} (off)`, off]]));
       pairs[name] = a && b ? [a.bg, b.bg] : null;
     }
+    const rings = {};
+    for (const [name, selector] of FOCUSED) rings[name] = await ringOf(selector);
+    const followed = await follows(FOLLOWS);
     const glyphs = await measure(GLYPHS);
-    const disabled = Object.values(await measure([["disabled", "#btn-disabled"], ["enabled", "#btn-forward"]])).map((m) => m && m.ink);
-    cells.push({ scheme, theme, probe, text, glyphs, pairs, disabled });
+    const disabled = Object.values(await measure([["disabled", "#btn-disabled", null, "self"], ["enabled", "#btn-forward", null, "self"]]));
+    cells.push({ scheme, theme, probe, text, glyphs, pairs, rings, followed, disabled });
   }
   await load("nobanner&burger", { forced: true, scheme, width: 375, height: 812 });
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 805 });
+  await page(PREPARE);
   for (const theme of THEMES) {
     await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
     await frames(2);
-    Object.assign(cells.find((c) => c.scheme === scheme && c.theme === theme).glyphs, await measure(PHONE_GLYPHS));
+    const cell = cells.find((c) => c.scheme === scheme && c.theme === theme);
+    Object.assign(cell.glyphs, await measure(PHONE_GLYPHS));
+    cell.followed.push(...await follows(PHONE_FOLLOWS));
   }
 }
 const cellName = (c) => `${c.scheme} ${c.theme}`;
 console.log(`\nFORCED COLOURS  painted contrast (ink against what it sits on), ${cells.map(cellName).join(" · ")}`);
-for (const [group, key] of [["text on a state", "text"], ["glyph", "glyphs"]]) {
+for (const [group, key] of [["text on a state", "text"], ["glyph", "glyphs"], ["focused ring", "rings"]]) {
   for (const name of Object.keys(cells[0][key])) {
     console.log(`  ${group.padEnd(15)} ${name.padEnd(44)} ${cells.map((c) => (c[key][name] ? c[key][name].ratio.toFixed(2) : "  —").padStart(6)).join(" ")}`);
   }
@@ -673,15 +752,24 @@ for (const [group, key] of [["text on a state", "text"], ["glyph", "glyphs"]]) {
 const below = (key, floor) => cells.flatMap((c) => Object.entries(c[key]).filter(([, m]) => !m || m.ratio < floor).map(([n, m]) => `${cellName(c)} ${n}: ${m ? m.ratio : "not found"}`));
 await check("forced colours, the reader can tell: an empty patch paints nothing (1:1), a line of text paints ink (≥ 7:1), on both palettes",
   () => cells.every((c) => c.probe["an empty patch"].ratio < 1.1 && c.probe["a line of body text"].ratio >= 7), cells.map((c) => [cellName(c), c.probe]));
+const missed = cells.flatMap((c) => [c.probe, c.text, c.glyphs, { disabled: c.disabled[0], enabled: c.disabled[1] }]
+  .flatMap((group) => Object.entries(group).filter(([, m]) => m && "holds" in m && !m.holds).map(([n]) => `${cellName(c)} ${n}`)));
+await check("…and every clip a figure comes from holds that element's ink: hiding the ink changes the clip",
+  () => missed.length === 0 && cells.every((c) => Object.values(c.text).concat(Object.values(c.glyphs)).every((m) => m && "holds" in m)), missed);
 await check("forced colours: every piece of text on a drawn state paints at 4.5:1 or better, on both palettes and all four themes",
   () => below("text", 4.5).length === 0, () => below("text", 4.5));
 await check("…every glyph the chrome shows paints at 3:1 or better against what it sits on",
   () => below("glyphs", 3).length === 0, () => below("glyphs", 3));
+const strays = cells.flatMap((c) => c.followed.filter(([, paint, context]) => !paint || paint !== context).map(([n, paint, context]) => `${cellName(c)} ${n}: ${paint} in ${context}`));
+await check("…and every glyph paints its context's forced colour, so it follows a palette the reader chose (never an author colour)",
+  () => strays.length === 0, strays);
+await check("…a focused element this file opts out draws its ring in a system colour, at 3:1 or better against what it covers",
+  () => below("rings", 3).length === 0, () => below("rings", 3));
 const same = cells.flatMap((c) => Object.entries(c.pairs).filter(([, p]) => !p || p[0] === p[1]).map(([n, p]) => `${cellName(c)} ${n}: ${p ? p[0] : "not found"}`));
 await check("…each state paints a different background from its neighbour (the rail's row, the TOC's and the series' current entries)",
   () => same.length === 0, same);
 await check("…a disabled text action paints a different colour from an enabled one",
-  () => cells.every((c) => c.disabled[0] && c.disabled[1] && c.disabled[0] !== c.disabled[1]), cells.map((c) => [cellName(c), c.disabled]));
+  () => cells.every((c) => c.disabled[0] && c.disabled[1] && c.disabled[0].ink !== c.disabled[1].ink), cells.map((c) => [cellName(c), c.disabled.map((m) => m && m.ink)]));
 
 /* ═══ 13. the rail's boot reveal and print ══════════════════════════════════════════════════════ */
 await load("nobanner");
@@ -732,9 +820,13 @@ const contrast = await page(`(() => {
     for (const [name, ink] of [["muted-foreground", "var(--muted-foreground)"], ["primary", "var(--primary)"], ["foreground", "var(--foreground)"], ["ring", "var(--ring)"], ["border", "var(--border)"]]) {
       row[name] = Object.fromEntries(Object.entries(surfaces).map(([s, bg]) => [s, Math.round(ratio(over(c(ink), bg), bg) * 100) / 100]));
     }
-    const card = surfaces.card;
-    const tint = over(c("color-mix(in srgb, var(--destructive) 8%, transparent)"), card);
-    row["destructive on the stale row (8% over --card)"] = { card: Math.round(ratio(over(c("var(--destructive)"), tint), tint) * 100) / 100 };
+    // The stale row as rendered: each of its inks on the row's own tint over the strip's --card.
+    const strip = parse(T.cs(".tickstrip", "backgroundColor")), tint = over(parse(T.cs(".tick--stale", "backgroundColor")), strip);
+    const on = (s, p = "color") => Math.round(ratio(over(parse(T.cs(s, p)), tint), tint) * 100) / 100;
+    row["stale row: name · last · next · stats · figure"] = { name: on(".tick--stale .tick-name"), last: on(".tick--stale .tick-last"),
+      next: on(".tick--stale .tick-next"), stats: on(".tick--stale .tick-stats"), figure: on(".tick--stale .tick-stats b") };
+    row["stale ✕ on its tint · running ● on the strip"] = { stale: on(".tick--stale .tick-dot"),
+      running: Math.round(ratio(over(parse(T.cs(".tick--running .tick-dot", "color")), strip), strip) * 100) / 100 };
     out[theme] = row;
   }
   document.documentElement.dataset.theme = "warm";
@@ -743,11 +835,13 @@ console.log("\nCONTRAST  (WCAG ratio; rows = ink, columns = --background / --car
 for (const [theme, rows] of Object.entries(contrast)) {
   for (const [ink, cells] of Object.entries(rows)) console.log(`  ${theme.padEnd(6)} ${ink.padEnd(46)} ${Object.values(cells).map((v) => v.toFixed(2).padStart(6)).join(" ")}`);
 }
-const textInks = ["muted-foreground", "primary", "foreground", "destructive on the stale row (8% over --card)"];
+const textInks = ["muted-foreground", "primary", "foreground", "stale row: name · last · next · stats · figure"];
 const lows = Object.entries(contrast).flatMap(([t, rows]) => textInks.flatMap((ink) => Object.entries(rows[ink]).filter(([, v]) => v < 4.5).map(([s, v]) => `${t} ${ink} on ${s}: ${v}`)));
 await check("every text ink the chrome uses clears 4.5:1 on every theme and surface", () => lows.length === 0, lows);
 const ringLows = Object.entries(contrast).flatMap(([t, rows]) => Object.entries(rows.ring).filter(([, v]) => v < 3).map(([s, v]) => `${t} ring on ${s}: ${v}`));
 await check("the focus ring clears 3:1 against every surface", () => ringLows.length === 0, ringLows);
+const tickLows = Object.entries(contrast).flatMap(([t, rows]) => Object.entries(rows["stale ✕ on its tint · running ● on the strip"]).filter(([, v]) => v < 3).map(([s, v]) => `${t} ${s}: ${v}`));
+await check("the stale ✕ and the running ● clear 3:1 as graphics", () => tickLows.length === 0, tickLows);
 
 console.log(failures ? `\ncheck-chrome: ${failures} FAILED (last check to pass: ${lastPassed})` : "\ncheck-chrome: all checks passed");
 process.exit(failures ? 1 : 0);

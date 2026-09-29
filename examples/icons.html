@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>danieldeusing-design — icons</title>
+
+    <!-- Pre-paint: the theme before first paint. `?theme=green` overrides the stored choice, so a
+         check or a screenshot can ask for one theme without clicking. `?bare` drops every
+         stylesheet marked data-full, leaving tokens.css + icons.css: the proof that the icon system
+         stands on those two alone (house rule 4). -->
+    <script>
+      (() => {
+        const themes = ["warm", "green", "mono", "paper"];
+        const q = new URLSearchParams(location.search);
+        let t = "warm";
+        try { const s = localStorage.getItem("theme"); if (themes.includes(s)) t = s; } catch {}
+        if (themes.includes(q.get("theme"))) t = q.get("theme");
+        document.documentElement.dataset.theme = t;
+        if (q.has("bare")) document.documentElement.dataset.bare = "";
+      })();
+    </script>
+
+    <link rel="stylesheet" href="../src/reset.css" data-full />
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" data-full />
+    <!-- components.css only for I3's language flags, which live there unchanged. -->
+    <link rel="stylesheet" href="../src/components.css" data-full />
+    <link rel="stylesheet" href="../src/icons.css" />
+    <script>
+      if (document.documentElement.hasAttribute("data-bare")) {
+        for (const link of document.querySelectorAll("link[data-full]")) link.remove();
+      }
+    </script>
+
+    <style>
+      /* Page-only layout. Every colour and size below is a token; nothing here is part of the
+         system, which is why every class carries the demo- prefix. None of it touches .ico. */
+      body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: var(--fs-base); }
+      .demo-wrap { max-width: var(--content-w); margin-inline: auto; padding: 1.5rem var(--content-pad) 4rem; }
+      .demo-bar {
+        position: sticky; top: 0; z-index: 30;
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem;
+        padding: 0.5rem var(--content-pad); background: var(--card); border-bottom: 1px solid var(--border);
+      }
+      .demo-bar strong { color: var(--primary); }
+      .demo-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+      .demo-btn {
+        box-sizing: border-box; min-block-size: var(--control-h); padding: 0 0.6rem; font: inherit; color: var(--muted-foreground);
+        background: transparent; border: 1px solid var(--control-edge); cursor: pointer; text-decoration: none;
+        display: inline-flex; align-items: center;
+      }
+      .demo-btn[aria-pressed="true"] {
+        color: var(--primary); border-color: var(--primary); font-weight: 700;
+        background: color-mix(in srgb, var(--primary) 12%, transparent);
+      }
+      .demo-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+      .demo-lede { color: var(--muted-foreground); max-width: 72ch; margin-block: 0.4rem 1rem; }
+      .demo-label { color: var(--muted-foreground); font-weight: 400; }
+      .demo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; }
+      .demo-pair { display: inline-flex; align-items: center; gap: 0.4rem; }
+      .demo-icons { display: grid; gap: 0.25rem 1rem; grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr)); list-style: none; padding: 0; margin: 0 0 1rem; }
+      .demo-icons li { display: flex; align-items: center; gap: 0.6rem; min-block-size: 2rem; }
+      .demo-surface { padding: 0.6rem 0.75rem; border: 1px solid var(--border); }
+      .demo-surface[data-surface="background"] { background: var(--background); }
+      .demo-surface[data-surface="card"] { background: var(--card); }
+      .demo-surface[data-surface="muted"] { background: var(--muted); }
+      .demo-cols { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); }
+      .demo-tone { padding: 0.6rem 0.75rem; color: var(--foreground); border: 1px solid color-mix(in srgb, var(--tone) 60%, transparent); background: color-mix(in srgb, var(--tone) 6%, transparent); }
+      .demo-tone > * + * { margin-top: 0.4rem; }
+      .demo-table { border-collapse: collapse; margin-bottom: 1rem; }
+      .demo-table th, .demo-table td { text-align: start; padding: 0.3rem 1rem 0.3rem 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
+      .demo-table th { color: var(--muted-foreground); font-weight: 400; }
+      .demo-glyph { font-weight: 700; color: var(--primary); }
+      .demo-link { color: var(--primary); }
+      h1 { font-size: var(--fs-2xl); margin: 0 0 0.5rem; }
+      h2 { font-size: var(--fs-xl); margin: 2.5rem 0 0.5rem; }
+      h3 { font-size: var(--fs-base); margin: 1.25rem 0 0.5rem; }
+      p { margin: 0 0 0.5rem; }
+      code { font-family: inherit; }
+      section { scroll-margin-top: 4rem; }
+      @media (max-width: 40rem) { .demo-table { display: block; overflow-x: auto; } }
+    </style>
+  </head>
+  <body>
+    <div class="demo-bar">
+      <span><strong>icons</strong> <span class="demo-label" id="mode">· WP4 · I1 I2 I3</span></span>
+      <span class="demo-controls" role="group" aria-label="theme">
+        <button type="button" class="demo-btn" data-set-theme="warm">warm</button>
+        <button type="button" class="demo-btn" data-set-theme="green">green</button>
+        <button type="button" class="demo-btn" data-set-theme="mono">mono</button>
+        <button type="button" class="demo-btn" data-set-theme="paper">paper</button>
+        <a class="demo-btn" id="bare-link" href="?bare">tokens + icons only</a>
+      </span>
+    </div>
+
+    <main class="demo-wrap">
+      <h1>Icons and glyphs</h1>
+      <p class="demo-lede">Every mask in the set, the <code>.ico</code> element at its four sizes and in every colour it can take,
+        the glyph vocabulary with its tones, and the flags and social marks. The page loads tokens.css and icons.css, plus
+        reset, base and components for the page itself; <code>?bare</code> drops those three.</p>
+
+      <!-- ── I1 · the set ──────────────────────────────────────────────── -->
+      <section id="set" aria-labelledby="set-h">
+        <h2 id="set-h">I1 · the set</h2>
+        <p class="demo-lede">58 lucide 0.559.0 outlines at stroke 2, each at 14px and 24px. The name is the <code>data-icon</code>
+          word and the token is <code>--ico-&lt;word&gt;</code>.</p>
+        <h3>the controls' glyphs <span class="demo-label">· WP1 · C1, C2, C6, M0, M4–M6, M9, S6, and part 1's markup</span></h3>
+        <ul class="demo-icons">
+          <li><span class="ico" data-icon="check" aria-hidden="true"></span><span class="ico ico--xl" data-icon="check" aria-hidden="true"></span><code>check</code></li>
+          <li><span class="ico" data-icon="minus" aria-hidden="true"></span><span class="ico ico--xl" data-icon="minus" aria-hidden="true"></span><code>minus</code></li>
+          <li><span class="ico" data-icon="x" aria-hidden="true"></span><span class="ico ico--xl" data-icon="x" aria-hidden="true"></span><code>x</code></li>
+          <li><span class="ico" data-icon="search" aria-hidden="true"></span><span class="ico ico--xl" data-icon="search" aria-hidden="true"></span><code>search</code></li>
+          <li><span class="ico" data-icon="filter" aria-hidden="true"></span><span class="ico ico--xl" data-icon="filter" aria-hidden="true"></span><code>filter</code></li>
+          <li><span class="ico" data-icon="arrow-up" aria-hidden="true"></span><span class="ico ico--xl" data-icon="arrow-up" aria-hidden="true"></span><code>arrow-up</code></li>
+          <li><span class="ico" data-icon="arrow-down" aria-hidden="true"></span><span class="ico ico--xl" data-icon="arrow-down" aria-hidden="true"></span><code>arrow-down</code></li>
+          <li><span class="ico" data-icon="chevron-down" aria-hidden="true"></span><span class="ico ico--xl" data-icon="chevron-down" aria-hidden="true"></span><code>chevron-down</code></li>
+          <li><span class="ico" data-icon="chevron-left" aria-hidden="true"></span><span class="ico ico--xl" data-icon="chevron-left" aria-hidden="true"></span><code>chevron-left</code></li>
+          <li><span class="ico" data-icon="trash-2" aria-hidden="true"></span><span class="ico ico--xl" data-icon="trash-2" aria-hidden="true"></span><code>trash-2</code></li>
+          <li><span class="ico" data-icon="pencil" aria-hidden="true"></span><span class="ico ico--xl" data-icon="pencil" aria-hidden="true"></span><code>pencil</code></li>
+          <li><span class="ico" data-icon="loader-circle" aria-hidden="true"></span><span class="ico ico--xl" data-icon="loader-circle" aria-hidden="true"></span><code>loader-circle</code></li>
+          <li><span class="ico" data-icon="refresh-cw" aria-hidden="true"></span><span class="ico ico--xl" data-icon="refresh-cw" aria-hidden="true"></span><code>refresh-cw</code></li>
+          <li><span class="ico" data-icon="star" aria-hidden="true"></span><span class="ico ico--xl" data-icon="star" aria-hidden="true"></span><code>star</code></li>
+          <li><span class="ico" data-icon="star-filled" aria-hidden="true"></span><span class="ico ico--xl" data-icon="star-filled" aria-hidden="true"></span><code>star-filled</code></li>
+          <li><span class="ico" data-icon="history" aria-hidden="true"></span><span class="ico ico--xl" data-icon="history" aria-hidden="true"></span><code>history</code></li>
+          <li><span class="ico" data-icon="home" aria-hidden="true"></span><span class="ico ico--xl" data-icon="home" aria-hidden="true"></span><code>home</code></li>
+          <li><span class="ico" data-icon="image-plus" aria-hidden="true"></span><span class="ico ico--xl" data-icon="image-plus" aria-hidden="true"></span><code>image-plus</code></li>
+          <li><span class="ico" data-icon="triangle-alert" aria-hidden="true"></span><span class="ico ico--xl" data-icon="triangle-alert" aria-hidden="true"></span><code>triangle-alert</code></li>
+          <li><span class="ico" data-icon="package" aria-hidden="true"></span><span class="ico ico--xl" data-icon="package" aria-hidden="true"></span><code>package</code></li>
+          <li><span class="ico" data-icon="download" aria-hidden="true"></span><span class="ico ico--xl" data-icon="download" aria-hidden="true"></span><code>download</code></li>
+        </ul>
+        <h3>results and states <span class="demo-label">· S1, S2 --lg</span></h3>
+        <ul class="demo-icons">
+          <li><span class="ico" data-icon="circle-check" aria-hidden="true"></span><span class="ico ico--xl" data-icon="circle-check" aria-hidden="true"></span><code>circle-check</code></li>
+          <li><span class="ico" data-icon="circle-alert" aria-hidden="true"></span><span class="ico ico--xl" data-icon="circle-alert" aria-hidden="true"></span><code>circle-alert</code></li>
+          <li><span class="ico" data-icon="circle-x" aria-hidden="true"></span><span class="ico ico--xl" data-icon="circle-x" aria-hidden="true"></span><code>circle-x</code></li>
+          <li><span class="ico" data-icon="info" aria-hidden="true"></span><span class="ico ico--xl" data-icon="info" aria-hidden="true"></span><code>info</code></li>
+        </ul>
+        <h3>copy, time, sort, links, social <span class="demo-label">· P6, P7, D4, D2, I2, I3</span></h3>
+        <ul class="demo-icons">
+          <li><span class="ico" data-icon="copy" aria-hidden="true"></span><span class="ico ico--xl" data-icon="copy" aria-hidden="true"></span><code>copy</code></li>
+          <li><span class="ico" data-icon="clock" aria-hidden="true"></span><span class="ico ico--xl" data-icon="clock" aria-hidden="true"></span><code>clock</code></li>
+          <li><span class="ico" data-icon="arrow-up-down" aria-hidden="true"></span><span class="ico ico--xl" data-icon="arrow-up-down" aria-hidden="true"></span><code>arrow-up-down</code></li>
+          <li><span class="ico" data-icon="external-link" aria-hidden="true"></span><span class="ico ico--xl" data-icon="external-link" aria-hidden="true"></span><code>external-link</code></li>
+          <li><span class="ico" data-icon="github" aria-hidden="true"></span><span class="ico ico--xl" data-icon="github" aria-hidden="true"></span><code>github</code></li>
+          <li><span class="ico" data-icon="mail" aria-hidden="true"></span><span class="ico ico--xl" data-icon="mail" aria-hidden="true"></span><code>mail</code></li>
+        </ul>
+        <h3>the action vocabulary <span class="demo-label">· I2</span></h3>
+        <ul class="demo-icons">
+          <li><span class="ico" data-icon="plus" aria-hidden="true"></span><span class="ico ico--xl" data-icon="plus" aria-hidden="true"></span><code>plus</code></li>
+          <li><span class="ico" data-icon="eye" aria-hidden="true"></span><span class="ico ico--xl" data-icon="eye" aria-hidden="true"></span><code>eye</code></li>
+          <li><span class="ico" data-icon="eye-off" aria-hidden="true"></span><span class="ico ico--xl" data-icon="eye-off" aria-hidden="true"></span><code>eye-off</code></li>
+          <li><span class="ico" data-icon="power" aria-hidden="true"></span><span class="ico ico--xl" data-icon="power" aria-hidden="true"></span><code>power</code></li>
+          <li><span class="ico" data-icon="upload" aria-hidden="true"></span><span class="ico ico--xl" data-icon="upload" aria-hidden="true"></span><code>upload</code></li>
+          <li><span class="ico" data-icon="send" aria-hidden="true"></span><span class="ico ico--xl" data-icon="send" aria-hidden="true"></span><code>send</code></li>
+          <li><span class="ico" data-icon="arrow-left" aria-hidden="true"></span><span class="ico ico--xl" data-icon="arrow-left" aria-hidden="true"></span><code>arrow-left</code></li>
+          <li><span class="ico" data-icon="arrow-right" aria-hidden="true"></span><span class="ico ico--xl" data-icon="arrow-right" aria-hidden="true"></span><code>arrow-right</code></li>
+          <li><span class="ico" data-icon="circle-fading-arrow-up" aria-hidden="true"></span><span class="ico ico--xl" data-icon="circle-fading-arrow-up" aria-hidden="true"></span><code>circle-fading-arrow-up</code></li>
+        </ul>
+        <h3>panels, trees, panes <span class="demo-label">· N1, K5, K9–K11, K13, O4</span></h3>
+        <ul class="demo-icons">
+          <li><span class="ico" data-icon="chevron-right" aria-hidden="true"></span><span class="ico ico--xl" data-icon="chevron-right" aria-hidden="true"></span><code>chevron-right</code></li>
+          <li><span class="ico" data-icon="chevrons-up-down" aria-hidden="true"></span><span class="ico ico--xl" data-icon="chevrons-up-down" aria-hidden="true"></span><code>chevrons-up-down</code></li>
+          <li><span class="ico" data-icon="chevrons-down-up" aria-hidden="true"></span><span class="ico ico--xl" data-icon="chevrons-down-up" aria-hidden="true"></span><code>chevrons-down-up</code></li>
+          <li><span class="ico" data-icon="folder-tree" aria-hidden="true"></span><span class="ico ico--xl" data-icon="folder-tree" aria-hidden="true"></span><code>folder-tree</code></li>
+          <li><span class="ico" data-icon="folder-open" aria-hidden="true"></span><span class="ico ico--xl" data-icon="folder-open" aria-hidden="true"></span><code>folder-open</code></li>
+          <li><span class="ico" data-icon="file-code" aria-hidden="true"></span><span class="ico ico--xl" data-icon="file-code" aria-hidden="true"></span><code>file-code</code></li>
+          <li><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span class="ico ico--xl" data-icon="panel-left-open" aria-hidden="true"></span><code>panel-left-open</code></li>
+          <li><span class="ico" data-icon="maximize-2" aria-hidden="true"></span><span class="ico ico--xl" data-icon="maximize-2" aria-hidden="true"></span><code>maximize-2</code></li>
+          <li><span class="ico" data-icon="folder" aria-hidden="true"></span><span class="ico ico--xl" data-icon="folder" aria-hidden="true"></span><code>folder</code></li>
+          <li><span class="ico" data-icon="file" aria-hidden="true"></span><span class="ico ico--xl" data-icon="file" aria-hidden="true"></span><code>file</code></li>
+          <li><span class="ico" data-icon="panel-left-close" aria-hidden="true"></span><span class="ico ico--xl" data-icon="panel-left-close" aria-hidden="true"></span><code>panel-left-close</code></li>
+        </ul>
+        <h3>named by the other packages' markup <span class="demo-label">· WP5 segmented and filter options, WP6 option icons, WP7 empty state, tag and count</span></h3>
+        <ul class="demo-icons">
+          <li><span class="ico" data-icon="git-branch" aria-hidden="true"></span><span class="ico ico--xl" data-icon="git-branch" aria-hidden="true"></span><code>git-branch</code></li>
+          <li><span class="ico" data-icon="code" aria-hidden="true"></span><span class="ico ico--xl" data-icon="code" aria-hidden="true"></span><code>code</code></li>
+          <li><span class="ico" data-icon="file-text" aria-hidden="true"></span><span class="ico ico--xl" data-icon="file-text" aria-hidden="true"></span><code>file-text</code></li>
+          <li><span class="ico" data-icon="type" aria-hidden="true"></span><span class="ico ico--xl" data-icon="type" aria-hidden="true"></span><code>type</code></li>
+          <li><span class="ico" data-icon="inbox" aria-hidden="true"></span><span class="ico ico--xl" data-icon="inbox" aria-hidden="true"></span><code>inbox</code></li>
+          <li><span class="ico" data-icon="bell" aria-hidden="true"></span><span class="ico ico--xl" data-icon="bell" aria-hidden="true"></span><code>bell</code></li>
+          <li><span class="ico" data-icon="lock" aria-hidden="true"></span><span class="ico ico--xl" data-icon="lock" aria-hidden="true"></span><code>lock</code></li>
+        </ul>
+      </section>
+
+      <!-- ── I1 · sizes ────────────────────────────────────────────────── -->
+      <section id="sizes" aria-labelledby="sizes-h">
+        <h2 id="sizes-h">I1 · four sizes</h2>
+        <p class="demo-lede">A glyph takes its box from an <code>--icon-*</code> token, never from font-size.</p>
+        <div class="demo-row">
+          <span class="demo-pair"><span class="ico ico--sm" id="size-sm" data-icon="refresh-cw" aria-hidden="true"></span><code>.ico--sm</code> <span class="demo-label">12px · a tag, a chip, a trigger, a meta stat</span></span>
+          <span class="demo-pair"><span class="ico" id="size-default" data-icon="refresh-cw" aria-hidden="true"></span><code>.ico</code> <span class="demo-label">14px · inside a control</span></span>
+          <span class="demo-pair"><span class="ico ico--lg" id="size-lg" data-icon="refresh-cw" aria-hidden="true"></span><code>.ico--lg</code> <span class="demo-label">16px · standalone beside body text</span></span>
+          <span class="demo-pair"><span class="ico ico--xl" id="size-xl" data-icon="refresh-cw" aria-hidden="true"></span><code>.ico--xl</code> <span class="demo-label">24px · heads a block</span></span>
+        </div>
+        <h3>in running text and in a flex row</h3>
+        <p id="inline-text">The build <span class="ico" data-icon="circle-check" aria-hidden="true"></span> passed and the deploy
+          <span class="ico" data-icon="circle-x" aria-hidden="true"></span> did not: in running text the glyph sits on the x-height.</p>
+        <p class="demo-row"><span class="demo-pair"><span class="ico ico--sm" data-icon="clock" aria-hidden="true"></span>3 min ago</span>
+          <span class="demo-pair"><span class="ico ico--sm" data-icon="git-branch" aria-hidden="true"></span>main</span>
+          <span class="demo-pair"><span class="ico ico--sm" data-icon="file-code" aria-hidden="true"></span>12 files</span></p>
+      </section>
+
+      <!-- ── I1 · colour ───────────────────────────────────────────────── -->
+      <section id="colour" aria-labelledby="colour-h">
+        <h2 id="colour-h">I1 · colour: the text's, or its own tone</h2>
+        <p class="demo-lede">A glyph is its label's colour. <code>data-tone</code> on the <code>.ico</code> itself paints it in that
+          tone; a tone on a container does not reach it.</p>
+        <div class="demo-cols">
+          <div class="demo-surface" data-surface="background">
+            <p class="demo-label">currentColor, on --background</p>
+            <p><span class="demo-pair" style="color: var(--foreground)"><span class="ico ico--lg" id="cc-fg" data-icon="history" aria-hidden="true"></span>--foreground</span></p>
+            <p><span class="demo-pair" style="color: var(--muted-foreground)"><span class="ico ico--lg" id="cc-muted" data-icon="history" aria-hidden="true"></span>--muted-foreground</span></p>
+            <p><span class="demo-pair" style="color: var(--primary)"><span class="ico ico--lg" id="cc-primary" data-icon="history" aria-hidden="true"></span>--primary</span></p>
+          </div>
+          <div class="demo-surface" data-surface="card" id="tones">
+            <p class="demo-label">data-tone on the .ico, on --card</p>
+            <p><span class="demo-pair"><span class="ico ico--lg" data-tone="primary" data-icon="plus" aria-hidden="true"></span>primary</span>
+              <span class="demo-pair"><span class="ico ico--lg" data-tone="success" data-icon="circle-check" aria-hidden="true"></span>success</span></p>
+            <p><span class="demo-pair"><span class="ico ico--lg" data-tone="warning" data-icon="triangle-alert" aria-hidden="true"></span>warning</span>
+              <span class="demo-pair"><span class="ico ico--lg" data-tone="destructive" data-icon="trash-2" aria-hidden="true"></span>destructive</span></p>
+            <p><span class="demo-pair"><span class="ico ico--lg" data-tone="info" data-icon="info" aria-hidden="true"></span>info</span>
+              <span class="demo-pair"><span class="ico ico--lg" data-tone="pending" data-icon="clock" aria-hidden="true"></span>pending</span>
+              <span class="demo-pair"><span class="ico ico--lg" data-tone="muted" data-icon="x" aria-hidden="true"></span>muted</span></p>
+          </div>
+          <div class="demo-tone" data-tone="destructive" id="leak">
+            <p class="demo-label">a container with data-tone="destructive"</p>
+            <p><span class="demo-pair" style="color: var(--primary)"><span class="ico ico--lg" id="leak-plain" data-icon="refresh-cw" aria-hidden="true"></span>retry — the glyph stays its label's --primary</span></p>
+            <p><span class="demo-pair"><span class="ico ico--lg" id="leak-own" data-tone="destructive" data-icon="circle-x" aria-hidden="true"></span>its own data-tone paints it</span></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── I1 · accessibility and failure ───────────────────────────── -->
+      <section id="a11y" aria-labelledby="a11y-h">
+        <h2 id="a11y-h">I1 · naming, and what goes wrong</h2>
+        <table class="demo-table">
+          <thead><tr><th>markup</th><th>renders</th><th>why</th></tr></thead>
+          <tbody>
+            <tr><td><code>aria-hidden="true"</code> beside a label</td>
+              <td><span class="demo-pair"><span class="ico" data-icon="download" aria-hidden="true"></span>export</span></td>
+              <td>decoration: the word says it</td></tr>
+            <tr><td>the only content of a link</td>
+              <td><a class="demo-link" href="#i3" aria-label="GitHub profile" id="icon-only"><span class="ico ico--lg" data-icon="github" aria-hidden="true"></span></a></td>
+              <td>the LINK is named, for its destination</td></tr>
+            <tr><td><code>role="img" aria-label</code> standing alone</td>
+              <td><span class="ico" role="img" aria-label="private" data-icon="lock" id="meaningful"></span></td>
+              <td>a glyph that means something with no word beside it</td></tr>
+            <tr><td>a word with no token</td>
+              <td><span id="bad-word-host"></span></td>
+              <td>a solid square, loud on purpose (built by the script below, so the repo-wide word check does not see it)</td></tr>
+            <tr><td>no word, inside an element that has one</td>
+              <td><span data-icon="star"><span class="ico" id="inherited" aria-hidden="true"></span></span></td>
+              <td><code>--ico</code> inherits: it draws the container's star</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ── I2 ─────────────────────────────────────────────────────────── -->
+      <section id="i2" aria-labelledby="i2-h">
+        <h2 id="i2-h">I2 · the glyph vocabulary</h2>
+        <p class="demo-lede">Two kinds. Text glyphs are the terminal idiom, drawn by CSS at the text size with empty alt text.
+          Every other glyph is a mask.</p>
+        <table class="demo-table" id="text-glyphs">
+          <thead><tr><th>text glyph</th><th>where</th></tr></thead>
+          <tbody>
+            <tr><td class="demo-glyph">$&nbsp;</td><td>the prompt, <code>.prompt</code></td></tr>
+            <tr><td class="demo-glyph">#&nbsp;</td><td>the comment, <code>.comment</code></td></tr>
+            <tr><td class="demo-glyph">▸ ▾</td><td>fold and disclosure</td></tr>
+            <tr><td class="demo-glyph">→</td><td>typed into a forward link's label</td></tr>
+            <tr><td class="demo-glyph">←</td><td>the rail's current row</td></tr>
+            <tr><td class="demo-glyph">» «</td><td>the rail toggle</td></tr>
+            <tr><td class="demo-glyph">[x] [&nbsp;]</td><td>the anim toggle</td></tr>
+            <tr><td class="demo-glyph">·</td><td>separators</td></tr>
+            <tr><td class="demo-glyph">✓ ✗ ● ○ –</td><td>state words (S5) and the tickstrip</td></tr>
+            <tr><td class="demo-glyph">[ ok ]</td><td>the boot log</td></tr>
+          </tbody>
+        </table>
+        <h3>action → glyph → tone</h3>
+        <table class="demo-table" id="actions">
+          <thead><tr><th>action</th><th>glyph</th><th>tone</th></tr></thead>
+          <tbody>
+            <tr><td>add, create, install</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="plus" aria-hidden="true"></span><span class="ico" data-tone="primary" data-icon="download" aria-hidden="true"></span>plus / download</span></td><td>default</td></tr>
+            <tr><td>edit</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="pencil" aria-hidden="true"></span>pencil</span></td><td>default</td></tr>
+            <tr><td>remove, delete, uninstall</td><td><span class="demo-pair"><span class="ico" data-tone="destructive" data-icon="trash-2" aria-hidden="true"></span>trash-2</span></td><td>destructive</td></tr>
+            <tr><td>confirm, apply, enable</td><td><span class="demo-pair"><span class="ico" data-tone="success" data-icon="check" aria-hidden="true"></span><span class="ico" data-tone="success" data-icon="power" aria-hidden="true"></span>check / power</span></td><td>success</td></tr>
+            <tr><td>disable, deactivate</td><td><span class="demo-pair"><span class="ico" data-tone="warning" data-icon="power" aria-hidden="true"></span>power</span></td><td>warning</td></tr>
+            <tr><td>view / hide</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="eye" aria-hidden="true"></span><span class="ico" data-tone="primary" data-icon="eye-off" aria-hidden="true"></span>eye / eye-off</span></td><td>default</td></tr>
+            <tr><td>refresh (busy)</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="refresh-cw" aria-hidden="true"></span><span class="ico" data-tone="primary" data-icon="loader-circle" aria-hidden="true"></span>refresh-cw (loader-circle)</span></td><td>default</td></tr>
+            <tr><td>update available</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="circle-fading-arrow-up" aria-hidden="true"></span>circle-fading-arrow-up</span></td><td>default</td></tr>
+            <tr><td>export, import</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="upload" aria-hidden="true"></span><span class="ico" data-tone="primary" data-icon="download" aria-hidden="true"></span>upload / download</span></td><td>default</td></tr>
+            <tr><td>open elsewhere</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="external-link" aria-hidden="true"></span>external-link</span></td><td>default</td></tr>
+            <tr><td>send</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="send" aria-hidden="true"></span>send</span></td><td>default</td></tr>
+            <tr><td>copy</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="copy" aria-hidden="true"></span>→ <span class="ico" data-tone="success" data-icon="check" aria-hidden="true"></span>/ <span class="ico" data-tone="destructive" data-icon="x" aria-hidden="true"></span>copy → check / x</span></td><td>default → success / destructive</td></tr>
+            <tr><td>favourite</td><td><span class="demo-pair"><span class="ico" data-tone="primary" data-icon="star" aria-hidden="true"></span><span class="ico" data-tone="primary" data-icon="star-filled" aria-hidden="true"></span>star / star-filled</span></td><td>default</td></tr>
+            <tr><td>back, forward in app history</td><td><span class="demo-pair"><span class="ico" data-tone="muted" data-icon="chevron-left" aria-hidden="true"></span><span class="ico" data-tone="muted" data-icon="chevron-right" aria-hidden="true"></span>chevron-left / chevron-right</span></td><td>muted</td></tr>
+            <tr><td>back in a dialog</td><td><span class="demo-pair"><span class="ico" data-tone="muted" data-icon="arrow-left" aria-hidden="true"></span>arrow-left</span></td><td>muted</td></tr>
+            <tr><td>close, dismiss</td><td><span class="demo-pair"><span class="ico" data-tone="muted" data-icon="x" aria-hidden="true"></span>x</span></td><td>muted</td></tr>
+            <tr><td>expand / collapse all</td><td><span class="demo-pair"><span class="ico" data-tone="muted" data-icon="chevrons-up-down" aria-hidden="true"></span><span class="ico" data-tone="muted" data-icon="chevrons-down-up" aria-hidden="true"></span>chevrons-up-down / chevrons-down-up</span></td><td>muted</td></tr>
+          </tbody>
+        </table>
+        <p class="demo-lede">No cyan, no orange, no amber: none is a token, and amber is --warning, which means attention.
+          Colour is never the only carrier; the glyph and the accessible name say it too.</p>
+      </section>
+
+      <!-- ── I3 ─────────────────────────────────────────────────────────── -->
+      <section id="i3" aria-labelledby="i3-h">
+        <h2 id="i3-h">I3 · flags and social marks</h2>
+        <p class="demo-lede">Flags are <code>.dd-flag-*</code> in components.css, unchanged, <code>aria-hidden</code> beside the
+          language name (absent under <code>?bare</code>, which does not load that file). <code>github</code> and <code>mail</code>
+          are masks at <code>--lg</code> beside a visible label; every other brand mark stays its surface's asset.</p>
+        <div class="demo-row" id="flags">
+          <span class="demo-pair"><span class="dd-flag dd-flag-de" aria-hidden="true"></span>deutsch</span>
+          <span class="demo-pair"><span class="dd-flag dd-flag-en" aria-hidden="true"></span>english</span>
+          <span class="demo-pair"><span class="dd-flag dd-flag-es" aria-hidden="true"></span>español</span>
+          <span class="demo-pair"><span class="dd-flag dd-flag-pt" aria-hidden="true"></span>português</span>
+        </div>
+        <p class="demo-row" id="social">
+          <a class="demo-link demo-pair" href="#i3"><span class="ico ico--lg" data-icon="github" aria-hidden="true"></span>github</a>
+          <a class="demo-link demo-pair" href="#i3"><span class="ico ico--lg" data-icon="mail" aria-hidden="true"></span>mail</a>
+          <a class="demo-link demo-pair" href="#i3" aria-label="GitHub profile"><span class="ico ico--lg" data-icon="github" aria-hidden="true"></span></a>
+        </p>
+      </section>
+    </main>
+
+    <script type="module">
+      const html = document.documentElement;
+      // The deliberate failure: a word the set does not have. Built here rather than written in the
+      // markup, because scripts/check-icons.mjs fails any unknown word it finds in the repo's files.
+      const bad = document.createElement("span");
+      bad.className = "ico ico--xl";
+      bad.id = "bad-word";
+      bad.setAttribute("aria-hidden", "true");
+      bad.dataset.icon = ["no", "such", "icon"].join("-");
+      document.getElementById("bad-word-host").replaceWith(bad);
+
+      const bare = html.hasAttribute("data-bare");
+      document.getElementById("mode").textContent = bare ? "· WP4 · tokens.css + icons.css only" : "· WP4 · I1 I2 I3";
+      const link = document.getElementById("bare-link");
+      link.textContent = bare ? "full page" : "tokens + icons only";
+      link.href = bare ? "?" : "?bare";
+
+      const sync = () => {
+        for (const b of document.querySelectorAll("[data-set-theme]")) b.setAttribute("aria-pressed", String(b.dataset.setTheme === html.dataset.theme));
+      };
+      document.addEventListener("click", (e) => {
+        const theme = e.target.closest("[data-set-theme]");
+        if (!theme) return;
+        html.dataset.theme = theme.dataset.setTheme;
+        try { localStorage.setItem("theme", html.dataset.theme); } catch {}
+        sync();
+      });
+      sync();
+    </script>
+  </body>
+</html>

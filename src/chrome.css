@@ -914,8 +914,11 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
 /* ── THE RAIL PRINTS ITS LISTING (0.60.0, opt-in) ──────────────────────────────────────────────
    danieldeusing.de types `ls -l` and the rail prints its rows under it, one after another — the
    same two beats as the page's own `$ command` sections. It is opt-in on the list
-   (`ul.ls-panel[data-term-list]`), and each row carries its index as `--i` in the markup: one rule
-   for any number of rows, instead of an nth-child ladder that silently stops where it was written.
+   (`ul.ls-panel[data-term-list]`), and each row's step comes from its position: the first twelve
+   rows 0.11s apart, every row after the twelfth with the twelfth (a longer listing would take
+   seconds to finish printing). It was an index written into the markup as `style="--i: N"`, and a
+   `style` attribute is inline style, which a strict Content-Security-Policy refuses (lead ruling:
+   no inline style in documented markup).
 
    CSS ONLY, and it fails visible. There is no resting `opacity: 0` anywhere: the rows are hidden
    only by the animation's own fill, so with animation off (html.anim-off stops it), reduced motion
@@ -930,11 +933,24 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   from { opacity: 0; transform: translateY(-2px); }
 }
 @media (min-width: 48.0625rem) and (prefers-reduced-motion: no-preference) {
-  html.term-anim .site-nav:has([data-term-list]) .ls-nav-title { animation: dd-print 0.25s ease 0.3s both; }
-  html.term-anim .ls-panel[data-term-list] > li {
+  /* `:not(.anim-off)` here, not only in tokens.css's global stop: the stop moved between files in
+     0.60.0, and a reveal that depends on another file to be switched off is not self-sufficient. */
+  html.term-anim:not(.anim-off) .site-nav:has([data-term-list]) .ls-nav-title { animation: dd-print 0.25s ease 0.3s both; }
+  html.term-anim:not(.anim-off) .ls-panel[data-term-list] > li {
     animation: dd-print 0.32s ease both;
     animation-delay: calc(0.6s + var(--i, 0) * 0.11s);
   }
+  .ls-panel[data-term-list] > li:nth-child(2) { --i: 1; }
+  .ls-panel[data-term-list] > li:nth-child(3) { --i: 2; }
+  .ls-panel[data-term-list] > li:nth-child(4) { --i: 3; }
+  .ls-panel[data-term-list] > li:nth-child(5) { --i: 4; }
+  .ls-panel[data-term-list] > li:nth-child(6) { --i: 5; }
+  .ls-panel[data-term-list] > li:nth-child(7) { --i: 6; }
+  .ls-panel[data-term-list] > li:nth-child(8) { --i: 7; }
+  .ls-panel[data-term-list] > li:nth-child(9) { --i: 8; }
+  .ls-panel[data-term-list] > li:nth-child(10) { --i: 9; }
+  .ls-panel[data-term-list] > li:nth-child(11) { --i: 10; }
+  .ls-panel[data-term-list] > li:nth-child(n + 12) { --i: 11; }
 }
 
 /* ── burger + mobile menu ── */
@@ -1087,6 +1103,26 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
     box-sizing: border-box; min-block-size: 44px; display: flex; align-items: center;
   }
 }
+/* …and on the footer itself, at every width (lead ruling): under a coarse pointer every control in
+   footer.status and the rail's toggle is a 44px target, and the footer grows to hold them, the way
+   the phone footer grows for its second row. Restated here rather than left to components.css's
+   coarse rule, because the fine-pointer `footer.status .dropdown > summary` above out-ranks it.
+   The clearance follows: 46px on one row (44 and the rule), 68px on a phone's two (18px of path,
+   .25rem of gap, 44 and the rule). `!important` for the reason given at the phone values. */
+@media (pointer: coarse) {
+  footer.status :is(.dropdown > summary, .anim-toggle, .doc-link) {
+    box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+    min-block-size: 44px; min-inline-size: 44px;
+  }
+  .ls-nav-toggle { min-block-size: 44px; min-inline-size: 44px; }
+  /* A rail row is a 44px target here (components.css), and its text sits in the middle of it,
+     not on a baseline at the top of a tall row. */
+  .ls-row { align-items: center; }
+  :root:has(body > footer.status) { --status-h: 2.875rem !important; }
+}
+@media (max-width: 48rem) and (pointer: coarse) {
+  :root:has(body > footer.status) { --status-h: 4.25rem !important; }
+}
 @media (max-width: 40rem) {
   .bar-history + .crumbs { margin-inline-start: 0.5rem; }
 }
@@ -1116,6 +1152,9 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
    `preserve-parent-color`. So no glyph here takes `none`: under it a glyph keeps its author colour. */
 @media (forced-colors: active) {
   .ls-row[aria-current="page"] { forced-color-adjust: none; background: Highlight; color: HighlightText; box-shadow: none; }
+  /* Not redundant once components.css lands: its rule for what sits inside a highlighted
+     `.dropdown-item` loses to this file's own `.ls-panel .ls-name`, `.ls-row--dir .ls-name` and
+     current-row selectors, so this is the rule that carries the rail's parts. */
   .ls-panel .ls-row :is(.ls-name, .ls-perm),
   .ls-panel .ls-row[aria-current="page"]::after { color: inherit; text-shadow: none; }
   .navlist a:is([aria-current="true"], [aria-current="page"]) { forced-color-adjust: none; background: Highlight; color: HighlightText; }

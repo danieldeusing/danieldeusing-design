@@ -17,7 +17,7 @@
  * which is what CI and the release gate set.
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { extname, join, normalize, sep } from "node:path";
@@ -80,7 +80,12 @@ export async function launch(name) {
     "--no-first-run", "--no-default-browser-check", "--disable-gpu", `--user-data-dir=${profile}`, "about:blank",
   ], { stdio: "ignore" });
   let socket;
-  const close = () => { try { socket?.close(); } catch { /* already closed */ } chrome.kill("SIGKILL"); };
+  // The profile goes with the browser: every run otherwise left a 2 MB directory in the temp dir.
+  const close = () => {
+    try { socket?.close(); } catch { /* already closed */ }
+    chrome.kill("SIGKILL");
+    rmSync(profile, { recursive: true, force: true, maxRetries: 3 });
+  };
   process.on("exit", close);
 
   let port = 0;

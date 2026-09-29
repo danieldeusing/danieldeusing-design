@@ -897,6 +897,20 @@ try {
   const differs = Object.keys(full).filter((k) => full[k] !== bare[k]).map((k) => ({ part: k, full: full[k], bare: bare[k] }));
   await check("with base.css, components.css and chrome.css gone the dialog, its parts and the tip compute the same — font included",
     differs.length === 0, differs);
+  // The demo page sets a mono body itself (as a tokens-only surface does), so the snapshot above
+  // cannot tell a dialog that declares its face from one that inherits it. A host page that says
+  // otherwise can: serif at 20px on <body>, and the overlays must still be mono at --fs-base.
+  const ownFont = await evaluate(`(() => {
+    document.body.style.fontFamily = "serif"; document.body.style.fontSize = "20px";
+    const d = __o.$("dlg-default"); d.showModal();
+    const t = __o.tip(); t.style.display = "grid";
+    const read = (n) => { const s = getComputedStyle(n); return /JetBrains Mono/.test(s.fontFamily) && s.fontSize === "12px"; };
+    const out = { dialog: read(d), title: read(d.querySelector(".dialog-title")) || getComputedStyle(d.querySelector(".dialog-title")).fontSize === "18px", tip: read(t) };
+    t.style.display = "none"; d.close();
+    document.body.style.fontFamily = ""; document.body.style.fontSize = "";
+    return out; })()`);
+  await check("on a host page whose body is serif 20px, the dialog and the tip are still mono at --fs-base (their own declarations)",
+    ownFont.dialog && ownFont.title && ownFont.tip, ownFont);
   await check("the page really is bare (no base.css, no components.css)",
     () => evaluate(`![...document.styleSheets].some((s) => /\\/(base|components|chrome)\\.css$/.test(s.href || ""))`));
   await evaluate(`${T("dgm-background")}.focus(); null`);

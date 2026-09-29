@@ -346,6 +346,15 @@ const snapshot = () => evaluate(`JSON.stringify({
   sizes: ${JSON.stringify(SIZED)}.map(([sel, dims]) => { const b = M.box(sel); return (dims.includes("w") ? b.w.toFixed(2) : "") + " " + (dims.includes("h") ? b.h.toFixed(2) : ""); }),
 })`);
 const full = JSON.parse(await snapshot());
+// D2's placeholder on the FULL page, where feedback.css's .empty--inline dresses it. `?bare` cannot see
+// this: there .empty has no rule at all. Chromium aligns block children by `justify-items`, so the
+// inline look inherited .empty's `center` and the line shrank to its words mid-table — measured.
+const placeholderLine = () => evaluate(`JSON.stringify((() => { const p = document.querySelector("#engine-empty tr[data-table-placeholder]");
+  if (!p) return null; const line = p.querySelector(".empty--inline > p").getBoundingClientRect(), c = p.cells[0].getBoundingClientRect();
+  return { lineLeft: Math.round(line.left), cellLeft: Math.round(c.left), lineW: Math.round(line.width), cellW: Math.round(c.width) }; })())`);
+const line = JSON.parse(await placeholderLine());
+await check("D2 — on the full page the empty table's sentence starts at its cell's edge and runs the cell's width (S1's inline look, not centred)",
+  () => line && line.lineLeft - line.cellLeft < 16 && line.lineW > line.cellW - 32, () => JSON.stringify(line));
 await open("bare&theme=warm");
 const bare = JSON.parse(await snapshot());
 const drift = [];

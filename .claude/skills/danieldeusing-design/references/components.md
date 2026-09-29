@@ -243,11 +243,11 @@ share the padding, the `--muted` highlight (on hover, `data-active="true"`, or R
 - `.dropdown-item--danger` is `--destructive`; `.dropdown-sep` is a 1px `--border` rule, drawn as a
   border so a contrast theme keeps it; `.dropdown-label` and `.select-group` are the muted uppercase
   heading of a group. A `.ico` in a row sits after the check column, `aria-hidden="true"`.
-- **A menu's `.dropdown-label` is for the eye.** Inside `role="menu"` its words would be loose text
-  between the items, so it is `aria-hidden="true"` — `initDropdowns()` sets that in a
-  `details.dropdown`, and a page-built menu writes it — and the menu keeps its name from its summary
-  or its own `aria-label`. A menu whose sections a reader must hear by name is two menus, or items
-  that say it themselves.
+- **A labelled section is a group.** A `.dropdown-label` and the items under it, up to the next
+  separator or label, are one `role="group"` named by the label (`aria-labelledby`), the APG shape:
+  a reader hears "sort by, group" and then its choices, and "sort by" and "order" in one menu stay
+  two things. `initDropdowns()` wraps the section in a `details.dropdown` itself; a page-built menu
+  writes the group (below). A menu with no label is left as it is.
 - **44px under a coarse pointer**: every row, and a summary that is only text or a glyph (centred, with
   no weight, so a `.btn-icon` summary keeps its own box).
 - **Placement is not the look.** `.select-panel` sets no `position` — `initSelects()` writes
@@ -281,8 +281,8 @@ dropdown `initTableTools()` builds in a table header had no click-away and no Es
 - **A panel of rows is an ARIA menu.** A panel holding only `.dropdown-item`, `.dropdown-sep` and
   `.dropdown-label` rows becomes `role="menu"` (named by its summary), its `li`s `role="none"`, its
   items `role="menuitem"` — one written as `menuitemradio` or `menuitemcheckbox` keeps that — its
-  separators `role="separator"` and its labels `aria-hidden="true"`; the summary gets
-  `aria-haspopup="menu"` and a synced `aria-expanded`. **A panel holding anything else stays a disclosure** — the table filter's text
+  separators `role="separator"`, and each labelled section a `role="group"` named by its label;
+  the summary gets `aria-haspopup="menu"` and a synced `aria-expanded`. **A panel holding anything else stays a disclosure** — the table filter's text
   box is the case: no menu roles, and Tab moves through it.
 - **Keys.** On the summary, Enter, Space and ArrowDown open the menu on its first item, ArrowUp on
   its last. Inside, ArrowDown and ArrowUp move and wrap, Home and End jump, a printable character
@@ -301,8 +301,19 @@ dropdown `initTableTools()` builds in a table header had no click-away and no Es
   same keys from `attachMenuKeys(panel, { onClose, returnFocusTo })`: roving focus, wrap, Home/End,
   typeahead, and `onClose` on Escape, Tab or activation with focus handed to `returnFocusTo`. Its
   items leave the tab order, and so does an item the page adds while it is attached. It returns a
-  function that takes the keys off again. Its `.dropdown-label` rows are the page's to mark
-  `role="none" aria-hidden="true"`.
+  function that takes the keys off again. Its labelled sections are the page's to write as groups —
+  the arrow keys walk from one group into the next:
+
+  ```html
+  <ul class="select-panel context-menu" role="menu" aria-label="actions for src/app.ts">
+    <li role="none"><ul role="group" aria-labelledby="ctx-file">
+      <li role="none"><span class="dropdown-label" id="ctx-file">file</span></li>
+      <li role="none"><button type="button" class="dropdown-item" role="menuitem">open in editor</button></li>
+    </ul></li>
+    <li class="dropdown-sep" role="separator"></li>
+    <li role="none"><button type="button" class="dropdown-item dropdown-item--danger" role="menuitem">delete</button></li>
+  </ul>
+  ```
 - `scripts/check-dropdown.mjs` drives every line above with real keys and a real mouse.
 
 ## The theme switcher (0.60.0)

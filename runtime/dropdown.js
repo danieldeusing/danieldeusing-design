@@ -25,10 +25,12 @@
  *   · a panel of rows — `.dropdown-item`, `.dropdown-sep`, `.dropdown-label`, bare or one per <li>
  *     — is a MENU. It gets `role="menu"`, its <li>s `role="none"`, its items `role="menuitem"`
  *     (an item that already says `menuitemradio` / `menuitemcheckbox` keeps it: the theme items
- *     do), its separators `role="separator"`, its labels `aria-hidden` (a heading for the eye —
- *     inside a menu its words would be loose text; the menu is named by its summary), and the
- *     summary `aria-haspopup="menu"` with an `aria-expanded` kept in step. Items are
- *     `tabindex="-1"`: the arrows reach them, Tab does not.
+ *     do), its separators `role="separator"`, and the summary `aria-haspopup="menu"` with an
+ *     `aria-expanded` kept in step. Items are `tabindex="-1"`: the arrows reach them, Tab does not.
+ *     A LABELLED SECTION — a `.dropdown-label` and the items under it, up to the next separator or
+ *     label — is wrapped in a `role="group"` named by the label (`aria-labelledby`), the APG shape:
+ *     inside a bare menu the label's words were loose text, and "sort by" and "order" could not be
+ *     told apart. A menu with no label is left as it is.
  *   · a panel holding anything else — the table filter's text box, a form — is a DISCLOSURE and is
  *     left exactly as the platform made it: no menu roles, and Tab walks through it. Announcing a
  *     text field as a menu would be a lie the reader acts on.
@@ -61,16 +63,44 @@ const isMenu = (panel) => panel?.getAttribute("role") === "menu";
 
 /* ── which panels are menus ──────────────────────────────────────────────────────────────────── */
 
-/* The rows a panel is made of, or null when it holds anything that is not a row. */
+const only = (el) => (el.tagName === "LI" && el.childElementCount === 1 ? el.firstElementChild : null);
+const rowOf = (el) => (el.matches(ROW) ? el : only(el)?.matches(ROW) ? only(el) : null);
+const groupOf = (el) => (el.matches('[role="group"]') ? el : only(el)?.matches('[role="group"]') ? only(el) : null);
+
+/* The rows a panel is made of — through the groups mark() made — or null when it holds anything
+   that is not a row. */
 function menuRows(panel) {
   const rows = [];
   for (const child of panel.children) {
-    const only = child.tagName === "LI" && child.childElementCount === 1 ? child.firstElementChild : null;
-    const row = child.matches(ROW) ? child : only?.matches(ROW) ? only : null;
-    if (!row) return null;
-    rows.push(row);
+    const group = groupOf(child);
+    const inner = group ? menuRows(group) : null;
+    const row = inner ? null : rowOf(child);
+    if (!inner && !row) return null;
+    rows.push(...(inner || [row]));
   }
   return rows.some((row) => row.matches(".dropdown-item")) ? rows : null;
+}
+
+/* Each label and the items under it become one group named by the label. Once: a label already in
+   a group is not at the top level any more, so a second call finds nothing to wrap. */
+function groupSections(panel) {
+  const children = [...panel.children];
+  for (let i = 0; i < children.length; i += 1) {
+    const label = rowOf(children[i]);
+    if (!label?.matches(".dropdown-label")) continue;
+    const section = [children[i]];
+    while (i + 1 < children.length && rowOf(children[i + 1])?.matches(".dropdown-item")) section.push(children[(i += 1)]);
+    if (section.length < 2) continue;
+    if (!label.id) label.id = `dd-menu-${(counter += 1)}`;
+    const inList = section[0].tagName === "LI";
+    const group = document.createElement(inList ? "ul" : "div");
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-labelledby", label.id);
+    const holder = inList ? document.createElement("li") : group;
+    if (inList) holder.append(group);
+    section[0].before(holder);
+    group.append(...section);
+  }
 }
 
 /* Idempotent: called on insert, whenever a panel's rows change, and on open. */
@@ -89,14 +119,10 @@ function mark(details) {
   }
   summary.setAttribute("aria-haspopup", "menu");
   summary.setAttribute("aria-expanded", String(details.open));
-  for (const child of panel.children) {
-    if (child.tagName === "LI" && !child.matches(".dropdown-sep")) child.setAttribute("role", "none");
-  }
+  groupSections(panel);
+  for (const li of panel.querySelectorAll("li:not(.dropdown-sep)")) li.setAttribute("role", "none");
   for (const row of rows) {
     if (row.matches(".dropdown-sep")) row.setAttribute("role", "separator");
-    // A heading for the eye. Inside role="menu" its words would be loose text between the items; the
-    // menu keeps the name its summary gives it.
-    else if (row.matches(".dropdown-label")) row.setAttribute("aria-hidden", "true");
     else if (row.matches(".dropdown-item")) {
       if (!CHOICE_ROLES.includes(row.getAttribute("role"))) row.setAttribute("role", "menuitem");
       row.tabIndex = -1;

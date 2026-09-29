@@ -80,6 +80,17 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8"><style>
 <button id="after">after</button>
 <details class="dropdown" id="dd2"><summary id="s2">second</summary>
   <ul class="dropdown-panel"><li><button type="button" class="dropdown-item" id="i2">only</button></li></ul></details>
+<details class="dropdown" id="ddv"><summary id="sv">view</summary>
+  <ul class="dropdown-panel">
+    <li><span class="dropdown-label">sort by</span></li>
+    <li><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true" id="v-name">name</button></li>
+    <li><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" id="v-updated">updated</button></li>
+    <li><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" id="v-stars">stars</button></li>
+    <li class="dropdown-sep"></li>
+    <li><span class="dropdown-label">order</span></li>
+    <li><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true" id="v-asc">ascending</button></li>
+    <li><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" id="v-desc">descending</button></li>
+  </ul></details>
 <details class="dropdown" id="dda"><summary id="sa">links</summary>
   <ul class="dropdown-panel"><li><a class="dropdown-item" id="a-ok" href="#a-ok-followed">open</a></li>
     <li><a class="dropdown-item" id="a-off" href="#a-off-followed" aria-disabled="true">unavailable</a></li></ul></details>
@@ -240,27 +251,44 @@ await section("a panel of rows is a menu; a panel holding a field is not", async
       expanded: document.getElementById("s1").getAttribute("aria-expanded") };
   })()`);
   check("a panel of rows becomes role=menu, labelled by its summary", roles.panel === "menu" && roles.labelledby === "s1", roles);
-  check("...its <li>s are role=none and its separator role=separator",
-    roles.lis.join() === "none,none,none,none,separator,none,none", roles.lis);
+  check("...its <li>s are role=none and its separator role=separator (the labelled section is one <li> now)",
+    roles.lis.join() === "none,separator,none,none", roles.lis);
   check("...its items are menuitems out of the tab order (tabindex -1)",
     roles.items.every((r) => r === "menuitem/-1"), roles.items);
   check("...and the summary says it opens a menu, and that it is shut", roles.haspopup === "menu" && roles.expanded === "false", roles);
 
-  // A .dropdown-label is a heading for the eye: inside role=menu its words would be loose text.
+  // A labelled section is an APG group named by its label, read off the accessibility tree.
   await send("Accessibility.enable");
-  await evaluate("document.getElementById('dd1').open = true; null"); // a closed <details> has no tree
-  await sleep(40);
-  const { nodes } = await send("Accessibility.getFullAXTree", {});
-  await evaluate("document.getElementById('dd1').open = false; null");
-  const byId = new Map(nodes.map((n) => [n.nodeId, n]));
-  const menu = nodes.find((n) => n.role?.value === "menu" && n.name?.value === "actions");
-  const loose = [];
-  const walk = (n) => { if (!n) return; if (!n.ignored && /text/i.test(n.role?.value || "") && /file/.test(n.name?.value || "")) loose.push(n.name.value);
-    for (const c of n.childIds || []) walk(byId.get(c)); };
-  walk(menu);
-  check("a .dropdown-label is out of the accessibility tree — no loose text in the menu, which keeps its summary's name",
-    !!menu && loose.length === 0 && (await evaluate(`document.querySelector("#dd1 .dropdown-label").getAttribute("aria-hidden")`)) === "true",
-    { menu: menu?.name?.value, loose });
+  // A menu's shape: each group with its name and the roles of the items under it, and any item
+  // outside a group. Opened one at a time (a closed <details> has no tree, and one open closes the other).
+  const shape = async (id, name) => {
+    await evaluate(`document.getElementById("${id}").open = true; null`);
+    await sleep(60);
+    const { nodes } = await send("Accessibility.getFullAXTree", {});
+    await evaluate(`document.getElementById("${id}").open = false; null`);
+    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+    const out = [];
+    const walk = (n, group) => {
+      if (!n) return;
+      const role = n.ignored ? null : n.role?.value;
+      if (role === "group") { group = { group: n.name?.value, items: [] }; out.push(group); }
+      else if (/^menuitem/.test(role || "")) (group ? group.items : out).push(role);
+      for (const c of n.childIds || []) walk(byId.get(c), group);
+    };
+    walk(nodes.find((n) => n.role?.value === "menu" && n.name?.value === name), null);
+    return out;
+  };
+  const view = await shape("ddv", "view"), actions = await shape("dd1", "actions");
+  check("a menu with a \"sort by\" and an \"order\" section exposes two named groups, 3 and 2 radios",
+    JSON.stringify(view) === JSON.stringify([{ group: "sort by", items: ["menuitemradio", "menuitemradio", "menuitemradio"] },
+      { group: "order", items: ["menuitemradio", "menuitemradio"] }]), view);
+  check("...and a label over part of a menu groups only its own items, up to the separator",
+    JSON.stringify(actions) === JSON.stringify([{ group: "file", items: ["menuitem", "menuitem", "menuitem"] }, "menuitem", "menuitem"]), actions);
+  check("...the label is not hidden: it is the group's name",
+    (await evaluate(`document.querySelector("#ddv .dropdown-label").hasAttribute("aria-hidden")`)) === false);
+  await reset(); await focusOn("sv"); await press("ArrowDown"); await press("ArrowDown"); await press("ArrowDown"); await press("ArrowDown");
+  check("...and the arrow keys walk from one group into the next", (await focused()) === "v-asc", await focused());
+  await reset();
 
   const disclosure = await evaluate(`({ role: document.querySelector("#ddx .dropdown-panel").getAttribute("role"),
     haspopup: document.getElementById("sx").getAttribute("aria-haspopup"),

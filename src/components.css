@@ -830,9 +830,9 @@ button.card-terminal:focus-visible { outline: 2px solid var(--ring); outline-off
 }
 
 /* A group heading inside a popup: an <optgroup>'s label in a listbox, `.dropdown-label` in a menu.
-   A menu's label is for the EYE: inside role="menu" its words would be loose text between the
-   items, so initDropdowns() takes it out of the accessibility tree (`aria-hidden`) and the menu
-   keeps the name its summary gives it. A page-built menu marks it the same way itself. */
+   A menu's label NAMES A GROUP: the label and the items under it are one role="group" with
+   `aria-labelledby` pointing at the label — initDropdowns() wraps the section, a page-built menu
+   writes it. The nested list that makes is reset with the popup's own lists, above. */
 .dropdown-label,
 .select-group {
   padding: 0.35rem 0.9rem 0.15rem 0.5rem;

@@ -307,10 +307,12 @@
           <div>
             <span class="demo-label">.dropdown-panel (menu) — shown open</span>
             <ul class="dropdown-panel" role="menu" aria-label="sort" id="static-menu">
-              <li role="none"><span class="dropdown-label" aria-hidden="true">sort by</span></li>
-              <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true" tabindex="-1" id="static-checked">name</button></li>
-              <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" tabindex="-1">updated</button></li>
-              <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" tabindex="-1" data-active="true">stars</button></li>
+              <li role="none"><ul role="group" aria-labelledby="static-sort-label">
+                <li role="none"><span class="dropdown-label" id="static-sort-label">sort by</span></li>
+                <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true" tabindex="-1" id="static-checked">name</button></li>
+                <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" tabindex="-1">updated</button></li>
+                <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" tabindex="-1" data-active="true">stars</button></li>
+              </ul></li>
               <li class="dropdown-sep" role="separator"></li>
               <li role="none"><button type="button" class="dropdown-item" role="menuitem" tabindex="-1" id="static-plain">reset sort</button></li>
               <li role="none"><button type="button" class="dropdown-item" role="menuitem" tabindex="-1" aria-current="true" id="static-current">history: current</button></li>

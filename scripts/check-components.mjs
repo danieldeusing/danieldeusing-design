@@ -34,9 +34,10 @@
  *   INVALID an invalid field says what is wrong in TEXT — every aria-invalid="true" in the demo and in
  *           the references' examples names a `.field-error` through aria-describedby (WCAG 1.4.1,
  *           3.3.1: the --destructive edge alone is colour only);
- *   SILENT  every `.ico`, in the demo and in the references' examples, is aria-hidden, and so is a
- *           menu's `.dropdown-label`;
- *   REMOVED the classes 0.60.0 removed (§1.1) are not declared again.
+ *   SILENT  every `.ico`, in the demo and in the references' examples, is aria-hidden, and a menu's
+ *           `.dropdown-label` names the role="group" it heads;
+ *   REMOVED the classes 0.60.0 removed (§1.1) are not declared again, and the forced glyph rule and
+ *           its `@supports not` fallback name the same selectors.
  *
  * The demo carries stand-ins for rules other packages of 0.60.0 own. Each switches itself off when
  * the real rule is present; DD_FORBID_STANDINS=1 FAILS while any is still in force.
@@ -362,7 +363,8 @@ const glyph = async (selector, pseudo) => {
  * colour of the text's own box is what the letters sit on; it must be the STATE's fill (sampled in
  * the row's padding), or the mode painted a Canvas backplate over the state and the word sits on
  * that instead — which a ratio against the row's fill would miss. The marker pass paints the text
- * magenta: the clip must hold it.
+ * magenta, and the clip must hold the WHOLE word: magenta within 3px of both of its ends. Any
+ * magenta at all was not enough — a clip slid 8px along the word still held some, and passed.
  */
 const words = async (textSel, rowSel = textSel, pseudoState = null) => {
   await reveal(rowSel);
@@ -377,11 +379,14 @@ const words = async (textSel, rowSel = textSel, pseudoState = null) => {
     return { x: l, y: t, width: rr - l, height: b - t, rowX: e.left, rowY: e.top };
   })()`);
   const clip = { x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height) };
-  await setStyle("mark", `${textSel}, ${textSel} * { color: rgb(255 0 255) !important; forced-color-adjust: none !important; text-shadow: none !important; }`);
+  // On black, so an anti-aliased end stroke stays magenta on any fill (on the dark palette's cyan it did not).
+  await setStyle("mark", `${textSel}, ${textSel} * { color: rgb(255 0 255) !important; background: rgb(0 0 0) !important;
+    forced-color-adjust: none !important; text-shadow: none !important; }`);
   const marked = await capture(clip);
   await setStyle("mark", "");
-  let aligned = false;
-  for (let y = 0; y < marked.height && !aligned; y += 1) for (let x = 0; x < marked.width && !aligned; x += 1) aligned = isMagenta(marked.at(x, y));
+  const inked = (x) => Array.from({ length: marked.height }, (_, y) => isMagenta(marked.at(x, y))).some(Boolean);
+  const ends = [0, 1, 2].map((d) => [d, marked.width - 1 - d]);
+  const aligned = ends.some(([l]) => inked(l)) && ends.some(([, r]) => inked(r));
   const img = await capture(clip);
   const fill = (await capture({ x: Math.floor(r.rowX) + 4, y: Math.floor(r.rowY) + 4, width: 1, height: 1 })).at(0, 0);
   if (pseudoState) await force(rowSel, []);
@@ -611,9 +616,13 @@ const swatch = async (colour, beside) => {
   const box = await evaluate(`(() => { const s = document.createElement("span"); s.id = "x-swatch";
     s.style.cssText = "display: inline-block; inline-size: 14px; block-size: 14px; background: " + ${JSON.stringify(colour)};
     document.querySelector(${JSON.stringify(beside)}).after(s); const r = s.getBoundingClientRect(); return [r.left, r.top]; })()`);
-  const img = await capture({ x: Math.ceil(box[0]) + 6, y: Math.ceil(box[1]) + 1, width: 1, height: 12 });
+  const clip = { x: Math.ceil(box[0]) + 6, y: Math.ceil(box[1]) + 1, width: 1, height: 12 };
+  const drawn = await capture(clip);
   await evaluate(`document.getElementById("x-swatch").remove(); null`);
-  return modeOf(Array.from({ length: 12 }, (_, y) => img.at(0, y)));
+  const gone = await capture(clip);
+  // Ownership, two shots: the same clip with the swatch and without it must differ.
+  const changed = Array.from({ length: 12 }, (_, y) => !near(drawn.at(0, y), gone.at(0, y), 0)).filter(Boolean).length;
+  return { colour: modeOf(Array.from({ length: 12 }, (_, y) => drawn.at(0, y))), owned: changed >= 3 };
 };
 
 await section("TONE — a fold's icon is its summary's colour (F7)", async () => {
@@ -622,15 +631,16 @@ await section("TONE — a fold's icon is its summary's colour (F7)", async () =>
   let destructive = null;
   for (const [name, fold] of [["an untoned fold inside a toned container", "#x-tone-fold"], ["a toned fold", "#fold-tone"], ["an untoned fold", "#fold-count"]]) {
     await reveal(fold);
-    const summary = await swatch(await evaluate(`cs(${JSON.stringify(`${fold} > summary`)}).color`), `${fold} > summary .ico`);
+    const own = await swatch(await evaluate(`cs(${JSON.stringify(`${fold} > summary`)}).color`), `${fold} > summary .ico`);
+    const summary = own.colour;
     destructive ??= await swatch(await evaluate(`token("--destructive")`), `${fold} > summary .ico`);
     await toggle("solid", true);
     const g = await glyph(`${fold} > summary .ico`, null);
     await toggle("solid", false);
-    out[name] = { icon: g.mode, summary, aligned: g.aligned, same: !!g.mode && near(g.mode, summary, 3) };
+    out[name] = { icon: g.mode, summary, aligned: g.aligned && own.owned, same: !!g.mode && near(g.mode, summary, 3) };
   }
   check("each icon paints its summary's colour, as painted — and the untoned fold's is not the container's destructive",
-    Object.values(out).every((o) => o.aligned && o.same) && !near(out["an untoned fold inside a toned container"].icon, destructive, 3),
+    Object.values(out).every((o) => o.aligned && o.same) && destructive.owned && !near(out["an untoned fold inside a toned container"].icon, destructive.colour, 3),
     { destructive, ...out });
   const tone = await evaluate(`[getComputedStyle(document.getElementById("x-tone-fold")).getPropertyValue("--tone").trim(),
     getComputedStyle(document.getElementById("fold-tone")).getPropertyValue("--tone").trim()]`);
@@ -829,11 +839,12 @@ await section("INVALID — an invalid field says what is wrong in text (WCAG 1.4
 });
 
 /* ── SILENT — what is for the eye stays out of the accessibility tree ────── */
-await section("SILENT — an icon and a menu's label are for the eye", async () => {
+await section("SILENT — an icon is for the eye; a menu's label names its group", async () => {
   const demo = await evaluate(`({ icons: [...document.querySelectorAll(".ico")].filter((i) => i.getAttribute("aria-hidden") !== "true").map((i) => i.outerHTML),
-    labels: [...document.querySelectorAll('[role="menu"] .dropdown-label')].filter((l) => l.getAttribute("aria-hidden") !== "true").map((l) => l.outerHTML),
+    labels: [...document.querySelectorAll('[role="menu"] .dropdown-label')].filter((l) => !(l.id && !l.hasAttribute("aria-hidden")
+      && l.closest('[role="group"]')?.getAttribute("aria-labelledby") === l.id)).map((l) => l.outerHTML),
     total: document.querySelectorAll(".ico").length })`);
-  check(`demo: all ${demo.total} .ico glyphs are aria-hidden, and every .dropdown-label in a menu is too`,
+  check(`demo: all ${demo.total} .ico glyphs are aria-hidden, and every .dropdown-label in a menu names the group it heads`,
     demo.total >= 5 && demo.icons.length === 0 && demo.labels.length === 0, demo);
   const blocks = ["components.md", "tables-and-forms.md"].flatMap((file) =>
     [...readFileSync(join(root, ".claude/skills/danieldeusing-design/references", file), "utf8").matchAll(/```html\n([\s\S]*?)```/g)].map((m) => m[1]));
@@ -844,11 +855,17 @@ await section("SILENT — an icon and a menu's label are for the eye", async () 
 
 /* ── REMOVED ──────────────────────────────────────────────────────────────── */
 // Code, not prose: the comments that record a removal name the class, so they are stripped first.
-await section("REMOVED — the classes 0.60.0 removed are not declared (§1.1)", async () => {
+await section("REMOVED — the classes 0.60.0 removed are not declared (§1.1), and the glyph lists agree", async () => {
   const css = readFileSync(join(root, "src/components.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   const back = [".filter-ctl", ".filter-set", ".filter-set-label", ".tbl-toolbar", ".tbl-search", ".tbl-filter-input"]
     .filter((name) => new RegExp(`${name.replace(".", "\\.")}(?![\\w-])`).test(css));
   check("components.css declares none of .filter-ctl, .filter-set(-label), .tbl-toolbar, .tbl-search, .tbl-filter-input", back.length === 0, back);
+  // The forced glyph rule and its `@supports not` fallback list the same selectors twice, by hand.
+  const list = (re) => (css.match(re)?.[1] || "").split(",").map((sel) => sel.trim()).filter(Boolean).sort();
+  const glyphs = list(/\}\s*([^{}]+)\{\s*forced-color-adjust:\s*preserve-parent-color;/);
+  const fallback = list(/@supports not \(forced-color-adjust: preserve-parent-color\)\s*\{([^{}]+)\{/);
+  check(`the forced glyph rule and its fallback name the same ${glyphs.length} selectors`,
+    glyphs.length >= 10 && JSON.stringify(glyphs) === JSON.stringify(fallback), { glyphs, fallback });
 });
 
 /* ── STAND-INS ────────────────────────────────────────────────────────────── */

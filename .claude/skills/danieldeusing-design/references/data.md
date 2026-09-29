@@ -340,15 +340,16 @@ Opacity is never an axis; cockpit's .55–.75 becomes `--off`.
 Under a forced palette (Windows High Contrast) the browser replaces backgrounds with Canvas and text
 with CanvasText, drops shadows, and paints a Canvas **backplate** behind text — which erases every
 state drawn with a fill. `data.css` redraws each in system colours, and `scripts/check-data.mjs`
-measures the result in both of Chromium's palettes, light and dark:
+reads the PAINTED pixels of each in both of Chromium's palettes, light and dark — a computed style
+says what was asked for, not what reached the screen:
 
 - **The selected tab is `forced-color-adjust: none` with a whole system pair**, `HighlightText` on
-  `Highlight` (11.30:1 light, 8.73:1 dark). Setting only the two colours is not enough, and that is
+  `Highlight` (11.31:1 light, 8.73:1 dark). Setting only the two colours is not enough, and that is
   the mistake to avoid anywhere a state carries text: the label is painted on the backplate in its
-  own colour — white on white, black on black — so the fill is right and the word is gone, while
-  every computed style still looks correct. The check therefore reads the tab's pixels.
+  own colour — white on white, black on black — so the fill is right and the word is gone (2.8:1 in
+  pixels), while every computed style still looks correct.
 - A disabled tab or row is `GrayText` at full strength (about 14:1): the palette's own word for
-  unavailable. Faded to .45 on top of it, it measured 2.93:1 light and 3.25:1 dark.
+  unavailable. Faded to .45 on top of it, it painted at 2.98:1 light and 3.25:1 dark.
 - A pinned row's bar is a real 3px `CanvasText` border, on the card's edge when stacked.
 - **A chart is repainted.** SVG keeps its theme colours under a forced palette, so on a dark one
   warm's chart text measured 3.52:1, its line 2.94:1 and its first series' bars 2.93:1, and the key's

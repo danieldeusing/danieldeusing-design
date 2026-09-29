@@ -12,9 +12,9 @@
  *   · A FOCUS RING THAT CANNOT FAIL. base.css draws a global ring, so a tab "having its ring" proves
  *     nothing with it loaded. The ring is asserted in `?bare`, where only data.css can supply it (X2).
  *   · FORCED COLOURS. A state drawn by a fill or a tint disappears under a forced palette. Each one
- *     this file draws is MEASURED there, in both of Chromium's palettes: its two states must differ by
- *     3:1 and its text reach 4.5:1 — and the selected tab's label is read in pixels, because the Canvas
- *     backplate that hid it shows in no computed style (X1).
+ *     this file draws is read from a SCREENSHOT there, in both of Chromium's palettes: its two states
+ *     must differ by 3:1 of paint and its text reach 4.5:1 — painted pixels, because the Canvas
+ *     backplate that hid the selected tab's label shows in no computed style (X1).
  *   · `hidden`. An author `display` beats the UA's `[hidden]`; every component must still hide, through
  *     tokens.css's one rule and no guard of its own (X3).
  *   · THE PICK CELL. Under a coarse pointer the bare checkbox stays small and the CELL is the 44px
@@ -344,96 +344,123 @@ const shownWhenHidden = await evaluate(`${JSON.stringify(HIDE)}.filter((sel) => 
 await check(`X3 — \`hidden\` hides each of ${HIDE.length} components whatever display it sets (tokens.css's rule; a marked stand-in until WP1 lands)`,
   () => shownWhenHidden.length === 0, JSON.stringify(shownWhenHidden));
 
-/* ── X1 · forced colours, in both of Chromium's palettes ─────────────────────────────────────────
-   The check measures CONTRAST of what is painted, not inequality (X1 as corrected, 2026-09-29): an
-   earlier version of this section asserted "the selected tab's fill is Highlight" and passed while its
-   label was invisible. Chromium paints a Canvas BACKPLATE behind forced text, which no computed style
-   shows — so that one is measured in pixels: the label must reach the screen as glyph strokes against
-   the fill, not as a solid block. Everything else is computed from the used colours. */
+/* ── X1 · forced colours: two palettes, PAINTED pixels ───────────────────────────────────────────
+   Under a forced palette the browser rewrites colours at PAINT time — it forces them, drops shadows,
+   and paints a Canvas backplate behind text — so a computed style says what was asked for, not what
+   reached the screen. An earlier version of this pass compared computed colours: it passed a selected
+   tab whose label was invisible, and read the key's vanished swatches as drawn. So everything here is
+   read from a screenshot, in the light AND the dark forced palette, at device scale 2 so a 12px
+   stroke has pixels of full ink. The measures:
+     · a mark (dot, bar, swatch, the pin bar) is its painted pixel against the Canvas around it, 3:1;
+     · text is its INK (the pixel of its box furthest from the box's commonest colour) against that
+       commonest colour, 4.5:1 — and for text on a fill, that commonest colour must BE the fill,
+       or a backplate is standing between them;
+     · a state pair (selected / not, solid / hollow, filled / outlined) differs by 3:1 of paint. */
 
-// Glyph strokes across the middle rows of an element's screenshot: a row of text crosses from the fill
-// to the ink and back once per stroke; a solid block (text drawn on a backplate of its own colour)
-// crosses once. `ink` is the colour the text should paint.
-const strokes = async (sel, ink) => {
+// Screenshot the region around `sel` into the page, where M.px / M.ink read it.
+const shoot = async (sel) => {
   await evaluate(`document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: "center", behavior: "instant" }); null`);
-  const r = await evaluate(`(() => { const q = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();
-    return { x: q.left + scrollX, y: q.top + scrollY, width: q.width, height: q.height, scale: 1 }; })()`);
-  const { data } = await send("Page.captureScreenshot", { format: "png", clip: r });
-  return evaluate(`(async () => {
+  const clip = await evaluate(`(() => { const q = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();
+    return { x: q.left + scrollX - 6, y: q.top + scrollY - 6, width: q.width + 12, height: q.height + 12, scale: 1 }; })()`);
+  const { data } = await send("Page.captureScreenshot", { format: "png", clip });
+  await evaluate(`(async () => {
     const img = await createImageBitmap(await (await fetch("data:image/png;base64,${data}")).blob());
     const c = new OffscreenCanvas(img.width, img.height), x = c.getContext("2d");
     x.drawImage(img, 0, 0);
-    const px = x.getImageData(0, 0, img.width, img.height).data;
-    const at = (col, row) => { const i = (row * img.width + col) * 4; return M.lum([px[i], px[i + 1], px[i + 2]]); };
-    const mid = Math.floor(img.height / 2), fill = at(2, mid), half = Math.abs(M.lum(M.over(["Canvas", ${JSON.stringify(ink)}])) - fill) / 2;
-    let most = 0;
-    for (let row = mid - 3; row <= mid + 3; row += 1) {
-      let inked = false, n = 0;
-      for (let col = 0; col < img.width; col += 1) {
-        const now = Math.abs(at(col, row) - fill) > half;
-        if (now && !inked) n += 1;
-        inked = now;
-      }
-      most = Math.max(most, n);
-    }
-    return most;
+    window.SHOT = { x0: ${clip.x}, y0: ${clip.y}, k: img.width / ${clip.width}, w: img.width, h: img.height,
+      d: x.getImageData(0, 0, img.width, img.height).data };
   })()`);
 };
+const PIXELS = `
+  const S = window.SHOT;
+  const at = (col, row) => { const i = (row * S.w + col) * 4; return [S.d[i], S.d[i + 1], S.d[i + 2]]; };
+  const px = (x, y) => at(Math.round((x + scrollX - S.x0) * S.k), Math.round((y + scrollY - S.y0) * S.k));
+  const pixels = (r) => { const out = [];
+    for (let row = Math.round((r.top + scrollY - S.y0) * S.k); row < Math.round((r.bottom + scrollY - S.y0) * S.k); row += 1)
+      for (let col = Math.round((r.left + scrollX - S.x0) * S.k); col < Math.round((r.right + scrollX - S.x0) * S.k); col += 1) out.push(at(col, row));
+    return out; };
+  const common = (r) => { const n = new Map(); let best = null;
+    for (const p of pixels(r)) { const key = p.join(); n.set(key, (n.get(key) || 0) + 1); if (!best || n.get(key) > n.get(best)) best = key; }
+    return best.split(",").map(Number); };
+  const ink = (r) => { const bg = common(r); let best = bg, most = 1;
+    for (const p of pixels(r)) { const q = M.ratio(p, bg); if (q > most) { most = q; best = p; } }
+    return { ink: best, bg, ratio: most }; };
+  const box = (q) => (typeof q === "string" ? document.querySelector(q) : q).getBoundingClientRect();
+  const text = (q) => { const r = document.createRange(); r.selectNodeContents(typeof q === "string" ? document.querySelector(q) : q); return r.getBoundingClientRect(); };
+  const grow = (r, n) => ({ left: r.left - n, top: r.top - n, right: r.right + n, bottom: r.bottom + n });
+  const centre = (r) => px((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+  const same = (a, b) => M.ratio(a, b) < 1.1;
+`;
+const measure = (body) => evaluate(`(() => { ${PIXELS} return JSON.stringify((() => { ${body} })()); })()`).then(JSON.parse);
+const r2 = (n) => (typeof n === "number" ? Math.round(n * 100) / 100 : n);
+const shown = (v) => () => JSON.stringify(v, (k, n) => r2(n));
 
+await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   await until("matchMedia('(forced-colors: active)').matches", "forced colours");
   await settle();
-  // Under forced colours the page is Canvas, so everything is measured over Canvas.
-  const fc = JSON.parse(await evaluate(`(() => {
-    const s = (sel, p, pseudo) => M.cs(sel, pseudo)[p];
-    const on = (fg, ...under) => M.ratio(M.over(["Canvas", ...under, fg]), M.over(["Canvas", ...under]));
-    const sel = M.cs("#tab-activity"), off = M.cs("#tab-queue");
-    return JSON.stringify({
-      palette: ["Canvas", "CanvasText", "Highlight", "HighlightText", "GrayText"].map(M.tok).join(" / "),
-      tabAdjust: sel.forcedColorAdjust,
-      tabLabel: on(sel.color, sel.backgroundColor),
-      tabFills: M.ratio(M.over(["Canvas", sel.backgroundColor]), M.over(["Canvas", off.backgroundColor])),
-      tabOff: on(off.color, off.backgroundColor),
-      disabled: ["#tab-modes", "#tab-syntax"].map((q) => [s(q, "color") === M.tok("GrayText"), s(q, "opacity"), on(s(q, "color"))]),
-      disabledVsEnabled: s("#tab-modes", "color") !== off.color,
-      pin: [s("#row-pinned > td:first-child", "borderLeftWidth"), on(s("#row-pinned > td:first-child", "borderLeftColor")),
-        s("${row2} > td:first-child", "borderLeftWidth")],
-      row: [on(s("#row-disabled > td:nth-child(3)", "color")), s("#row-disabled > td:nth-child(3)", "color") !== s("${row2} > td:nth-child(3)", "color")],
-      text: on(s("#trend text", "fill")),
-      line: on(s("#trend .chart-line", "stroke")),
-      grid: on(s("#balance .chart-grid", "stroke")),
-      dot: [on(s("#trend .chart-dot:not(.chart-dot--hollow)", "fill")), on(s("#trend .chart-dot--hollow", "stroke")),
-        M.ratio(M.over(["Canvas", s("#trend .chart-dot:not(.chart-dot--hollow)", "fill")]), M.over(["Canvas", s("#trend .chart-dot--hollow", "fill")]))],
-      series: [on(s('#flow g[data-series="income"] rect', "fill")), on(s('#flow g[data-series="expenses"] rect', "stroke")),
-        M.ratio(M.over(["Canvas", s('#flow g[data-series="income"] rect', "fill")]), M.over(["Canvas", s('#flow g[data-series="expenses"] rect', "fill")]))],
-      swatch: [on(s(".chart-key li:nth-child(1)", "backgroundColor", "::before")), on(s(".chart-key li:nth-child(2)", "borderTopColor", "::before")),
-        s(".chart-key li:nth-child(2)", "borderTopWidth", "::before"),
-        M.ratio(M.over(["Canvas", s(".chart-key li:nth-child(1)", "backgroundColor", "::before")]), M.over(["Canvas", s(".chart-key li:nth-child(2)", "backgroundColor", "::before")]))],
-    });
-  })()`));
-  const label = await strokes("#tab-activity", "HighlightText");
-  const r2 = (n) => (typeof n === "number" ? n.toFixed(2) : n);
-  const detail = (v) => () => JSON.stringify(v, (k, n) => r2(n));
-  console.log(`forced colours, ${scheme} palette (Canvas / CanvasText / Highlight / HighlightText / GrayText): ${fc.palette}`);
-  await check(`X1 ${scheme} — the selected tab's label reaches the screen: glyph strokes on the Highlight fill, not a Canvas backplate (${label} crossings)`,
-    () => label >= 4, () => `crossings ${label}, forced-color-adjust ${fc.tabAdjust}`);
-  await check(`X1 ${scheme} — ...and measures ${r2(fc.tabLabel)}:1 on it (HighlightText on Highlight), its fill ${r2(fc.tabFills)}:1 against an unselected tab's`,
-    () => fc.tabLabel >= 4.5 && fc.tabFills >= 3 && fc.tabOff >= 4.5, detail([fc.tabLabel, fc.tabFills, fc.tabOff]));
-  await check(`X1 ${scheme} — a disabled tab (disabled and aria-disabled) is GrayText at full strength, ${r2(fc.disabled[0][2])}:1, not the enabled tabs' ink`,
-    () => fc.disabled.every(([gray, opacity, ratio]) => gray && opacity === "1" && ratio >= 4.5) && fc.disabledVsEnabled, detail(fc.disabled));
-  await check(`X1 ${scheme} — the pinned row's bar is a 3px border at ${r2(fc.pin[1])}:1; an ordinary row has none`,
-    () => fc.pin[0] === "3px" && fc.pin[1] >= 3 && fc.pin[2] === "0px", detail(fc.pin));
-  await check(`X1 ${scheme} — a disabled row is GrayText at ${r2(fc.row[0])}:1, and not an enabled row's ink`,
-    () => fc.row[0] >= 4.5 && fc.row[1], detail(fc.row));
-  await check(`X1 ${scheme} — chart text ${r2(fc.text)}:1 and its line ${r2(fc.line)}:1, not the theme colours SVG would keep`,
-    () => fc.text >= 4.5 && fc.line >= 3, detail([fc.text, fc.line, fc.grid]));
-  await check(`X1 ${scheme} — a solid dot (${r2(fc.dot[0])}:1) and a hollow one (its ring ${r2(fc.dot[1])}:1) differ by ${r2(fc.dot[2])}:1 of fill`,
-    () => fc.dot[0] >= 3 && fc.dot[1] >= 3 && fc.dot[2] >= 3, detail(fc.dot));
-  await check(`X1 ${scheme} — two series differ: the first filled (${r2(fc.series[0])}:1), the second outlined (${r2(fc.series[1])}:1)`,
-    () => fc.series[0] >= 3 && fc.series[1] >= 3 && fc.series[2] >= 3, detail(fc.series));
-  await check(`X1 ${scheme} — the key's swatches are drawn like their series: filled ${r2(fc.swatch[0])}:1, outlined ${r2(fc.swatch[1])}:1`,
-    () => fc.swatch[0] >= 3 && fc.swatch[1] >= 3 && fc.swatch[2] === "1px" && fc.swatch[3] >= 3, detail(fc.swatch));
+  console.log(`forced colours, ${scheme} palette (Canvas / CanvasText / Highlight / HighlightText / GrayText): ${await evaluate(
+    `["Canvas", "CanvasText", "Highlight", "HighlightText", "GrayText"].map(M.tok).join(" / ")`)}`);
+
+  await shoot("#page-tabs");
+  const tabs = await measure(`
+    const sel = box("#tab-activity"), off = box("#tab-queue");
+    const selFill = px(sel.left + 3, sel.top + sel.height / 2), offFill = px(off.left + 3, off.top + off.height / 2);
+    const label = ink(text("#tab-activity")), offLabel = ink(text("#tab-queue")), disabled = ink(text("#tab-modes"));
+    return { fills: M.ratio(selFill, offFill), label: label.ratio, onFill: same(label.bg, selFill), offLabel: offLabel.ratio,
+      disabled: disabled.ratio, disabledInk: disabled.ink, enabledInk: offLabel.ink };`);
+  await check(`X1 ${scheme} — the selected tab's label is painted on its fill, not on a backplate, at ${r2(tabs.label)}:1`,
+    () => tabs.onFill && tabs.label >= 4.5, shown(tabs));
+  await check(`X1 ${scheme} — the selected tab's fill stands ${r2(tabs.fills)}:1 off an unselected tab's, whose label is ${r2(tabs.offLabel)}:1`,
+    () => tabs.fills >= 3 && tabs.offLabel >= 4.5, shown(tabs));
+  await shoot("#tab-syntax");
+  const syntax = await measure(`return ink(text("#tab-syntax"));`);
+  await check(`X1 ${scheme} — a disabled tab is GrayText at full strength (${r2(tabs.disabled)}:1 disabled, ${r2(syntax.ratio)}:1 aria-disabled), not the enabled tabs' ink`,
+    () => tabs.disabled >= 4.5 && syntax.ratio >= 4.5 && tabs.disabledInk.join() !== tabs.enabledInk.join(), shown([tabs.disabled, syntax.ratio, tabs.disabledInk, tabs.enabledInk]));
+
+  await shoot("#dense-table");
+  const rows = await measure(`
+    const pin = box("#row-pinned > td:first-child"), plain = box("${row2} > td:first-child");
+    const bar = M.ratio(px(pin.left + 0.5, pin.top + pin.height / 2), px(pin.left + 6, pin.top + pin.height / 2));
+    const none = M.ratio(px(plain.left + 0.5, plain.top + plain.height / 2), px(plain.left + 6, plain.top + plain.height / 2));
+    const off = ink(text("#row-disabled > td:nth-child(3)")), on = ink(text("${row2} > td:nth-child(3)"));
+    return { bar, none, off: off.ratio, offInk: off.ink, onInk: on.ink };`);
+  await check(`X1 ${scheme} — the pinned row's bar is painted at ${r2(rows.bar)}:1; an ordinary row shows none (${r2(rows.none)}:1)`,
+    () => rows.bar >= 3 && rows.none < 1.1, shown(rows));
+  await check(`X1 ${scheme} — a disabled row's text is GrayText at ${r2(rows.off)}:1, not an enabled row's ink`,
+    () => rows.off >= 4.5 && rows.offInk.join() !== rows.onInk.join(), shown(rows));
+
+  await shoot("#trend");
+  const trend = await measure(`
+    const canvas = common(box("#trend"));
+    const dots = [...document.querySelectorAll("#trend .chart-dot")];
+    const solid = box(dots[2]), next = box(dots[3]), hollow = box(dots.find((d) => d.classList.contains("chart-dot--hollow")));
+    const mx = (solid.left + solid.right + next.left + next.right) / 4, my = (solid.top + solid.bottom + next.top + next.bottom) / 4;
+    return { text: ink(box("#trend text")).ratio, line: ink({ left: mx - 2, right: mx + 2, top: my - 3, bottom: my + 3 }).ratio,
+      solid: M.ratio(centre(solid), canvas), ring: ink(grow(hollow, 1)).ratio, fills: M.ratio(centre(solid), centre(hollow)) };`);
+  await check(`X1 ${scheme} — chart text ${r2(trend.text)}:1 and its line ${r2(trend.line)}:1 are painted in the palette, not the theme`,
+    () => trend.text >= 4.5 && trend.line >= 3, shown(trend));
+  await check(`X1 ${scheme} — a solid dot (${r2(trend.solid)}:1) and a hollow one (its ring ${r2(trend.ring)}:1) differ by ${r2(trend.fills)}:1 of paint`,
+    () => trend.solid >= 3 && trend.ring >= 3 && trend.fills >= 3, shown(trend));
+
+  await shoot("#flow");
+  const bars = await measure(`
+    const canvas = common(box("#flow"));
+    const one = box('#flow g[data-series="income"] rect'), two = box('#flow g[data-series="expenses"] rect');
+    return { filled: M.ratio(centre(one), canvas), outline: ink(grow(two, 1)).ratio, fills: M.ratio(centre(one), centre(two)) };`);
+  await check(`X1 ${scheme} — two series differ: the first filled (${r2(bars.filled)}:1), the second outlined (${r2(bars.outline)}:1), ${r2(bars.fills)}:1 apart`,
+    () => bars.filled >= 3 && bars.outline >= 3 && bars.fills >= 3, shown(bars));
+
+  await shoot(".chart-key");
+  const key = await measure(`
+    const canvas = common(box(".chart-key"));
+    const size = parseFloat(getComputedStyle(document.querySelector(".chart-key li"), "::before").width);
+    const swatch = (li) => { const r = box(li), m = r.top + r.height / 2; return { left: r.left, right: r.left + size, top: m - size / 2, bottom: m + size / 2 }; };
+    const [a, b] = [...document.querySelectorAll(".chart-key li")].map(swatch);
+    return { filled: M.ratio(centre(a), canvas), outline: ink(grow(b, 1)).ratio, fills: M.ratio(centre(a), centre(b)) };`);
+  await check(`X1 ${scheme} — the key's swatches are painted like their series: filled ${r2(key.filled)}:1, outlined ${r2(key.outline)}:1`,
+    () => key.filled >= 3 && key.outline >= 3 && key.fills >= 3, shown(key));
 }
 await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 900, deviceScaleFactor: 1, mobile: false });
 await sleep(100);

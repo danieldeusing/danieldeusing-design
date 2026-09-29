@@ -549,7 +549,7 @@ section.doc.tab-panel { margin-top: 1.35rem; }
    in the dark one: the fill was right and the label was gone, and a check that compared computed
    colours passed it. `forced-color-adjust: none` stops the forcing and the backplate, so the pair is
    declared in full. The disabled tab drops its .45 there: GrayText is already the palette's own word
-   for unavailable, and faded to .45 it measured 2.93:1 (light palette) and 3.25:1 (dark).
+   for unavailable, and faded to .45 it painted at 2.98:1 (light palette) and 3.25:1 (dark).
 
    CHARTS ARE THE OTHER WAY ROUND. SVG is `preserve-parent-color` by default, so nothing is forced: a
    chart keeps its THEME colours over whatever Canvas the reader's palette has, and warm's --primary on

@@ -819,17 +819,25 @@ const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.cap
 // it. Fewer than 3 changed pixels means the target paints nothing visible (ink the colour of its
 // ground: mono's glyph on a light palette did exactly that) or the clip does not hold it.
 const inkDiff = (drawn, bare) => {
-  let changed = 0, ratio = 1;
+  let changed = 0, ratio = 1, x0 = Infinity, x1 = -1, y0 = Infinity, y1 = -1;
   for (let i = 0; i < drawn.px.length; i += drawn.bpp) {
     if (Math.max(...[0, 1, 2].map((k) => Math.abs(drawn.px[i + k] - bare.px[i + k]))) <= 2) continue;
     changed += 1;
     const [a, b] = [drawn.lum(i), bare.lum(i, bare.px)].sort((p, q) => q - p);
     ratio = Math.max(ratio, (a + 0.05) / (b + 0.05));
+    const x = (i / drawn.bpp) % drawn.width, y = Math.floor(i / drawn.bpp / drawn.width);
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
   }
-  return { changed, ratio };
+  // `boxRatio`: brightest against darkest in the DRAWN shot, inside the box the changed pixels span.
+  let lo = 1, hi = 0;
+  for (let y = y0; y <= y1; y += 1) for (let x = x0; x <= x1; x += 1) {
+    const l = drawn.lum((y * drawn.width + x) * drawn.bpp); lo = Math.min(lo, l); hi = Math.max(hi, l);
+  }
+  return { changed, ratio, boxRatio: changed ? (hi + 0.05) / (lo + 0.05) : 1 };
 };
 // How each kind is hidden: a button's glyph is its ::before (the button, its border and its fill stay);
-// an element glyph is the element; a word goes transparent and loses its backplate, the box stays.
+// an element glyph is the element; a word goes transparent and loses its backplate, the box stays (for
+// a word the diff only locates it; its ratio is read from the drawn shot, see below).
 const HIDE_PROBE = `<style id="own-probe">
   [data-own-probe="pseudo"]::before { visibility: hidden !important; }
   [data-own-probe="self"] { visibility: hidden !important; }
@@ -909,12 +917,20 @@ const painted = async () => {
     })(); null`);
     const bare = await shot();
     await evaluate(`delete __t.el(${JSON.stringify(sel)}).dataset.ownProbe; null`);
-    const { changed, ratio } = inkDiff(drawn, bare);
+    // A WORD's ratio is read inside the drawn shot, brightest pixel against darkest, over the box its
+    // changed pixels span — the word and its backplate, nothing of the button around them. Neither
+    // simpler reading holds. Changed pixel against itself hidden: hiding the word with
+    // forced-color-adjust: none also drops the backplate and brings the fill back, so it measures
+    // backplate against fill. The whole text clip: the line box is taller than the backplate, so the
+    // fill shows above and below it. A word painted Canvas-on-Canvas into a CanvasText box read 21:1
+    // both ways (the reviewer's MX6); inside the changed box it is one flat colour.
+    const diff = inkDiff(drawn, bare), changed = diff.changed, ratio = kind === "text" ? diff.boxRatio : diff.ratio;
     paintedYield.captures += 1;
     paintedYield[kind] = Math.min(paintedYield[kind], ratio);
     if (changed < 3) { problems.push(`${sel} (${kind}): hiding it changes ${changed} pixel(s) in the clip — it paints nothing visible there, or the clip does not hold it`); continue; }
     paintedYield.owned += 1;
-    if (!(ratio >= min)) problems.push(`${sel} (${kind}): its own ink reaches ${ratio.toFixed(2)}:1 over ${changed} changed pixels, wants ${min}`);
+    if (!(ratio >= min)) problems.push(kind === "text" ? `${sel} (text): the word and its backplate read ${ratio.toFixed(2)}:1 brightest to darkest, wants ${min}`
+      : `${sel} (${kind}): its own ink reaches ${ratio.toFixed(2)}:1 over ${changed} changed pixels, wants ${min}`);
   }
   return problems;
 };

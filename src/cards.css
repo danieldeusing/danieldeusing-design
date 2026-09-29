@@ -431,8 +431,8 @@ a.stat-cta:hover {
 .panel-head > .disclosure-btn {
   color: var(--foreground);
 }
-/* A class-less link: reset.css gives links --primary and a tokens-only page leaves them the head's
-   colour, so it is stated here. A classed link (.link-quiet) keeps its class's colour. */
+/* A class-less link: reset.css makes a link inherit the head's --primary, while a tokens-only page
+   hands it the :where reset's --foreground, so the colour is stated here for both. A classed link (.link-quiet) keeps its class's colour. */
 :where(.panel-head) > a:not([class]) {
   color: var(--foreground);
 }

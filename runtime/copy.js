@@ -19,7 +19,9 @@
  * THE RESULT IS ALWAYS SAID, AND IT IS SAID TWICE. For 2000ms after a press the button carries
  * `data-state="copied"` or `"failed"`: the glyph turns into a check or an x and takes --success or
  * --destructive, and a text button's label reads "copied" or "copy failed". The same words go to
- * one visually hidden `role="status"` region, created once, so a screen reader hears them too.
+ * one visually hidden `role="status"` region, so a screen reader hears them too. The region is made
+ * by `initCopyButtons()`, BEFORE any press: a region created by the first press is new to the
+ * accessibility tree at the moment it is written to, and the first result would go unheard.
  * cockpit's copy buttons showed ✓/✗ and announced nothing; a reader who could not see the glyph
  * never learned whether it had worked.
  *
@@ -35,12 +37,16 @@
  * this matters: "Saying nothing let the visitor paste whatever was on the clipboard before." So a
  * failure shows the x, says "copy failed", and — when the text came from an element — selects that
  * element's text, so ⌘C / Ctrl+C still works. The announcement then says "text selected".
+ * A source with nothing in it — a whitespace-only `.cmd-text`, a `data-copy-from` that matches
+ * nothing — is a failure of its own: the x, and "nothing to copy". Nothing is selected, because
+ * there is nothing a reader could copy by hand either.
  *
  * WHAT IS COPIED. A non-empty `data-copy` value, exactly as written; otherwise the `textContent` of
  * the `data-copy-from` target, exactly as it is; otherwise the `.cmd-text` of the closest `.cmd`,
  * TRIMMED — a command copied with a trailing newline runs the moment it is pasted into a shell.
  * Line numbers drawn by `.code-view` are generated content and are never part of textContent. With
- * no source at all the press fails rather than writing an empty string over the clipboard.
+ * no source, or an empty one, the press fails rather than writing an empty string over the
+ * clipboard.
  *
  * Framework apps (seedr, configr) render the same attributes from their own state and their own
  * `role="status"`, and never run this over nodes the framework owns (house rule 10).
@@ -48,8 +54,9 @@
 
 const STATE_MS = 2000;
 // A live region only speaks when its text CHANGES after it is already in the accessibility tree.
-// Clearing it and writing the message a beat later is what lets the same "copied" be heard twice in
-// a row, and lets a region that was just created (or just moved into a dialog) be heard at all.
+// A region that stayed where it was and holds other words is written at once. Clearing it and
+// writing the message a beat later is for the other two cases: the same "copied" twice in a row,
+// and a region that was just moved into a dialog, which is new to the tree there.
 const ANNOUNCE_DELAY_MS = 100;
 const VISUALLY_HIDDEN =
   "position:absolute;inline-size:1px;block-size:1px;margin:-1px;padding:0;border:0;" +
@@ -88,23 +95,30 @@ function selectContents(element) {
   selection.addRange(range);
 }
 
+function makeRegion() {
+  region = document.createElement("div");
+  region.setAttribute("role", "status");
+  region.setAttribute("data-copy-status", "");
+  // CSSOM, never setAttribute("style"): under seedr's `style-src 'self'` the attribute is refused
+  // (a style-src-attr violation, measured) while style.cssText applies. Inline, so the region hides
+  // itself whichever stylesheets the page happens to load.
+  region.style.cssText = VISUALLY_HIDDEN;
+  document.body.append(region);
+}
+
 function announce(button, message) {
-  if (!region) {
-    region = document.createElement("div");
-    region.setAttribute("role", "status");
-    region.setAttribute("data-copy-status", "");
-    // CSSOM, never setAttribute("style"): under seedr's `style-src 'self'` the attribute is refused
-    // (a style-src-attr violation, measured) while style.cssText applies. Inline, so the region hides
-    // itself whichever stylesheets the page happens to load.
-    region.style.cssText = VISUALLY_HIDDEN;
-  }
   // A modal <dialog> makes everything outside it inert, and an inert live region is never read —
   // cockpit's copy buttons live in its patch dialog. So the one region goes where the button is.
   const home = button.closest("dialog[open]") || document.body;
-  if (region.parentNode !== home) home.append(region);
-  region.textContent = "";
+  const moved = region.parentNode !== home;
+  if (moved) home.append(region);
   regionOwner = button;
   clearTimeout(announceTimer);
+  if (!moved && region.textContent !== message) {
+    region.textContent = message;
+    return;
+  }
+  region.textContent = "";
   announceTimer = setTimeout(() => {
     region.textContent = message;
   }, ANNOUNCE_DELAY_MS);
@@ -146,10 +160,18 @@ function show(button, state) {
 
 async function press(button) {
   let source = { text: "", element: null };
-  let copied = false;
   try {
     source = sourceOf(button);
-    if (!source.text) throw new Error("data-copy: nothing to copy");
+  } catch {
+    // An invalid `data-copy-from` selector: nothing to copy, said as such below.
+  }
+  if (!source.text) {
+    show(button, "failed");
+    announce(button, "nothing to copy");
+    return;
+  }
+  let copied = false;
+  try {
     // Called synchronously inside the click, so the press's user activation still counts.
     await navigator.clipboard.writeText(source.text);
     copied = true;
@@ -167,6 +189,9 @@ async function press(button) {
 export function initCopyButtons() {
   if (installed) return;
   installed = true;
+  // Called from a classic script in <head>, there is no body to hold the region yet.
+  if (document.body) makeRegion();
+  else document.addEventListener("DOMContentLoaded", makeRegion, { once: true });
   document.addEventListener("click", (event) => {
     const button = event.target instanceof Element ? event.target.closest("button[data-copy]") : null;
     // aria-disabled keeps a button focusable (so its tip can explain why it is off); the press

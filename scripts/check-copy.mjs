@@ -17,12 +17,12 @@
  *
  * It drives examples/content.html, whose module calls initCopyButtons() once, served from this
  * checkout by a loopback server. With no browser it SKIPS loudly; DD_REQUIRE_BROWSER=1 makes that
- * skip a failure.
+ * skip a failure, and DD_FORBID_STANDINS=1 makes a stand-in in force one too.
  *
  *   node scripts/check-copy.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, sep } from "node:path";
@@ -90,7 +90,13 @@ const chrome = spawn(CHROME, [
   "--window-size=1280,900", `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+// The profile goes with the browser on every exit path, a failed or aborted run included.
+const shutdown = () => {
+  try { socket?.close(); } catch {}
+  chrome.kill("SIGKILL");
+  server.close();
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch {}
+};
 process.on("exit", shutdown);
 
 let port = 0;
@@ -165,7 +171,11 @@ for (let i = 0; i < 60; i += 1) {
   await sleep(100);
   try { if (await evaluate(`document.readyState === "complete" && document.getElementById("standins").textContent !== ""`)) break; } catch {}
 }
-console.log(`stand-ins in force: ${await evaluate("document.documentElement.dataset.standins")}`);
+const standinList = await evaluate("document.documentElement.dataset.standins");
+console.log(`stand-ins in force: ${standinList}`);
+if (process.env.DD_FORBID_STANDINS === "1") {
+  await check("DD_FORBID_STANDINS=1: nothing stands in for the real files", () => (standinList === "none" ? [] : [`in force: ${standinList}`]));
+}
 
 // Every write is recorded and then passed to the REAL clipboard. `mode` makes the next writes
 // refuse (as an insecure origin or a denied permission does) or removes the API entirely.
@@ -230,6 +240,29 @@ const settle = () => sleep(250); // past the 100ms announcement delay
 const waitReset = () => sleep(STATE_MS + 300);
 
 /* ═════════════════════════════════════════════════════════════════════════════════════════════ */
+
+// The WP7 ruling: a status goes into a role="status" region ALREADY in the page. A region made on the
+// first press is new to the accessibility tree at the moment it is written to, which is exactly when
+// a screen reader may not be listening yet.
+await check("the status region is in the page from init, before any press: one, role=status, silent, hidden, in the accessibility tree", async () => {
+  const r = await regions();
+  if (r.length !== 1) return [`${r.length} status regions before the first press, want the one initCopyButtons() makes`];
+  const out = [];
+  if (r[0].role !== "status") out.push(`role is ${r[0].role}`);
+  if (r[0].text !== "") out.push(`it already says ${JSON.stringify(r[0].text)}`);
+  const s = await evaluate(`(() => { const r = document.querySelector("[data-copy-status]").getBoundingClientRect(); return [r.width, r.height]; })()`);
+  if (!(s[0] <= 1 && s[1] <= 1)) out.push(`it is ${s[0]}x${s[1]}px, not visually hidden`);
+  const { result } = await send("Runtime.evaluate", { expression: `document.querySelector("[data-copy-status]")` });
+  const { nodes } = await send("Accessibility.getPartialAXTree", { objectId: result.objectId, fetchRelatives: false });
+  if (nodes[0]?.ignored) out.push("the accessibility tree ignores it");
+  return out;
+});
+await check("the first press is heard at once: the region already in the page says \"copied\" 50ms later", async () => {
+  await press("#cmd-one > button");
+  await sleep(50);
+  const text = await regionText();
+  return text === "copied" ? [] : [`50ms after the press it says ${JSON.stringify(text)}`];
+});
 
 await check("init is idempotent: after initCopyButtons() ran three times, one press writes once", async () => {
   await evaluate(`import("/runtime/copy.js").then((m) => { m.initCopyButtons(); m.initCopyButtons(); }).then(() => null)`);
@@ -379,6 +412,24 @@ await check("the text form, refused: \"copy failed\", and the name still \"copy\
   await mode("real");
   return out;
 });
+// The first press of a cycle keeps the label to restore; a press DURING the state must not, or it
+// saves "copied" as the label and the button reads "copied" for good.
+await check("a text button pressed again during its state comes back as \"copy\", not \"copied\"", async () => {
+  await waitReset();
+  await press("#copy-text");
+  await sleep(600);
+  await press("#copy-text");
+  const read = () => evaluate(`(() => { const b = document.querySelector("#copy-text"); return [b.textContent, b.getAttribute("aria-label"), b.getAttribute("data-state")]; })()`);
+  const during = await read();
+  await sleep(STATE_MS + 300);
+  const after = await read();
+  const out = [];
+  if (during[0] !== "copied" || during[1] !== "copy") out.push(`during the second state: label ${JSON.stringify(during[0])}, aria-label ${JSON.stringify(during[1])}`);
+  if (after[0] !== "copy") out.push(`after it the label reads ${JSON.stringify(after[0])}, want "copy"`);
+  if (after[1] !== null) out.push(`the pinned aria-label stayed behind: ${JSON.stringify(after[1])}`);
+  if (after[2] !== null) out.push(`data-state is still ${after[2]}`);
+  return out;
+});
 
 await check("data-copy-from copies that element's text exactly", async () => {
   await press("#copy-from");
@@ -436,7 +487,52 @@ await check("nothing to copy fails instead of writing an empty string over the c
   const out = [];
   if ((await writes()).length !== n) out.push("writeText was called");
   if ((await stateOf("#empty")) !== "failed") out.push(`data-state is ${await stateOf("#empty")}`);
-  if ((await regionText()) !== "copy failed") out.push(`region says ${JSON.stringify(await regionText())}`);
+  if ((await regionText()) !== "nothing to copy") out.push(`region says ${JSON.stringify(await regionText())}`);
+  return out;
+});
+await check("a whitespace-only .cmd-text has nothing to copy: it says so, selects nothing, and never claims text is selected", async () => {
+  await evaluate(`document.querySelector("#late").insertAdjacentHTML("beforeend",
+    '<div class="cmd" id="cmd-blank"><code class="cmd-text">   </code><button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy aria-label="copy blank command"></button></div>');
+    getSelection().removeAllRanges(); null`);
+  const n = (await writes()).length;
+  await press("#cmd-blank > button");
+  await settle();
+  const out = [];
+  if ((await writes()).length !== n) out.push("writeText was called");
+  if ((await stateOf("#cmd-blank > button")) !== "failed") out.push(`data-state is ${await stateOf("#cmd-blank > button")}`);
+  if ((await regionText()) !== "nothing to copy") out.push(`region says ${JSON.stringify(await regionText())}`);
+  const selected = await evaluate("getSelection().toString()");
+  if (selected !== "") out.push(`it selected ${JSON.stringify(selected)}`);
+  return out;
+});
+// A formatter puts the command on its own indented line; copied as it stands, the trailing newline
+// runs the command the moment it is pasted into a shell.
+await check("a formatter-style .cmd-text — the command on its own indented line — is copied trimmed", async () => {
+  await evaluate(`document.querySelector("#late").insertAdjacentHTML("beforeend",
+    '<div class="cmd" id="cmd-fmt"><code class="cmd-text">\\n      npm install -g @danieldeusing/seedr\\n    </code><button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy aria-label="copy formatted install command"></button></div>'); null`);
+  await press("#cmd-fmt > button");
+  await settle();
+  const w = (await writes()).at(-1);
+  return w === "npm install -g @danieldeusing/seedr" ? [] : [`wrote ${JSON.stringify(w)}`];
+});
+// A button's name from its content leaves out what is aria-hidden, so the label pinned into
+// aria-label for the length of the state must too — "⧉ copy" is named "copy".
+await check("a text button with an aria-hidden glyph keeps the name \"copy\" before, during and after its state", async () => {
+  await evaluate(`document.querySelector("#late").insertAdjacentHTML("beforeend",
+    '<button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="copy-glyph" data-copy="glyph text"><span aria-hidden="true">⧉</span> copy</button>'); null`);
+  // Chrome names it from content as " copy" — the space after the hidden glyph survives. Leading
+  // and trailing whitespace is not part of what is said, so the browser's name is compared trimmed;
+  // the pinned aria-label is ours and must be exactly "copy".
+  const before = (await axName("#copy-glyph"))?.trim();
+  await press("#copy-glyph");
+  await settle();
+  const during = [await axName("#copy-glyph"), await evaluate(`document.querySelector("#copy-glyph").getAttribute("aria-label")`)];
+  await waitReset();
+  const after = [(await axName("#copy-glyph"))?.trim(), await evaluate(`document.querySelector("#copy-glyph").innerHTML`)];
+  const out = [];
+  if (before !== "copy") out.push(`name before is ${JSON.stringify(before)}`);
+  if (during[0] !== "copy" || during[1] !== "copy") out.push(`during: name ${JSON.stringify(during[0])}, pinned aria-label ${JSON.stringify(during[1])}`);
+  if (after[0] !== "copy" || !after[1].includes('aria-hidden="true"')) out.push(`after: name ${JSON.stringify(after[0])}, content ${JSON.stringify(after[1])}`);
   return out;
 });
 

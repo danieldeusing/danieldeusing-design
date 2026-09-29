@@ -404,6 +404,9 @@ a.stat-cta:hover {
   background: var(--card);
   border: 1px solid var(--border);
 }
+/* The head's colour is its glyph's: a glyph paints the colour of the element around it, never a colour
+   of its own (icons.md: forced colours cannot reach a colour declared on the glyph). The title, the
+   disclosure button and the actions state their own. */
 .panel-head {
   display: flex;
   align-items: center;
@@ -412,12 +415,16 @@ a.stat-cta:hover {
   box-sizing: border-box;
   min-block-size: 2.5rem;
   padding: 0 var(--card-pad);
+  color: var(--primary);
   border-block-end: 1px solid var(--border);
 }
 .panel-head > .ico {
   inline-size: var(--icon-size);
   block-size: var(--icon-size);
-  color: var(--primary);
+}
+.panel-head > .disclosure-btn,
+.panel-actions {
+  color: var(--foreground);
 }
 /* Any heading level; the class sets the size. 500 like K2's card title. */
 .panel-title {
@@ -625,6 +632,7 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
 /* The current / selected row: the rail's marker (chrome.css `.ls-row[aria-current="page"]`), value
    for value. After the hover and as specific, so the marker survives the pointer. */
 .list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]) {
+  --muted-foreground: var(--foreground);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   box-shadow: inset 3px 0 0 0 var(--primary);
 }
@@ -633,9 +641,18 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   font-weight: 700;
   text-shadow: 0 0 8px var(--glow);
 }
-.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]) :is(.list-row-lead, .list-row-meta, .list-row-desc) {
-  color: var(--foreground);
-}
+/* ON THE TINT, MUTED TEXT FAILS, and so does a tone. Muted measured 3.95–4.37:1 (warm) and
+   3.96–4.55 (mono) on the 12% tint; the chosen row (here and in K9) therefore makes
+   --muted-foreground its --foreground, so the lead, the meta, the description and every muted tag,
+   count or glyph inside follow, whichever package drew them. A toned word (a warning tag) measured
+   3.73:1 (paper, over --muted), and a lighter tint cannot save it — at 4% it is still 4.48 — so a
+   tone inside a chosen row is mixed 20% toward --foreground: every tone then reaches 4.63:1 or
+   better on every theme and surface, and keeps its hue. The marker stays the rail's 12%. */
+:is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"]) [data-tone="success"] { --tone: color-mix(in srgb, var(--success) 80%, var(--foreground)); }
+:is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"]) [data-tone="warning"] { --tone: color-mix(in srgb, var(--warning) 80%, var(--foreground)); }
+:is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"]) [data-tone="destructive"] { --tone: color-mix(in srgb, var(--destructive) 80%, var(--foreground)); }
+:is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"]) [data-tone="info"] { --tone: color-mix(in srgb, var(--info) 80%, var(--foreground)); }
+:is(.list-row:is([aria-current]:not([aria-current="false"]), [aria-selected="true"]), .tree [aria-selected="true"] > .tree-row, .tree .tree-row[aria-current="page"]) [data-tone="pending"] { --tone: color-mix(in srgb, var(--pending) 80%, var(--foreground)); }
 
 
 /* ── K7 · ENTRY — a dated or labelled record ─────────────────────────────────────────────────────
@@ -835,6 +852,8 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   padding-inline-start: 0.55rem;
   border-inline-start: 1px solid color-mix(in srgb, var(--muted-foreground) 40%, transparent);
 }
+/* The row's colour is its glyph's (muted on a leaf, --primary on a branch): a glyph paints the colour
+   of its parent, never one of its own. The label states --foreground. */
 .tree-row {
   display: flex;
   align-items: center;
@@ -842,14 +861,19 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   box-sizing: border-box;
   padding: 0.125rem 0.25rem;
   white-space: nowrap;
-  color: var(--foreground);
+  color: var(--muted-foreground);
   text-decoration: none;
   cursor: pointer;
+}
+.tree [aria-expanded] > .tree-row,
+.tree .tree-row[aria-expanded] {
+  color: var(--primary);
 }
 .tree-label {
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--foreground);
 }
 /* The chevron column: a spacer on a leaf, so leaves and branches line up. */
 .tree-row::before {
@@ -872,28 +896,29 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
 .tree-row > .ico {
   inline-size: var(--icon-size);
   block-size: var(--icon-size);
-  color: var(--muted-foreground);
-}
-.tree [aria-expanded] > .tree-row > .ico,
-.tree .tree-row[aria-expanded] > .ico {
-  color: var(--primary);
 }
 .tree-row:hover {
   background: var(--muted);
+}
+.tree-row:hover .tree-label {
   color: var(--primary);
 }
 /* The current / selected row: K6's marker, which is the rail's. */
 .tree [aria-selected="true"] > .tree-row,
 .tree .tree-row[aria-current="page"] {
+  --muted-foreground: var(--foreground);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   box-shadow: inset 3px 0 0 0 var(--primary);
   color: var(--primary);
   font-weight: 700;
   text-shadow: 0 0 8px var(--glow);
 }
+.tree [aria-selected="true"] > .tree-row .tree-label,
+.tree .tree-row[aria-current="page"] .tree-label {
+  color: inherit;
+}
 .tree [aria-selected="true"] > .tree-row > .tree-meta,
 .tree .tree-row[aria-current="page"] > .tree-meta {
-  color: var(--foreground);
   font-weight: 400;
   text-shadow: none;
 }
@@ -913,6 +938,9 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
 .tree [aria-disabled="true"] > .tree-row:hover,
 .tree .tree-row[aria-disabled="true"]:hover {
   background: none;
+}
+.tree [aria-disabled="true"] > .tree-row:hover .tree-label,
+.tree .tree-row[aria-disabled="true"]:hover .tree-label {
   color: var(--foreground);
 }
 /* Counts, tags, a hover-revealed action — pushed to the row's end. */
@@ -1091,6 +1119,7 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
 }
 @media (pointer: coarse) {
   .pane-collapsed {
+    min-inline-size: 44px;
     min-block-size: 44px;
   }
 }
@@ -1272,9 +1301,6 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
 .console--fill {
   block-size: 100%;
 }
-.console--fill .console-body {
-  block-size: auto;
-}
 
 
 /* ── FORCED COLOURS ──────────────────────────────────────────────────────────────────────────────
@@ -1297,9 +1323,8 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
    technically painted and cannot be seen. `preserve-parent-color` hands it the row's FORCED colour
    instead. An engine without that value keeps the first rule, CanvasText, which is always visible
    on Canvas; on a chosen row, where CanvasText would sit on Highlight, the chevron is HighlightText.
-   For the same reason a glyph this file COLOURS (the panel head's and the tree's .ico) gives its
-   colour back here: the icon's own rule (icons.css) paints currentColor, and a colour declared on
-   the glyph itself is a colour the parent's forcing never reaches.
+   The .ico glyphs in a panel head or a tree row need nothing here: they take their colour from the
+   head or the row, which the mode forces, and icons.css hands them that forced colour.
 
    THE CHOSEN ROW LEAVES THE MODE, and paints itself. Measured in Chromium: with only a Highlight
    fill, every text run inside the row keeps the mode's Canvas BACKPLATE, so the row showed black
@@ -1331,12 +1356,6 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   .tree [aria-expanded] > .tree-row[aria-current="page"]::before,
   .tree .tree-row[aria-current="page"][aria-expanded]::before {
     background: HighlightText;
-  }
-  .panel-head > .ico,
-  .tree-row > .ico,
-  .tree [aria-expanded] > .tree-row > .ico,
-  .tree .tree-row[aria-expanded] > .ico {
-    color: inherit;
   }
   .splitter::before {
     forced-color-adjust: none;

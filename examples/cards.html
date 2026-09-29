@@ -130,6 +130,7 @@
     </style>
     <!-- WP7 · T1 .tag, T2 .count, S8 .dot -->
     <style id="standin-wp7" media="not all">
+      :is(.tag, .count):not([data-tone]) { --tone: initial; }
       .tag {
         --tag-c: var(--tag-color, var(--tone, var(--muted-foreground)));
         display: inline-flex; align-items: center; gap: 0.25rem; vertical-align: middle; box-sizing: border-box;
@@ -267,9 +268,10 @@
           // in @layer base so a component's own rule wins (tokens.css, X1): without it a .btn-icon's
           // glyph paints Canvas on Canvas and the button is an empty box.
           css += "@layer base { @media (forced-colors: active) {" +
-            " [data-icon]::before { forced-color-adjust: none; color: CanvasText; --tone: CanvasText; }" +
             " @supports (forced-color-adjust: preserve-parent-color) {" +
-            " [data-icon]::before { forced-color-adjust: preserve-parent-color; color: inherit; --tone: currentColor; } } } }";
+            " [data-icon]::before { forced-color-adjust: preserve-parent-color; --tone: currentColor; } }" +
+            " @supports not (forced-color-adjust: preserve-parent-color) {" +
+            " [data-icon]::before { forced-color-adjust: none; background: CanvasText; } } } }";
           glyphs.push("mapping " + unmapped.join(" "));
         }
         if (!drawn) {
@@ -278,10 +280,12 @@
             " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
             ".ico[data-tone] { background: var(--tone, currentColor); }" +
             ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }" +
-            // WP4's forced-colours glyph (icons.css, X1): the parent's forced colour, CanvasText without it
-            "@media (forced-colors: active) { .ico, .ico[data-tone] { forced-color-adjust: none; background: CanvasText; }" +
-            " @supports (forced-color-adjust: preserve-parent-color) { .ico, .ico[data-tone] {" +
-            " forced-color-adjust: preserve-parent-color; background: currentColor; } } }";
+            // WP4's forced-colours glyph (icons.css @ c35f091, X1): the parent's forced colour, and
+            // CanvasText where preserve-parent-color is unknown. Neither branch sets a color.
+            "@media (forced-colors: active) { @supports (forced-color-adjust: preserve-parent-color) {" +
+            " .ico, .ico[data-tone] { forced-color-adjust: preserve-parent-color; background: currentColor; } }" +
+            " @supports not (forced-color-adjust: preserve-parent-color) {" +
+            " .ico, .ico[data-tone] { forced-color-adjust: none; background: CanvasText; } } }";
           glyphs.push(".ico");
         }
         if (css) {
@@ -340,7 +344,7 @@
             </div>
             <h3 class="card-title"><a class="card-link" href="#k2">review</a></h3>
             <p class="card-desc">Reviews the current diff against the repository's conventions, its tests and the house rules, and says which of them the change breaks and why that matters for the next reader of the code.</p>
-            <footer class="card-foot"><span class="meta-stat"><span class="ico" data-icon="package" aria-hidden="true" style="color: var(--cat-teal)"></span>12</span><time datetime="2026-09-25">3 days ago</time></footer>
+            <footer class="card-foot"><span class="meta-stat"><span style="display: contents; color: var(--cat-teal)"><span class="ico" data-icon="package" aria-hidden="true"></span></span>12</span><time datetime="2026-09-25">3 days ago</time></footer>
           </li>
           <li class="card-terminal card-terminal--link" data-tone="success">
             <div class="card-head">
@@ -385,7 +389,7 @@
           <a class="stat-tile" data-state="broken" href="#k4"><span class="stat-label">runners</span><span class="stat-value">1 down</span><span class="stat-note">dd-infra-ci-2 refused</span><span class="stat-cta">fix →</span></a>
           <a class="stat-tile" data-state="unknown" href="#k4"><span class="stat-label">executions</span><span class="stat-value">—</span><span class="stat-note">could not count</span><span class="stat-cta">retry →</span></a>
           <div class="stat-tile" data-tone="info"><span class="stat-label">in flight</span><span class="stat-value">2</span><span class="stat-note">a static tile, data-tone="info"</span></div>
-          <div class="stat-tile"><span class="ico ico--xl" data-icon="package" aria-hidden="true" style="color: var(--cat-amber)"></span><span class="stat-label">skills</span><span class="stat-value">128</span><a class="stat-cta" href="#k4">browse →</a></div>
+          <div class="stat-tile"><span style="display: contents; color: var(--cat-amber)"><span class="ico ico--xl" data-icon="package" aria-hidden="true"></span></span><span class="stat-label">skills</span><span class="stat-value">128</span><a class="stat-cta" href="#k4">browse →</a></div>
         </div>
       </section>
 
@@ -464,15 +468,19 @@
             </ul>
           </div>
           <div>
-            <p class="demo-cap">--select (a master column): rest, hover, current, aria-selected, disabled</p>
+            <p class="demo-cap">--select (a master column): rest, hover, current (with tags and a count), disabled</p>
             <div class="card-terminal card-terminal--flush">
               <ul class="row-list row-list--select" aria-label="capabilities" id="k6-select">
                 <li><button type="button" class="list-row" id="k6-rest"><span class="list-row-title">review</span><span class="list-row-meta">rw-</span></button></li>
-                <li><button type="button" class="list-row" aria-current="true" id="k6-current"><span class="list-row-lead">02</span><span class="list-row-title">deploy-check</span><span class="list-row-meta">rw-</span></button></li>
-                <li><button type="button" class="list-row" aria-selected="true"><span class="list-row-title">aria-selected</span><span class="list-row-meta">r--</span></button></li>
+                <li><button type="button" class="list-row" aria-current="true" id="k6-current"><span class="list-row-lead">02</span><span class="list-row-title">deploy-check</span><span class="list-row-meta"><span class="tag">draft</span> <span class="count">3</span> <span class="tag" data-tone="success">ok</span> <span class="tag" data-tone="warning">stale</span> <span class="tag" data-tone="destructive">failed</span> <span class="tag" data-tone="info">new</span> <span class="tag" data-tone="pending">queued</span> <span class="tag" data-tone="muted">off</span></span></button></li>
                 <li><button type="button" class="list-row" disabled><span class="list-row-title">disabled</span><span class="list-row-meta">---</span></button></li>
               </ul>
             </div>
+            <p class="demo-cap" style="margin-top: 1rem">a listbox: aria-selected belongs to role="option" (or row, treeitem), not to a plain button</p>
+            <ul class="row-list row-list--select" role="listbox" aria-label="agents" id="k6-listbox">
+              <li role="none"><button type="button" class="list-row" role="option" aria-selected="false"><span class="list-row-title">claude</span></button></li>
+              <li role="none"><button type="button" class="list-row" role="option" aria-selected="true"><span class="list-row-title">codex</span><span class="list-row-meta">r--</span></button></li>
+            </ul>
             <p class="demo-cap" style="margin-top: 1rem">a nav list: aria-current="page"</p>
             <ul class="row-list row-list--select" aria-label="settings">
               <li><a class="list-row" href="#k6"><span class="list-row-title">general</span></a></li>
@@ -566,13 +574,19 @@
           </section>
           <div>
             <p class="demo-cap">a navigating tree (configr's settings): the rows are links, the current page is aria-current="page"</p>
-            <ul class="tree" role="tree" aria-label="settings">
-              <li role="treeitem" aria-level="1" aria-expanded="true">
-                <a class="tree-row" href="#k9"><span class="tree-label">agents</span></a>
+            <ul class="tree" role="tree" aria-label="settings" id="k9-nav">
+              <li role="none">
+                <a class="tree-row" role="treeitem" aria-level="1" aria-expanded="true" href="#k9" tabindex="-1"><span class="tree-label">agents</span></a>
                 <ul role="group">
-                  <li role="treeitem" aria-level="2"><a class="tree-row" href="#k9" aria-current="page" id="k9-nav-current"><span class="tree-label">codex</span></a></li>
-                  <li role="treeitem" aria-level="2"><a class="tree-row" href="#k9"><span class="tree-label">claude</span></a></li>
+                  <li role="none"><a class="tree-row" role="treeitem" aria-level="2" href="#k9" aria-current="page" tabindex="0" id="k9-nav-current"><span class="tree-label">codex</span></a></li>
+                  <li role="none"><a class="tree-row" role="treeitem" aria-level="2" href="#k9" tabindex="-1"><span class="tree-label">claude</span></a></li>
                 </ul>
+              </li>
+            </ul>
+            <p class="demo-cap" style="margin-top: 1rem">tags and a count in a selected row follow it</p>
+            <ul class="tree" role="tree" aria-label="changes" id="k9-tags">
+              <li role="treeitem" aria-level="1" aria-selected="true" tabindex="0">
+                <span class="tree-row"><span class="ico" data-icon="file-code" aria-hidden="true"></span><span class="tree-label">app.ts</span><span class="tree-meta"><span class="tag">draft</span> <span class="count">3</span> <span class="tag" data-tone="success">ok</span> <span class="tag" data-tone="warning">stale</span> <span class="tag" data-tone="destructive">failed</span> <span class="tag" data-tone="info">new</span> <span class="tag" data-tone="pending">queued</span> <span class="tag" data-tone="muted">off</span></span></span>
               </li>
             </ul>
           </div>

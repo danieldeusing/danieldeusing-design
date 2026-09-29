@@ -452,6 +452,7 @@ const FIXTURE = `
   <section class="panel"><div class="panel-body"><div class="clamp" id="fx-clamp-panel" data-clamped style="--clamp-h: 2rem"><p style="margin: 0; height: 5rem">x</p></div></div></section>
 
   <section class="console" id="fx-console" style="--console-h: 14rem; width: 30rem" aria-labelledby="fx-console-title"><header class="console-bar" id="fx-console-bar"><span class="console-dots" id="fx-console-dots" aria-hidden="true"></span><h3 class="console-title" id="fx-console-title">agent output</h3><p class="console-status" id="fx-console-status" role="status"><span class="dot" data-tone="success" aria-hidden="true"></span>live</p></header><div class="console-body" tabindex="0" id="fx-console-body" aria-labelledby="fx-console-title"><div id="fx-console-line">line 1</div><div class="console-line--current" id="fx-console-current">line <mark>2</mark></div></div></section>
+  <div id="fx-console-unsized"><section class="console console--fill"><div class="console-body" id="fx-console-unsized-body"><div style="height: 4000px">200 lines</div></div></section></div>
   <div style="height: 20rem" id="fx-console-host"><section class="console console--fill" id="fx-console-fill"><div class="console-body" id="fx-console-fill-body">x</div></section></div>
 </div>`;
 const inject = () => evaluate(`document.querySelector("main").insertAdjacentHTML("afterbegin", ${JSON.stringify(FIXTURE)}); null`);
@@ -621,7 +622,7 @@ const EXPECT = [
     ...edge("#fx-tree-group", "left", "1px", "solid", mix("--muted-foreground", 40)),
     ["#fx-tree-leaf-row", "", "display", { is: "flex" }], ["#fx-tree-leaf-row", "", "align-items", { is: "center" }], ["#fx-tree-leaf-row", "", "column-gap", "0.375rem"],
     ["#fx-tree-leaf-row", "", "padding-top", "0.125rem"], ["#fx-tree-leaf-row", "", "padding-left", "0.25rem"], ["#fx-tree-leaf-row", "", "white-space", { is: "nowrap" }],
-    ["#fx-tree-leaf-row", "", "color", "var(--foreground)"], ["#fx-tree-leaf-row", "", "cursor", { is: "pointer" }],
+    ["#fx-tree-leaf-row", "", "color", "var(--muted-foreground)"], ["#fx-tree-long", "", "color", "var(--foreground)"], ["#fx-tree-branch-row", "", "color", "var(--primary)"], ["#fx-tree-leaf-row", "", "cursor", { is: "pointer" }],
     ["#fx-tree-leaf-row", "::before", "width", "var(--icon-sm)"], ["#fx-tree-leaf-row", "::before", "mask-image", { is: "none" }],
     ["#fx-tree-leaf-row", "::before", "background-color", "transparent"],
     ["#fx-tree-branch-row", "::before", "background-color", "var(--muted-foreground)"], ["#fx-tree-branch-row", "::before", "mask-image", "var(--ico-chevron-down)"],
@@ -780,7 +781,9 @@ const GEOMETRY = [
   ["K12 the status sits at the bar's end; a --fill console fills its container", () => W(`(() => {
     const bar = W.box("#fx-console-bar"), st = W.box("#fx-console-status"), pad = parseFloat(getComputedStyle(W.q("#fx-console-bar")).paddingRight);
     return [W.near(st.right, bar.right - pad, "status right edge"), W.near(W.box("#fx-console-fill").height, 320, "console --fill"),
-      W.near(W.box("#fx-console-fill-body").height, 318, "its body (the rest)")].filter(Boolean);
+      W.near(W.box("#fx-console-fill-body").height, 318, "its body (the rest)"),
+      W.box("#fx-console-unsized-body").height <= innerHeight * 0.55 + 1 ? null
+        : "a --fill console in an unsized box grows to " + W.box("#fx-console-unsized-body").height + "px, not --console-h (55vh)"].filter(Boolean);
   })()`)],
 ];
 const runGeometry = async (suffix) => { for (const [label, fn] of GEOMETRY) await check(`${label} (${suffix})`, fn); };
@@ -874,6 +877,33 @@ await check("the demo page shows every element and state the spec names", () => 
    ".console .console-dots", ".console .console-status .dot--pulse", ".console-line--current", ".console-body mark"]
   .filter((sel) => !document.querySelector(sel)).map((sel) => "missing on the demo page: " + sel)`));
 
+await check("every tree on the demo is ONE tab stop, and every treeitem is focusable (APG, a navigation tree included)", () => evaluate(`
+  [...document.querySelectorAll('[role="tree"]')].flatMap((tree) => {
+    const out = [], name = tree.id || tree.getAttribute("aria-label");
+    const stops = [...tree.querySelectorAll("a[href], button, [tabindex]")].filter((el) => el.tabIndex >= 0);
+    if (stops.length !== 1) out.push(name + ": " + stops.length + " tab stops, want 1 (a roving tabindex)");
+    const items = [...tree.querySelectorAll('[role="treeitem"]')];
+    if (!items.length) out.push(name + ": no treeitem");
+    for (const it of items) if (!it.hasAttribute("tabindex")) out.push(name + ": a treeitem that cannot take focus (" + it.textContent.trim().slice(0, 20) + ")");
+    return out;
+  })`));
+await check("aria-selected on the demo sits only on roles that support it (option, row, gridcell, tab, treeitem)", () => evaluate(`
+  [...document.querySelectorAll("[aria-selected]")].filter((el) => !["option", "row", "gridcell", "tab", "treeitem", "columnheader", "rowheader"].includes(el.getAttribute("role")))
+    .map((el) => el.tagName.toLowerCase() + "." + el.className + ' carries aria-selected with role "' + el.getAttribute("role") + '"')`));
+await check("the demo's icon stand-in is WP4's corrected forced form: preserve-parent-color, @supports not → none + CanvasText, no color", () => evaluate(`(() => {
+  const src = [...document.scripts].map((sc) => sc.textContent).join("\\n");
+  const forced = src.split("forced-colors: active").slice(1).map((part) => part.split(";\\n")[0]);
+  const out = [];
+  if (forced.length < 2) out.push("the stand-in carries " + forced.length + " forced-colours blocks, want 2 (.ico and [data-icon]::before)");
+  for (const f of forced) {
+    if (!f.includes("@supports not (forced-color-adjust: preserve-parent-color)")) out.push("a forced block without its @supports-not branch");
+    if (/[\\s;{]color\\s*:/.test(f)) out.push("a forced block sets a color: " + f.match(/[\\s;{]color\\s*:[^;}]*/)[0].trim());
+  }
+  return out; })()`));
+await check("no glyph in this file's components carries a colour of its own — it takes its parent's (icons.md)", () => evaluate(`
+  [...document.querySelectorAll(":is(.panel-head, .tree-row, .stat-tile, .pane-collapsed, .card-head, .card-foot, .list-row, .console) .ico")]
+    .filter((el) => getComputedStyle(el).color !== getComputedStyle(el.parentElement).color || el.style.color)
+    .map((el) => "a .ico in " + el.parentElement.className + " is " + getComputedStyle(el).color + ", its parent " + getComputedStyle(el.parentElement).color)`));
 await check("no data-tip on the demo repeats its element's accessible name (X4)", () => evaluate(`
   [...document.querySelectorAll("[data-tip][aria-label]")].filter((el) => el.dataset.tip.trim() === el.getAttribute("aria-label").trim())
     .map((el) => (el.id || el.className) + ": data-tip equals aria-label")`));
@@ -938,7 +968,7 @@ await check("hover on an entry underlines its title link", () => hovering(["#fx-
   ["#fx-entry-link", "", "text-decoration-line", { is: "underline" }], ["#fx-entry-link", "", "text-underline-offset", { is: "4px" }]])));
 await check("hover on a tree row is --muted and --primary; the selected row keeps its marker; a disabled row does not light", () =>
   hovering(["#fx-tree-leaf-row", "#fx-tree-selected-row", "#fx-tree-disabled-row"], () => expectRows([
-    ["#fx-tree-leaf-row", "", "background-color", "var(--muted)"], ["#fx-tree-leaf-row", "", "color", "var(--primary)"],
+    ["#fx-tree-leaf-row", "", "background-color", "var(--muted)"], ["#fx-tree-long", "", "color", "var(--primary)"], ["#fx-tree-leaf-row", "", "color", "var(--muted-foreground)"],
     ["#fx-tree-selected-row", "", "background-color", mix("--primary", 12)], ["#fx-tree-disabled-row", "", "background-color", "transparent"]])));
 await check("hover on a splitter lights its line --primary; hover on the strip turns it --primary", () => hovering(["#fx-vsplit", "#fx-hsplit", "#fx-collapsed"], () => expectRows([
   ["#fx-vsplit", "::before", "background-color", "var(--primary)"], ["#fx-hsplit", "::before", "background-color", "var(--primary)"],
@@ -988,6 +1018,8 @@ await check("a coarse pointer: 44px rows, tree rows, strips and link calls to ac
     ["#fx-collapsed", "", "min-height", { is: "44px" }], ["#fx-tile-cta-link", "", "min-height", { is: "44px" }], ["#fx-tile-cta", "", "min-height", { is: "auto" }],
     ["#fx-vsplit", "", "width", "2.75rem"], ["#fx-vsplit", "", "margin-left", "-1rem"], ["#fx-vsplit", "", "z-index", { is: "1" }],
     ["#fx-hsplit", "", "height", "2.75rem"], ["#fx-hsplit", "", "margin-top", "-0.875rem"]]);
+  const strip = await W(`(() => { const b = W.box("#fx-collapsed"); return [b.width, b.height]; })()`);
+  if (!(strip[0] >= 44 && strip[1] >= 44)) out.push(`the strip a hidden pane leaves is ${strip[0]}×${strip[1]}px under a coarse pointer, want at least 44×44`);
   const gap = await W(`W.box("#fx-pane-b").left - W.box("#fx-pane-a").right`);
   if (Math.abs(gap - 12) > 0.6) out.push(`the gap between the panes is ${gap}px under a coarse pointer, want the fine pointer's 12px`);
   return out;
@@ -1119,8 +1151,8 @@ const CHEVRON = { lead: true, hide: "::before" }, LINE = { inset: 2, hide: "::be
 const FORCED_GLYPHS = [
   ["an open branch's chevron", "#fx-tree-branch-row", CHEVRON], ["a closed branch's chevron", "#fx-tree-closed-row", CHEVRON],
   ["a navigation branch's chevron (a link row)", "#fx-navtree-parent", CHEVRON], ["a selected branch's chevron", "#fx-tree-selbranch-row", CHEVRON],
-  ["a branch's folder glyph (a .ico this file colours)", "#fx-tree-branch-ico", {}], ["a leaf's file glyph (a .ico this file colours)", "#fx-tree-leaf-ico", {}],
-  ["a selected leaf's glyph", "#fx-tree-selected-ico", {}], ["a panel head's glyph (a .ico this file colours)", "#fx-panel-ico", {}],
+  ["a branch's folder glyph (a .ico its row colours)", "#fx-tree-branch-ico", {}], ["a leaf's file glyph (a .ico its row colours)", "#fx-tree-leaf-ico", {}],
+  ["a selected leaf's glyph", "#fx-tree-selected-ico", {}], ["a panel head's glyph (a .ico its row colours)", "#fx-panel-ico", {}],
   ["the vertical splitter's line", "#fx-vsplit", LINE], ["the grip", "#fx-hsplit", LINE],
 ];
 // [what, the focusable element, the element that draws its ring, whether the ring sits outside it]
@@ -1206,7 +1238,8 @@ for (const palette of ["light", "dark"]) {
 // declares it cut out of cards.css (and out of the icon stand-in, when it is in force). The chevron
 // is then CanvasText, and HighlightText on a chosen row, where CanvasText would sit on Highlight.
 const toFallback = String.raw`(async () => {
-  const cut = (css) => css.replace(/@supports \(forced-color-adjust: preserve-parent-color\) \{[^{}]*\{[^{}]*\}\s*\}/g, "");
+  const cut = (css) => css.replace(/@supports \(forced-color-adjust: preserve-parent-color\) \{[^{}]*\{[^{}]*\}\s*\}/g, "")
+    .replace(/@supports not \(forced-color-adjust: preserve-parent-color\) \{([^{}]*\{[^{}]*\})\s*\}/g, "$1");
   const code = (css) => css.replace(/\/\*[\s\S]*?\*\//g, "");
   const link = [...document.querySelectorAll('link[rel="stylesheet"]')].find((l) => l.href.endsWith("/src/cards.css"));
   const before = await (await fetch(link.href)).text();
@@ -1308,6 +1341,12 @@ const SAMPLES = [
   { name: "K9 leaf glyph (muted)", html: `<ul class="tree"><li><span class="tree-row"><span class="ico" data-icon="file" data-m></span></span></li></ul>`, kind: "glyph", fg: "background-color", against: "outside" },
   { name: "K9 branch glyph (--primary)", html: `<ul class="tree"><li aria-expanded="true"><span class="tree-row"><span class="ico" data-icon="folder-open" data-m></span></span></li></ul>`, kind: "glyph", fg: "background-color", against: "outside" },
   { name: "K9 branch glyph · hovered row", html: `<ul class="tree"><li aria-expanded="true"><span class="tree-row" data-hover><span class="ico" data-icon="folder-open" data-m></span></span></li></ul>`, kind: "glyph", fg: "background-color", against: "outside" },
+  { name: "K6 current row · untoned tag", html: `<ul class="row-list row-list--select"><li><button class="list-row" aria-current="true"><span class="list-row-meta"><span class="tag" data-m>t</span></span></button></li></ul>`, kind: "text" },
+  { name: "K6 current row · count", html: `<ul class="row-list row-list--select"><li><button class="list-row" aria-current="true"><span class="list-row-meta"><span class="count" data-m>3</span></span></button></li></ul>`, kind: "text" },
+  ...TONES.map((t) => ({ name: `K6 current row · ${t} tag`, html: `<ul class="row-list row-list--select"><li><button class="list-row" aria-current="true"><span class="list-row-meta"><span class="tag" data-tone="${t}" data-m>t</span></span></button></li></ul>`, kind: "text" })),
+  { name: "K9 selected row · untoned tag", html: `<ul class="tree"><li aria-selected="true"><span class="tree-row"><span class="tree-meta"><span class="tag" data-m>t</span></span></span></li></ul>`, kind: "text" },
+  { name: "K9 selected row · count", html: `<ul class="tree"><li aria-selected="true"><span class="tree-row"><span class="tree-meta"><span class="count" data-m>3</span></span></span></li></ul>`, kind: "text" },
+  ...TONES.map((t) => ({ name: `K9 selected row · ${t} tag`, html: `<ul class="tree"><li aria-selected="true"><span class="tree-row"><span class="tree-meta"><span class="tag" data-tone="${t}" data-m>t</span></span></span></li></ul>`, kind: "text" })),
   { name: "K9 leaf glyph · selected row", html: `<ul class="tree"><li aria-selected="true"><span class="tree-row"><span class="ico" data-icon="file" data-m></span></span></li></ul>`, kind: "glyph", fg: "background-color", against: "outside" },
   { name: "K9 row ring (inset, on the selected row)", html: `<ul class="tree"><li aria-selected="true"><span class="tree-row" data-m>x</span></li></ul>`, kind: "ring" },
   { name: "K9 guide per level", html: `<ul class="tree"><li><ul role="group" data-m><li>x</li></ul></li></ul>`, kind: "info", fg: "border-left-color", against: "outside" },

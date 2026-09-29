@@ -209,7 +209,7 @@ transparent, rule-less entity cards move to. **A container: no hover, no focus o
 
 | part | what it is |
 |---|---|
-| `.panel-head` | the strip. A glyph in it is `--primary` at the default glyph size |
+| `.panel-head` | the strip. Its colour is `--primary`, and a glyph in it takes that colour (the title, a disclosure button and the actions state their own) |
 | `.panel-title` | any heading level; body size, weight 500 like a card title; cut off with an ellipsis rather than wrapped, so the head stays one line |
 | `.panel-head--eyebrow` | the title in eyebrow type — studio's pane heads and explorer strips |
 | `.panel-actions` | at the head's end: `.btn-icon`s, a `.segmented`, a select |
@@ -275,16 +275,23 @@ row in a `--select` list takes the menu highlight, `--muted`, because it is a ch
 ### The current row — one marker for the whole system
 
 `aria-current="true"` (the chosen item of a selection list), `aria-current="page"` (the page you are
-on, in a nav list) or `aria-selected="true"` marks the row, and **the marker is the rail's**: the
+on, in a nav list) or `aria-selected="true"` marks the row. **`aria-selected` belongs only to a role
+that supports it** — `option` (a `role="listbox"` list), `row`, `gridcell`, `tab` or `treeitem` —
+never to a plain `<button>` or link: `<ul role="listbox"><li role="none"><button class="list-row"
+role="option" aria-selected="true">`. **The marker is the rail's**: the
 same 12% `--primary` tint, the same 3px inset edge, the same bold `--primary` title with the rail's
 glow (`chrome.css`, `.ls-row[aria-current="page"]`). configr drew "this one" six different ways and
 cockpit a seventh; a reader who has learned one marker should never have to learn a second. The
 tree's selected row is the same marker.
 
-- On the tint, `--muted-foreground` falls to 4.08:1 (warm, over `--card`), so **the lead, the meta
-  and the description turn `--foreground`** on the current row (8.07). A `.tag` or `.count` inside
-  keeps its own colour, and a muted one measures 3.95–4.37:1 on that tint (warm, the three
-  surfaces): in a row that can become current, put words in the meta slot, not a muted tag.
+- **On the tint, muted text fails**: 3.95–4.37:1 on warm and 3.96–4.55 on mono, over the three
+  surfaces. So a chosen row (here and in the tree) makes `--muted-foreground` its `--foreground`,
+  and everything muted inside follows — the lead, the meta, the description, and a muted `.tag`,
+  `.count` or glyph from any package: 7.80:1 or better on every theme.
+- **A tone on the tint fails too** — a warning tag measured 3.73:1 (paper, over `--muted`), and no
+  lighter tint saves it. Inside a chosen row every tone (`data-tone`) is mixed 20% toward
+  `--foreground`: it keeps its hue and reaches 4.63:1 or better on every theme and surface. Nothing
+  to do in the markup; tags, counts and dots in a chosen row are safe.
 - **The rail's trailing `←` is not copied.** It points from the right-hand rail back at the content;
   a list or a tree sits on the content's left, where the same arrow points away from what it
   describes.
@@ -384,9 +391,23 @@ framework components (a framework never lets a design-system script walk nodes i
 - **The focus ring sits on the row**, not around the item: a focused open branch would otherwise
   outline its whole subtree.
 - `.tree-meta` pushes counts, tags or a hover-revealed action (`.reveal`) to the row's end.
-- **A tree that navigates** (configr's settings) makes each row a link — `<a class="tree-row"
-  href="…">` — and marks the current page `aria-current="page"`. A search above it is a
-  `.search-field`; matches are `<mark>`, and the ancestors of a match open.
+- **A tree that navigates** (configr's settings) follows APG's navigation treeview: the LINK is the
+  treeitem, and the `<li>` steps aside.
+
+  ```html
+  <ul class="tree" role="tree" aria-label="settings">
+    <li role="none">
+      <a class="tree-row" role="treeitem" aria-level="1" aria-expanded="true" href="/agents" tabindex="-1"><span class="tree-label">agents</span></a>
+      <ul role="group">
+        <li role="none"><a class="tree-row" role="treeitem" aria-level="2" aria-current="page" href="/agents/codex" tabindex="0"><span class="tree-label">codex</span></a></li>
+      </ul>
+    </li>
+  </ul>
+  ```
+
+  `aria-expanded` and `aria-current="page"` go on the `<a>`, and so does the roving `tabindex`: the
+  tree is ONE tab stop, not a tab stop per link. Enter follows the link; the arrows move as below.
+  A search above it is a `.search-field`; matches are `<mark>`, and the ancestors of a match open.
 - `aria-disabled="true"` on a treeitem draws it at .45 with no hover.
 
 ### The keyboard the app implements (APG tree view; seedr's handler is the reference)
@@ -398,7 +419,9 @@ framework components (a framework never lets a design-system script walk nodes i
 | → | on a closed branch: open it. On an open branch: move to its first child |
 | ← | on an open branch: close it. Otherwise: move to the parent |
 | Home / End | first / last visible item |
-| Enter / Space | activate: select a leaf, toggle a branch |
+| Enter / Space | activate: select a leaf, toggle a branch (in a navigation tree, Enter follows the link) |
+| a printable character | type-ahead: focus the next visible item whose label starts with it (typed quickly, the characters add up to a prefix) |
+| `*` | open every closed sibling branch at the focused item's level |
 | Shift+F10 or the Menu key | the row's context menu, when it has one |
 
 ARIA: `role="tree"` with a label; `role="treeitem"` with `aria-level`; `aria-expanded` on every
@@ -452,7 +475,7 @@ when it is selected, and arrowing past forty files must not fetch forty.
 | ← / → (vertical) or ↑ / ↓ (horizontal) | move by 1.5rem (24px) |
 | PageUp / PageDown | move by 6rem (96px) |
 | Home / End | to the minimum / the maximum |
-| Enter | may collapse the controlled pane and restore it (APG) |
+| Enter | may collapse the controlled pane and restore it (APG). Collapsed, `aria-valuenow` is `0` (the pane has no size), so a collapsible pane's `aria-valuemin` is `0`; restored, it returns to the size before the collapse |
 | pointer | drag with pointer capture; set `data-dragging` on the splitter while dragging |
 
 Keep `aria-valuenow` (px) in step with the size. **A pane that can be resized can also be hidden and

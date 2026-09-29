@@ -66,6 +66,8 @@
       .ico[data-icon="triangle-alert"] { --ico: var(--ico-triangle-alert); }
       /* WP6 (runtime/select.js): writes `position: fixed` inline on the panel it appends. */
       body > .select-panel { position: fixed; }
+      /* X3, WP1 (tokens.css): `hidden` beats every author `display`, once, for the whole system. */
+      [hidden]:not([hidden="until-found"]) { display: none !important; }
     </style>
 
     <style>
@@ -155,11 +157,11 @@
           <span class="demo-note">disabled</span>
         </div>
         <div class="demo-row">
-          <button type="button" class="btn-terminal btn-terminal--compact" id="btn-busy" aria-busy="true" disabled>saving</button>
-          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ghost-busy" aria-busy="true" disabled>refreshing</button>
-          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" id="btn-bin-busy" aria-label="removing poi/vu3" aria-busy="true" disabled></button>
+          <button type="button" class="btn-terminal btn-terminal--compact" id="btn-busy" aria-busy="true" aria-disabled="true">saving</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ghost-busy" aria-busy="true" aria-disabled="true">refreshing</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" id="btn-bin-busy" aria-label="removing poi/vu3" aria-busy="true" aria-disabled="true"></button>
           <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-toggle-busy">press to go busy for 2s</button>
-          <span class="demo-note">busy: <code>aria-busy="true"</code> + <code>disabled</code></span>
+          <span class="demo-note">busy: <code>aria-busy="true"</code> + <code>aria-disabled="true"</code> — focus stays, full strength</span>
         </div>
         <p class="demo-note">One toolbar row on each surface — every control is <code>--control-h</code> tall:</p>
         <!-- Computed by the page from its own controls, on load and on every theme change. -->
@@ -454,7 +456,7 @@
       // HEIGHT CHECK — every single-line control on this page must measure --control-h, both as
       // rendered and from its own padding and line height with the min-block-size floor removed:
       // a field that only reaches 28px because the floor lifts it is one inherited line height away
-      // from 29.6px. Rendered into #height-check, and onto its data-* for scripts/check-control-height.mjs.
+      // from 29.6px. Rendered into #height-check, and onto its data-* for scripts/check-components.mjs.
       const SINGLE_LINE = 'input:is([type="text"], [type="search"], [type="url"], [type="email"], [type="password"], ' +
         '[type="number"], [type="tel"], [type="date"], :not([type])), .select-trigger, select:not(.select-field > select), ' +
         ".btn-terminal--compact, .btn-terminal--destructive, .btn-terminal--edit";
@@ -498,12 +500,14 @@
         });
       }
 
-      // C1 busy: the page sets aria-busy AND disabled, and clears both.
+      // C1 busy: the page sets aria-busy AND aria-disabled, ignores a press while they stand, and
+      // clears both. Never `disabled`: it would throw keyboard focus to <body> mid-action.
       document.getElementById("btn-toggle-busy").addEventListener("click", (event) => {
         const button = event.currentTarget;
+        if (button.getAttribute("aria-disabled") === "true") return;
         button.setAttribute("aria-busy", "true");
-        button.disabled = true;
-        setTimeout(() => { button.removeAttribute("aria-busy"); button.disabled = false; }, 2000);
+        button.setAttribute("aria-disabled", "true");
+        setTimeout(() => { button.removeAttribute("aria-busy"); button.removeAttribute("aria-disabled"); }, 2000);
       });
 
       // M1, delegated: a dropdown rendered AFTER initDropdowns() gets the same menu.

@@ -11,14 +11,19 @@
  *     listener bound per notice at init would work in the demo and never in a real page.
  *   · THE PAGE'S VETO. `notice:dismiss` is cancelable so a page can remember or hide instead; if the
  *     runtime removed first and asked afterwards, the veto would be decoration.
+ *   · WHERE FOCUS CANNOT GO. The next element after a notice is often one a keyboard user never lands
+ *     on: the hidden <select> behind select.js's trigger, an inactive tab of a roving tablist, a
+ *     button under `visibility: hidden`, `inert` or `aria-hidden`. Each is measured here with the
+ *     real thing — the enhanced select is the SHIPPED select.js, served beside the harness.
  *
  * The keys are REAL key events through the DevTools input pipeline (Enter and Space on a native
  * button), not `.click()` — the claim is that the keyboard needs nothing extra, and only the browser's
  * own activation behaviour can prove that.
  *
- * The SHIPPED module is read off the filesystem and inlined, so the fixture cannot drift from the
- * thing asserted. Headless chromium as in check-tabletools.mjs; it SKIPS loudly without one
- * (DD_REQUIRE_BROWSER=1 makes that a failure), and lets the browser pick its DevTools port.
+ * The SHIPPED modules are read off the filesystem (notice.js inlined, select.js served), so the
+ * fixture cannot drift from the thing asserted. Headless chromium as in check-tabletools.mjs; it
+ * SKIPS loudly without one (DD_REQUIRE_BROWSER=1 makes that a failure), and lets the browser pick
+ * its DevTools port.
  *
  *   node scripts/check-notice.mjs
  */
@@ -55,17 +60,30 @@ if (!CHROME) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const RUNTIME = readFileSync(join(root, "runtime/notice.js"), "utf8").replace(/^export /gm, "");
-const HARNESS = `<!doctype html><html><head><meta charset="utf-8"></head><body>
+const SELECT = readFileSync(join(root, "runtime/select.js"), "utf8");
+// components.css's two rules for an enhanced select: the native one stays in the box, transparent and
+// unclickable, under the trigger the reader sees — so it HAS client rects, exactly as on a real page.
+const HARNESS = `<!doctype html><html><head><meta charset="utf-8"><style>
+.select-field { position: relative; display: inline-block; }
+.select-field > select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+</style></head><body>
 <input id="elsewhere" aria-label="elsewhere">
 <div id="mount"></div>
 <script type="module">
+import { initSelects } from "/select.js";
 ${RUNTIME}
 window.initNotices = initNotices;
+window.initSelects = initSelects;
 window.events = [];
+// Every element that receives focus, in order — "never focused" is a claim about the whole path.
+// \`focus\` in the capture phase, not \`focusin\`: select.js moves focus on to its trigger from
+// inside the select's own focus event, and Chromium then never sends the select a focusin at all.
+window.focusLog = [];
+document.addEventListener("focus", (event) => window.focusLog.push(event.target.id || event.target.tagName), true);
 document.addEventListener("notice:dismiss", (event) => window.events.push({
   target: event.target.id, bubbles: event.bubbles, cancelable: event.cancelable }));
 // A notice between two focusable buttons, rebuilt per case.
-window.build = (html) => { document.getElementById("mount").innerHTML = html; window.events = []; };
+window.build = (html) => { document.getElementById("mount").innerHTML = html; window.events = []; window.focusLog = []; };
 window.NOTICE = (id) => '<div class="notice" id="' + id + '" role="alert"><span class="notice-label" id="' + id +
   '-label">warning:</span><p>two sources publish this skill.</p><button type="button" class="notice-dismiss" id="' + id +
   '-x" aria-label="dismiss">×</button></div>';
@@ -73,9 +91,10 @@ window.gone = (id) => !document.getElementById(id);
 window.focused = () => document.activeElement && (document.activeElement.id || document.activeElement.tagName);
 <\/script></body></html>`;
 
-const server = createServer((_req, res) => {
-  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-  res.end(HARNESS);
+const server = createServer((req, res) => {
+  const script = req.url === "/select.js";
+  res.writeHead(200, { "content-type": script ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8" });
+  res.end(script ? SELECT : HARNESS);
 }).listen(0, "127.0.0.1");
 await new Promise((ok) => server.on("listening", ok));
 
@@ -145,7 +164,7 @@ const press = async (key) => {
   await send("Input.dispatchKeyEvent", { type: "keyUp", key, code: keys[key].code, windowsVirtualKeyCode: keys[key].windowsVirtualKeyCode });
   await sleep(30);
 };
-const state = () => evaluate("JSON.stringify({ focused: window.focused(), events: window.events, mount: document.getElementById('mount').innerHTML.length })");
+const state = () => evaluate("JSON.stringify({ focused: window.focused(), focusLog: window.focusLog, events: window.events, mount: document.getElementById('mount').innerHTML.length })");
 
 await evaluate("window.initNotices(); null");
 
@@ -179,9 +198,16 @@ await evaluate(`window.build('<button type="button" class="notice-dismiss" id="s
 await check("a .notice-dismiss outside any .notice is ignored, not an error",
   () => evaluate("!!document.getElementById('stray') && window.events.length === 0"));
 
-await evaluate(`window.initNotices(); window.build(window.NOTICE("n5")); document.getElementById("n5-x").click(); null`);
-await check("calling initNotices() twice still dismisses once — it installs one listener",
-  () => evaluate("window.gone('n5') && window.events.length === 1"), () => state());
+// Asked through the veto, because that is the only way a second listener shows: without it the
+// first listener removes the notice, and the second one's event fires on a detached node that
+// nothing hears. Vetoed, the notice stays in the page and a second listener asks a second time.
+await evaluate(`window.initNotices(); window.build(window.NOTICE("n5")); (() => {
+  const veto = (event) => event.preventDefault();
+  document.addEventListener("notice:dismiss", veto);
+  document.getElementById("n5-x").click();
+  document.removeEventListener("notice:dismiss", veto); })(); null`);
+await check("calling initNotices() twice installs ONE listener — a vetoed dismiss is asked once, not twice",
+  () => evaluate("!window.gone('n5') && window.events.length === 1"), () => state());
 
 /* ── the keyboard, and where focus goes ───────────────────────────────────────────────────────── */
 await evaluate(`window.build('<button id="before">before</button>' + window.NOTICE("k1") + '<button id="after">after</button>');
@@ -211,6 +237,34 @@ await evaluate(`document.body.insertAdjacentHTML("afterbegin", '<input id="elsew
   document.getElementById("k4-x").click(); null`);
 await check("a dismiss that did not hold focus leaves focus where it was — nothing is stolen",
   () => evaluate("window.gone('k4') && window.focused() === 'elsewhere'"), () => state());
+
+/* ── where focus cannot go: each case puts the trap first and a real target after it ────────────── */
+const dismissByKey = async (id, html) => {
+  await evaluate(`window.build(window.NOTICE(${JSON.stringify(id)}) + ${JSON.stringify(html)}); window.initSelects(document.getElementById("mount"));
+    document.getElementById(${JSON.stringify(`${id}-x`)}).focus(); window.focusLog = []; null`);
+  await press("Enter");
+};
+await dismissByKey("f1", '<label>model <select id="model"><option>opus</option><option>sonnet</option></select></label>');
+await check("an enhanced select after the notice: focus lands on its trigger, and the hidden <select> never receives it",
+  () => evaluate(`window.gone('f1') && document.activeElement.classList.contains("select-trigger") && !window.focusLog.includes("model")`),
+  () => state());
+
+await dismissByKey("f2", '<div role="tablist"><button role="tab" id="tab-b" tabindex="-1" aria-selected="false">b</button>' +
+  '<button role="tab" id="tab-a" tabindex="0" aria-selected="true">a</button></div>');
+await check("a roving tablist after the notice: focus goes to the ACTIVE tab, never to a tabindex=-1 one",
+  () => evaluate(`window.gone('f2') && window.focused() === "tab-a" && !window.focusLog.includes("tab-b")`), () => state());
+
+await dismissByKey("f3", '<button id="invisible" style="visibility: hidden">invisible</button><button id="after">after</button>');
+await check("a visibility:hidden button after the notice cannot take focus: the next one does, not <body>",
+  () => evaluate(`window.gone('f3') && window.focused() === "after"`), () => state());
+
+await dismissByKey("f4", '<div inert><button id="inert-btn">inert</button></div><button id="after">after</button>');
+await check("an inert subtree after the notice is skipped",
+  () => evaluate(`window.gone('f4') && window.focused() === "after"`), () => state());
+
+await dismissByKey("f5", '<div aria-hidden="true"><button id="aria-hidden-btn">hidden from AT</button></div><button id="after">after</button>');
+await check("an aria-hidden subtree after the notice is skipped — focus inside it would be a place nobody can hear",
+  () => evaluate(`window.gone('f5') && window.focused() === "after" && !window.focusLog.includes("aria-hidden-btn")`), () => state());
 
 console.log(failures
   ? `\ncheck-notice: ${failures} FAILED (last check to pass: ${lastPassed})`

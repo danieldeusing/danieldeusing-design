@@ -20,7 +20,11 @@
  *   2. moves focus, if it was inside the notice, to the next focusable thing after it (or the one
  *      before it, when nothing follows). The dismiss button is about to stop existing; left alone,
  *      focus would fall to <body> and a keyboard or screen-reader user would be thrown back to the
- *      top of the page for having closed a message.
+ *      top of the page for having closed a message. "Focusable" means a place the reader could
+ *      Tab to: never a negative tabindex (the hidden <select> behind select.js's trigger, an
+ *      inactive tab of a roving tablist), nothing inside `[aria-hidden="true"]` or `[inert]`,
+ *      nothing disabled or unrendered. And a focus that does not take — `visibility: hidden`, a modal
+ *      dialog's inert background — is checked, not assumed: the next candidate is tried.
  *   3. removes the notice. A dismissed message is gone, not hidden: a hidden `role="alert"` is dead
  *      markup that still has to be reasoned about.
  *
@@ -31,21 +35,37 @@
  * — removing a node React rendered desynchronises React (house rule 10).
  */
 
-const FOCUSABLE =
-  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = "a[href], button, input, select, textarea, summary, [tabindex]";
 
 let installed = false;
 
-function focusBeside(notice) {
-  const candidates = [...document.querySelectorAll(FOCUSABLE)].filter(
-    (element) => !notice.contains(element) && element.getClientRects().length > 0,
+function reachable(element, notice) {
+  return (
+    !notice.contains(element) &&
+    element.tabIndex >= 0 &&
+    !element.matches(":disabled") &&
+    !element.closest('[aria-hidden="true"], [inert]') &&
+    element.getClientRects().length > 0
   );
-  const after = candidates.find(
+}
+
+function focusBeside(notice) {
+  const candidates = [...document.querySelectorAll(FOCUSABLE)].filter((element) =>
+    reachable(element, notice),
+  );
+  const after = candidates.filter(
     (element) => notice.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
   );
-  (after || candidates.reverse().find(
+  const before = candidates.filter(
     (element) => notice.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_PRECEDING,
-  ))?.focus();
+  );
+  for (const element of [...after, ...before.reverse()]) {
+    element.focus();
+    // Took, if focus has left the notice for somewhere that is not <body>. Not `=== element`: a
+    // control may hand its focus on to the part the reader sees, and that is still a landing.
+    const active = document.activeElement;
+    if (active && active !== document.body && !notice.contains(active)) return;
+  }
 }
 
 export function initNotices() {

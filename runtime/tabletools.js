@@ -750,8 +750,33 @@ function useSearchBox(inst, input) {
  * Either can be the page's own (adopted, above). Every write here is conditional, so the observer
  * that calls this hears its own re-insertion once, finds everything in place, and stops.
  */
+/*
+ * THE BAR IS THE RENDERER'S WHEN THE RENDERER PATCHES THE MOUNT. The engine's OWN <search> sits before
+ * the wrapper, where no renderer's markup has one — so a patcher matching children by position lines
+ * the page's `div.tablewrap` up against the engine's bar, builds a new table there and throws the old
+ * one away, on every poll. That cannot be fixed from here without changing the markup (the bar cannot
+ * go inside the wrapper, which scrolls, or after it), so it is a contract: a renderer that re-renders
+ * this mount draws `<search class="filter-bar" data-table-bar>` itself. The engine says so when it can
+ * tell — its own bar gone while an engine table is still in that mount — once per table identity, as
+ * the node is new on every poll. A page that clears the whole mount is not warned.
+ */
+const warnedBars = new Set();
+function ownBarLost(inst) {
+  const mount = inst.ownBarParent;
+  // Only when the table is still there, or a table of the SAME identity took its place: that is a
+  // re-render of this table. A mount cleared, or filled with a different table, is the page's business.
+  const again = inst.table.isConnected ||
+    [...mount.querySelectorAll("table[data-table-tools]")].some((t) => identityOf(t) === inst.identity);
+  if (warnedBars.has(inst.identity) || !again) return;
+  warnedBars.add(inst.identity);
+  console.warn(`initTableTools: a renderer that re-renders this mount must draw <search class="filter-bar" data-table-bar> ` +
+    `before the table "${inst.identity || "(no data-table-id or aria-label)"}" itself. The engine's own bar was taken out, and a ` +
+    "patcher matching by position rebuilds the table in its place on every render.");
+}
+
 function ensureChrome(inst) {
   const table = inst.table;
+  if (inst.ownBar && inst.ownBarParent && !inst.ownBar.isConnected) ownBarLost(inst);
   if (!table.isConnected) return;
   const anchor = table.closest(".tablewrap") || table;
 
@@ -778,7 +803,10 @@ function ensureChrome(inst) {
         bar = inst.ownBar;
       }
       if (!bar.contains(inst.searchField)) bar.prepend(inst.searchField);
-      if (!bar.isConnected) anchor.before(bar);
+      if (!bar.isConnected) {
+        anchor.before(bar);
+        if (bar === inst.ownBar) inst.ownBarParent = bar.parentElement;
+      }
     }
     if (pageBar && pageBar !== inst.bar) {
       inst.bar = pageBar;

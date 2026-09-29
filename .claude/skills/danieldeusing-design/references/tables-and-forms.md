@@ -466,6 +466,14 @@ the pager slices exactly the matching set and needs to know nothing about filter
   **Two engine tables in one patched mount need DISTINCT ids** (or page-drawn bars and counts, so the
   positions line up): the guard can only tell tables apart by what they are called, and two with the same
   id, label or neither can trade nodes unseen. The engine says so once in the console, naming the id.
+- **A renderer that re-renders the mount draws the bar.** This is a contract. Without a page bar the engine inserts its own
+  `<search>` before the wrapper, where the renderer's markup has none. A patcher matching by position
+  (cockpit's `cockpitPatch`) then lines the page's `div.tablewrap` up against that bar, builds a new
+  table in its place and discards the old one on every poll. The view is lost without a `data-table-id`;
+  with one, the box's casing and the focus still go. So a mount that is patched carries
+  `<search class="filter-bar" data-table-bar>` before each engine table's wrapper (the engine puts its
+  box in it, or adopts the renderer's own). The engine warns once per table in the console when it sees
+  its own bar taken out while that table, or a table of the same identity, is still in the mount.
 - **Focus survives a re-render.** A patch that takes out the sort button, the badge, the summary or a
   menu item it had focused drops focus to `<body>`; the engine puts the same node back and focus with it.
   A focus the reader moved away on purpose is left alone.

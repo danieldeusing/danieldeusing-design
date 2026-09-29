@@ -676,6 +676,41 @@ if (!DOM_PATCH) {
   const byPatch = await focusKept(`window.cockpitPatch(document.querySelector("#mount thead"), '<tr><th data-col="name">name</th><th data-col="team" data-filter="pick">team</th><th data-col="score" data-sort-type="num">score</th></tr>')`);
   await check("fix round 3 — cockpitPatch re-renders the header: focus stays on the sort button, the badge, the summary and an open menu's item", async () =>
     byPatch.every(([, before, after]) => before && after === "same node"), JSON.stringify(byPatch));
+
+  // H1: the contract. With the engine's OWN bar before the wrapper, a mount patch rebuilds the table on
+  // every poll, and the engine says so once. With the page's bar, the same table node survives and the
+  // engine says nothing. A page that simply clears its mount is not warned either.
+  const WRAPPED = (id) => `<div class="tablewrap"><table data-table-tools data-table-id="${id}" aria-label="${id}"><thead><tr><th data-col="v">v</th></tr></thead><tbody>${rowsOf(4)}</tbody></table></div>`;
+  const H1_BAR = '<search class="filter-bar" data-table-bar><span class="filter-bar-spacer"></span></search>';
+  const barWarnings = () => evaluate(`JSON.stringify(window.warned.filter((w) => w.includes("data-table-bar")))`);
+  const threePolls = (source) => evaluate(`(async () => { for (let i = 0; i < 3; i += 1) {
+    window.cockpitPatch(document.getElementById("later"), ${JSON.stringify("SOURCE")}.replace("SOURCE", source)); await new Promise((r) => setTimeout(r, 150)); } })()`.replace("source", JSON.stringify(source)));
+  await evaluate(`localStorage.clear(); window.warned = []; document.getElementById("later").innerHTML = ${JSON.stringify(WRAPPED("h1-own"))}; null`);
+  await sleep(100);
+  await threePolls(WRAPPED("h1-own"));
+  const ownBarWarned = await barWarnings();
+  await check("fix round 4 — H1: the engine's own bar under three cockpitPatch polls of the mount draws exactly one console.warn naming <search data-table-bar>", async () =>
+    JSON.parse(ownBarWarned).length === 1 && JSON.parse(ownBarWarned)[0].includes('"h1-own"'), ownBarWarned);
+  await evaluate(`localStorage.clear(); window.warned = []; document.getElementById("later").innerHTML = ${JSON.stringify(H1_BAR + WRAPPED("h1-page"))};
+    window.keepTable = document.querySelector("#later table"); null`);
+  await sleep(100);
+  await searchIn("h1-page", "L2");
+  await sleep(100);
+  await threePolls(H1_BAR + WRAPPED("h1-page"));
+  const pageBarState = await evaluate(`JSON.stringify({ same: document.querySelector("#later table") === window.keepTable,
+    rows: [...document.querySelectorAll("#later tbody tr:not([data-table-placeholder])")].map((r) => r.cells[0].textContent).join(" "),
+    box: document.querySelector("#later search input").value, warned: window.warned.filter((w) => w.includes("data-table-bar")).length })`);
+  await check("...and with the page's own <search data-table-bar>, three polls keep the same table node, its view and its box, and nothing is warned", async () =>
+    pageBarState === JSON.stringify({ same: true, rows: "L2", box: "L2", warned: 0 }), pageBarState);
+  await evaluate(`window.warned = []; document.getElementById("later").innerHTML = ${JSON.stringify(WRAPPED("h1-clear"))}; null`);
+  await sleep(100);
+  await evaluate(`document.getElementById("later").innerHTML = ${JSON.stringify(WRAPPED("h1-other"))}; null`);
+  await sleep(100);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
+  await sleep(100);
+  const clearWarned = await barWarnings();
+  await check("...and a page that fills its mount with a different table, then clears it, is not warned", async () => JSON.parse(clearWarned).length === 0, clearWarned);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
 }
 
 /* ── fix round 1 · a count belongs to one table ────────────────────────────────────────────────────

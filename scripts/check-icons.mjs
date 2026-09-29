@@ -383,7 +383,7 @@ const chrome = spawn(CHROME, [
 ], { stdio: ["ignore", "ignore", "pipe"] });
 let socket;
 process.on("exit", () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close();
-  rmSync(profile, { recursive: true, force: true }); });
+  rmSync(profile, { recursive: true, force: true, maxRetries: 10 }); });
 const browserWs = await new Promise((ok, bad) => {
   let seen = "";
   const timer = setTimeout(() => bad(new Error("headless chromium did not print its DevTools url")), 20000);

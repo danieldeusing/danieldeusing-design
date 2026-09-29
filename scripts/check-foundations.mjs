@@ -102,7 +102,7 @@ const chrome = spawn(CHROME, [
 ], { stdio: "ignore" });
 let socket;
 process.on("exit", () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close();
-  rmSync(profile, { recursive: true, force: true }); });
+  rmSync(profile, { recursive: true, force: true, maxRetries: 10 }); });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let PORT = 0;
 for (let i = 0; ; i += 1) {
@@ -141,6 +141,7 @@ const check = (label, condition, detail) => {
   try { condition = typeof condition === "function" ? condition() : condition; } catch (error) {
     condition = false; detail = `threw: ${String(error?.message || error).split("\n")[0]}`;
   }
+  if (typeof condition?.then === "function") { condition = false; detail = "handed a promise: await the measurement before the check"; }
   if (condition) { console.log(`PASS  ${label}`); lastPassed = label; return; }
   failures += 1;
   console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${detail}`}`);

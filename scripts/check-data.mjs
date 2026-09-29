@@ -531,9 +531,10 @@ for (const scheme of ["light", "dark"]) {
   await shoot("#tab-syntax");
   const syntax = await measure(`return ink(text("#tab-syntax"));`);
   // Disabled keeps its .45 under a forced palette, estate-wide (the lead's ruling; WCAG exempts it from
-  // contrast): GrayText, faded — still painted, and not the enabled tabs' ink.
+  // contrast): GrayText at 45% — in the INK, not as the tab's opacity, which would fade its focus ring
+  // too — still painted, and not the enabled tabs' ink.
   const faded = await evaluate(`["#tab-modes", "#tab-syntax"].map((s) => { const c = getComputedStyle(document.querySelector(s));
-    return c.opacity === "0.45" && c.color === M.tok("GrayText"); })`);
+    return c.opacity === "1" && c.color === M.tok("color-mix(in srgb, GrayText 45%, Canvas)"); })`);
   await check(`X1 ${scheme} — a disabled tab is GrayText at .45 (painted ${r2(tabs.disabled)}:1 disabled, ${r2(syntax.ratio)}:1 aria-disabled), not the enabled tabs' ink`,
     () => faded.every(Boolean) && tabs.disabled >= 2 && syntax.ratio >= 2 && tabs.disabledInk.join() !== tabs.enabledInk.join(),
     shown([faded, tabs.disabled, syntax.ratio, tabs.disabledInk, tabs.enabledInk]));
@@ -595,9 +596,9 @@ for (const scheme of ["light", "dark"]) {
     }
     await check(`X1 ${scheme} ${t} — a keyboard-focused tab's ring is painted ${rings.slice(0, 2).map((r) => r2(r.on)).join(":1 (selected), ")}:1 (unselected) off its fill, and gone without the focus`,
       () => rings.slice(0, 2).every((r) => r.focus && r.on >= 3 && r.off < 1.1), shown(rings));
-    // A disabled tab's ring fades with it (.45), so it is held to "painted", not to 3:1.
-    await check(`X1 ${scheme} ${t} — ...and an aria-disabled tab's ring, faded with it, is still painted at ${r2(rings[2].on)}:1, and gone without the focus`,
-      () => rings[2].focus && rings[2].on >= 1.5 && rings[2].off < 1.1, shown(rings[2]));
+    // A disabled tab's text is faded, its focus ring is not (2.4.7): a whole CanvasText ring, 3:1.
+    await check(`X1 ${scheme} ${t} — ...and an aria-disabled tab's ring is NOT faded with it: ${r2(rings[2].on)}:1 off its fill, gone without the focus`,
+      () => rings[2].focus && rings[2].on >= 3 && rings[2].off < 1.1, shown(rings[2]));
   }
   await theme("warm");
 }

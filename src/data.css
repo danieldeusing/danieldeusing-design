@@ -594,9 +594,13 @@ section.doc.tab-panel { margin-top: 1.35rem; }
    colours passed it. `forced-color-adjust: none` stops the forcing and the backplate, so the pair is
    declared in full. A disabled tab is GrayText and KEEPS its .45, as every disabled control in the
    estate does under a forced palette (the lead's ruling): one look for "unavailable" everywhere, and
-   WCAG exempts a disabled control from contrast. It paints about 3:1, and its focus ring is forced
-   like any other tab's. A disabled row has no .45 to keep — it is muted text, not opacity — so under
-   a forced palette it is GrayText.
+   WCAG exempts a disabled control from contrast. But its FOCUS RING is exempt from nothing (2.4.7),
+   and `opacity` on the tab faded the outline with it: 2.45:1 light, 2.39:1 dark. So here the .45
+   moves from the element into its ink — `none`, and GrayText mixed 45% into Canvas, which paints the
+   same pixel as GrayText at .45 over Canvas — and the tab itself is opaque, so its ring is a whole
+   CanvasText one, like WP2's aria-disabled row. Its parts inherit that ink, or under `none` a
+   .tab-status would show its theme tone. A disabled row has no .45 to keep — it is muted text, not
+   opacity — so under a forced palette it is GrayText.
 
    CHARTS ARE THE OTHER WAY ROUND. SVG is `preserve-parent-color` by default, so nothing is forced: a
    chart keeps its THEME colours over whatever Canvas the reader's palette has, and warm's --primary on
@@ -613,7 +617,14 @@ section.doc.tab-panel { margin-top: 1.35rem; }
   }
   .tab[aria-selected="true"]:focus-visible { outline-color: HighlightText; }
   .tab:disabled,
-  .tab[aria-disabled="true"] { color: GrayText; }
+  .tab[aria-disabled="true"] {
+    forced-color-adjust: none;
+    opacity: 1;
+    color: color-mix(in srgb, GrayText 45%, Canvas);
+    background: transparent;
+  }
+  .tab:is(:disabled, [aria-disabled="true"]) * { color: inherit; }
+  .tab:is(:disabled, [aria-disabled="true"]):focus-visible { outline-color: CanvasText; }
   table.dense tr[data-pin] > :first-child { border-inline-start: 3px solid CanvasText; }
   tr[aria-disabled="true"] > :not(:first-child) { color: GrayText; }
   .chart text { fill: CanvasText; }

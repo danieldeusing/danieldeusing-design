@@ -230,16 +230,21 @@ window.__wp8 = (() => {
     // fold captures nothing), instantly (base.css scrolls smoothly). lead: only the row's ::before,
     // the first thing in it — a chevron clip must not also hold the row's .ico or its words, which
     // would pass for a chevron that is not there.
-    // inset: pixels kept off every edge — a splitter's line sits in the middle of its box, and the
-    // panes' own edges beside it are CanvasText too, so a clip that grazes one would pass a line that
-    // is not drawn.
+    // inset: CSS pixels kept off every edge. A box's edge lands between device pixels, so a clip cut
+    // exactly on it takes in a sliver of whatever is outside — Canvas round a Highlight row, a pane's
+    // CanvasText edge beside a splitter's line — and that sliver would pass a mark that is not drawn.
+    // lead: the row's ::before box alone (first in the row, centred on its cross axis), so a chevron
+    // clip holds neither the row's .ico nor its words.
     shot(sel, lead, inset = 0) {
       const el = q(sel);
       el.scrollIntoView({ block: "center", behavior: "instant" });
       const r = el.getBoundingClientRect();
-      if (lead) return { x: r.x + scrollX + parseFloat(getComputedStyle(el).paddingLeft), y: r.y + scrollY,
-        w: parseFloat(getComputedStyle(el, "::before").width), h: r.height };
-      return { x: r.x + scrollX + inset, y: r.y + scrollY + inset, w: r.width - 2 * inset, h: r.height - 2 * inset };
+      let b = { x: r.x + scrollX, y: r.y + scrollY, w: r.width, h: r.height };
+      if (lead) {
+        const pseudo = getComputedStyle(el, "::before"), w = parseFloat(pseudo.width), h = parseFloat(pseudo.height);
+        b = { x: b.x + parseFloat(getComputedStyle(el).paddingLeft), y: b.y + (r.height - h) / 2, w, h };
+      }
+      return { x: b.x + inset, y: b.y + inset, w: b.w - 2 * inset, h: b.h - 2 * inset };
     },
     // A SCREENSHOT of that box, decoded by the page itself (no image library): the colour most of it
     // is (what the mark sits on), the strongest contrast any pixel reaches against it, that pixel's
@@ -1098,7 +1103,7 @@ const forcedCell = async (label, theme, palette) => {
   await check(`${where}: every glyph and line reaches 3:1 on what it sits on (${FORCED_GLYPHS.length}, from pixels)`, () => faint);
   const wrong = [];
   for (const [what, chosen, rest] of FORCED_STATES) {
-    const c = await inkOf(chosen), r = await inkOf(rest);
+    const c = await inkOf(chosen, false, 1), r = await inkOf(rest, false, 1);
     if (!onHighlight(c.bg)) wrong.push(`${what}: its words sit on ${c.bg}, not Highlight (rgb(${env.highlight.join(", ")}) over Canvas)`);
     if (c.bg === r.bg) wrong.push(`${what}: chosen and at rest on the same ${c.bg}`);
     if (c.strongest < 4.5) wrong.push(`${what}: its words reach ${c.strongest.toFixed(2)}:1 (${c.mark} on ${c.bg})`);

@@ -299,7 +299,7 @@ second call installs nothing.
 
 ```html
 <p class="meta"><time datetime="2026-09-02">02 Sep 2026</time><span class="meta-sep" aria-hidden="true">·</span><a class="doc-link" href="/about">by Daniel Deusing</a><span class="meta-sep" aria-hidden="true">·</span><span>~6 min read</span></p>
-<span class="meta-stat"><span class="ico ico--sm" data-icon="package" aria-hidden="true" style="color: var(--cat-teal)"></span>12</span>
+<span class="meta-stat"><span class="ico ico--sm" data-icon="package" data-tone aria-hidden="true" style="--tone: var(--cat-teal)"></span>12</span>
 ```
 
 The line under a title or in a card's foot. Muted, and laid out as items that wrap **with** their
@@ -311,7 +311,10 @@ separators, never as one sentence that breaks in the middle of a date.
   louder than its key is `.meta-val` (configr's key/value lines).
 - **`.meta-stat`** is a glyph and a count, tabular so a column of counts does not jitter. The glyph
   is 12px whatever class it carries. Its colour, when it names a TYPE, is the surface's categorical
-  choice (`--cat-*`).
+  choice (`--cat-*`), and it goes in through **`--tone`**, with `data-tone` on the `.ico` — **never
+  as a `color` on the glyph.** Forced colours drop a tone and paint the glyph in its parent's forced
+  colour; a glyph with a `color` of its own keeps that colour instead, and the teal above measured
+  2.19:1 on a light palette that way. The count stays muted.
 
 **There is no text step below `--muted-foreground`.** This is where the estate kept inventing one.
 pagr's faint steps, measured on the three surfaces across the four themes:
@@ -424,7 +427,12 @@ and `main` keeps its landmark. The markup is in the template, in a comment after
   element wins. Remove the utilities a class replaces rather than stacking them.
 - **Print**: copy buttons are gone, code and commands wrap with no height cap (a scrollbar does not
   exist on paper), and the page title loses its glow.
-- **Forced colours**: everything here is text, so it survives. The copy states are glyph SHAPES
-  (copy, check, x), the current series part is bold, and links stay underlined.
+- **Forced colours**: the marks this file draws — the dash, `[ ok ]`, the line numbers — are text,
+  so they survive with no rule. Every colour goes, so nothing may depend on one: the copy states
+  are glyph SHAPES (copy, check, x), the current series part is bold, and links stay underlined. A
+  glyph paints its parent's forced colour (`preserve-parent-color`, the icon system's default), so
+  a state colour belongs on the button or the text, **never on the glyph itself**; a `--cat-*`
+  tint goes through `--tone` (P8). `scripts/check-content.mjs` measures what is painted against
+  what it sits on, four themes by both palettes.
 - **`hidden` hides every one of these**, flex and grid rows included. `tokens.css` answers that once
   for the whole system; never add a `[hidden]` rule for one class.

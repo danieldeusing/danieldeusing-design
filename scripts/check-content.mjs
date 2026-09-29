@@ -34,6 +34,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateSync } from "node:zlib";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHROME = process.env.DD_CHROME
@@ -230,7 +231,20 @@ window.__t = (() => {
   const lum = (c) => 0.2126 * toLin(c.r) + 0.7152 * toLin(c.g) + 0.0722 * toLin(c.b);
   const ratio = (fg, bg) => { const b = parse(bg), f = over(parse(fg), b); const [hi, lo] = [lum(f), lum(b)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05); };
   const surface = (name) => probe("background-color", "var(" + name + ")");
-  return { el, cs, probe, token, expect, rect, ratio, surface };
+  // What a thing is painted ON: the backgrounds from node outwards, composited down to the first
+  // opaque one (Canvas when none is), so a glyph on a filled box is measured against that fill.
+  const backdrop = (node) => {
+    const layers = [];
+    for (let n = node; n; n = n.parentElement) {
+      const c = parse(getComputedStyle(n).backgroundColor);
+      if (c.a > 0) layers.push(c);
+      if (c.a >= 1) break;
+    }
+    let base = layers.length && layers[layers.length - 1].a >= 1 ? layers.pop() : parse(probe("background-color", "Canvas"));
+    while (layers.length) base = over(layers.pop(), base);
+    return "rgb(" + [base.r, base.g, base.b].map((v) => Math.round(v * 255)).join(", ") + ")";
+  };
+  return { el, cs, probe, token, expect, rect, ratio, surface, backdrop };
 })();
 null`;
 
@@ -564,11 +578,11 @@ await check("P8 .meta: a muted, wrapping flex line, 4px 8px gaps, no margin", ()
   }],
   ["#meta-kv .meta-val", null, { color: { token: "--foreground" } }],
 ]));
-await check("P8 .meta-stat: glyph + tabular count; the glyph is 12px whatever class it carries", () => expectAll([
+await check("P8 .meta-stat: glyph + tabular count; the glyph is 12px whatever class it carries, tinted through --tone", () => expectAll([
   // inline-flex, blockified to flex because .meta is itself a flex row
   ["#meta-stats .meta-stat", null, { display: { re: "^(inline-)?flex$" }, "align-items": "center", "column-gap": "4px", "font-variant-numeric": "tabular-nums" }],
-  ["#meta-stats .meta-stat:first-child > .ico", null, { width: "12px", height: "12px" }],
-  ["#meta-stats .meta-stat:last-child > .ico", null, { width: "12px", height: "12px" }],
+  ["#meta-stats .meta-stat:first-child > .ico", null, { width: "12px", height: "12px", "background-color": { token: "--cat-teal" } }],
+  ["#meta-stats .meta-stat:last-child > .ico", null, { width: "12px", height: "12px", "background-color": { token: "--cat-violet" } }],
 ]));
 
 /* ── P9 series navigation ───────────────────────────────────────────────────────────────────── */
@@ -686,33 +700,109 @@ await check("hidden hides every content.css component (tokens.css + the full pag
 
 // Forced colours replace author colours with the user's palette, and a user picks a LIGHT or a DARK
 // one — so every theme is run under both. A mask glyph is a background: painted in Canvas it is
-// gone, and painted in an author colour it can land ON Canvas (mono's white --primary on a light
-// palette measured 1.00:1). So the assertion is contrast against Canvas, not merely "not Canvas".
+// gone, and painted in an author colour — which is what forced-color-adjust: none keeps, and what a
+// glyph with a `color` of its own keeps even under preserve-parent-color — it can land ON Canvas
+// (mono's white --primary on a light palette measured 1.00:1). So the assertion is the CONTRAST of
+// what is painted against what it is painted on, never merely "not Canvas" (X1, corrected).
 // A fresh load per theme: under forced colours Chromium does not restyle a pseudo-element that
 // opted out with forced-color-adjust: none when data-theme changes.
+//
+// Computed colours are only half of it. Chromium paints a Canvas BACKPLATE behind every run of text
+// in this mode, and it is visible in no computed value, so a word can vanish while its computed
+// pair reads 21:1 (WP7 measured 1.14:1 that way). So each glyph and each word that carries a state
+// is also CAPTURED and decoded, and its brightest pixel measured against its darkest: a glyph box
+// holds only the glyph and what it sits on, a word's box only the word and its ground. Twice the
+// pixel density, so a 1px stroke covers whole pixels. (The decoder is WP7's, check-feedback.mjs.)
+const decodePng = (png) => { // 8-bit RGB or RGBA, not interlaced: what Page.captureScreenshot writes
+  let pos = 8, width = 0, height = 0, bpp = 4;
+  const idat = [];
+  while (pos < png.length) {
+    const length = png.readUInt32BE(pos), type = png.toString("ascii", pos + 4, pos + 8), data = png.subarray(pos + 8, pos + 8 + length);
+    if (type === "IHDR") { width = data.readUInt32BE(0); height = data.readUInt32BE(4); bpp = data[9] === 6 ? 4 : 3; }
+    if (type === "IDAT") idat.push(data);
+    pos += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(idat)), stride = width * bpp, out = Buffer.alloc(height * stride);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)], line = y * (stride + 1) + 1;
+    for (let x = 0; x < stride; x += 1) {
+      const a = x >= bpp ? out[y * stride + x - bpp] : 0, b = y ? out[(y - 1) * stride + x] : 0;
+      const c = x >= bpp && y ? out[(y - 1) * stride + x - bpp] : 0, p = a + b - c;
+      const paeth = Math.abs(p - a) <= Math.abs(p - b) && Math.abs(p - a) <= Math.abs(p - c) ? a : Math.abs(p - b) <= Math.abs(p - c) ? b : c;
+      out[y * stride + x] = (raw[line + x] + [0, a, b, (a + b) >> 1, paeth][filter]) & 255;
+    }
+  }
+  const lum = (i) => [0, 1, 2].map((k) => out[i + k] / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, v, k) => sum + v * [0.2126, 0.7152, 0.0722][k], 0);
+  let lo = 1, hi = 0;
+  for (let i = 0; i < out.length; i += bpp) { const l = lum(i); lo = Math.min(lo, l); hi = Math.max(hi, l); }
+  return { width, height, ratio: (hi + 0.05) / (lo + 0.05) };
+};
+const PAINTED = [
+  ...["#states-icon .btn-icon:not(.btn-icon--bare):not([data-state])", "#states-icon .btn-icon:not(.btn-icon--bare)[data-state=copied]",
+    "#states-icon .btn-icon:not(.btn-icon--bare)[data-state=failed]", "#states-icon .btn-icon--bare[data-state=copied]", "#cmd-one > button",
+    "#p1-glyph .page-title > .ico", "#meta-stats .meta-stat:first-child > .ico", "#meta-stats .meta-stat:last-child > .ico"].map((sel) => [sel, "glyph", 3]),
+  ...["#states-text [data-state=copied]", "#states-text [data-state=failed]", "#seq a[aria-current=page]"].map((sel) => [sel, "text", 4.5]),
+];
+const painted = async () => {
+  const problems = [];
+  for (const [sel, kind, min] of PAINTED) {
+    // A glyph: the box inside the border, where nothing but the glyph is drawn. A word: the box of its
+    // text, where a backplate would sit. Both inset one CSS pixel: a box edge that falls between device
+    // pixels paints a blended row, and a border's or a fill's row would lend the capture a contrast
+    // its glyph or word does not have.
+    const clip = await evaluate(`(() => {
+      const el = __t.el(${JSON.stringify(sel)});
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+      let r;
+      if (${JSON.stringify(kind)} === "text") { const range = document.createRange(); range.selectNodeContents(el); r = range.getBoundingClientRect(); }
+      else {
+        const b = el.getBoundingClientRect(), cs = getComputedStyle(el), px = (p) => parseFloat(cs.getPropertyValue(p));
+        r = { left: b.left + px("border-left-width"), top: b.top + px("border-top-width"),
+          width: b.width - px("border-left-width") - px("border-right-width"), height: b.height - px("border-top-width") - px("border-bottom-width") };
+      }
+      return { x: r.left + 1 + scrollX, y: r.top + 1 + scrollY, width: r.width - 2, height: r.height - 2, scale: 1 };
+    })()`);
+    // NOT captureBeyondViewport: it lays the page out again at full height with no scrollbar, and this
+    // page's centred column moves 7.5px right under a clip measured before it (measured: the at-rest
+    // glyph's capture held its button's border, and a glyph painted at 1.34:1 passed at 21:1). The
+    // element is scrolled into view above, so the viewport as it is holds it.
+    const { data } = await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false });
+    const { ratio } = decodePng(Buffer.from(data, "base64"));
+    if (!(ratio >= min)) problems.push(`${sel} (${kind}): the painted ${kind} reaches ${ratio.toFixed(2)}:1, wants ${min}`);
+  }
+  return problems;
+};
 for (const theme of THEMES) {
   await load(`?theme=${theme}`);
   for (const scheme of ["light", "dark"]) {
     await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
-    await check(`forced colours, ${theme}, ${scheme} palette: glyphs >= 3:1 on Canvas, text glyphs >= 4.5:1, the copy states differ in shape`, async () => {
+    await check(`forced colours, ${theme}, ${scheme} palette: glyphs >= 3:1 and text >= 4.5:1 on what they sit on, the copy states differ in shape`, async () => {
       if (!(await evaluate(`matchMedia("(forced-colors: active)").matches`))) return ["could not emulate forced colours — this check proved nothing"];
       return evaluate(`(() => {
-        const canvas = __t.probe("background-color", "Canvas");
         const out = [];
         const ICON = "#states-icon .btn-icon:not(.btn-icon--bare)";
+        // A pseudo-element glyph sits on its own element's box; an element glyph on its parent's.
         const glyphs = [
           [ICON + ":not([data-state])", "::before"], [ICON + "[data-state=copied]", "::before"], [ICON + "[data-state=failed]", "::before"],
           ["#states-icon .btn-icon--bare[data-state=copied]", "::before"], ["#cmd-one > button", "::before"],
-          ["#p1-glyph .page-title > .ico", null], ["#meta-stats .meta-stat:first-child > .ico", null],
+          ["#p1-glyph .page-title > .ico", null], ["#meta-stats .meta-stat:first-child > .ico", null], ["#meta-stats .meta-stat:last-child > .ico", null],
         ];
         for (const [sel, pseudo] of glyphs) {
-          const bg = getComputedStyle(__t.el(sel), pseudo).backgroundColor;
-          const r = bg === "rgba(0, 0, 0, 0)" ? 1 : __t.ratio(bg, canvas);
-          if (r < 3) out.push(sel + (pseudo || "") + " glyph " + bg + " is " + r.toFixed(2) + ":1 on Canvas " + canvas);
+          const e = __t.el(sel);
+          const paint = getComputedStyle(e, pseudo).backgroundColor;
+          const under = __t.backdrop(pseudo ? e : e.parentElement);
+          const r = paint === "rgba(0, 0, 0, 0)" ? 1 : __t.ratio(paint, under);
+          if (r < 3) out.push(sel + (pseudo || "") + " glyph " + paint + " is " + r.toFixed(2) + ":1 on " + under);
         }
-        for (const [sel, pseudo] of [["#list-dash > li", "::before"], ["#list-steps > li", "::before"], ["#boot .boot-step", "::before"], ["#code-view .line", "::before"], ["#md-article a", null]]) {
-          const r = __t.ratio(getComputedStyle(__t.el(sel), pseudo).color, canvas);
-          if (r < 4.5) out.push(sel + (pseudo || "") + " text is " + r.toFixed(2) + ":1 on Canvas");
+        // Text that carries a state (the copy button's words, the current series part) and text drawn as a mark.
+        const TEXT = [["#list-dash > li", "::before"], ["#list-steps > li", "::before"], ["#boot .boot-step", "::before"], ["#code-view .line", "::before"],
+          ["#md-article a", null], ["#seq a[aria-current=page]", null], ["#states-text [data-state=copied]", null], ["#states-text [data-state=failed]", null]];
+        for (const [sel, pseudo] of TEXT) {
+          const e = __t.el(sel);
+          const under = __t.backdrop(e);
+          const r = __t.ratio(getComputedStyle(e, pseudo).color, under);
+          if (r < 4.5) out.push(sel + (pseudo || "") + " text is " + r.toFixed(2) + ":1 on " + under);
         }
         const mask = (sel) => { const st = getComputedStyle(__t.el(sel), "::before"); return st.maskImage || st.webkitMaskImage; };
         const [rest, copied, failed] = [":not([data-state])", "[data-state=copied]", "[data-state=failed]"].map((x) => mask(ICON + x));
@@ -723,6 +813,11 @@ for (const theme of THEMES) {
         return out;
       })()`);
     });
+    await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
+    await evaluate(`document.documentElement.classList.add("anim-off"); null`);
+    await check(`forced colours, ${theme}, ${scheme} palette, PAINTED: every glyph reaches 3:1 and every state word 4.5:1 (pixels read back)`, painted);
+    await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
+    await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   }
   await send("Emulation.setEmulatedMedia", { features: [] });
 }
@@ -865,6 +960,9 @@ const ON_SURFACES = [
   ["copy text: failed", "#states-text [data-state=failed]", null, 4.5],
   ["copy glyph: copied (non-text)", "#states-icon .btn-icon--bare[data-state=copied]", null, 3],
   ["copy glyph: failed (non-text)", "#states-icon .btn-icon--bare[data-state=failed]", null, 3],
+  // An .ico paints its background; tinted through --tone, the tint IS the background.
+  ["meta-stat glyph --cat-teal (non-text)", "#meta-stats .meta-stat:first-child > .ico", null, 3, "background-color"],
+  ["meta-stat glyph --cat-violet (non-text)", "#meta-stats .meta-stat:last-child > .ico", null, 3, "background-color"],
 ];
 const ON_MUTED = [
   ["code text", "#code-plain", null, 4.5],
@@ -885,8 +983,8 @@ for (const theme of THEMES) {
   await check(`contrast, ${theme}: every text pairing >= 4.5:1 and every glyph >= 3:1`, async () => {
     const rows = await evaluate(`(() => {
       const surfaces = ["--background", "--card", "--muted"].map((s) => __t.surface(s));
-      const fg = (sel, pseudo) => getComputedStyle(__t.el(sel), pseudo).color;
-      const onSurfaces = ${JSON.stringify(ON_SURFACES)}.map(([label, sel, pseudo, min]) => [label, min, surfaces.map((bg) => __t.ratio(fg(sel, pseudo), bg))]);
+      const fg = (sel, pseudo, prop) => getComputedStyle(__t.el(sel), pseudo).getPropertyValue(prop || "color");
+      const onSurfaces = ${JSON.stringify(ON_SURFACES)}.map(([label, sel, pseudo, min, prop]) => [label, min, surfaces.map((bg) => __t.ratio(fg(sel, pseudo, prop), bg))]);
       const onMuted = ${JSON.stringify(ON_MUTED)}.map(([label, sel, pseudo, min]) => {
         const host = __t.el(sel).closest(".code-block, .cmd");
         return [label, min, [__t.ratio(fg(sel, pseudo), getComputedStyle(host).backgroundColor)]];

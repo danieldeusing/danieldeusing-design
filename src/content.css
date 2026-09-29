@@ -512,7 +512,13 @@ ul.dash > li::before {
    so a hovered button that has just copied stays green.
 
    A copy button is never the FILLED primary: --success text on a --primary fill has nothing to
-   stand on. It is the ghost or the bare icon button. */
+   stand on. It is the ghost or the bare icon button.
+
+   FORCED COLOURS take both state colours away, and the SHAPE still tells the three apart. The
+   colour is set on the BUTTON, never on its glyph: the glyph is `preserve-parent-color` (tokens.css
+   gives every [data-icon]::before that default), so it paints the colour the button was forced to.
+   Under `forced-color-adjust: none` it would inherit --success itself — 1.74:1 on a light palette,
+   measured — which is why no rule here may give the glyph a colour of its own. */
 [data-copy][data-state="copied"] {
   --ico: var(--ico-check);
   --btn-icon-color: var(--success);

@@ -102,9 +102,10 @@
     <style id="standin-wp1-hidden" media="not all">
       [hidden]:not([hidden="until-found"]) { display: none !important; }
     </style>
-    <!-- WP4 · I1 glyphs: the --ico-<word> masks this page needs, the [data-icon] → --ico mapping and
-         the .ico class as icons.css draws it (forced colours included). The script fills in ONLY the
-         pieces that are missing and names them. -->
+    <!-- WP4 · I1 glyphs: the --ico-<word> masks this page needs, the [data-icon] → --ico mapping with
+         tokens.css's forced-colours default for [data-icon]::before, and the .ico class as icons.css
+         draws it (forced colours included). The script fills in ONLY the pieces that are missing and
+         names them. -->
     <style id="standin-wp4" media="not all"></style>
     <!-- WP5 · C2 .btn-icon — what the copy buttons and the section-head toggle need -->
     <style id="standin-wp5" media="not all">
@@ -132,10 +133,10 @@
       .btn-icon:is(:disabled, [aria-disabled="true"]) { opacity: 0.45; cursor: default; }
       @media (pointer: coarse) { .btn-icon { min-inline-size: 44px; min-block-size: 44px; } }
       @media print { .btn-icon { display: none !important; } }
-      /* X1: a mask glyph is a background, which forced colours replace with Canvas. Drawn in the
-         system's ButtonText instead — NOT with forced-color-adjust: none, which in Chromium keeps the
-         AUTHOR colour (measured: mono's white --primary on a light palette, 1.00:1). */
-      @media (forced-colors: active) { .btn-icon[data-icon]::before { background: ButtonText; } }
+      /* Forced colours (X1, corrected 2026-09-29): nothing of its own. The glyph takes WP4's
+         [data-icon]::before default, which the WP4 stand-in carries while tokens.css does not:
+         preserve-parent-color, so it paints the button's FORCED colour even while a state rule
+         (content.css's copied / failed) has given the button an author one. */
     </style>
 
     <style>
@@ -220,6 +221,12 @@
         }
         if (!probe('<i data-icon="check"></i>', (el) => getComputedStyle(el).getPropertyValue("--ico").trim() !== "")) {
           css += Object.keys(ICONS).map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
+          // WP4's tokens.css ships this default beside the mapping, in @layer base so a component's own
+          // forced-colours rule wins: a [data-icon]::before glyph paints its parent's FORCED colour.
+          css += "@layer base { @media (forced-colors: active) {" +
+            " [data-icon]::before { forced-color-adjust: none; color: CanvasText; --tone: CanvasText; }" +
+            " @supports (forced-color-adjust: preserve-parent-color) {" +
+            " [data-icon]::before { forced-color-adjust: preserve-parent-color; color: inherit; --tone: currentColor; } } } }";
           glyphs.push("[data-icon] mapping");
         }
         if (!probe('<span class="ico"></span>', (el) => getComputedStyle(el).display === "inline-block")) {
@@ -230,7 +237,10 @@
             ".ico--sm { inline-size: var(--icon-sm); block-size: var(--icon-sm); }" +
             ".ico--lg { inline-size: var(--icon-lg); block-size: var(--icon-lg); }" +
             ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }" +
-            "@media (forced-colors: active) { .ico, .ico[data-tone] { background: CanvasText; } }";
+            // icons.css (WP4): CanvasText where preserve-parent-color is unknown, else the parent's forced colour.
+            "@media (forced-colors: active) { .ico, .ico[data-tone] { forced-color-adjust: none; background: CanvasText; }" +
+            " @supports (forced-color-adjust: preserve-parent-color) {" +
+            " .ico, .ico[data-tone] { forced-color-adjust: preserve-parent-color; background: currentColor; } } }";
           glyphs.push(".ico");
         }
         document.getElementById("standin-wp4").textContent = css;
@@ -564,10 +574,10 @@ context: vu3
             <p class="meta" id="meta-kv"><span>version <span class="meta-val">0.60.0</span></span><span class="meta-sep" aria-hidden="true">·</span><span>source <span class="meta-val">official</span></span></p>
           </div>
           <div class="demo-cell">
-            <p class="demo-cap">stats — glyph + count (the glyph is 12px whatever class it carries)</p>
+            <p class="demo-cap">stats — glyph + count (the glyph is 12px whatever class it carries; its type colour comes through --tone, never a color of its own)</p>
             <p class="meta" id="meta-stats">
-              <span class="meta-stat"><span class="ico" data-icon="package" aria-hidden="true" style="color: var(--cat-teal)"></span>12</span>
-              <span class="meta-stat"><span class="ico ico--sm" data-icon="copy" aria-hidden="true" style="color: var(--cat-violet)"></span>1,204</span>
+              <span class="meta-stat"><span class="ico" data-icon="package" data-tone aria-hidden="true" style="--tone: var(--cat-teal)"></span>12</span>
+              <span class="meta-stat"><span class="ico ico--sm" data-icon="copy" data-tone aria-hidden="true" style="--tone: var(--cat-violet)"></span>1,204</span>
             </p>
           </div>
         </div>

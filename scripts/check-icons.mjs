@@ -16,8 +16,8 @@
  *     tokens.css names, and must match byte for byte: a token carrying another word's picture
  *     passes every other check here;
  *   · `.ico` — its four sizes, its colour (the text's, or its own data-tone, never a container's),
- *     the loud square for an unknown word, no radius, print, forced colours, the naming contract —
- *     on the demo page and again with only tokens.css + icons.css loaded (house rule 4);
+ *     the loud square for an unknown word, no radius, print, forced colours, hidden, the naming
+ *     contract — on the demo page and again with only tokens.css + icons.css loaded (house rule 4);
  *   · the mapping's cascade — a component in a later layer, and a utility, can swap the glyph;
  *   · glyph colours clear 3:1 (WCAG 1.4.11) on every theme and surface;
  *   · the skill reference — its forced-colours examples carry the fallback, and it states the rule
@@ -33,6 +33,8 @@
  * loudly; DD_REQUIRE_BROWSER=1 makes that skip a failure. lucide-react is borrowed the same way
  * check-tailwind-layers.mjs borrows @tailwindcss/node — configr's, or DD_LUCIDE_REACT — and with
  * none of the named version the drawing comparison SKIPS loudly; DD_REQUIRE_LUCIDE=1 fails it.
+ * A stand-in (the harness's copy of a rule another package owns) prints while it is in force, and
+ * DD_FORBID_STANDINS=1 fails the run instead, for the integration build.
  *
  *   node scripts/check-icons.mjs                          this checkout
  *   node scripts/check-icons.mjs ../other-checkout …      and the words other checkouts use
@@ -64,8 +66,11 @@ process.on("uncaughtException", (error) => {
   console.log("\ncheck-icons: ABORTED");
   process.exit(1);
 });
+// A green run says what it did not measure: every skip and stand-in is repeated on the last line.
+const notes = [];
 const finish = () => {
-  console.log(failures ? `\ncheck-icons: ${failures} FAILED` : "\ncheck-icons: all checks passed");
+  const said = notes.length ? ` — ${notes.join("; ")}` : "";
+  console.log(failures ? `\ncheck-icons: ${failures} FAILED${said}` : `\ncheck-icons: all checks passed${said}`);
   process.exit(failures ? 1 : 0);
 };
 
@@ -145,6 +150,7 @@ if (!LUCIDE || lucideVersion !== VERSIONS[0]) {
   const why = LUCIDE ? `${LUCIDE} is lucide-react ${lucideVersion} and tokens.css names ${VERSIONS[0]}`
     : "no lucide-react on this machine (DD_LUCIDE_REACT points at one)";
   console.log(`      drawing comparison SKIPPED — ${why}: a token carrying the wrong picture goes unseen.`);
+  notes.push("drawing comparison SKIPPED");
   if (process.env.DD_REQUIRE_LUCIDE === "1") check("DD_REQUIRE_LUCIDE=1: every token is compared against lucide's drawing", false, why);
 } else {
   const icons = join(LUCIDE, "dist/esm/icons");
@@ -237,6 +243,7 @@ if (!CHROME) {
   console.log("\ncheck-icons: browser half SKIPPED — no headless chromium on this machine.");
   console.log("  Whether an SVG decodes, a mask paints and a layer wins is only provable in a browser;");
   console.log("  the static half above still ran. Install one with `npx playwright install chromium`.");
+  notes.push("browser half SKIPPED");
   if (process.env.DD_REQUIRE_BROWSER === "1") {
     console.log("  DD_REQUIRE_BROWSER=1: a skip counts as a FAILURE here.");
     process.exit(1);
@@ -267,7 +274,6 @@ const asFallbackEngine = (css) => {
   }
   return out;
 };
-const X3_IN_TOKENS = /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important;?\s*\}/.test(TOKENS_CSS);
 // The probe buttons are a component written as X1 asks: its glyph paints currentColor; under
 // forced colours a pressed one is HighlightText on Highlight (as controls.css draws the pressed
 // icon button) and a disabled one GrayText; and its own @supports not branch paints CanvasText, or
@@ -318,6 +324,10 @@ const cascadePage = (head) => `<!doctype html><html data-theme="warm"><head>${he
 <button class="probe" id="pressed" data-icon="star" aria-pressed="true"></button>
 <span class="u-ico-x" id="utility" data-icon="check"></span>
 </body></html>`;
+const hiddenPage = (standin) => `<!doctype html><html data-theme="warm"><head>
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/icons.css">${standin}
+</head><body><span class="ico" id="shown" data-icon="x" aria-hidden="true"></span>
+<span class="ico" id="hid" data-icon="x" aria-hidden="true" hidden></span></body></html>`;
 const HARNESS = {
   // The Tailwind entry's cascade without Tailwind: its layer order, tokens.css unlayered (as that
   // entry imports it), a component's state glyph in `components`, a utility in `utilities`.
@@ -341,13 +351,11 @@ const HARNESS = {
   "/__harness/forced-fallback.html": asFallbackEngine(forcedPage("/__harness/tokens-fallback.css", "/__harness/icons-fallback.css")),
   "/__harness/tokens-fallback.css": asFallbackEngine(TOKENS_CSS),
   "/__harness/icons-fallback.css": asFallbackEngine(ICONS_CSS),
-  // X3: `hidden` hides a .ico although .ico sets its own display.
-  "/__harness/hidden.html": `<!doctype html><html data-theme="warm"><head>
-<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/icons.css">
-${X3_IN_TOKENS ? "" : `<style id="standin-x3">/* STAND-IN for X3's tokens.css rule, which WP1 adds; used only while tokens.css lacks it */
-[hidden]:not([hidden="until-found"]) { display: none !important; }</style>`}
-</head><body><span class="ico" id="shown" data-icon="x" aria-hidden="true"></span>
-<span class="ico" id="hid" data-icon="x" aria-hidden="true" hidden></span></body></html>`,
+  // X3: `hidden` hides a .ico although .ico sets its own display — with tokens.css and icons.css
+  // alone. The stand-in page is loaded only if that fails; see the hidden section below.
+  "/__harness/hidden.html": hiddenPage(""),
+  "/__harness/hidden-standin.html": hiddenPage(`<style id="standin-x3">/* STAND-IN for the one [hidden] rule tokens.css carries once WP1 lands */
+[hidden]:not([hidden="until-found" i]) { display: none !important; }</style>`),
 };
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript" };
 const server = createServer((req, res) => {
@@ -669,13 +677,25 @@ check("outside forced colours the defaults are inert: a ::before glyph is its bu
 
 /* ── hidden (X3): `hidden` hides a .ico, whose display is its own ──────────────────────────────── */
 
-if (!X3_IN_TOKENS) {
-  console.log("      STAND-IN: tokens.css does not yet carry X3's [hidden] rule (WP1 adds it); the hidden harness");
-  console.log("      carries it, so this asserts that .ico does not defeat that rule — not that the rule exists.");
-}
+// The behaviour, not a spelling: tokens.css and icons.css alone must hide a hidden .ico. Only
+// while they do not (WP1's rule not merged yet) does the stand-in go in, and then this says so —
+// and DD_FORBID_STANDINS=1, set for the integration build, fails instead.
 await load("/__harness/hidden.html");
 check("precondition: a .ico without `hidden` is displayed (inline-block)", (await style("#shown", "display")) === "inline-block");
-check(`a .ico with \`hidden\` is not displayed${X3_IN_TOKENS ? " — tokens.css alone does it" : " (X3 stand-in)"}`, (await style("#hid", "display")) === "none");
+const hiddenAlone = await style("#hid", "display");
+if (hiddenAlone === "none") {
+  check("a .ico with `hidden` is not displayed — tokens.css and icons.css alone do it, no stand-in", true);
+} else {
+  console.log(`      STAND-IN in force: with tokens.css and icons.css alone a hidden .ico is display: ${hiddenAlone}. The`);
+  console.log("      one [hidden] rule tokens.css carries once WP1 lands is stood in for below, so this asserts");
+  console.log("      only that .ico does not defeat that rule — not that the rule exists.");
+  notes.push("X3 stand-in in force");
+  if (process.env.DD_FORBID_STANDINS === "1") {
+    check("DD_FORBID_STANDINS=1: no stand-in is in force — tokens.css hides a hidden .ico itself (X3)", false, `display: ${hiddenAlone}`);
+  }
+  await load("/__harness/hidden-standin.html");
+  check("a .ico with `hidden` is not displayed beside the X3 stand-in — .ico does not defeat the rule", (await style("#hid", "display")) === "none");
+}
 
 /* ── contrast: a glyph is a graphical object, WCAG 1.4.11 asks 3:1 ────────── */
 

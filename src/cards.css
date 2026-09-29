@@ -967,10 +967,12 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
 .split > .split-pane:last-child {
   flex: 1 1 0;
 }
-/* The last PANE, when a right-hand pane was hidden and its strip is now the last child: the pane
-   left over takes the room. A rule of its own, because an engine that cannot read `of S` drops a
-   whole selector list and the plain case must survive it. */
-.split > .split-pane:nth-last-child(1 of .split-pane) {
+/* The last SHOWN pane, when a right-hand pane was hidden and its strip is now the last child: the
+   pane left over takes the room. `:not([hidden])` because a page may keep the hidden pane in place
+   rather than remove it, and a hidden last pane would otherwise leave the one on screen at
+   --split-size. A rule of its own, because an engine that cannot read `of S` drops a whole
+   selector list and the plain case must survive it. */
+.split > .split-pane:nth-last-child(1 of .split-pane:not([hidden])) {
   flex: 1 1 0;
 }
 .split-pane + .split-pane {

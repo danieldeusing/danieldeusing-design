@@ -376,6 +376,7 @@ const FIXTURE = `
   <div class="split" id="fx-split-fixed" style="--split-size: 10rem; width: 480px"><div class="split-pane" id="fx-fixed-a">a</div><div class="split-pane" id="fx-fixed-b">b</div></div>
   <div class="split" id="fx-split-left" style="width: 480px"><button type="button" class="pane-collapsed" id="fx-collapsed" aria-label="show files"><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span id="fx-collapsed-label" aria-hidden="true">files</span></button><div class="split-pane" id="fx-left-rest">rest</div></div>
   <div class="split" id="fx-split-right" style="width: 480px; --split-size: 10rem"><div class="split-pane" id="fx-right-rest">rest</div><button type="button" class="pane-collapsed pane-collapsed--end" id="fx-collapsed-end" aria-label="show preview"><span aria-hidden="true">preview</span></button></div>
+  <div class="split" id="fx-split-kept" style="width: 480px; --split-size: 10rem"><div class="split-pane" id="fx-kept-rest">rest</div><div class="splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-label="resize kept" hidden></div><div class="split-pane" hidden>kept</div><button type="button" class="pane-collapsed pane-collapsed--end" aria-label="show kept"><span aria-hidden="true">kept</span></button></div>
   <button type="button" class="pane-collapsed" id="fx-collapsed-disabled" disabled aria-label="show nothing"><span aria-hidden="true">x</span></button>
   <button type="button" class="list-row" id="fx-focus-probe" style="display: none">never shown</button>
 
@@ -697,6 +698,7 @@ const GEOMETRY = [
     return [W.near(w("#fx-pane-a"), 192, "first pane"), W.near(w("#fx-pane-b"), 640 - 192 - 12, "last pane"),
       W.near(w("#fx-fixed-a"), 160, "fixed master"), W.near(w("#fx-left-rest"), 480 - 32, "left strip, rest"),
       W.near(w("#fx-right-rest"), 480 - 32, "right strip (--end), rest"),
+      W.near(w("#fx-kept-rest"), 480 - 32, "right pane kept in place with hidden, rest"),
       W.near(W.box("#fx-vsplit").height, 128, "the vertical splitter spans the row"),
       W.near(parseFloat(getComputedStyle(W.q("#fx-vsplit"), "::before").height), 128, "its line spans it")].filter(Boolean);
   })()`)],

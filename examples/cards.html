@@ -592,9 +592,11 @@
             </div>
           </div>
           <div>
-            <p class="demo-cap">the right pane hidden: --end, the left pane takes the room</p>
+            <p class="demo-cap">the right pane hidden in place: --end, the left pane takes the room</p>
             <div class="split" style="block-size: 8rem; border: 1px solid var(--border)" id="k10-hidden-right">
               <div class="split-pane" style="padding: 0.75rem" id="k10-rest-right">files</div>
+              <div class="splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="k10-preview" aria-label="resize preview" hidden></div>
+              <div class="split-pane" id="k10-preview" hidden>preview</div>
               <button type="button" class="pane-collapsed pane-collapsed--end" aria-controls="k10-preview" aria-expanded="false" aria-label="show preview" id="k10-collapsed-end"><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span aria-hidden="true">preview</span></button>
             </div>
           </div>

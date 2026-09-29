@@ -20,10 +20,20 @@
  * the function reads, which is why these assertions are about the shipped function rather than
  * about a re-implementation of it living in a harness.
  *
+ * ONE CASE NEEDS A BROWSER, and it is the last one: the pager's `rows` picker is a <select> this
+ * module creates, and every dropdown list is the system's list (0.60.0), so initTablePagination()
+ * enhances it itself. That is DOM behaviour — a wrapper, a trigger, a MutationObserver reaching a
+ * pager built later — so it drives the shipped module in headless Chromium, on a page that never
+ * calls initSelects(). Without a browser that one case SKIPS; DD_REQUIRE_BROWSER=1 makes it fail.
+ *
  *   node scripts/check-pagination.mjs
  */
 import assert from "node:assert/strict";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import { CHROME, launch, serve } from "./lib/chromium.mjs";
 
 import {
   DEFAULT_PAGE_SIZE,
@@ -179,4 +189,47 @@ test("paging never invents, drops or reorders a row of the sorted set", () => {
     collected.push(...rows.filter((r) => !r.hidden).map((r) => r.row));
   }
   assert.deepEqual(collected, sorted);
+});
+
+/* ── the picker is the system's dropdown, with no page-level initSelects() ───────── */
+
+test("the pager's rows picker is the system's dropdown on a page that never calls initSelects()", async (t) => {
+  if (!CHROME) {
+    assert.notEqual(process.env.DD_REQUIRE_BROWSER, "1", "DD_REQUIRE_BROWSER=1 and no headless chromium on this machine");
+    t.skip("no headless chromium on this machine — install one with `npx playwright install chromium`");
+    return;
+  }
+  const rows = (n) => Array.from({ length: n }, (_, i) => `<tr><td>row ${i}</td></tr>`).join("");
+  const page = `<!doctype html><html><head><meta charset="utf-8">
+    <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/components.css"></head><body>
+    <table data-table-id="pager-probe"><tbody>${rows(30)}</tbody></table><div id="later"></div>
+    <script type="module">
+      import { initTablePagination } from "/runtime/pagination.js";
+      initTablePagination();
+      window.ready = true;
+    </script></body></html>`;
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const server = await serve(root, { "/__pager.html": page });
+  const browser = await launch("pagination");
+  try {
+    await browser.navigate(`${server.origin}/__pager.html`);
+    await browser.until("window.ready === true");
+    const enhanced = (id) => browser.evaluate(`(() => {
+      const select = document.querySelector('table[data-table-id="${id}"]').closest(".tablewrap, table").parentElement
+        .querySelector(".table-pager select");
+      const field = select && select.parentElement;
+      const trigger = field && field.querySelector(".select-trigger");
+      return Boolean(select && field.classList.contains("select-field") && trigger &&
+        trigger.getAttribute("role") === "combobox" && select.getAttribute("aria-hidden") === "true");
+    })()`);
+    assert.equal(await enhanced("pager-probe"), true, "the pager's <select> was left to the operating system's menu");
+    await browser.evaluate(`document.getElementById("later").innerHTML =
+      '<table data-table-id="pager-later"><tbody>${rows(25)}</tbody></table>'; null`);
+    await browser.until(`!!document.querySelector('table[data-table-id="pager-later"] ~ .table-pager .select-trigger')`,
+      "the later table's pager to be enhanced");
+    assert.equal(await enhanced("pager-later"), true, "a pager built after load was left to the operating system's menu");
+  } finally {
+    browser.close();
+    server.close();
+  }
 });

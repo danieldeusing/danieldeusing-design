@@ -53,6 +53,8 @@
  * teaches people to ignore the console.
  */
 
+import { initSelects } from "./select.js";
+
 /** The sizes offered in the picker. 20 is the default; the rest are the reader's call. */
 export const PAGE_SIZES = [5, 10, 20, 50, 100, 200];
 export const DEFAULT_PAGE_SIZE = 20;
@@ -322,6 +324,11 @@ function enhance(table) {
  * @param {ParentNode} [root=document] Where to look for the initial pass.
  */
 export function initTablePagination(root = document) {
+  // The `rows` picker is a <select> this module creates, so this module enhances it: every dropdown
+  // list is the system's list, and a pager whose list opened in the operating system's menu because
+  // its page never called initSelects() was the one exception. Idempotent, and its observer covers
+  // every pager built later.
+  initSelects();
   for (const table of root.querySelectorAll("table")) enhance(table);
 
   if (documentObserver) return;

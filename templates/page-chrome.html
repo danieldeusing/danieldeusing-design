@@ -3,7 +3,8 @@
 
   Every danieldeusing surface wears the same three pieces, in this order:
 
-    header.bar      brand on the left, the `ls -l` head on the right
+    header.bar      brand in the left slot, the `ls -l` head in the right slot, and
+                    optionally history + the path in the centre
     .ls-nav         the sticky right RAIL — the site navigation, always the rail,
                     never a dropdown
     footer.status   fixed, full width, and the home of EVERY control: theme,
@@ -14,7 +15,8 @@
   pre-rail dropdown long after cockpit moved on. Each was locally reasonable and the
   estate stopped looking like one thing — which is the entire problem the design
   system exists to prevent. A surface that needs a different arrangement should say
-  so here, not solve it privately.
+  so here, not solve it privately. Every slot and class is explained for an author in
+  the skill's references/chrome.md.
 
   ── WHY THE RAIL AND NOT A DROPDOWN ──
   A dropdown answers "where can I go?" only while you hold it open, and it covers the
@@ -29,12 +31,15 @@
   The header names the page; the footer operates it. Theme, language and animation are
   session preferences, not navigation, and mixing them into the header put a colour
   picker next to a brand on one surface and nowhere at all on another. One place, on
-  every surface, so a reader who has found it once has found it everywhere.
+  every surface, so a reader who has found it once has found it everywhere. On a phone
+  the footer folds into the burger's `.mobile-footer` — so the two must carry the same
+  controls. A page with no `.mobile-footer` keeps its footer on a phone instead,
+  wrapped to two rows (fine for three controls; more than that belongs in the burger).
 
   ── WHAT YOU MUST WIRE UP (the CSS alone is not enough) ──
   1. Pre-paint, INLINE in <head>, before any stylesheet — see the <head> block below.
-     The theme and the rail state must be applied before first paint, or the page
-     visibly flashes the default and jumps.
+     The theme, the animation choice and the rail state must be applied before first
+     paint, or the page visibly flashes the default and jumps.
 
      THERE IS NO ZOOM BLOCK ANY MORE (0.29.0). Scaling above 1920 is CSS now — the
      root font size in tokens.css — so it needs no script and cannot be forgotten.
@@ -42,14 +47,16 @@
      assigns `document.documentElement.style.zoom` on top of 0.29.0 scales TWICE.
   2. At the end of <body>, import and call the runtime:
        import { initLsNav, initBurgerNav, initThemeSwitcher, initDropdowns,
-                initAnimToggle, initTableScroll, initSelects }
+                initAnimToggle, initTableScroll, initSelects, initToc }
          from "@danieldeusing/design/runtime";
      initBurgerNav() is not optional here: the markup below ships a .nav-burger, and
      below the 48rem breakpoint that button is the ONLY way to reach the navigation.
      Without it the burger renders and does nothing, which is worse than no burger.
-  3. `initLsNav()` measures header and footer height and publishes --ls-nav-top /
-     --ls-nav-bottom, which is how the rail sits BETWEEN the chrome instead of under
-     it. A page with no footer.status still works — it just reserves nothing.
+  3. `initLsNav()` measures the chrome ON EVERY PAGE, rail or not: the header's (or the
+     .bar-stack's) bottom edge and the footer's height into --ls-nav-top / --ls-nav-bottom,
+     and the page toolbar's bottom into --sticky-top. That is how the rail sits BETWEEN the
+     chrome, and how the toolbar and the table of contents park under the header instead
+     of under a guessed 3rem. Call it on a rail-less page too.
   4. `initTableScroll()` wraps every table so a wide one scrolls itself rather than
      scrolling the whole page sideways. The markup contract is nothing — author a
      plain <table>. Call it again after rendering more rows.
@@ -58,21 +65,37 @@
      the page. The markup contract is nothing here either: author a plain <select>, and
      it stays the element that holds the value and fires input/change. Selects rendered
      later are picked up on their own, so there is nothing to call again.
+  6. `initToc()` only if the page has a table of contents (the optional `.layout` below).
 -->
 
 <!-- ─────────────── <head> ─────────────── -->
 <!-- INLINE and FIRST. A module at the end of <body> runs after first paint, so a
-     reader who chose "green" or hid the rail would watch the default paint and then
-     jump, on every single page load. Both reads are wrapped: a locked-down browser
-     throws on localStorage, and a page that cannot remember is still a working page —
-     it just starts from the default, which is the right answer when in doubt. -->
+     reader who chose "green", turned animation off or hid the rail would watch the
+     default paint and then jump, on every single page load. Every read is wrapped: a
+     locked-down browser throws on localStorage, and a page that cannot remember is still
+     a working page — it just starts from the default, which is the right answer when in
+     doubt. Storage keys: "theme" (default warm), "anim", "ls-nav". -->
+<meta name="theme-color" content="#f5efe2" />
+<!-- Optional: a per-theme favicon. The package ships the hook, not the files — a favicon
+     names a surface. Pass `initThemeSwitcher({ faviconHref: (t) => "/favicon-" + t + ".svg" })`
+     and give the link this id; the runtime swaps its href on every theme change.
+<link rel="icon" id="favicon" href="/favicon-warm.svg" />
+-->
 <script>
   (() => {
+    const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
+    let theme = "warm";
     try {
-      const themes = ["warm", "green", "mono", "paper"];
       const stored = localStorage.getItem("theme");
-      if (themes.includes(stored)) document.documentElement.dataset.theme = stored;
+      if (stored && stored in bg) theme = stored;
     } catch {}
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg[theme]);
+    let animOff = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    try {
+      if (localStorage.getItem("anim") === "off") animOff = true;
+    } catch {}
+    if (animOff) document.documentElement.classList.add("anim-off");
     try {
       if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
     } catch {}
@@ -80,64 +103,161 @@
 </script>
 
 <!-- ─────────────── header ─────────────── -->
+<!-- A page-wide BANNER ("2 alerts", "control is frozen") and the header stick as ONE layer:
+     wrap both in <div class="bar-stack">, banner first, header after it. Two sticky
+     elements at the top do not stack, they overlap — the banner hid the header entirely.
+     A page without a banner needs no stack. -->
 <header class="bar">
-  <a href="/" class="brand"
-    ><span class="glow">danieldeusing-SURFACE</span><span class="cursor-block" aria-hidden="true"></span
-  ></a>
+  <div class="bar-side">
+    <a href="/" class="brand"
+      ><span class="glow">danieldeusing-SURFACE</span><span class="cursor-block" aria-hidden="true"></span
+    ></a>
+  </div>
 
-  <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
-  </button>
-
-  <nav aria-label="site" id="site-nav" class="site-nav">
-    <!-- The head lives in the BAR, the rail hangs below it. Keeping `ls -l` at one
-         fixed spot is the point: the toggle is in the same place open or closed. -->
-    <div class="ls-nav-head">
-      <span class="ls-nav-title prompt">ls -l</span>
-      <!-- The guillemet is GENERATED by chrome.css (» open, « closed) — do not type a
-           character in here, or it will disagree with the state on the next release. -->
-      <button type="button" class="ls-nav-toggle" data-ls-nav-toggle aria-controls="nav"
-              aria-expanded="true" aria-label="show or hide navigation"></button>
+  <!-- OPTIONAL: the centre band — history and the path, centred over <main>. For a site a
+       reader moves around (danieldeusing.de, seedr). It gives way to the burger on a phone.
+       The history menu carries `hidden` until the page has two entries to list.
+       Write the crumbs WITHOUT whitespace between the tags: they are one line of inline
+       text, and a newline between two <li> is a space in the path ("~ /articles").
+  <div class="bar-center">
+    <div class="bar-history" role="group" aria-label="history">
+      <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-left" aria-label="back" disabled></button>
+      <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-right" aria-label="forward" disabled></button>
+      <details class="dropdown" hidden>
+        <summary class="btn-icon btn-icon--bare" data-icon="history" aria-label="history"></summary>
+        <ul class="dropdown-panel dropdown-panel--down"></ul>
+      </details>
     </div>
+    <nav class="crumbs" aria-label="breadcrumb"><span class="crumbs-host" aria-hidden="true">visitor@danieldeusing:</span><ol><li><a class="crumbs-home" href="/" aria-label="home">~</a></li><li><a href="/section">section</a></li><li><span aria-current="page">page</span></li></ol></nav>
+  </div>
+  -->
 
-    <div class="ls-nav" id="nav">
-      <ul class="ls-panel" role="list">
-        <!-- One <li> per entry. `ls-row--dir` marks a directory (it takes the accent
-             and the weight); `ls-row--sub` / `ls-row--sub2` draw the nesting. The
-             permission string is decoration that carries meaning: drwxr-xr-x has
-             children, -rw-r--r-- does not. -->
-        <!-- `.ls-group` is a heading inside the rail, and since 0.8.0 the package STYLES it.
-             It did not before, so every surface that wanted grouped navigation wrote its own
-             rule and they all differed — if yours still carries one, delete it, it is now a
-             fork. Only a positional tweak (an inset, a first-child) belongs locally. -->
-        <li><span class="ls-group"># group</span></li>
-        <li class="ls-row"><span class="ls-perm">-rw-r--r--</span><a class="ls-name" href="/page">page</a></li>
-        <li class="ls-row ls-row--dir"><span class="ls-perm">drwxr-xr-x</span><a class="ls-name" href="/section/">section/</a></li>
-        <li class="ls-row ls-row--sub"><span class="ls-perm">-rw-r--r--</span><a class="ls-name" href="/section/child">child</a></li>
-      </ul>
-    </div>
+  <div class="bar-side bar-right">
+    <!-- OPTIONAL: a connection that can drop says so in words. role="status" announces the
+         change; the dot is decoration. Tones: pending (connecting…), success (live),
+         destructive (down).
+    <p class="bar-status" role="status"><span class="dot" data-tone="pending" aria-hidden="true"></span>connecting…</p>
+    -->
+    <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+    </button>
 
-    <!-- The pre-rail flat list, for a surface that ships NO rail. Below the 48rem breakpoint the
-         burger owns navigation, and since 0.7.2 chrome.css hides this list whenever a .ls-nav is
-         present in the same nav — the rail is the one carrying the structure, so a page with both
-         showed its whole navigation twice, stacked. 0.7.3 then gave the surviving rail rows a
-         44px min-height, because the list being hidden was the finger-sized one.
+    <nav aria-label="site" id="site-nav" class="site-nav">
+      <!-- The head lives in the BAR, the rail hangs below it. Keeping `ls -l` at one
+           fixed spot is the point: the toggle is in the same place open or closed. -->
+      <div class="ls-nav-head">
+        <span class="ls-nav-title prompt">ls -l</span>
+        <!-- The guillemet is GENERATED by chrome.css (» open, « closed) — do not type a
+             character in here, or it will disagree with the state on the next release.
+             The state is aria-expanded, never aria-pressed: it opens and closes a region. -->
+        <button type="button" class="ls-nav-toggle" data-ls-nav-toggle aria-controls="nav"
+                aria-expanded="true" aria-label="show or hide navigation"></button>
+      </div>
 
-         So if you keep the rail above, this element is dead markup — it is here only so a
-         pre-rail surface still has somewhere to look. DO NOT ALSO HIDE THE RAIL BELOW THE
-         BREAKPOINT to keep this list instead: chrome.css has already hidden this one, `:has()`
-         still matches a `display:none` rail, and the page ends up with NO navigation at all.
-         (Verified in a browser: rail=none, mobile-nav=none, 0 visible links.) -->
-    <ul class="mobile-nav" role="list"></ul>
-  </nav>
+      <div class="ls-nav" id="nav">
+        <ul class="ls-panel" role="list">
+          <!-- One <li> per entry. `ls-row--dir` marks a directory (it takes the accent
+               and the weight); `ls-row--sub` / `ls-row--sub2` draw the nesting. The
+               permission string is decoration that carries meaning: drwxr-xr-x has
+               children, -rw-r--r-- does not. The whole row is ONE link (the <a> carries
+               .ls-row), and the page you are on carries aria-current="page" on it — derived
+               per page by whatever renders the nav, never hand-written into a shared nav.
+               To have the rows print one by one under a typed `ls -l`, add
+               `data-term-list` to this <ul> and set html.term-anim PRE-PAINT (each row's
+               step comes from its position; no inline style). -->
+          <!-- `.ls-group` is a heading inside the rail, and since 0.8.0 the package STYLES it.
+               It did not before, so every surface that wanted grouped navigation wrote its own
+               rule and they all differed — if yours still carries one, delete it, it is now a
+               fork. Only a positional tweak (an inset, a first-child) belongs locally. -->
+          <li><span class="ls-group"># group</span></li>
+          <li><a class="dropdown-item ls-row" href="/page" aria-current="page"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">page</span></a></li>
+          <li><a class="dropdown-item ls-row ls-row--dir" href="/section/"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">section/</span></a></li>
+          <li><a class="dropdown-item ls-row ls-row--sub" href="/section/child"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">child</span></a></li>
+        </ul>
+      </div>
+
+      <!-- The pre-rail flat list, for a surface that ships NO rail. Below the 48rem breakpoint the
+           burger owns navigation, and since 0.7.2 chrome.css hides this list whenever a .ls-nav is
+           present in the same nav — the rail is the one carrying the structure, so a page with both
+           showed its whole navigation twice, stacked. 0.7.3 then gave the surviving rail rows a
+           44px min-height, because the list being hidden was the finger-sized one.
+
+           So if you keep the rail above, this element is dead markup — it is here only so a
+           pre-rail surface still has somewhere to look. DO NOT ALSO HIDE THE RAIL BELOW THE
+           BREAKPOINT to keep this list instead: chrome.css has already hidden this one, `:has()`
+           still matches a `display:none` rail, and the page ends up with NO navigation at all.
+           (Verified in a browser: rail=none, mobile-nav=none, 0 visible links.) -->
+      <ul class="mobile-nav" role="list"></ul>
+
+      <!-- The footer's controls, folded into the burger for a phone. footer.status hides below
+           48rem ONLY on a page that has this block, so keep it in step with the footer below:
+           the same links, the same menus as accordions (`details.mobile-theme`), the same toggle. -->
+      <div class="mobile-footer">
+        <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+        <!-- OPTIONAL: the language accordion, on a multilingual site. Each row is a real link to
+             this page in that locale; the current one carries aria-current="true" (it navigates,
+             so it takes the accent, not a ✓). lang + hreflang let each name be read in its own
+             language.
+        <details class="mobile-theme">
+          <summary><span class="visually-hidden">language </span><span class="dd-flag dd-flag-en" aria-hidden="true"></span><span>english</span><span class="mf-chev" aria-hidden="true">▾</span></summary>
+          <div class="mf-panel">
+            <a class="dropdown-item" href="/de/page" hreflang="de" lang="de" data-lang-value="de"><span class="dd-flag dd-flag-de" aria-hidden="true"></span>deutsch</a>
+            <a class="dropdown-item" href="/page" hreflang="en" lang="en" data-lang-value="en" aria-current="true"><span class="dd-flag dd-flag-en" aria-hidden="true"></span>english</a>
+          </div>
+        </details>
+        -->
+        <details class="mobile-theme">
+          <summary><span class="visually-hidden">theme </span><span class="dd-dot" aria-hidden="true"></span><span data-theme-label>warm</span><span class="mf-chev" aria-hidden="true">▾</span></summary>
+          <div class="mf-panel">
+            <button type="button" class="dropdown-item" data-theme-value="warm">warm</button>
+            <button type="button" class="dropdown-item" data-theme-value="green">green</button>
+            <button type="button" class="dropdown-item" data-theme-value="mono">mono</button>
+            <button type="button" class="dropdown-item" data-theme-value="paper">paper</button>
+          </div>
+        </details>
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
+          <span data-anim-box aria-hidden="true">[x]</span>
+          <span>anim</span>
+        </button>
+      </div>
+    </nav>
+  </div>
 </header>
 
 <!-- ─────────────── content ─────────────── -->
-<!-- .wrap is the shared column: --content-w wide, --content-pad from the edges. Set
-     padding-BLOCK here for the page's own vertical rhythm — never the `padding`
-     shorthand, which resets padding-inline and silently drops the shared margin. -->
-<main class="wrap" style="padding-block: 1.1rem 6rem">
+<!-- .wrap is the shared column: --content-w wide, --content-pad from the edges (1.25rem on a
+     phone). Set padding-BLOCK here for the page's own vertical rhythm — never the `padding`
+     shorthand, which resets padding-inline and silently drops the shared margin. It no longer
+     needs room for the footer: the BODY reserves exactly --status-h below the content.
+     In the page's stylesheet, never a style attribute (a strict CSP refuses inline style):
+       main.wrap { padding-block: 1.1rem var(--space-section); } -->
+<main class="wrap">
+  <!-- OPTIONAL: a toolbar that sticks under the header — the breadcrumb when the bar has no
+       centre band (cockpit), a filter bar. First in <main>, above .layout, so its rule spans
+       both columns.
+  <div class="page-toolbar">
+    <nav class="crumbs" aria-label="breadcrumb"><ol><li><a href="/">cockpit</a></li><li><a href="/#control">control</a></li><li><span aria-current="page">page</span></li></ol></nav>
+  </div>
+  -->
+
   <!-- page content -->
+
+  <!-- OPTIONAL: a table of contents, for a page with more than one section, from 64rem wide.
+       A page shows a TOC or a minimap, never both. Each entry's data-toc-link names the id of
+       its section; initToc() marks the current one aria-current="true".
+  <div class="layout">
+    <div class="content">…sections with ids…</div>
+    <aside class="toc">
+      <nav class="navlist toc-inner" aria-labelledby="toc-h">
+        <p class="navlist-label" id="toc-h">on this page</p>
+        <ol>
+          <li><a href="#overview" data-toc-link="overview">overview</a></li>
+          <li class="navlist-sub"><a href="#steps" data-toc-link="steps">steps</a></li>
+        </ol>
+      </nav>
+    </aside>
+  </div>
+  -->
 </main>
 
 <!-- ─────────────── footer ─────────────── -->
@@ -146,18 +266,26 @@
 <footer class="status">
   <span class="status-left"><span class="glow">[surface]</span> what this page is</span>
 
-  <nav class="status-right">
+  <nav class="status-right" aria-label="page settings">
     <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
     <span class="sep" aria-hidden="true"></span>
 
+    <!-- OPTIONAL: the language menu, on a multilingual site (see the burger's copy above).
     <details class="dropdown">
-      <summary>
-        <span class="visually-hidden">theme </span>
-        <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
-        <span data-theme-label>warm</span>
-        <span aria-hidden="true">▾</span>
-      </summary>
-      <ul class="dropdown-panel" role="list">
+      <summary><span class="visually-hidden">language </span><span class="dd-flag dd-flag-en" aria-hidden="true"></span><span>en</span><span aria-hidden="true">▾</span></summary>
+      <ul class="dropdown-panel">
+        <li><a class="dropdown-item" href="/de/page" hreflang="de" lang="de" data-lang-value="de"><span class="dd-flag dd-flag-de" aria-hidden="true"></span>deutsch</a></li>
+        <li><a class="dropdown-item" href="/page" hreflang="en" lang="en" data-lang-value="en" aria-current="true"><span class="dd-flag dd-flag-en" aria-hidden="true"></span>english</a></li>
+      </ul>
+    </details>
+    <span class="sep" aria-hidden="true"></span>
+    -->
+
+    <!-- The summary reads "theme warm": the hidden word names the menu, the label says the
+         value. The dot is the one theme indicator (.dd-dot), never an inline <svg>. -->
+    <details class="dropdown">
+      <summary><span class="visually-hidden">theme </span><span class="dd-dot" aria-hidden="true"></span><span data-theme-label>warm</span><span aria-hidden="true">▾</span></summary>
+      <ul class="dropdown-panel">
         <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
         <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
         <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
@@ -167,9 +295,11 @@
 
     <span class="sep" aria-hidden="true"></span>
     <!-- aria-label, never title: `[x] anim` is a glyph plus an abbreviation, so the button needs a
-         real name — and a `title` would additionally be the BROWSER's tooltip, which waits a second,
-         is unstyled and does not exist on a touch screen. data-tip is the estate's hover. -->
-    <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true"
-            aria-label="Toggle animations" data-tip="Toggle animations">[x] anim</button>
+         real name. No data-tip either: a tip that repeats the name is announced twice. The box
+         is written by initAnimToggle(), so it must be its own [data-anim-box] element. -->
+    <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
+      <span data-anim-box aria-hidden="true">[x]</span>
+      <span>anim</span>
+    </button>
   </nav>
 </footer>

@@ -8,8 +8,10 @@
  *   HEIGHT  every single-line control is --control-h, rendered AND with its min-block-size floor
  *           removed — a floor only lifts, so a field whose own padding and line height overshoot
  *           (29.6px measured on the foundations branch) is invisible to a rendered-height check;
- *   FORCED  under forced colours, light and dark, every mask glyph is drawn and every state still
- *           differs from its neighbour — the mode repaints backgrounds as Canvas, which erases both;
+ *   FORCED  under forced colours, light and dark, every mask glyph stands 3:1 off what it sits on
+ *           and every state still differs from its neighbour — the mode repaints backgrounds as
+ *           Canvas, which erases both. "Not the Canvas colour" is not enough: an opted-out glyph
+ *           paints the colour its element was GIVEN, so cream on the white Canvas passes that test;
  *   FOCUS   each component draws its OWN 2px --ring focus ring. Asserted with base.css switched
  *           off: base.css draws a global ring that would answer for a component that lost its rule;
  *   FONT    a control renders in its surroundings' font, not the browser's 13.33px control font;
@@ -191,11 +193,21 @@ const FORCED = `(() => {
   const canvas = sys("Canvas");
   const bg = (sel, pseudo) => cs(sel, pseudo).backgroundColor;
   const fg = (sel) => cs(sel).color;
+  const rgb = (c) => c.match(/[\\d.]+/g).map(Number);
+  const over = (top, under) => { const a = top[3] ?? 1; return [0, 1, 2].map((i) => a * top[i] + (1 - a) * under[i]); };
+  const lum = (c) => c.map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+    .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+  // What a glyph sits on: the first opaque-ish background from its host up, over Canvas.
+  const backdrop = (el) => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor);
+    if ((c[3] ?? 1) > 0) return over(c, rgb(canvas)); } return rgb(canvas); };
+  const standsOff = (sel, pseudo) => { const el = document.querySelector(sel); const under = backdrop(pseudo ? el : el.parentElement);
+    const ink = over(rgb(bg(sel, pseudo)), under); const [x, y] = [lum(ink), lum(under)];
+    return +((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)).toFixed(2); };
   const plainOption = '#static-listbox .select-option:not([aria-selected="true"]):not([data-active]):not([aria-disabled="true"])';
   const glyphs = {
-    "busy spinner": bg("#btn-busy", "::before"), "bin": bg("#btn-bin", "::after"), "pencil": bg("#btn-edit", "::after"),
-    "menu ✓": bg("#static-checked", "::before"), "listbox ✓": bg("#opt-chosen", "::before"),
-    "zoom hint": bg("#dgm", "::after"), "theme dot": bg("#theme-menu .dd-dot"),
+    "busy spinner": standsOff("#btn-busy", "::before"), "bin": standsOff("#btn-bin", "::after"), "pencil": standsOff("#btn-edit", "::after"),
+    "menu ✓": standsOff("#static-checked", "::before"), "listbox ✓": standsOff("#opt-chosen", "::before"),
+    "zoom hint": standsOff("#dgm", "::after"), "theme dot": standsOff("#theme-menu .dd-dot"),
   };
   const pairs = {
     "menu ✓ — checked vs not": [bg("#static-checked", "::before"), bg('#static-menu [aria-checked="false"]', "::before")],
@@ -210,7 +222,6 @@ const FORCED = `(() => {
   return { forced: matchMedia("(forced-colors: active)").matches, canvas, glyphs, pairs,
     caret: [cs("#trigger-model").backgroundImage, cs("#trigger-model", "::after").content] };
 })()`;
-const drawn = (colour, canvas) => colour !== canvas && !/^rgba\(.*,\s*0\)$/.test(colour); // alpha 0 draws nothing
 
 await section("FORCED — forced colours keep every glyph and every state (X1)", async () => {
   for (const scheme of ["light", "dark"]) {
@@ -218,8 +229,8 @@ await section("FORCED — forced colours keep every glyph and every state (X1)",
     await sleep(120);
     const r = await evaluate(FORCED);
     check(`${scheme}: the forced-colours mode is on (the check can see it at all)`, r.forced, r.forced);
-    const lost = Object.entries(r.glyphs).filter(([, c]) => !drawn(c, r.canvas));
-    check(`${scheme}: every mask glyph is drawn, none in the Canvas colour (${r.canvas})`, lost.length === 0, lost);
+    const lost = Object.entries(r.glyphs).filter(([, ratio]) => !(ratio >= 3));
+    check(`${scheme}: every mask glyph stands at least 3:1 off what it sits on (Canvas is ${r.canvas})`, lost.length === 0, r.glyphs);
     const same = Object.entries(r.pairs).filter(([, [a, b]]) => a === b);
     check(`${scheme}: every state differs from its neighbour — ${Object.keys(r.pairs).length} pairs`, same.length === 0, same);
     check(`${scheme}: the select's caret survives — the mode drops its gradient, and a text glyph stands in`,

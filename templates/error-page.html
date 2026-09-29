@@ -1,0 +1,218 @@
+<!doctype html>
+<!--
+  danieldeusing-design — the error page: a 404, or the page an app shows when it has crashed.
+
+  One file, the standard chrome (templates/page-chrome.html has the reasoning for every piece of it),
+  and a body of four lines. Fill the {{PLACEHOLDERS}}; the CDN urls are PINNED for the reason
+  documentation.html gives — this page ships the system's chrome MARKUP, so it pins the release that
+  styles it, and a release bumps every template pin in the same commit (check-release fails otherwise).
+
+  ── THE BODY IS THE TERMINAL SAYING NO ──
+    $ articles/no-such-post
+    404: command not found▮
+    no such file or directory.
+    cd ~
+
+  The prompt is the path the reader asked for, the title is the shell's answer, the lede its errno,
+  and the only thing on the page to press is the way home. danieldeusing.de and seedr drew exactly
+  this, each by hand and each a little differently (a 48–60px title on one, 18px on the other, a
+  "Go home" button, a "cat" prefix); this is the one version.
+
+  ── THE TITLE IS THE DISPLAY STEP (lead ruling, 2026-09-28) ──
+  `.page-title--display`: 30px, 36px from 48rem — the size danieldeusing.de titles its pages at, and
+  the site is the source of truth. The spec had brought the 404 down to the 24px app title; the ruling
+  put the display step back for public page titles and named the error page's status line as one.
+  The crash variant below uses the same title so the two error pages read as one page.
+
+  ── THE PROMPT IS FILLED FROM THE ADDRESS BAR ──
+  A static host serves ONE 404.html for every missing path (Cloudflare Pages does, and so does
+  seedr's dist/404.html), so the path cannot be written in at build time — an Astro 404 rendered
+  once prints "404" there. The script at the end writes `location.pathname` into the prompt with
+  textContent (never innerHTML: the path is whatever the visitor typed). Without script the
+  placeholder you fill in below stays, so make it something true on its own, e.g. "page".
+
+  ── SERVE IT WITH THE STATUS, AND noindex ANYWAY ──
+  A 404 page must be served with status 404, or a crawler indexes every mistyped url as a page.
+  Static hosts do that for 404.html by themselves. A single-page app that renders its not-found
+  view client-side answers 200 — which is why the robots meta is here regardless: it is the one
+  statement that survives being served with the wrong status.
+
+  ── THE CRASH VARIANT ──
+  For an app's last resort (seedr's error boundary): the prompt is the route that failed, the title
+  "something broke", the lede is the error's message, the way out is a `reload` button, and the whole
+  body is `role="alert"`, so a screen reader hears it without hunting for it. The markup is in the
+  comment after <main>; a framework renders it from its error boundary, and a build-free page swaps
+  it in for the 404 body. The reload button is the filled primary: it is the one thing to do here.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>404: command not found — {{SURFACE}}</title>
+    <meta name="theme-color" content="#f5efe2" />
+
+    <!-- pre-paint: the saved theme, the animation gate and the rail state, before first paint -->
+    <script>
+      (() => {
+        const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
+        let theme = "warm";
+        try {
+          const stored = localStorage.getItem("theme");
+          if (stored && stored in bg) theme = stored;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg[theme]);
+
+        let animOff = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        try {
+          if (localStorage.getItem("anim") === "off") animOff = true;
+        } catch {}
+        if (animOff) document.documentElement.classList.add("anim-off");
+
+        try {
+          if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
+        } catch {}
+      })();
+    </script>
+
+    <!-- The design system, PINNED (see the header). `onerror` swaps in a same-release snapshot for a
+         reader with no route to the CDN, as documentation.html does. -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.59.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.59.0.min.css'"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.59.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.59.0.fonts.css'"
+    />
+  </head>
+
+  <body>
+    <a href="#main" class="skip-link">skip to content</a>
+    <header class="bar">
+      <a href="/" class="brand"
+        ><span class="glow">{{SURFACE}}</span><span class="cursor-block" aria-hidden="true"></span
+      ></a>
+
+      <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+      </button>
+
+      <nav aria-label="site" id="site-nav" class="site-nav">
+        <!-- KEEP YOUR SURFACE'S RAIL. A reader who followed a dead link has one next move, which is
+             to go somewhere else, and the rail is the list of places. A surface with no rail deletes
+             the .ls-nav-head and the .ls-nav and NOTHING ELSE: the burger and the .mobile-footer stay,
+             because below 48rem they are the only way to the theme picker (page-chrome.html). -->
+        <div class="ls-nav-head">
+          <span class="ls-nav-title prompt">ls -l</span>
+          <button type="button" class="ls-nav-toggle" data-ls-nav-toggle aria-controls="nav" aria-expanded="true" aria-label="show or hide navigation"></button>
+        </div>
+        <div class="ls-nav" id="nav">
+          <ul class="ls-panel" role="list">
+            <li><a class="dropdown-item ls-row ls-row--dir" href="{{NAV_1_HREF}}"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">{{NAV_1_LABEL}}</span></a></li>
+            <li><a class="dropdown-item ls-row" href="{{NAV_2_HREF}}"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
+          </ul>
+        </div>
+        <div class="mobile-footer">
+          <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+          <details class="mobile-theme">
+            <summary>
+              <span class="dd-dot" aria-hidden="true"></span>
+              <span data-theme-label>warm</span>
+              <span class="mf-chev" aria-hidden="true">▾</span>
+            </summary>
+            <div class="mf-panel">
+              <button type="button" class="dropdown-item" data-theme-value="warm">warm</button>
+              <button type="button" class="dropdown-item" data-theme-value="green">green</button>
+              <button type="button" class="dropdown-item" data-theme-value="mono">mono</button>
+              <button type="button" class="dropdown-item" data-theme-value="paper">paper</button>
+            </div>
+          </details>
+          <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations" data-tip="Toggle animations">
+            <span data-anim-box aria-hidden="true">[x]</span>
+            <span>anim</span>
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- THE 404. The gap under the lede is danieldeusing.de's (1.5rem, as between the prompt and the
+         title): the way out is a separate thought from the error, not its last line. -->
+    <main class="wrap" id="main" style="padding-block: 6rem 5rem">
+      <p class="prompt" data-requested-path>{{REQUESTED_PATH}}</p>
+      <h1 class="page-title page-title--display">404: command not found<span class="cursor-block" aria-hidden="true"></span></h1>
+      <p class="lede">no such file or directory.</p>
+      <p style="margin-block-start: 1.5rem"><a class="link-quiet" href="/">cd ~</a></p>
+    </main>
+
+    <!-- THE CRASH VARIANT, in place of the <main> above:
+
+    <main class="wrap" id="main" style="padding-block: 6rem 5rem">
+      <div role="alert">
+        <p class="prompt">{{FAILING_ROUTE}}</p>
+        <h1 class="page-title page-title--display">something broke<span class="cursor-block" aria-hidden="true"></span></h1>
+        <p class="lede">{{ERROR_MESSAGE}}</p>
+        <p style="margin-block-start: 1.5rem"><button type="button" class="btn-terminal btn-terminal--compact" data-reload>reload</button></p>
+      </div>
+    </main>
+
+    and give <title> the same words. The message is the error's own text, set with textContent — an
+    exception message is not markup. -->
+
+    <footer class="status">
+      <span class="status-left"><span class="glow">[{{SURFACE}}]</span> not found</span>
+      <nav class="status-right">
+        <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+        <span class="sep" aria-hidden="true"></span>
+        <!-- A multilingual surface adds its language menu here (details.dropdown with one link per
+             locale, `hreflang` + `lang` on each, `aria-current="true"` on the current one). On a 404
+             each item links THAT LOCALE'S HOME — the page asked for does not exist in any of them. -->
+        <details class="dropdown">
+          <summary>
+            <span class="visually-hidden">theme </span>
+            <span class="dd-dot" aria-hidden="true"></span>
+            <span data-theme-label>warm</span>
+            <span aria-hidden="true">▾</span>
+          </summary>
+          <ul class="dropdown-panel" role="list">
+            <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+          </ul>
+        </details>
+        <span class="sep" aria-hidden="true"></span>
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations" data-tip="Toggle animations">
+          <span data-anim-box aria-hidden="true">[x]</span>
+          <span>anim</span>
+        </button>
+      </nav>
+    </footer>
+
+    <script type="module">
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initAnimToggle, initBurgerNav, initLsNav, initTooltips } from
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.59.0/runtime/index.js";
+      applyStoredTheme();
+      initThemeSwitcher();
+      initDropdowns();
+      initAnimToggle();
+      initBurgerNav();
+      initLsNav();
+      initTooltips();
+
+      // The path the reader asked for, from the address bar (see the header). textContent, never
+      // innerHTML. A malformed escape (`%E0%A4%A`) cannot be decoded and is shown as typed.
+      const prompt = document.querySelector("[data-requested-path]");
+      if (prompt) {
+        let path = location.pathname;
+        try { path = decodeURIComponent(path); } catch {}
+        prompt.textContent = path.replace(/^\/+/, "") || "index";
+      }
+      // The crash variant's one action.
+      document.querySelector("[data-reload]")?.addEventListener("click", () => location.reload());
+    </script>
+  </body>
+</html>

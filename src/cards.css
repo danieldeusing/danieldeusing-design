@@ -431,6 +431,11 @@ a.stat-cta:hover {
 .panel-head > .disclosure-btn {
   color: var(--foreground);
 }
+/* A class-less link: reset.css gives links --primary and a tokens-only page leaves them the head's
+   colour, so it is stated here. A classed link (.link-quiet) keeps its class's colour. */
+:where(.panel-head) > a:not([class]) {
+  color: var(--foreground);
+}
 /* Any heading level; the class sets the size. 500 like K2's card title. */
 .panel-title {
   flex: 1;

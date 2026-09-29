@@ -362,7 +362,7 @@ const FIXTURE = `
   </ul>
   <div data-tone="warning"><article class="card-terminal card-terminal--flash" id="fx-card-flash-leak"><h3 class="card-title">untoned flash in a toned box</h3></article></div>
   <div style="width: 20rem"><article class="card-terminal" id="fx-card-lone"><h3 class="card-title">lone</h3><p class="card-desc">desc</p></article></div>
-  <section class="panel" id="fx-panel-leak"><header class="panel-head"><span class="ico" data-icon="folder-tree" id="fx-leak-ico" aria-hidden="true"></span><span id="fx-leak-text">bare</span><time id="fx-leak-time" datetime="2026-09-29">today</time><span class="dot" id="fx-leak-dot" aria-hidden="true"></span></header></section>
+  <section class="panel" id="fx-panel-leak"><header class="panel-head"><span class="ico" data-icon="folder-tree" id="fx-leak-ico" aria-hidden="true"></span><span id="fx-leak-text">bare</span><time id="fx-leak-time" datetime="2026-09-29">today</time><span class="dot" id="fx-leak-dot" aria-hidden="true"></span><button type="button" class="disclosure-btn" id="fx-leak-disclosure" aria-expanded="true" aria-label="collapse leak"></button><span class="tag" id="fx-leak-tag">tag</span><button type="button" class="btn-icon btn-icon--sm" data-icon="star" id="fx-leak-btn" aria-label="favourite leak"></button><a href="#fx" id="fx-leak-link">plain link</a></header></section>
   <div style="width: 20rem"><article class="card-terminal" id="fx-card-p-title"><p class="card-title" id="fx-title-on-p">a title on a p</p></article></div>
   <div style="width: 20rem"><div class="card-terminal" id="fx-card-orphan" style="position: relative"><h3 class="card-title"><a class="card-link" id="fx-card-orphan-link" href="#fx">no --link on the card</a></h3><p class="card-desc" id="fx-card-orphan-text">text</p></div></div>
   <ul class="card-grid" id="fx-grid-narrow" style="--card-min: 12rem; width: 150px"><li class="card-terminal">a</li></ul>
@@ -702,9 +702,11 @@ const runExpect = async (suffix) => {
 
 /* Geometry: what the declarations are FOR. Measured from the laid-out boxes. */
 const GEOMETRY = [
-  ["K5 the head's --primary reaches its glyph only: text, a <time> and an untoned dot in the head are --foreground", () => evaluate(`(${JSON.stringify([
+  ["K5 the head's --primary reaches its glyph only: text, a <time>, an untoned dot, the disclosure button and a plain link are --foreground; a tag and an icon button keep their own", () => evaluate(`(${JSON.stringify([
     ["#fx-leak-ico", "", "color", "var(--primary)"], ["#fx-leak-text", "", "color", "var(--foreground)"],
-    ["#fx-leak-time", "", "color", "var(--foreground)"], ["#fx-leak-dot", "", "background-color", "var(--foreground)"]])}).map((r) => window.__wp8.expect(...r)).filter(Boolean)`)],
+    ["#fx-leak-time", "", "color", "var(--foreground)"], ["#fx-leak-dot", "", "background-color", "var(--foreground)"],
+    ["#fx-leak-disclosure", "", "color", "var(--foreground)"], ["#fx-leak-link", "", "color", "var(--foreground)"],
+    ["#fx-leak-tag", "", "color", "var(--muted-foreground)"], ["#fx-leak-btn", "", "color", "var(--primary)"]])}).map((r) => window.__wp8.expect(...r)).filter(Boolean)`)],
   ["K2/K5/K7 a card, panel or entry title leads --lh-tight whatever element carries it (base.css gives only h1-h3 that leading)", () => W(`(() => {
     const want = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lh-tight"));
     return ["#fx-card-title", "#fx-panel-title", "#fx-entry-title", "#fx-title-on-p"].map((id) => {
@@ -898,6 +900,9 @@ await check("every tree row's words on the demo sit in a .tree-label (the row ca
       if (n.textContent.trim() && !n.parentElement.closest(".tree-label, .tree-meta")) out.push("text outside .tree-label: " + n.textContent.trim().slice(0, 30));
     return out;
   })`));
+await check("no text sits straight in a .panel-head on the demo (it would take the glyph's --primary): wrap it", () => evaluate(`
+  [...document.querySelectorAll(".panel-head")].flatMap((head) => [...head.childNodes]
+    .filter((n) => n.nodeType === 3 && n.textContent.trim()).map((n) => "bare text in a panel head: " + n.textContent.trim().slice(0, 30)))`));
 await check("aria-selected on the demo sits only on roles that support it (option, row, gridcell, tab, treeitem)", () => evaluate(`
   [...document.querySelectorAll("[aria-selected]")].filter((el) => !["option", "row", "gridcell", "tab", "treeitem", "columnheader", "rowheader"].includes(el.getAttribute("role")))
     .map((el) => el.tagName.toLowerCase() + "." + el.className + ' carries aria-selected with role "' + el.getAttribute("role") + '"')`));

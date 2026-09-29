@@ -209,7 +209,7 @@ transparent, rule-less entity cards move to. **A container: no hover, no focus o
 
 | part | what it is |
 |---|---|
-| `.panel-head` | the strip. Its colour is `--primary`, which only its glyph takes: every other child is `--foreground` (a link keeps its link colour). Bare text straight in the head takes the head's colour — wrap it |
+| `.panel-head` | the strip. Its colour is `--primary`, which only its glyph takes: every other child is `--foreground`, a plain link (no class) included, while a classed child — a tag, a count, an icon button, a `.link-quiet` — keeps its own colour. Bare text straight in the head takes the head's colour — wrap it |
 | `.panel-title` | any heading level; body size, weight 500 like a card title; cut off with an ellipsis rather than wrapped, so the head stays one line |
 | `.panel-head--eyebrow` | the title in eyebrow type — studio's pane heads and explorer strips |
 | `.panel-actions` | at the head's end: `.btn-icon`s, a `.segmented`, a select |

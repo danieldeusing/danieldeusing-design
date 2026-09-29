@@ -344,6 +344,7 @@ const FIXTURE = `
   </ul>
   <div data-tone="warning"><article class="card-terminal card-terminal--flash" id="fx-card-flash-leak"><h3 class="card-title">untoned flash in a toned box</h3></article></div>
   <div style="width: 20rem"><article class="card-terminal" id="fx-card-lone"><h3 class="card-title">lone</h3><p class="card-desc">desc</p></article></div>
+  <div style="width: 20rem"><article class="card-terminal" id="fx-card-p-title"><p class="card-title" id="fx-title-on-p">a title on a p</p></article></div>
   <div style="width: 20rem"><div class="card-terminal" id="fx-card-orphan" style="position: relative"><h3 class="card-title"><a class="card-link" id="fx-card-orphan-link" href="#fx">no --link on the card</a></h3><p class="card-desc" id="fx-card-orphan-text">text</p></div></div>
   <ul class="card-grid" id="fx-grid-narrow" style="--card-min: 12rem; width: 150px"><li class="card-terminal">a</li></ul>
   <section class="panel" id="fx-panel-stack-1"><div class="panel-body">1</div></section>
@@ -681,6 +682,13 @@ const runExpect = async (suffix) => {
 
 /* Geometry: what the declarations are FOR. Measured from the laid-out boxes. */
 const GEOMETRY = [
+  ["K2/K5/K7 a card, panel or entry title leads --lh-tight whatever element carries it (base.css gives only h1-h3 that leading)", () => W(`(() => {
+    const want = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lh-tight"));
+    return ["#fx-card-title", "#fx-panel-title", "#fx-entry-title", "#fx-title-on-p"].map((id) => {
+      const cs = getComputedStyle(W.q(id)), got = parseFloat(cs.lineHeight) / parseFloat(cs.fontSize);
+      return Math.abs(got - want) < 0.01 ? null : id + " leads " + got.toFixed(3) + ", not --lh-tight " + want;
+    }).filter(Boolean);
+  })()`)],
   ["K2/K6 a description clamps at three lines in a card and two in a row, and hides the rest", () => W(`(() => {
     const lines = (id, n) => { const el = W.q(id), lh = parseFloat(getComputedStyle(el).lineHeight);
       return [W.near(el.getBoundingClientRect().height, n * lh, id + " height, " + n + " lines"),

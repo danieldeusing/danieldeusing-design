@@ -429,11 +429,12 @@ pencil were masks before any of this existed. The class and `data-icon` layer th
 
 - **The names are the estate's `data-icon` words**, not always lucide's current file names: lucide
   renamed `filter` to `funnel` and `home` to `house`; markup keeps the word a reader expects.
-- Source: lucide 0.575.0 (what seedr's lucide-react resolves), stroke 2 on a 24-unit box — the same
-  drawing seedr and configr ship through lucide-react. Lucide's ISC notice and Feather's MIT notice
-  travel with the tokens in `tokens.css`.
+- Source: lucide 0.559.0, stroke 2 on a 24-unit box — the same drawing seedr and configr ship through
+  lucide-react. The version is named once, in `tokens.css`; `icons.md` has the whole set of 51 words and
+  why seedr's 0.575.0 draws the same. Lucide's ISC notice and Feather's MIT notice travel with the
+  tokens in `tokens.css`, into the minified bundle too; `tokens.json` leaves the drawings out.
 - **The forced-colours half is not optional.** Windows High Contrast swaps every author
-  background for Canvas, and a mask glyph IS a background: without it all 21 glyphs paint nothing.
+  background for Canvas, and a mask glyph IS a background: without it every glyph paints nothing.
   `preserve-parent-color` paints the glyph in the colour its parent was forced to (CanvasText in
   text, LinkText in a link, ButtonText in a button). Not `forced-color-adjust: none` alone: the
   glyph keeps its author colour, measured at 1.11–1.78:1 against the forced palette, or nothing at

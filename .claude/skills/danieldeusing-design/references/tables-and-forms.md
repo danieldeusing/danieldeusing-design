@@ -335,7 +335,8 @@ knows to scroll.
 a `rows` picker (5/10/20/50/100/200, remembered per table in
 `localStorage["table-rows:<id>"]`), and prev/next. Everything in that bar is already yours — the
 buttons are `.btn-terminal--ghost.btn-terminal--compact` and the picker is a bare `<select>` that
-`initSelects()` enhances — so **there is no new colour and nothing to hand-write.**
+`initTablePagination()` enhances itself since 0.60.0 — so **there is no new colour and nothing to
+hand-write.**
 
 **The order is filter → sort → slice, over the full dataset, and it is guaranteed by construction.**
 The natural wrong build cuts the data to twenty rows and wires the sort and the filter to the cut:

@@ -63,22 +63,24 @@ Other entry points: `@danieldeusing/design` (npm, the `.` export = full bundle) 
 classes away) · `@danieldeusing/design/tokens.css` alone, for a surface that wants only the
 palette and none of the look (netmon does exactly this).
 
-**`tokens.css` + `chrome.css`, without `components.css`, is a supported combination** — it is
-what netmon ships (as a committed same-origin snapshot, because it is read during outages). Know
-what that gets you, because the split is not where it looks: `components.css` is effectively
-**not separable**. Taking one component out of it drags base.css's scanline overlay, its table
-type and its control styling onto a surface with its own layout, so in practice a surface either
-takes the whole look or takes none of it.
+Every stylesheet is also exported on its own (`@danieldeusing/design/<file>.css`), and so is every
+runtime module (`@danieldeusing/design/runtime/<module>`).
 
-A tokens+chrome consumer therefore gets the content column (`.wrap`), `.tablewrap`, the a11y
-helpers, `header.bar`, `footer.status`, the `ls -l` rail — **and, since 0.17.0, the ticker strip**
-(`.tickstrip` / `.ticktable` / `.tick*`), which moved out of `components.css` for exactly this
-reason: a tickstrip is page-level status chrome, and the surfaces that most need to say "my
-poller is still running" were the ones that could not load it. It does **not** get `.btn-terminal`,
-`.card-terminal`, `.legend`, `.tabs`, `details.fold`, `.dropdown`, `.field-row` or the diagram
-zoom — those stay in `components.css`. A surface needing that vocabulary must mirror it under its
-own class names, never borrow the system's for a stylesheet it does not load; borrowing the name
-is the silent fork `bin/design-conformance` exists to catch.
+**Every file except `components.css` renders on `tokens.css` alone** (0.60.0). `chrome.css`,
+`icons.css`, `controls.css`, `tags.css`, `feedback.css`, `filters.css`, `data.css`, `cards.css`,
+`overlays.css`, `tooltip.css` and `content.css` each draw the same on a page that loads tokens.css
+and that file as in the full bundle; each package's suite measures it with `?bare`. netmon ships
+tokens + chrome (as a committed same-origin snapshot, because it is read during outages); configr and
+seedr's studio load tokens alone and add what they render.
+
+`components.css` is still **not separable**: taking one component out of it drags base.css's
+scanline overlay, its table type and its control styling onto a surface with its own layout. It keeps
+`.btn-terminal`, `.card-terminal` (the box a `cards.css` card decorates), `.legend`, `details.fold`,
+`.dropdown`, the select, `.field-row` and the diagram opener. The tab bar moved to `data.css` in
+0.60.0, and the ticker strip to `chrome.css` in 0.17.0, so a tokens-only surface can have both. A
+surface needing components.css's vocabulary without loading it mirrors it under its own class names,
+never borrows the system's for a stylesheet it does not load; borrowing the name is the silent fork
+`bin/design-conformance` exists to catch.
 
 ## Themes: four, selected by `html[data-theme]`
 
@@ -139,13 +141,20 @@ surfaces had **four** content widths (78rem / 1180px / 72rem / none) and netmon 
 where everything else sat at `0.75rem` — because the system offered no token to inherit.
 
 ```css
---content-w: 90rem;     --content-pad: 1.5rem;  /* 1440px — 92rem until 0.56.0 */
---fs-base: 0.75rem; /* 12px — ALL normal text. The only size you write. */
---fs-lg: 0.9375rem; /* 15px — h3 / section heads */
---fs-xl: 1.125rem;  /* 18px — h2 / page title */
---fs-2xl: 1.5rem;   /* 24px — h1 / hero, display only */
---lh-tight: 1.3;    --lh-base: 1.5;
+--content-w: 90rem;     --content-pad: 1.5rem;  /* 1440px; 1.25rem a side below 40rem (0.60.0) */
+--fs-base: 0.75rem;     /* 12px — ALL normal text. The only size you write. */
+--fs-lg: 0.9375rem;     /* 15px — h3 / section heads */
+--fs-xl: 1.125rem;      /* 18px — h2, a dialog title, a stat value */
+--fs-2xl: 1.5rem;       /* 24px — h1 and an app's .page-title */
+--fs-display: 1.875rem; /* 30px, 36px from 40rem — a public page title and an error code, nothing else (0.60.0) */
+--lh-tight: 1.3;        --lh-base: 1.5;        --lh-display: 1.2;  /* the display step's leading */
 ```
+
+`--fs-display` is not a text size. It is danieldeusing.de's page title (`.page-title--display`,
+`content.css`) and the error page's status code; an app surface's title stays `--fs-2xl`, and nothing
+read as body copy, a label or a heading inside a page takes it. The step carries its own breakpoint,
+so a title that uses it needs no media query. `foundations.md` has the rest of the scale's tokens:
+control, card, glyph and dot sizes, the twelve categorical hues, elevation, motion and tone.
 
 ### ONE SIZE FOR TEXT (0.27.0, Daniel) — `--fs-xs`, `--fs-sm` and `--fs-md` are gone
 
@@ -196,12 +205,12 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   resets `padding-inline` to 0 and silently takes the shared margins back.
 - A page that genuinely is not a column (a full-bleed dashboard table) sets `max-width: none`
   deliberately. It does not invent a fifth number.
-- There is exactly **one** text step and three heading steps. The bottom of the scale used to be
-  four sizes 1px apart, defended here as deliberate; see "ONE SIZE FOR TEXT" above for what usage
-  showed instead.
-- Tailwind apps get `max-w-content` and `text-fs-base` / `-lg` / `-xl` / `-2xl`. `text-fs-xs`, `-sm`
-  and `-md` went with the tokens behind them. Tailwind's own `text-xs/sm/base` are deliberately
-  **not** remapped — opt in by name.
+- There is exactly **one** text step, three heading steps and one display step. The bottom of the
+  scale used to be four sizes 1px apart, defended here as deliberate; see "ONE SIZE FOR TEXT" above
+  for what usage showed instead.
+- Tailwind apps get `max-w-content` and `text-fs-base` / `-lg` / `-xl` / `-2xl` / `-display`.
+  `text-fs-xs`, `-sm` and `-md` went with the tokens behind them. Tailwind's own `text-xs/sm/base`
+  are deliberately **not** remapped — opt in by name.
 - **There is no wide-screen scaling. Removed in 0.56.0 (Daniel).** From 0.29.0 to 0.55.0
   `tokens.css` set a fluid root font size above 1920px, so every rem — type, `--content-w`,
   `--space-section` — grew together on a large display. It is gone, and it will read as a
@@ -228,14 +237,17 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
 
 ## A card has its own padding (0.38.0, Daniel) — do not add your own
 
-`.card-terminal` pads itself, `0.85rem 1.1rem`. Before 0.38.0 it had none and every surface
-either added padding or, more often, did not — which is why the family contacts tiles shipped
-with their label starting hard against the border.
+`.card-terminal` pads itself, `var(--card-pad)`: 12px on every side since 0.60.0 (it was
+`0.85rem 1.1rem`), the inset seedr's and configr's card grids already used. Before 0.38.0 it had none
+and every surface either added padding or, more often, did not — which is why the family contacts
+tiles shipped with their label starting hard against the border.
 
 So a card is `<div class="card-terminal">` with content in it, and nothing else. Do not wrap the
 content in a padded inner div, and do not redeclare `.card-terminal` to adjust the value —
 `bin/design-conformance` treats that as the fork it is. A card that genuinely needs to be flush
-(a full-bleed chart, an image) sets `padding: 0` on its own class, deliberately and once.
+(a full-bleed chart, an image, a table or a `.row-list` flush to its edge) is `.card-terminal--flush`.
+What goes inside a card — its title, description, foot, a link over the whole card, a tone — is
+`cards.css` (`references/cards.md`).
 
 ## The shared component vocabulary — a consumer must not redeclare any of it
 
@@ -258,32 +270,49 @@ not sit on `--background`, because on a `--card` surface the default paints a 1.
 
 | Group | Classes | Source |
 | --- | --- | --- |
-| chrome | `.wrap` `.tablewrap` (+ `--tablewrap-max-h`, `--tablewrap-fade`) `.bleed-rail` `.skip-link` `.visually-hidden` `header.bar` `.brand` `.bar-right` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`) `.nav-burger` `.mobile-nav` `.mobile-footer` | `src/chrome.css` |
-| `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`, **`[aria-current="page"]`**) `.ls-perm` `.ls-name` `.ls-group` | `src/chrome.css` |
-| text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` `.ascii-rule` | `src/components.css` |
-| blocks | `.card-terminal` `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`, `--edit`, `:disabled`) `.filter-ctl` (`[aria-pressed]`, marked `[x]`) `.filter-set` (+ `.filter-set-label`, marked `(•)`) `.field-row` (`> .lbl`, `> .field-val`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` / `.fold-body` `.legend` | `src/components.css` |
-| tabs | `.tabs` `.tab` (`[aria-selected]`) `section.doc.tab-panel` | `src/components.css` |
-| status ticker | `.tickstrip` `.tick` (`--ok`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` | `src/chrome.css` (moved from components 0.17.0) |
-| diagram zoom | `.dgm-zoomable` `.dgm-overlay` `.dgm-stage` `.dgm-bar` `.dgm-btn` `.dgm-close` `.dgm-art` | `src/components.css` |
-| minimap | `.minimap` `.minimap-bar` (`.active`) | `src/components.css` |
-| dropdown (a menu) | `.dropdown` `.dropdown-panel` (`--down`) `.dropdown-item` `.anim-toggle` | `src/components.css` |
-| table pager | `.table-pager` `.table-pager-status` `.table-pager-size` `.table-pager-nav` — **all rendered for you** by `initTablePagination()`; the markup contract is `data-table-id` on the `<table>` and nothing else |
-| select (a value) | the `select` element, plus `.select-field` `.select-trigger` `.select-value` `.select-panel` `.select-option` (`[aria-selected]`, `[data-active]`, `[aria-disabled]`) `.select-group` — **all rendered for you**, see `references/tables-and-forms.md` | `src/components.css` |
-| misc | `.dd-dot` `.dd-flag` (`-de/-en/-es/-pt`) | `src/components.css` |
-| typing animation | the `[data-term]` / `[data-term-out]` contract + the `html.anim-off` kill switch | `src/components.css` |
+| element defaults | bare `h1`–`h4`, `p`, `code`, `kbd`, `pre`, `mark`, `hr`, `blockquote`, `figure`, `table`, the mark on a checkbox or radio; `.bg-dots` | `src/base.css` |
+| text colour | `.text-foreground` `.text-muted-foreground` `.text-primary` `.text-destructive` `.text-success` `.text-warning` `.text-info` `.text-pending` | `src/utilities.css` (the bundle loads it after every component file; a Tailwind app writes its own) |
+| chrome | `.wrap` (+ `.wrap--full`) `.tablewrap` (+ `--tablewrap-max-h`, `--tablewrap-fade`) `.bleed-rail` `.skip-link` `.visually-hidden` `.bar-stack` `header.bar` (+ `.bar--app`) `.bar-side` `.bar-center` `.bar-right` `.bar-history` `.bar-status` `.brand` `.cursor-block--static` `.crumbs` (`.crumbs-host`, `.crumbs-home`) `.page-toolbar` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`, `button.doc-link`) `.nav-burger` `.mobile-nav` `.mobile-footer` `.mobile-theme` `.mf-panel` `.mf-chev` `.layout` `.content` `.toc` `.toc-inner` `.navlist` (`-label`, `-sub`, `-lead`) `.scrollbars-thin`; token `--sticky-top` | `src/chrome.css` |
+| `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`, **`[aria-current="page"]`**) `.ls-perm` `.ls-name` `.ls-group`; `data-term-list` + `--i` on the list | `src/chrome.css` |
+| status ticker | `.tickstrip` `.tick` (`--ok`, `--running`, `--stale`, `--never`) `.tick-dot` `.tick-name` `.tick-last` `.tick-next` `.tick-sep` `.tick-stats` `.ticktable` — **rendered for you** by `renderTickStrip()` | `src/chrome.css` |
+| text primitives | `.glow` `.glow-lg` `.prompt` (prepends `$ `) `.comment` (prepends `# `) `.cursor-block` `.link-quiet` (+ `button.link-quiet`) `.ascii-rule` | `src/components.css` |
+| buttons, fields, folds | `.btn-terminal` (+ `--ghost`, `--compact`, `--destructive`, `--edit`, `--danger`, `--success`, `[aria-busy]`) `.disclosure-btn` `.card-terminal` (+ `--link`, `--flush`) `.field-row` (`> .lbl`, `> .field-val`, `.field-desc`, `.field-error`, `--top`, `--stacked`, `--field-label-w`) `.eli5` / `.eli5-term` `details.fold` (`.fold-body`, `.fold-count`, `.fold-empty`, `--compact`, `--boxed`) `.legend` (+ `.legend-label`) | `src/components.css` |
+| menus and the select | `.dropdown` `.dropdown-panel` (`--down`, `--end`) `.dropdown-item` (+ `--danger`) `.dropdown-label` `.dropdown-sep` `.anim-toggle`; the `select` element, plus `.select-field` `.select-trigger` `.select-value` `.select-panel` `.select-option` `.select-group` — **all rendered for you**, see `components.md` and `filters.md` | `src/components.css` |
+| minimap, diagram opener, misc | `.minimap` `.minimap-bar` (`[aria-current]`) `.dgm-zoomable` `.dd-dot` `.dd-flag` (`-de/-en/-es/-pt`); the `[data-term]` / `[data-term-out]` typing contract | `src/components.css` (the `html.anim-off` kill switch is `tokens.css`'s since 0.60.0) |
+| icons | `.ico` (+ `--sm`, `--lg`, `--xl`, `[data-tone]`); `data-icon="<word>"` on any glyph host; the `--ico-*` masks, 51 words | `src/icons.css`, `src/tokens.css` |
+| controls | `.btn-icon` (+ `--bare`, `--sm`, `[aria-pressed]`) `.btn-group` `.btn-row` `.form-actions` (+ `--ruled`) `.form-status` `.switch` `.segmented` `.choice-grid` `.choice-card` (`.choice-title`, `.choice-desc`) `.dropzone` `.thumb-grid` `.thumb` `.reveal-host` `.reveal` `.confirm-inline` (`-note`) `.confirm-code` (`-value`, `-input`, `-status`) | `src/controls.css` |
+| tags and counts | `.tag` (+ `--dashed`, `--off`, `--strong`, `--struck`, `--solid`, `--icon`, `--bracket`; `data-tone` for a state, `data-hue` for an identity) `.count` (+ `--overlay`) | `src/tags.css` |
+| feedback | `.empty` (+ `--inline`) `.notice` (+ `--lg`, `.notice-label`, `.notice-dismiss`) `.callout` (+ `.callout-title`) `.banner` (+ `.banner-title`, `.banner-list`) `.state` `.spinner` (+ `--lg`) `.loading` `.fence` (`.fence-label`, `.fence-body`, `.fence-end`) `.dot` (+ `--pulse`, `--overlay`) | `src/feedback.css` |
+| filters, search, sort | `.search-field` (+ `.search-clear`, `[data-pending]`) `select[data-filter]` (`.select-trigger--filter`, `.filter-dd`, `.filter-clear`, `.select-search`, `.option-desc`) `.sort-ctl` (+ `.sort-dir`) `.filter-bar` (+ `--sticky`, `.filter-bar-spacer`) `.chip-set` `.chip` (+ `--remove`, `.chip-key`, `.chip-count`) `.filter-chips` `button.value-filter` `.result-count` `.match-count` `.load-more` | `src/filters.css` |
+| data | `table.dense` (`.num`, `.actions`, `.pick`, `tr[data-pin]`, `tr[aria-disabled]`, `.dense--form`, `.stackable`) `table.kv` (+ `.kv--labels`) `dl.kv` `.when` (`.when-ago`, `.when-exact`, `--inline`) `.tabs` (+ `--compact`, `--strip`) `.tab` (`.tab-label`, `.tab-status`, `.tab--info`) `.tab-panel` `.chart` `.chart-plot` `.chart-key` (+ `--chart-h`, `--chart-color`, `--chart-bg`, `data-hue`); the table engine's `.tbl-*` — **rendered for you** by `initTableTools()` | `src/data.css` |
+| table pager | `.table-pager` `.table-pager-status` `.table-pager-size` `.table-pager-nav` — **all rendered for you** by `initTablePagination()`; the markup contract is `data-table-id` on the `<table>` and nothing else | `src/components.css` |
+| cards and lists | K2 inside a card: `.card-head` `.card-title` `.card-desc` `.card-foot` `.card-link` `.card-terminal--rule` `--flash`; `.card-grid`; `.stat-grid` `.stat-tile` (`.stat-label`, `.stat-value`, `.stat-note`); `.panel` (`.panel-head`, `.panel-title`, `.panel-actions`, `.panel-body`, `.panel-foot`); `.row-list` `.list-row`; `.entry` / `.entry-list`; `.manpage`; `.tree` (`.tree-row`, **`.tree-label`, required**, `.tree-meta`); `.split` `.splitter` `.pane-collapsed`; `.clamp`; `.console` | `src/cards.css` |
+| overlays | `dialog.dialog` (+ `--sm`, `--lg`, `--xl`, `--full`, `--fit`, `--drawer`; `.dialog-head`, `.dialog-title`, `.dialog-close`, `.dialog-back`, `.dialog-toolbar`, `.dialog-body`, `.dialog-section`, `.dialog-foot`) `.select-panel.context-menu` `dialog.dgm-overlay` (`.dgm-stage`, `.dgm-bar`, `.dgm-art`) | `src/overlays.css` |
+| tooltip | `[data-tip]` and its one panel, `#ddtip` | `src/tooltip.css` |
+| content | `.page-title` (+ `--display`) `.lede` `.eyebrow` `.section-head` `.subhead` `.markdown` `ol.steps` `ul.plain` `ul.dash` `.code-block` (+ `--scroll`, `--wrap`) `.code-view` `.tok-*` `.diff-*` `.cmd` (+ `.cmd-text`) `[data-copy]` `.meta` (`.meta-stat`, `.meta-sep`) `.boot-log` | `src/content.css` |
 
 `.prompt` already prepends `$ ` — never author a literal leading `$ ` inside one (it doubles).
 
 ## Component rules live in `references/`
 
-The table above is the whole vocabulary. How each component behaves, and the traps behind it,
-is in three files next to this one. Read the one for what you are building before you write its
-markup:
+The table above is the whole vocabulary. How each component behaves, and the traps behind it, is in
+the reference file for it, next to this one. Read the one for what you are building before you write
+its markup:
 
 | Building … | Read |
 |---|---|
-| any button (never a local button class), **a filter, a toggle or a picker — anything that only changes what is shown (`.filter-ctl` marked `[x]`, a picker a labelled `.filter-set` marked `(•)`; never a button, never bare text)**, a row action (link or button, edit, remove), the rail's current page, `.ls-perm`, a hover explanation (`data-tip`, never `title`), a change to `runtime/tooltip.js` (netmon carries an inline copy), an `.eli5` box | `references/components.md` |
-| a table (plain markup, column widths, horizontal scroll, paging, search / filter / sort), any `@tailwindcss/typography` (`.prose`) surface, a `<select>`, a settings panel (`.field-row`) | `references/tables-and-forms.md` |
+| a size, a colour for a *thing* (the twelve `--cat-*` hues), a popup's depth, motion, a state colour (`data-tone`), bare markup, the Tailwind entry | `references/foundations.md` |
+| any button with words (never a local button class), a text field, a dropdown menu, the theme switcher, a fold, a legend, a card's box, a row action, the rail's current page, `.ls-perm`, an `.eli5` box | `references/components.md` |
+| an icon-only button, joined controls, a form footer, an on/off switch, a checkbox or radio, a segmented choice, choice cards, an upload, actions revealed on hover, a confirmation | `references/controls.md` |
+| a search box, **a filter or a toggle — anything that only changes what is shown** (`select[data-filter]` for one of several, `.switch` for on/off, a `.chip-set` for several; never a button), a sort, a list that drops down | `references/filters.md` |
+| an empty list, the outcome of an action, an annotation, a page-wide alarm, a status word, a load in progress, text somebody else wrote, a tag, a count, a dot | `references/feedback.md` |
+| a grid of cards and what goes inside one, a dashboard tile, a panel, a row list, a timeline, a man page, a file tree, a split view, a clamped text, a log console | `references/cards.md` |
+| a dialog, a confirmation, an alert, a drawer, a context menu, a hover explanation (`data-tip`, never `title`), a change to `runtime/tooltip.js` (netmon carries an inline copy), a zoomable diagram or image | `references/overlays.md` |
+| the header bar, a banner above it, the breadcrumb, the rail, the footer, the page column, a table of contents, the burger, anything that sticks under the header | `references/chrome.md` |
+| a page title, a label over a block, rendered markdown, code, a command to copy, a meta line, the boot log, an error page | `references/content.md` |
+| a table (plain markup, column widths, horizontal scroll, paging, the dense table, key/value pairs, the table engine), any `@tailwindcss/typography` (`.prose`) surface, a `<select>`, a settings panel (`.field-row`) | `references/tables-and-forms.md` |
+| an instant or an age, a chart, a tab row, the ticker strip, cockpit's state tags | `references/data.md` |
+| a glyph: which word, its colour, an icon-only control's name, a glyph drawn in a component, a flag, a brand mark | `references/icons.md` |
 | a call into the runtime: the theme functions and every `init*()` | `references/runtime.md` |
 
 ## Chrome templates: start here for any surface
@@ -303,6 +332,10 @@ out of its own `node_modules` instead of copying whatever the nearest surface ha
   `.nav-burger` and the `.mobile-footer` inside it must stay, because `footer.status` is
   `display: none` below 48rem and that burger is the only place a phone has the theme picker.
 - **`templates/documentation.html`** — a whole page built on it, for a one-file doc.
+- **`templates/error-page.html`** (0.60.0) — the 404 and the crash page on the same chrome
+  (`references/content.md`).
+
+`references/chrome.md` describes every piece of that chrome for an author.
 
 Follow it exactly; the rail in particular reads state from `html[data-ls-nav]` and needs its own
 pre-paint line:

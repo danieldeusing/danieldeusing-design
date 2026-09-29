@@ -535,9 +535,17 @@ footer.status .anim-toggle { min-block-size: var(--control-h, 1.75rem); padding:
    padded the body 2rem against a 47.8px footer, cockpit padded its column 6rem.
 
    Only when the footer is the body's own child, i.e. the page-level footer; a footer.status
-   inside a demo or a card is not the page's. */
-body:has(> footer.status) { padding-block-end: var(--status-h, 2rem); }
-html:has(footer.status) { scroll-padding-block-end: var(--status-h, 2rem); }
+   inside a demo or a card is not the page's.
+
+   THE RESERVE IS MEASURED ONCE THE RUNTIME RUNS. --status-h is the footer's designed MINIMUM (its
+   `min-block-size`, 2rem, and the phone and coarse values below); a footer whose controls wrap to
+   another row is taller than that (measured: 115px against a 68px reserve on a coarse phone with
+   four controls), and the content under it could not be reached. initLsNav() writes the footer's
+   rendered height as --status-reserve; before it runs, or with no script, the token stands in. A
+   separate property and not --status-h itself: the footer's own min-height reads --status-h, so a
+   measured value written there would hold the footer at its tallest and it could never shrink. */
+body:has(> footer.status) { padding-block-end: var(--status-reserve, var(--status-h, 2rem)); }
+html:has(footer.status) { scroll-padding-block-end: var(--status-reserve, var(--status-h, 2rem)); }
 
 .doc-link { color: var(--muted-foreground); text-decoration: none; transition: color 0.15s ease; }
 .doc-link:not(:disabled):hover { color: var(--primary); }
@@ -1053,8 +1061,8 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   /* The controls take the second row, and a control that does not fit wraps rather than running
      off the edge: a clipped control cannot be reached at all, which is worse than a footer one row
      taller than --status-h. Measured at 375px: a link, the theme menu and the anim toggle fit one
-     row with room to spare; add the language menu and it takes a third row, which the 3.25rem does
-     not clear. A page with that many controls folds them into the burger, where there is room. */
+     row with room to spare; add the language menu and it takes a third row, which the measured
+     --status-reserve clears (the 3.25rem alone did not). */
   .status-right { flex: 1 1 100%; flex-wrap: wrap; row-gap: 0.25rem; }
   /* …and the room the body reserves follows the footer's real height: two rows (18px of path,
      .25rem of gap, the 28px control row and the rule — 51px, inside 3.25rem), or nothing at all

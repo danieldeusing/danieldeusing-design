@@ -227,11 +227,17 @@ On a phone:
 - **Without one, the footer stays** (seedr): the path takes the first row, the controls the second,
   and the body reserves both (`--status-h: 3.25rem`). A control that does not fit wraps rather than
   running off the screen — a clipped control cannot be reached at all. Three controls (a link, the
-  theme menu, the anim toggle) fit a 375px row; a fourth takes a third row, which is NOT cleared.
+  theme menu, the anim toggle) fit a 375px row; a fourth takes a third row, and the reserve follows it (below).
   A page with that many controls folds them into the burger.
 - **Under a coarse pointer every footer control is a 44px target**, and the footer grows to hold
   them: `--status-h` is 2.875rem on one row and 4.25rem on a phone's two. The rail's toggle is 44px
   too, and a rail row's text sits in the middle of its 44px row.
+- **The page reserves the footer's RENDERED height.** `--status-h` is the footer's designed minimum
+  and the pre-JS reserve; once `initLsNav()` runs it writes `--status-reserve` (the page footer's
+  height) and the body and scroll padding read that. A footer whose controls wrap outgrows the token
+  (measured: 115px against 68px on a coarse phone with four controls). It is a separate property on
+  purpose: the footer's own min-height reads `--status-h`, so a measured value written there would
+  hold the footer at its tallest. Do not set `--status-reserve` yourself.
 - **The phone and coarse values of `--status-h` are `!important`, so a page cannot override them.**
   They have to be: the Tailwind entry imports `tokens.css` unlayered and this file in
   `@layer components`, and an unlayered declaration beats every layered one, custom properties
@@ -483,7 +489,7 @@ scrollbar APIs must not be declared together.
 
 | call | does |
 |---|---|
-| `initLsNav()` | Every page. The rail's show/hide (every `[data-ls-nav-toggle]`, `aria-expanded`, `localStorage["ls-nav"]`), and the measured chrome: `--ls-nav-top` (the header's or `.bar-stack`'s bottom edge), `--ls-nav-bottom` (the footer), `--sticky-top` (plus the page toolbar). A property is written only when it changed — it runs on every scroll. The rail's initial state is applied PRE-PAINT by the inline `<head>` line, never by this. |
+| `initLsNav()` | Every page. The rail's show/hide (every `[data-ls-nav-toggle]`, `aria-expanded`, `localStorage["ls-nav"]`), and the measured chrome: `--ls-nav-top` (the header's or `.bar-stack`'s bottom edge), `--ls-nav-bottom` (the footer), `--sticky-top` (plus the page toolbar), `--status-reserve` (the page footer's rendered height). A property is written only when it changed — it runs on every scroll. The rail's initial state is applied PRE-PAINT by the inline `<head>` line, never by this. |
 | `initBurgerNav()` | The phone burger; required wherever the markup has a `.nav-burger`. |
 | `initAnimToggle()` | Every `[data-anim-toggle]`, its box and its `data-label-on/off` label; `localStorage["anim"]`. Apply `html.anim-off` pre-paint. |
 | `initToc(root?)` | The table of contents' spy: `aria-current="true"` on the current entry. Returns `{ destroy }`. |

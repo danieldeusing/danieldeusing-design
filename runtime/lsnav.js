@@ -90,6 +90,11 @@ function measureChrome() {
   // A hidden footer (mobile folds it into the burger) reserves nothing.
   write(root, "--ls-nav-bottom", `${Math.max(0, h(status) - 1)}px`);
   write(root, "--sticky-top", `${top + h(toolbar)}px`);
+  // What the page reserves under a fixed footer is the footer's RENDERED height, not the token: a
+  // footer whose controls wrap to another row outgrows --status-h (the token stays the pre-JS value,
+  // and the footer's own minimum). Only the page's footer, the body's own child; none, none reserved.
+  const page = document.querySelector("body > footer.status");
+  write(root, "--status-reserve", page ? `${page.getBoundingClientRect().height / zoom}px` : "");
 }
 
 // This runs on EVERY scroll event, and a write to <html>'s inline style invalidates the style of

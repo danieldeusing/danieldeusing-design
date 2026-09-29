@@ -57,7 +57,8 @@
       copy of what the spec gives another package, here ONLY so this page renders:
         · WP1 (tokens.css): --control-h, --status-h, --dot-size, --icon-*, the phone --content-pad,
           [data-tone] -> --tone (F1, F7)
-        · WP4 (icons): the three --ico-* masks the header uses, [data-icon] -> --ico (I1)
+        · WP4 (icons): the three --ico-* masks the header uses, [data-icon] -> --ico (I1), and the
+          forced-colours default that makes a [data-icon] glyph its control's colour (RULES-CROSSCUT X1)
         · WP5 (controls.css): .btn-icon, .btn-icon--bare (C2)
         · WP7 (feedback.css): .dot (S8), .banner (S4)
         · WP1 (tokens.css): `[hidden]` hides whatever display a class sets (RULES-CROSSCUT X3)
@@ -90,6 +91,12 @@
       :where([data-icon="chevron-left"]) { --ico: var(--ico-chevron-left); }
       :where([data-icon="chevron-right"]) { --ico: var(--ico-chevron-right); }
       :where([data-icon="history"]) { --ico: var(--ico-history); }
+      @media (forced-colors: active) {
+        :where([data-icon])::before { forced-color-adjust: none; color: CanvasText; --tone: CanvasText; }
+        @supports (forced-color-adjust: preserve-parent-color) {
+          :where([data-icon])::before { forced-color-adjust: preserve-parent-color; color: inherit; --tone: currentColor; }
+        }
+      }
 
       :where(.btn-icon) {
         display: inline-grid; place-items: center; box-sizing: border-box;

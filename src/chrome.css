@@ -1086,21 +1086,26 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
 
 /* ── FORCED COLOURS (0.60.0) ────────────────────────────────────────────────────────────────────
    Windows' high-contrast modes repaint every background with Canvas, drop every box-shadow and
-   give every link one colour. Two states in the chrome were drawn ONLY with those: the rail's
-   current row (a tint and an inset edge) and the TOC's current entry (colour alone, on purpose, so
-   the list never re-wraps while the reader scrolls). Under forced colours both were identical to
-   their neighbours. They take the system's own "selected" pair instead, and opt out of the
-   adjustment so the pair is not repainted too — which is why every piece of text inside them
-   names HighlightText explicitly: forced-color-adjust is inherited, and the theme's --primary on
-   Highlight is nobody's contrast pair. A disabled text action says so in GrayText, the system's
-   word for unavailable.
+   give every link one colour. Three "you are here" marks in the chrome were drawn ONLY with those,
+   and painted exactly like their neighbours: the rail's current row (a tint and an inset edge), the
+   TOC's current entry (colour alone, on purpose, so the list never re-wraps while the reader
+   scrolls) and a series' current part (colour, and a weight that is easy to miss).
 
-   Everything else here already survives: the tick strip's state is a glyph, the rail's arrow is a
-   character, the anim box is text, the crumbs' current segment is text and not a link. */
+   Each takes the system's "selected" pair ON THE ELEMENT THAT CARRIES THE TEXT, with
+   `forced-color-adjust: none`, and both halves are needed (RULES-CROSSCUT X1). Without `none` the
+   mode paints a Canvas backplate behind the text, and the word vanishes on its Highlight row. With
+   it, everything inside keeps its AUTHOR colour, because the property is inherited: so the rail's
+   name and permissions take the row's colour, whoever gave the row its pair. That includes
+   components.css, which opts a `.dropdown-item` under the pointer out the same way; the name's muted
+   colour on that Highlight measured 1.25–2.82:1 in pixels. A disabled text action is GrayText.
+
+   Every glyph the chrome draws is a character (the tick states, `←`, `»`, `/`, `▾`), which the mode
+   forces like any text, and the burger is an inline <svg>, which the user agent already gives
+   `preserve-parent-color`. So no glyph here takes `none`: under it a glyph keeps its author colour. */
 @media (forced-colors: active) {
-  .ls-row[aria-current="page"] { forced-color-adjust: none; background: Highlight; box-shadow: none; }
-  .ls-row[aria-current="page"] :is(.ls-name, .ls-perm),
-  .ls-row[aria-current="page"]::after { color: HighlightText; text-shadow: none; }
-  .navlist a[aria-current="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  .ls-row[aria-current="page"] { forced-color-adjust: none; background: Highlight; color: HighlightText; box-shadow: none; }
+  .ls-panel .ls-row :is(.ls-name, .ls-perm),
+  .ls-panel .ls-row[aria-current="page"]::after { color: inherit; text-shadow: none; }
+  .navlist a:is([aria-current="true"], [aria-current="page"]) { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   button:is(.doc-link, .doc-link--forward):disabled { color: GrayText; }
 }

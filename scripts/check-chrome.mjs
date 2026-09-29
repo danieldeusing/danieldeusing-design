@@ -16,8 +16,10 @@
  *   · The runtime keeps several controls in step with one state (every rail toggle, every anim
  *     toggle, the one TOC entry that is current). Each is asserted through a real pointer press,
  *     and with a control rendered after the call.
- *   · Focus rings, `hidden`, forced colours (RULES-CROSSCUT X1-X3): run on ?bare — tokens.css and
- *     chrome.css only — because base.css draws a global ring that would keep a deleted rule green.
+ *   · Focus rings and `hidden` (RULES-CROSSCUT X2, X3): run on ?bare — tokens.css and chrome.css
+ *     only — because base.css draws a global ring that would keep a deleted rule green.
+ *   · Forced colours (X1) are read as PAINTED PIXELS off screenshots, on a light and a dark forced
+ *     palette and all four themes: the computed style does not show the backplate the mode paints.
  *
  * MUTATION RUNS never edit a tracked file: DD_OVERRIDE="src/chrome.css=/tmp/mutant.css;…" makes the
  * built-in server answer those paths from the given files instead.
@@ -34,6 +36,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateSync } from "node:zlib";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHROME = process.env.DD_CHROME
@@ -138,7 +141,7 @@ const evaluate = async (expression) => {
  * One page load per scenario, each from a clean store: the rail and the anim toggle PERSIST their
  * state, and a scenario inheriting the last one's "off" would be asserting the wrong page.
  */
-async function load(query = "", { width = 1440, height = 900, coarse = false, forced = false, print = false, keep = false } = {}) {
+async function load(query = "", { width = 1440, height = 900, coarse = false, forced = false, scheme = "light", print = false, keep = false } = {}) {
   if (!keep) await evaluate("try { localStorage.clear() } catch {} null").catch(() => {});
   // A phone width is emulated AS a phone: its scrollbars overlay the page instead of taking 15px
   // of a 375px viewport, which would measure a narrower phone than any real one.
@@ -146,7 +149,8 @@ async function load(query = "", { width = 1440, height = 900, coarse = false, fo
   await send("Emulation.setTouchEmulationEnabled", coarse ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
   await send("Emulation.setEmulatedMedia", {
     media: print ? "print" : "",
-    features: [{ name: "forced-colors", value: forced ? "active" : "none" }, { name: "prefers-reduced-motion", value: "no-preference" }],
+    features: [{ name: "forced-colors", value: forced ? "active" : "none" }, { name: "prefers-color-scheme", value: scheme },
+      { name: "prefers-reduced-motion", value: "no-preference" }],
   });
   const loaded = next("Page.loadEventFired");
   await send("Page.navigate", { url: BASE + (query ? `?${query}` : "") });
@@ -526,21 +530,158 @@ const shown = await page(`T.qa(".bar-stack, .bar-side, .bar-center, .bar-history
   .map((e) => { e.hidden = true; const d = T.cs(e, "display"); e.hidden = false; return [e.className || e.tagName, d]; }).filter(([, d]) => d !== "none")`);
 await check("with tokens.css loaded, `hidden` hides each of them whatever display its class sets", () => shown.length === 0, shown);
 
-/* ═══ 12. forced colours (X1) ════════════════════════════════════════════════════════════════════ */
-await load("bare&nobanner", { forced: true });
-await page(`document.getElementById("rail").scrollIntoView({ behavior: "instant" }); null`);
-await frames(4);
-const forced = await page(`(() => { const cur = document.querySelector('.ls-row[aria-current="page"]'), other = document.querySelector(".ls-row:not([aria-current])");
-  const on = document.querySelector('.toc [aria-current="true"]'), off = document.querySelector(".toc a:not([aria-current])");
-  return { active: matchMedia("(forced-colors: active)").matches,
-    rail: [T.cs(cur, "backgroundColor"), T.cs(other, "backgroundColor")], railText: [T.cs(cur.querySelector(".ls-name"), "color"), T.cs(other.querySelector(".ls-name"), "color")],
-    toc: on && [T.cs(on, "backgroundColor"), T.cs(off, "backgroundColor")], disabled: [T.cs("#btn-disabled", "color"), T.cs("#btn-forward", "color")] }; })()`);
-await check("forced colours: the rail's current row is not the same as its neighbours (Highlight, not a lost tint)",
-  () => forced.active && forced.rail[0] !== forced.rail[1] && forced.railText[0] !== forced.railText[1], forced);
-await check("…the TOC's current entry is not the same as the others (its colour-only mark would be lost)",
-  () => Boolean(forced.toc) && forced.toc[0] !== forced.toc[1], forced.toc);
-await check("…a disabled text action is not the same as an enabled one (GrayText)", () => forced.disabled[0] !== forced.disabled[1], forced.disabled);
-console.log("NOTE  chrome.css draws no mask glyph: every glyph it owns (tick states, ←, », /) is a character, which forced colours keep");
+/* ═══ 12. forced colours (X1): PAINTED pixels, two palettes, four themes ════════════════════════
+ * Under forced colours the computed style is not what reaches the screen. Text that keeps the
+ * adjustment gets a Canvas BACKPLATE no style mentions, so a HighlightText word on a Highlight row
+ * reads 21:1 in getComputedStyle and 1:1 on screen; and a glyph under `none` keeps its author colour,
+ * which passes on one palette and not the other. So every figure here is read off a screenshot, on a
+ * light AND a dark forced palette (prefers-color-scheme under forced-colors), on all four themes. */
+const decodePng = (buffer) => {
+  let at = 8, width = 0, height = 0, bpp = 0;
+  const idat = [];
+  while (at < buffer.length) {
+    const length = buffer.readUInt32BE(at), type = buffer.toString("ascii", at + 4, at + 8), data = buffer.subarray(at + 8, at + 8 + length);
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0); height = data.readUInt32BE(4); bpp = { 2: 3, 6: 4 }[data[9]];
+      if (data[8] !== 8 || data[12] !== 0 || !bpp) throw new Error("png: only 8-bit, non-interlaced RGB(A) is decoded here");
+    }
+    if (type === "IDAT") idat.push(data);
+    at += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(idat)), stride = width * bpp, out = Buffer.alloc(height * stride);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x += 1) {
+      const a = x >= bpp ? out[y * stride + x - bpp] : 0, b = y ? out[(y - 1) * stride + x] : 0, c = x >= bpp && y ? out[(y - 1) * stride + x - bpp] : 0;
+      const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+      out[y * stride + x] = (raw[y * (stride + 1) + 1 + x] + [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][filter]) & 255;
+    }
+  }
+  const pixels = [];
+  for (let i = 0; i < out.length; i += bpp) pixels.push([out[i], out[i + 1], out[i + 2]]);
+  return pixels;
+};
+const luminance = (rgb) => rgb.map((v) => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+const ratioOf = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+// What a region PAINTS: its commonest colour is what the ink sits on, and the ink is the pixel that
+// stands out from it most (a stem reaches the glyph's full colour; anti-aliasing only fades it).
+const paint = async (clip) => {
+  const { data } = await send("Page.captureScreenshot", { format: "png", clip: { ...clip, scale: 1 } });
+  const pixels = decodePng(Buffer.from(data, "base64"));
+  const counts = new Map();
+  for (const p of pixels) counts.set(p.join(), (counts.get(p.join()) || 0) + 1);
+  const bg = [...counts].sort((x, y) => y[1] - x[1])[0][0].split(",").map(Number);
+  let ink = bg, ratio = 1;
+  for (const p of pixels) { const r = ratioOf(p, bg); if (r > ratio) { ratio = r; ink = p; } }
+  return { bg: bg.join(), ink: ink.join(), ratio: Math.round(ratio * 100) / 100 };
+};
+// The regions, as page clips: each element's CONTENT box (a border is ink too, and would pass a
+// glyph that is not there). Only an element outside the viewport is scrolled to: the sticky layers
+// are always on screen, and scrolling for them would move the TOC's current entry mid-measurement.
+const REGIONS = `window.R = (selector, part) => {
+  const e = document.querySelector(selector);
+  if (!e) return null;
+  const at = e.getBoundingClientRect();
+  if (at.top < 0 || at.bottom > innerHeight) e.scrollIntoView({ block: "center", behavior: "instant" });
+  const b = e.getBoundingClientRect(), s = getComputedStyle(e), n = (p) => parseFloat(s[p]) || 0;
+  const r = { left: b.left + n("borderLeftWidth") + n("paddingLeft"), right: b.right - n("borderRightWidth") - n("paddingRight"),
+    top: b.top + n("borderTopWidth") + n("paddingTop"), bottom: b.bottom - n("borderBottomWidth") - n("paddingBottom") };
+  if (part === "after-name") r.left = e.querySelector(".ls-name").getBoundingClientRect().right + 1;
+  if (part === "before-child") r.right = e.firstElementChild.getBoundingClientRect().left - 1;
+  const x = Math.ceil(r.left + scrollX), y = Math.ceil(r.top + scrollY);
+  return { x, y, width: Math.floor(r.right + scrollX) - x, height: Math.floor(r.bottom + scrollY) - y };
+}; null`;
+const measure = async (items) => {
+  await evaluate(REGIONS);
+  const out = {};
+  for (const [name, selector, part] of items) {
+    const region = await evaluate(`R(${JSON.stringify(selector)}, ${JSON.stringify(part || null)})`);
+    await frames(1);
+    out[name] = region && region.width > 0 && region.height > 0 ? await paint(region) : null;
+  }
+  return out;
+};
+const PALETTES = ["light", "dark"], THEMES = ["warm", "green", "mono", "paper"];
+// [name, selector, part] — text on a state (4.5:1), a glyph (3:1), a state's neighbour (must differ)
+const TEXT_ON_STATE = [
+  ["rail current: name", '.ls-nav .ls-row[aria-current="page"] .ls-name'],
+  ["rail current: permissions", '.ls-nav .ls-row[aria-current="page"] .ls-perm'],
+  ["rail current: the ← mark", '.ls-nav .ls-row[aria-current="page"]', "after-name"],
+  ["rail row another rule selects: name", ".ls-nav .ls-row.__selected .ls-name"],
+  ["rail row another rule selects: permissions", ".ls-nav .ls-row.__selected .ls-perm"],
+  ["TOC current entry", '.toc a[aria-current="true"]'],
+  ["series current part", '#series a[aria-current="page"]'],
+];
+const PAIRS = [
+  ["rail current row", '.ls-nav .ls-row[aria-current="page"]', '.ls-nav .ls-row:not([aria-current]):not(.__selected)'],
+  ["TOC current entry", '.toc a[aria-current="true"]', ".toc a:not([aria-current])"],
+  ["series current part", '#series a[aria-current="page"]', "#series a:not([aria-current])"],
+];
+const GLYPHS = [
+  ["tick ● ok", ".tick--ok .tick-dot"], ["tick ● running", ".tick--running .tick-dot"],
+  ["tick ✕ stale", ".tick--stale .tick-dot"], ["tick ○ never", ".tick--never .tick-dot"],
+  ["rail toggle »", ".ls-nav-toggle"], ["crumbs /", "#bar-crumbs li + li", "before-child"],
+  ["history ‹ (WP4 mask, stand-in)", '.bar-history [data-icon="chevron-left"]'], ["history ⟲ (WP4 mask, stand-in)", '.bar-history [data-icon="history"]'],
+];
+const PHONE_GLYPHS = [["burger (inline svg)", ".nav-burger svg"], ["accordion ▾", ".mobile-footer .mf-chev"],
+  ["burger menu current row: name", '.site-nav .ls-row[aria-current="page"] .ls-name']];
+const cells = [];
+for (const scheme of PALETTES) {
+  await load("nobanner", { forced: true, scheme });
+  // The pointer parks in the page's left gutter: a hovered row would be measured as another state.
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 450 });
+  // What components.css does to a menu row under the pointer, on a rail row: opt it out and give it
+  // the selected pair. The row's name and permissions must follow it, whoever set the pair.
+  await page(`(() => { const s = document.createElement("style");
+    s.textContent = "@media (forced-colors: active) { .ls-row.__selected { forced-color-adjust: none; background: Highlight; color: HighlightText; } }";
+    document.head.append(s); document.querySelector('.ls-nav .ls-row:not([aria-current])').classList.add("__selected");
+    for (const [id, text] of [["__blank", ""], ["__ink", "MMMM"]]) { const e = document.createElement("div"); e.id = id; e.textContent = text;
+      e.style.cssText = "position:fixed;left:8px;top:" + (id === "__blank" ? 300 : 340) + "px;width:60px;height:24px;font:16px monospace;background:white;z-index:99";
+      document.body.append(e); } })()`);
+  const probe = await measure([["an empty patch", "#__blank"], ["a line of body text", "#__ink"]]);
+  for (const theme of THEMES) {
+    await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
+    // Parked on the TOC's own section: the TOC has a current entry (nothing is current above the
+    // first section) and the series list is on screen, so nothing below scrolls until the glyphs.
+    await page(`document.getElementById("toc").scrollIntoView({ block: "start", behavior: "instant" }); null`);
+    await frames(4);
+    const text = await measure(TEXT_ON_STATE);
+    const pairs = {};
+    for (const [name, on, off] of PAIRS) {
+      const [a, b] = Object.values(await measure([[`${name} (on)`, on], [`${name} (off)`, off]]));
+      pairs[name] = a && b ? [a.bg, b.bg] : null;
+    }
+    const glyphs = await measure(GLYPHS);
+    const disabled = Object.values(await measure([["disabled", "#btn-disabled"], ["enabled", "#btn-forward"]])).map((m) => m && m.ink);
+    cells.push({ scheme, theme, probe, text, glyphs, pairs, disabled });
+  }
+  await load("nobanner&burger", { forced: true, scheme, width: 375, height: 812 });
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 805 });
+  for (const theme of THEMES) {
+    await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
+    await frames(2);
+    Object.assign(cells.find((c) => c.scheme === scheme && c.theme === theme).glyphs, await measure(PHONE_GLYPHS));
+  }
+}
+const cellName = (c) => `${c.scheme} ${c.theme}`;
+console.log(`\nFORCED COLOURS  painted contrast (ink against what it sits on), ${cells.map(cellName).join(" · ")}`);
+for (const [group, key] of [["text on a state", "text"], ["glyph", "glyphs"]]) {
+  for (const name of Object.keys(cells[0][key])) {
+    console.log(`  ${group.padEnd(15)} ${name.padEnd(44)} ${cells.map((c) => (c[key][name] ? c[key][name].ratio.toFixed(2) : "  —").padStart(6)).join(" ")}`);
+  }
+}
+const below = (key, floor) => cells.flatMap((c) => Object.entries(c[key]).filter(([, m]) => !m || m.ratio < floor).map(([n, m]) => `${cellName(c)} ${n}: ${m ? m.ratio : "not found"}`));
+await check("forced colours, the reader can tell: an empty patch paints nothing (1:1), a line of text paints ink (≥ 7:1), on both palettes",
+  () => cells.every((c) => c.probe["an empty patch"].ratio < 1.1 && c.probe["a line of body text"].ratio >= 7), cells.map((c) => [cellName(c), c.probe]));
+await check("forced colours: every piece of text on a drawn state paints at 4.5:1 or better, on both palettes and all four themes",
+  () => below("text", 4.5).length === 0, () => below("text", 4.5));
+await check("…every glyph the chrome shows paints at 3:1 or better against what it sits on",
+  () => below("glyphs", 3).length === 0, () => below("glyphs", 3));
+const same = cells.flatMap((c) => Object.entries(c.pairs).filter(([, p]) => !p || p[0] === p[1]).map(([n, p]) => `${cellName(c)} ${n}: ${p ? p[0] : "not found"}`));
+await check("…each state paints a different background from its neighbour (the rail's row, the TOC's and the series' current entries)",
+  () => same.length === 0, same);
+await check("…a disabled text action paints a different colour from an enabled one",
+  () => cells.every((c) => c.disabled[0] && c.disabled[1] && c.disabled[0] !== c.disabled[1]), cells.map((c) => [cellName(c), c.disabled]));
 
 /* ═══ 13. the rail's boot reveal and print ══════════════════════════════════════════════════════ */
 await load("nobanner");

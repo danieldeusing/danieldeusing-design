@@ -1,10 +1,12 @@
 /*
  * minimap.js — a document minimap: one bar per section, down the left edge.
  *
- * Replaces the "On this page" list. A text table of contents costs a whole
- * column of the page to repeat headings the reader is about to scroll past
- * anyway; a minimap answers the same two questions — how long is this, and
- * where am I — in 2rem of gutter, so the content gets the full width back.
+ * The full-width document's answer to the "On this page" list. A text table of
+ * contents costs a whole column to repeat headings the reader is about to scroll
+ * past; a minimap answers the same two questions — how long is this, and where
+ * am I — in 2rem of gutter. A page shows a TOC OR a minimap, never both: where
+ * there is room for the column the TOC wins, so initMinimap() returns null on a
+ * page that has one (any `[data-toc-link]`).
  *
  * Markup contract: NOTHING. Point it at the sections and it builds itself:
  *
@@ -26,6 +28,8 @@ export function initMinimap(options = {}) {
     label = "document sections",
     mount = document.body,
   } = options;
+
+  if (document.querySelector("[data-toc-link]")) return null;
 
   const sections = Array.from(document.querySelectorAll(sectionSelector)).filter((s) => s.id);
   // One bar is not a map. Same reasoning as a one-entry nav: it would tell the
@@ -68,11 +72,9 @@ export function initMinimap(options = {}) {
 
   const setActive = (index) => {
     bars.forEach((bar, i) => {
-      const on = i === index;
-      bar.classList.toggle("active", on);
       // aria-current, not aria-selected: these are links into a document, not
-      // a tab set, and only one can be current.
-      if (on) bar.setAttribute("aria-current", "true");
+      // a tab set, and only one can be current. The CSS styles the bar from it.
+      if (i === index) bar.setAttribute("aria-current", "true");
       else bar.removeAttribute("aria-current");
     });
     const bar = bars[index];

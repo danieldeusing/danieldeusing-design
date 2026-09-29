@@ -81,29 +81,69 @@ export function applyStoredTheme(options) {
   applyTheme(getStoredTheme(), options);
 }
 
+const CONTROLS = "[data-theme-value], [data-theme-label]";
+let switcherOptions;
+let switcherWired = false;
+
+/*
+ * THE ACTIVE THEME IS A STATE, NOT A COLOUR (0.60.0). It used to be marked only by a stylesheet
+ * rule per theme — `html[data-theme="green"] .dropdown-item[data-theme-value="green"]` painted in
+ * --primary with a glow — so a screen reader heard four identical buttons and no hint which one
+ * was in force. The state now lives on the item, where both the reader and the stylesheet read it:
+ *   · inside a dropdown menu the items are `role="menuitemradio"` with `aria-checked`, which is
+ *     what an APG menu of one-of-several settings is, and what draws the ✓ (components.css);
+ *   · anywhere else (the burger's inline list) a menuitem role would claim a menu that is not
+ *     there, so the item is a toggle button with `aria-pressed`, which draws the same ✓.
+ * Re-synced on every theme change from ANY source — a pick here, setTheme() from page code, a
+ * reload — because the observer watches html[data-theme] itself rather than trusting a click.
+ */
+function syncThemeControls() {
+  const theme = document.documentElement.dataset.theme ?? DEFAULT_THEME;
+  for (const label of document.querySelectorAll("[data-theme-label]")) {
+    if (label.textContent !== theme) label.textContent = theme;
+  }
+  for (const item of document.querySelectorAll("[data-theme-value]")) {
+    const chosen = String(item.getAttribute("data-theme-value") === theme);
+    if (item.closest("details.dropdown .dropdown-panel")) {
+      item.setAttribute("role", "menuitemradio");
+      item.setAttribute("aria-checked", chosen);
+    } else {
+      item.setAttribute("aria-pressed", chosen);
+    }
+  }
+}
+
 /**
- * Wire up a theme switcher built from the standard markup:
+ * Wire up every theme switcher built from the standard markup, including ones rendered later:
  *   <button data-theme-value="green">green</button>   (one per theme)
  *   <span data-theme-label></span>                     (shows the active theme)
+ * Items inside a `details.dropdown` become `menuitemradio` + `aria-checked`; items elsewhere carry
+ * `aria-pressed`. Call once; a second call only replaces the options.
  * @param {{ faviconHref?: (theme: Theme) => string }} [options]
  */
 export function initThemeSwitcher(options) {
-  const labels = document.querySelectorAll("[data-theme-label]");
-  const syncLabel = () => {
-    const theme = document.documentElement.dataset.theme ?? DEFAULT_THEME;
-    labels.forEach((label) => {
-      label.textContent = theme;
-    });
-  };
-  syncLabel();
+  switcherOptions = options;
+  syncThemeControls();
+  if (switcherWired) return;
+  switcherWired = true;
 
-  document.querySelectorAll("[data-theme-value]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const theme = /** @type {HTMLElement} */ (button).dataset.themeValue;
-      if (theme) setTheme(/** @type {Theme} */ (theme), options);
-      syncLabel();
-      // close the enclosing dropdown after a pick (no-op if not inside one)
-      button.closest("details.dropdown")?.removeAttribute("open");
-    });
+  // Delegated, so a switcher rendered after this call still switches.
+  document.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest("[data-theme-value]") : null;
+    const theme = button?.getAttribute("data-theme-value");
+    if (!theme) return;
+    setTheme(/** @type {Theme} */ (theme), switcherOptions);
+    syncThemeControls();
+    // close the enclosing dropdown after a pick (no-op if not inside one)
+    button.closest("details.dropdown")?.removeAttribute("open");
   });
+
+  new MutationObserver((records) => {
+    const relevant = records.some(
+      (record) =>
+        record.type === "attributes" ||
+        [...record.addedNodes].some((node) => node instanceof Element && (node.matches(CONTROLS) || node.querySelector(CONTROLS))),
+    );
+    if (relevant) syncThemeControls();
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"], childList: true, subtree: true });
 }

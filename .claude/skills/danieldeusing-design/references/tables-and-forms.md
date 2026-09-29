@@ -241,17 +241,27 @@ every `required` select.
   the way the platform finds them — `aria-label`, then `aria-labelledby`, then a `<label>` by `for=`
   or by wrapping — and the trigger's name becomes *label + current value*, as a native select
   announces.
-- **The opt-outs are real ones**: `multiple` and `size > 1` are left alone (the platform renders
-  those inline; there is no popup to replace), and `data-select="off"` skips a select entirely.
-- **Selection is not marked by colour, and that is arithmetic.** `--primary` against
+- **`multiple` and `size > 1` are left alone** — the platform renders those inline, and there is
+  no popup to replace. There is no other opt-out: `data-select="off"` is gone in 0.60.0, because
+  every dropdown list is the system's list.
+- **Selection is a ✓, not a colour, and that is arithmetic.** `--primary` against
   `--popover-foreground` measures 1.65 / 1.31 / 1.48 / **1.27** on warm/green/mono/paper — two
-  inks a reader cannot tell apart. Same finding as the rail's current row, same answer: a left
-  **edge marker** plus **bold**, with the colour as the third signal. Do not "simplify" it back
-  to a tint.
-- **The control's border is `--foreground` at 60%, not `--border`.** `--border` is a container
-  hairline measuring 1.37 / 2.00 / 1.61 / 1.42 against `--background` — invisible as a control
-  edge, where WCAG 1.4.11 wants 3:1. 60% is the first step that clears it on all four themes
-  against all three surfaces a control can land on (warm binds, at 3.24).
+  inks a reader cannot tell apart. Since 0.60.0 the chosen option shows a ✓ in the check column
+  every option reserves — the mark a chosen menu item wears too (`components.md`, "One popup
+  look") — and keeps its weight and ink; 0.59.0's left edge and bold are gone. Do not "simplify"
+  it back to a tint.
+- **The trigger is a field: `--control-h` tall, on the `--control-edge`.** The edge is
+  `--foreground` at 60%, not `--border`: `--border` is a container hairline measuring
+  1.37 / 2.00 / 1.61 / 1.42 against `--background` — invisible as a control edge, where WCAG 1.4.11
+  wants 3:1 — and 60% clears it on all four themes against all three surfaces a control can land
+  on (warm binds, at 3.26 on `--muted`). Focus adds the `--primary` edge to the `--ring` outline;
+  `aria-invalid="true"` on the `<select>` gives the trigger the `--destructive` edge, and, as on
+  every field, the select names a `.field-error` through `aria-describedby` that says what is wrong
+  — the edge alone is colour. It is the height of the text field and the compact button beside it
+  ("One control height" in `components.md`). A disabled select keeps its edge under the pointer: it does not answer it at all.
+- **Under forced colours the caret is text.** The mode drops the gradient that draws it, so the
+  trigger draws its ▾ as a glyph instead; a bare `<select>` that no runtime enhanced has no caret
+  there — one more reason every page calls `initSelects()`.
 
 ## A wide table scrolls itself (0.23.0) — including one you render after the page loads
 
@@ -447,3 +457,35 @@ edge once, for every row.
 - Below `40rem` it stacks on its own. A form's submit gets a `.field-row` with an **empty** `.lbl`,
   so it lands on the same value edge as the fields above it and stacks with them for free — rather
   than a local margin that writes the label width down a second time.
+
+### A description, an error, a tall value, a table (0.60.0)
+
+```html
+<div class="field-row">
+  <label class="lbl" for="model">model</label>
+  <div class="field-val">
+    <select id="model" aria-describedby="model-desc model-err" aria-invalid="true">…</select>
+    <p class="field-desc" id="model-desc">used for every review on this repository</p>
+    <p class="field-error" id="model-err" role="alert">pick a model the agent supports</p>
+  </div>
+</div>
+```
+
+Cockpit wrote each of these locally, which is how one settings row came to exist in three
+spellings.
+
+- **`.field-desc` says what the setting does and `.field-error` what is wrong with it** — each a
+  whole line under the control inside `.field-val`, muted and `--destructive`. Point the control at
+  both with `aria-describedby`, set `aria-invalid="true"` on it while the error stands (the field
+  takes the `--destructive` edge), and give an error that appears after an action `role="alert"`.
+  **`aria-invalid` never stands without its `.field-error`**: the edge is colour alone (WCAG 1.4.1)
+  and says nothing about the fix (3.3.1).
+- **`.field-row--top`** heads a tall value with its label — a textarea, a stack of radios — where a
+  centred label reads as belonging to neither line.
+- **`.field-row--stacked`** puts the label over the value at every width, for a value that needs
+  the whole row: a table, a long textarea.
+- **A value that is a table** loses its first row's top padding, so the table's first line sits on
+  the label's line.
+- **`button.lbl` is a label that opens its explanation** — in a dialog, on a phone, where there is
+  no hover to read a tip by. It keeps the label's look (no box, start-aligned, muted), turns
+  `--primary` under the pointer and in focus, and is 44px tall under a coarse pointer.

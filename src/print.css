@@ -139,9 +139,12 @@
   /* The `ls -l` rail sits inside .site-nav, so the rule above already hides it —
      but the room it reserved is padding on the BODY, and that would print as a
      17rem gutter down the right of every page. Hiding a fixed element does not
-     reclaim the space something else was told to leave for it. */
+     reclaim the space something else was told to leave for it. The same goes for
+     the footer's clearance (0.60.0): the body reserves --status-h below its
+     content for a footer that paper does not have. */
   body {
     padding-right: 0 !important;
+    padding-block-end: 0 !important;
   }
 
   /* NOTHING IS NEEDED FOR [data-tip] ON PAPER ANY MORE, and that is worth saying rather than
@@ -163,6 +166,15 @@
   }
   .content {
     min-width: 0;
+  }
+  /* The page toolbar is a sticky strip on screen and nothing on paper — except its breadcrumb,
+     which is exactly the kicker line a printed page wants above its title ("cockpit / control /
+     automation"). So it stops sticking and loses its rule and padding, and what it holds stays. */
+  .page-toolbar {
+    position: static;
+    border: 0;
+    padding: 0;
+    margin: 0 0 1rem;
   }
 
   /* ── heading hierarchy against a 12px body ─────────────────────────────
@@ -196,7 +208,7 @@
   h3,
   h4,
   .prompt,
-  .toc-label {
+  .navlist-label {
     break-after: avoid-page;
     break-inside: avoid;
   }

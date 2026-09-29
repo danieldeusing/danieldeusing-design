@@ -852,10 +852,14 @@ try {
   for (let i = 0; i < 6; i += 1) { await key("Tab"); zoomWalk.push(await evaluate(`(() => { const a = document.activeElement; return a === document.body ? "BODY" : document.querySelector("dialog.dgm-overlay").contains(a) ? "in" : "OUT"; })()`)); }
   await check("Tab stays in the view", zoomWalk.every((w) => w !== "OUT") && zoomWalk.includes("in"), zoomWalk);
   const art = await evaluate(`(() => { const r = document.querySelector(".dgm-art").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
-  const beforePan = await evaluate(`document.querySelector(".dgm-art").style.transform`);
+  const translateOf = () => evaluate(`(() => { const m = /translate\\(([-\\d.]+)px, ([-\\d.]+)px\\)/.exec(document.querySelector(".dgm-art").style.transform); return m ? [Number(m[1]), Number(m[2])] : null; })()`);
+  const beforePan = await translateOf();
   await drag(art.x, art.y, art.x + 120, art.y + 60);
-  await check("a drag pans the artwork and does NOT close the view (0.59.0 closed it after every pan)",
-    () => evaluate(`document.querySelector("dialog.dgm-overlay").open && document.querySelector(".dgm-art").style.transform !== ${JSON.stringify(beforePan)}`));
+  const afterPan = await translateOf();
+  await check("a drag on the image pans it by the whole drag — not hijacked by the browser's own image drag",
+    !!beforePan && !!afterPan && Math.abs(afterPan[0] - beforePan[0] - 120) < 2 && Math.abs(afterPan[1] - beforePan[1] - 60) < 2, { beforePan, afterPan });
+  await check("...and the click that ends the pan does NOT close the view (0.59.0 closed it after every pan)",
+    () => evaluate(`document.querySelector("dialog.dgm-overlay").open`));
   await click(20, 880);
   await check("a click on the empty stage closes it, and focus goes back to the opener",
     () => evaluate(`!document.querySelector("dialog.dgm-overlay").open && document.activeElement === __o.$("dgm-figure")`));

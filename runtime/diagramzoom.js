@@ -132,6 +132,10 @@ export function initDiagramZoom(selector = ".diagram") {
     const endDrag = () => { dragging = false; stage.classList.remove("is-grabbing"); };
     stage.addEventListener("pointerup", endDrag);
     stage.addEventListener("pointercancel", endDrag);
+    // An <img> is draggable by default: a few pixels in, the browser starts its own drag of the
+    // image, cancels the pointer, and the pan stops where that began — measured, a 120px drag moved
+    // the picture 24px. Only an svg had ever panned properly.
+    stage.addEventListener("dragstart", (e) => e.preventDefault());
   };
 
   const open = (source) => {

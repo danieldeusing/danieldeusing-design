@@ -8,27 +8,45 @@
  *   HEIGHT  every single-line control is --control-h, rendered AND with its min-block-size floor
  *           removed — a floor only lifts, so a field whose own padding and line height overshoot
  *           (29.6px measured on the foundations branch) is invisible to a rendered-height check;
- *   FORCED  under forced colours, light and dark, every mask glyph stands 3:1 off what it sits on
- *           and every state still differs from its neighbour — the mode repaints backgrounds as
- *           Canvas, which erases both. "Not the Canvas colour" is not enough: an opted-out glyph
- *           paints the colour its element was GIVEN, so cream on the white Canvas passes that test.
- *           And a highlighted row is read in PIXELS: the mode paints a Canvas backplate behind text
- *           that keeps the adjustment, which every computed colour misses;
+ *   FORCED  under forced colours, on BOTH palettes and all FOUR themes: every mask glyph paints at
+ *           least 3:1 against what it sits on, every word on a state reads at 4.5:1 with the state's
+ *           fill under it, every state differs from its neighbour, and a focused menu row's ring
+ *           reaches 3:1, enabled or aria-disabled. All of it in PAINTED pixels (X1): a computed
+ *           colour cannot see opacity, a Canvas backplate, or a glyph that kept its author colour
+ *           (a .25 zoom hint and a .2 ✓ both passed the computed-colour version of this check).
+ *           Every capture is taken inside the viewport with the scrollbars hidden, and a marker pass
+ *           — the element painted magenta — proves each clip holds its own element before its ratio
+ *           is believed. Rings are measured after REAL key presses: a forced :focus-visible paints
+ *           no outline at all;
+ *   HINT    the zoom hint reads at rest: 3:1 in painted pixels, on all four themes;
+ *   CHOSEN  every chosen row shape (aria-selected, aria-checked, on either row class) draws its ✓;
+ *   TONE    a fold's icon is its summary's colour, and an untoned fold does not take a container's
+ *           tone (F7);
  *   FOCUS   each component draws its OWN 2px --ring focus ring. Asserted with base.css switched
  *           off: base.css draws a global ring that would answer for a component that lost its rule;
  *   FONT    a control renders in its surroundings' font, not the browser's 13.33px control font;
  *   HIDDEN  `hidden` hides every component, whatever `display` the component sets;
- *   STATES  disabled is .45 and does not answer the pointer; busy is full strength and keeps focus;
- *           a popup whose first child is not a row still lays its rows out flush;
- *   COARSE  under a coarse pointer every control is a 44px target;
+ *   STATES  disabled is .45 and does not answer the pointer, and neither does busy; busy is full
+ *           strength and keeps focus; a popup whose first child is not a row lays its rows out flush;
+ *   COARSE  under a coarse pointer every control is a 44px target: buttons, rows, summaries;
  *   MOTION  reduced motion stops the busy spinner and the cursor blink, and nothing else does;
- *   RADIUS  no corner on the page is rounded, except a circle.
+ *   RADIUS  no corner on the page is rounded, except a circle;
+ *   INVALID an invalid field says what is wrong in TEXT — every aria-invalid="true" in the demo and in
+ *           the references' examples names a `.field-error` through aria-describedby (WCAG 1.4.1,
+ *           3.3.1: the --destructive edge alone is colour only);
+ *   SILENT  every `.ico`, in the demo and in the references' examples, is aria-hidden, and so is a
+ *           menu's `.dropdown-label`;
+ *   REMOVED the classes 0.60.0 removed (§1.1) are not declared again.
+ *
+ * The demo carries stand-ins for rules other packages of 0.60.0 own. Each switches itself off when
+ * the real rule is present; DD_FORBID_STANDINS=1 FAILS while any is still in force.
  *
  * A real browser (layout, cascade and the forced-colours mode are the subject), served off the
  * working tree over loopback, debugging port 0 read back from DevToolsActivePort. No browser: it
  * SKIPS loudly, and fails under DD_REQUIRE_BROWSER=1.
  *
  *   node scripts/check-components.mjs
+ *   DD_VERBOSE=1 node scripts/check-components.mjs    # also prints every forced-colours ratio
  */
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
@@ -116,6 +134,13 @@ const nodeOf = async (selector) => {
   return nodeId;
 };
 const force = async (selector, states) => send("CSS.forcePseudoState", { nodeId: await nodeOf(selector), forcedPseudoClasses: states });
+const KEYS = { ArrowDown: ["ArrowDown", 40], ArrowUp: ["ArrowUp", 38], Escape: ["Escape", 27], Tab: ["Tab", 9] };
+const press = async (key) => {
+  const [code, keyCode] = KEYS[key];
+  await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key, code, windowsVirtualKeyCode: keyCode });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode: keyCode });
+  await sleep(40); // `toggle` is dispatched asynchronously
+};
 
 // A PNG from captureScreenshot, decoded to RGB(A) bytes: 8-bit, non-interlaced, as Chromium writes it.
 const decodePng = (base64) => {
@@ -144,46 +169,16 @@ const decodePng = (base64) => {
       px[y * stride + x] = (raw[y * (stride + 1) + 1 + x] + predict) & 255;
     }
   }
-  return { width, height, bpp, px };
+  const at = (x, y) => { const i = (y * width + x) * bpp; return [px[i], px[i + 1], px[i + 2]]; };
+  return { width, height, at };
 };
-// The share of a row's TEXT box painted in one colour: a backplate is a slab of it, text is strokes.
-const slabShare = async (selector, rgb) => {
-  const box = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.scrollIntoView({ block: "center" });
-    const range = document.createRange(); range.selectNodeContents(el); const r = range.getBoundingClientRect();
-    return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }; })()`);
-  const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { ...box, scale: 1 } });
-  const { width, height, bpp, px } = decodePng(data);
-  let hits = 0;
-  for (let i = 0; i < width * height; i += 1) {
-    if ([0, 1, 2].every((k) => Math.abs(px[i * bpp + k] - rgb[k]) <= 16)) hits += 1;
-  }
-  return +(hits / (width * height)).toFixed(2);
-};
-
-await send("Page.enable");
-await send("DOM.enable");
-await send("CSS.enable");
-await send("Emulation.setDeviceMetricsOverride", { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
-await send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/examples/components.html` });
-for (let i = 0; i < 50; i += 1) {
-  const ran = await evaluate(`document.getElementById("height-check")?.dataset.result || ""`).catch(() => "");
-  if (ran) break;
-  await sleep(100);
-}
-// A forced :hover would otherwise be read mid-transition. The select.js trigger gets a name to aim at.
-await evaluate(`(() => {
-  const s = document.createElement("style");
-  s.id = "no-motion";
-  s.textContent = "*, *::before, *::after { transition: none !important; animation: none !important; }";
-  document.head.append(s);
-  document.querySelector("#sel-model").closest(".select-field").querySelector(".select-trigger").id = "trigger-model";
-  document.querySelector("select[disabled]").closest(".select-field").querySelector(".select-trigger").id = "trigger-disabled";
-  window.token = (name, prop = "color") => { const p = document.createElement("i"); p.style[prop] = "var(" + name + ")"; document.body.append(p);
-    const v = getComputedStyle(p)[prop]; p.remove(); return v; };
-  window.sys = (name) => { const p = document.createElement("i"); p.style.backgroundColor = name; document.body.append(p);
-    const v = getComputedStyle(p).backgroundColor; p.remove(); return v; };
-  window.cs = (sel, pseudo) => getComputedStyle(document.querySelector(sel), pseudo || null);
-})()`);
+const lum = (c) => c.map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+  .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const near = (a, b, tolerance = 12) => a.every((v, i) => Math.abs(v - b[i]) <= tolerance);
+const MAGENTA = [255, 0, 255];
+const isMagenta = ([r, g, b]) => r - g > 80 && b - g > 80;
+const round2 = (n) => Math.round(n * 100) / 100;
 
 let failures = 0;
 let last = "(none yet)";
@@ -201,6 +196,50 @@ const section = async (name, body) => {
     console.log(`FAIL  ${name}: threw after "${last}" — ${error.message.split("\n")[0]}`);
   }
 };
+
+/* ── SETUP ────────────────────────────────────────────────────────────────── */
+let selectStandIn = null;
+await section("SETUP — the page loads, and the runtime has enhanced it", async () => {
+  await send("Page.enable");
+  await send("DOM.enable");
+  await send("CSS.enable");
+  await send("Emulation.setDeviceMetricsOverride", { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/examples/components.html` });
+  let ran = "";
+  for (let i = 0; i < 50 && !ran; i += 1) {
+    ran = await evaluate(`document.getElementById("height-check")?.dataset.result || ""`).catch(() => "");
+    if (!ran) await sleep(100);
+  }
+  check("the page ran its own height check (the demo loaded and its script ran)", ran !== "", ran);
+  // No transitions, so a forced :hover is not read mid-fade. No scrollbars for the whole run (X1): a
+  // capture then lands where the layout was measured. `solid` switches every mask off, so a mask
+  // glyph paints one flat block of its colour; `mark` is the marker pass's slot.
+  await evaluate(`(() => {
+    const add = (id, css, off) => { const s = document.createElement("style"); s.id = id; s.textContent = css; s.disabled = !!off; document.head.append(s); };
+    add("no-motion", "*, *::before, *::after { transition: none !important; animation: none !important; }");
+    add("no-scrollbars", "html { scrollbar-width: none; } ::-webkit-scrollbar { display: none; }");
+    add("solid", "*, *::before, *::after { -webkit-mask: none !important; mask: none !important; }", true);
+    add("mark", "");
+    document.querySelector("#sel-model").closest(".select-field").querySelector(".select-trigger").id = "trigger-model";
+    document.querySelector("select[disabled]").closest(".select-field").querySelector(".select-trigger").id = "trigger-disabled";
+    window.token = (name, prop = "color") => { const p = document.createElement("i"); p.style[prop] = "var(" + name + ")"; document.body.append(p);
+      const v = getComputedStyle(p)[prop]; p.remove(); return v; };
+    window.cs = (sel, pseudo) => getComputedStyle(document.querySelector(sel), pseudo || null);
+  })()`);
+  // WP6's select.js writes position: fixed on the panel it appends; this branch's does not yet, and
+  // the demo's stand-in carries it. Open one list to see which.
+  selectStandIn = await evaluate(`(() => {
+    const trigger = document.getElementById("trigger-model"); trigger.click();
+    const panel = [...document.body.children].find((n) => n.matches(".select-panel"));
+    const inline = panel ? panel.style.position : "(no panel opened)"; trigger.click();
+    return inline === "fixed" ? null : "wp6 (select.js does not place its own panel)";
+  })()`);
+});
+if (failures) {
+  console.log(`\ncheck-components: ${failures} FAILED — the page did not come up, so nothing after the setup was run`);
+  shutdown();
+  process.exit(1);
+}
 
 /* ── HEIGHT ───────────────────────────────────────────────────────────────── */
 const MEASURE = `(() => {
@@ -237,67 +276,366 @@ await section("HEIGHT — one control height, and the box is the token", async (
   await evaluate(`document.documentElement.style.fontSize = ""; null`);
 });
 
-/* ── FORCED ───────────────────────────────────────────────────────────────── */
-const FORCED = `(() => {
-  const canvas = sys("Canvas");
-  const bg = (sel, pseudo) => cs(sel, pseudo).backgroundColor;
-  const fg = (sel) => cs(sel).color;
-  const rgb = (c) => c.match(/[\\d.]+/g).map(Number);
-  const over = (top, under) => { const a = top[3] ?? 1; return [0, 1, 2].map((i) => a * top[i] + (1 - a) * under[i]); };
-  const lum = (c) => c.map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
-    .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
-  // What a glyph sits on: the first opaque-ish background from its host up, over Canvas.
-  const backdrop = (el) => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor);
-    if ((c[3] ?? 1) > 0) return over(c, rgb(canvas)); } return rgb(canvas); };
-  const standsOff = (sel, pseudo) => { const el = document.querySelector(sel); const under = backdrop(pseudo ? el : el.parentElement);
-    const ink = over(rgb(bg(sel, pseudo)), under); const [x, y] = [lum(ink), lum(under)];
-    return +((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)).toFixed(2); };
-  const plainOption = '#static-listbox .select-option:not([aria-selected="true"]):not([data-active]):not([aria-disabled="true"])';
-  const glyphs = {
-    "busy spinner": standsOff("#btn-busy", "::before"), "bin": standsOff("#btn-bin", "::after"), "pencil": standsOff("#btn-edit", "::after"),
-    "menu ✓": standsOff("#static-checked", "::before"), "listbox ✓": standsOff("#opt-chosen", "::before"),
-    "zoom hint": standsOff("#dgm", "::after"), "theme dot": standsOff("#theme-menu .dd-dot"),
-    // An .ico (I1) opts out and paints currentColor, so it is only as good as the colour its host gives it.
-    "icon in a button": standsOff("#btn-ico .ico"), "icon in an option": standsOff("#static-listbox .select-option .ico"),
-    "icon in a fold summary": standsOff("#fold-count .ico"), "icon in a toned fold": standsOff("#fold-tone .ico"),
-    "icon in a dropdown summary": standsOff("#dd-history .ico"),
-  };
-  const pairs = {
-    "menu ✓ — checked vs not": [bg("#static-checked", "::before"), bg('#static-menu [aria-checked="false"]', "::before")],
-    "listbox ✓ — selected vs not": [bg("#opt-chosen", "::before"), bg(plainOption, "::before")],
-    "listbox row — keyboard-active vs rest": [bg("#opt-active"), bg(plainOption)],
-    "menu row — active vs rest": [bg('#static-menu [data-active="true"]'), bg("#static-plain")],
-    "menu row — off vs on": [fg("#static-disabled"), fg("#static-plain")],
-    "listbox row — off vs on": [fg("#opt-disabled"), fg(plainOption)],
-    "menu row — where you are vs rest": [fg("#static-current"), fg("#static-plain")],
-    "minimap bar — current vs rest": [bg('.minimap-bar[aria-current="true"]'), bg(".minimap-bar:not([aria-current])")],
-  };
-  return { forced: matchMedia("(forced-colors: active)").matches, canvas, glyphs, pairs,
-    caret: [cs("#trigger-model").backgroundImage, cs("#trigger-model", "::after").content] };
-})()`;
+/* ── pixels: capture, clip proof, and the three measurements ─────────────── */
+const setStyle = (id, css) => evaluate(`document.getElementById(${JSON.stringify(id)}).textContent = ${JSON.stringify(css)}; null`);
+const toggle = (id, on) => evaluate(`document.getElementById(${JSON.stringify(id)}).disabled = ${!on}; null`);
+const reveal = (selector) => evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)});
+  if (!el) throw new Error("nothing on the page matches " + ${JSON.stringify(selector)});
+  el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }); })()`);
 
-await section("FORCED — forced colours keep every glyph and every state (X1)", async () => {
+// In VIEWPORT coordinates, taken inside the viewport: captureBeyondViewport re-lays the page and a
+// clip measured before it lands up to ~7.5px off (X1).
+const capture = async (clip) => {
+  const [sx, sy] = await evaluate("[scrollX, scrollY]");
+  const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false,
+    clip: { x: clip.x + sx, y: clip.y + sy, width: clip.width, height: clip.height, scale: 1 } });
+  return decodePng(data);
+};
+// The border box of an element or of one of its pseudo-elements, in viewport coordinates.
+const boxOf = async (selector, pseudo) => {
+  const { root: doc } = await send("DOM.getDocument", { depth: -1 });
+  const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector });
+  if (!nodeId) throw new Error(`nothing on the page matches ${selector}`);
+  let node = { nodeId };
+  if (pseudo) {
+    const { node: described } = await send("DOM.describeNode", { nodeId, depth: 1 });
+    const generated = (described.pseudoElements || []).find((p) => p.pseudoType === pseudo);
+    if (!generated) return null;
+    node = { backendNodeId: generated.backendNodeId };
+  }
+  try {
+    const { model } = await send("DOM.getBoxModel", node);
+    const q = model.border;
+    return { x: q[0], y: q[1], width: q[2] - q[0], height: q[5] - q[1] };
+  } catch { return null; }
+};
+const modeOf = (pixels) => {
+  const counts = new Map();
+  for (const p of pixels) counts.set(p.join(), (counts.get(p.join()) || 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
+};
+const PAD = 3;
+const clipAround = (box) => {
+  const x = Math.floor(box.x) - PAD, y = Math.floor(box.y) - PAD;
+  return { x, y, width: Math.ceil(box.x + box.width) + PAD - x, height: Math.ceil(box.y + box.height) + PAD - y };
+};
+
+/*
+ * A GLYPH: the colour it paints against what it sits on. With `solid` on, a mask glyph paints one
+ * flat block, so the pixels down its middle column ARE its colour, whatever the mask's shape. The
+ * surroundings are four pixels 2px outside its box, one per side, and the ratio is against the
+ * worst of them. The marker pass paints the glyph magenta first: the middle column must turn
+ * magenta and none of the four surroundings may, or the clip is not on the glyph and the ratio
+ * would describe something else.
+ */
+const glyph = async (selector, pseudo) => {
+  await reveal(selector);
+  const box = await boxOf(selector, pseudo);
+  if (!box || box.width < 1 || box.height < 1) return { drawn: false };
+  const clip = clipAround(box);
+  const cx = Math.floor(box.x + box.width / 2) - clip.x;
+  const cy = Math.floor(box.y + box.height / 2) - clip.y;
+  const column = [];
+  for (let y = Math.floor(box.y) - clip.y; y < Math.ceil(box.y + box.height) - clip.y; y += 1) column.push(y);
+  const around = (img) => [img.at(1, cy), img.at(clip.width - 2, cy), img.at(cx, 1), img.at(cx, clip.height - 2)];
+  const rule = `${selector}${pseudo ? `::${pseudo}` : ""}`;
+  await setStyle("mark", `${rule} { background: rgb(255 0 255) !important; color: rgb(255 0 255) !important;
+    border-color: rgb(255 0 255) !important; forced-color-adjust: none !important; opacity: 1 !important; }`);
+  const marked = await capture(clip);
+  await setStyle("mark", "");
+  const aligned = column.some((y) => isMagenta(marked.at(cx, y))) && around(marked).every((p) => !isMagenta(p));
+  const img = await capture(clip);
+  const under = around(img);
+  let best = { ratio: 0, ink: null };
+  for (const y of column) {
+    const ink = img.at(cx, y);
+    const ratio = Math.min(...under.map((u) => contrast(ink, u)));
+    if (ratio > best.ratio) best = { ratio, ink };
+  }
+  // The colour it paints most: the page's scanline overlay darkens every third row a little, so the
+  // single most-contrasting pixel is not the colour to compare with another element's.
+  return { drawn: true, aligned, ratio: round2(best.ratio), ink: best.ink, under: under[0], mode: modeOf(column.map((y) => img.at(cx, y))) };
+};
+
+/*
+ * A WORD ON A STATE: the text's ink against the colour that is actually under it. The dominant
+ * colour of the text's own box is what the letters sit on; it must be the STATE's fill (sampled in
+ * the row's padding), or the mode painted a Canvas backplate over the state and the word sits on
+ * that instead — which a ratio against the row's fill would miss. The marker pass paints the text
+ * magenta: the clip must hold it.
+ */
+const words = async (textSel, rowSel = textSel, pseudoState = null) => {
+  await reveal(rowSel);
+  if (pseudoState) await force(rowSel, pseudoState);
+  const r = await evaluate(`(() => {
+    const el = document.querySelector(${JSON.stringify(textSel)}), row = document.querySelector(${JSON.stringify(rowSel)});
+    const range = document.createRange(); range.selectNodeContents(el);
+    const rects = [...range.getClientRects()].filter((q) => q.width > 0 && q.height > 0);
+    const l = Math.min(...rects.map((q) => q.left)), t = Math.min(...rects.map((q) => q.top));
+    const rr = Math.max(...rects.map((q) => q.right)), b = Math.max(...rects.map((q) => q.bottom));
+    const e = row.getBoundingClientRect();
+    return { x: l, y: t, width: rr - l, height: b - t, rowX: e.left, rowY: e.top };
+  })()`);
+  const clip = { x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height) };
+  await setStyle("mark", `${textSel}, ${textSel} * { color: rgb(255 0 255) !important; forced-color-adjust: none !important; text-shadow: none !important; }`);
+  const marked = await capture(clip);
+  await setStyle("mark", "");
+  let aligned = false;
+  for (let y = 0; y < marked.height && !aligned; y += 1) for (let x = 0; x < marked.width && !aligned; x += 1) aligned = isMagenta(marked.at(x, y));
+  const img = await capture(clip);
+  const fill = (await capture({ x: Math.floor(r.rowX) + 4, y: Math.floor(r.rowY) + 4, width: 1, height: 1 })).at(0, 0);
+  if (pseudoState) await force(rowSel, []);
+  const counts = new Map();
+  for (let y = 0; y < img.height; y += 1) for (let x = 0; x < img.width; x += 1) {
+    const key = img.at(x, y).join(); counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const dominant = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
+  let ink = dominant, best = 1;
+  for (let y = 0; y < img.height; y += 1) for (let x = 0; x < img.width; x += 1) {
+    const ratio = contrast(img.at(x, y), dominant);
+    if (ratio > best) { best = ratio; ink = img.at(x, y); }
+  }
+  return { aligned, ratio: round2(best), ink, dominant, fill, onFill: near(dominant, fill) };
+};
+
+/* A FOCUS RING on the focused element: the inset ring's outer two pixel columns against the row's
+   fill, 4px in. The marker pass paints the ring magenta, so the two columns must be the ring. */
+const ring = async () => {
+  const r = await evaluate(`(() => { const e = document.activeElement.getBoundingClientRect(); return { x: e.left, y: e.top, width: e.width, height: e.height }; })()`);
+  const clip = { x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height) };
+  const mid = Math.floor(clip.height / 2);
+  await setStyle("mark", `:focus-visible { outline-color: rgb(255 0 255) !important; forced-color-adjust: none !important; }`);
+  const marked = await capture(clip);
+  await setStyle("mark", "");
+  const aligned = isMagenta(marked.at(0, mid)) || isMagenta(marked.at(1, mid));
+  const img = await capture(clip);
+  const fill = img.at(4, 4);
+  const ratio = Math.max(contrast(img.at(0, mid), fill), contrast(img.at(1, mid), fill));
+  return { aligned, ratio: round2(ratio), ring: img.at(1, mid), fill };
+};
+
+/* ── FORCED ───────────────────────────────────────────────────────────────── */
+// Probes the demo does not carry. `.x-approve` is cockpit's own button colour
+// (`.btn-terminal.btn-approve { color: var(--success) }`, execution.css:288) — a page's colour beats
+// the system's forced one, which is exactly when a glyph that opted out keeps the page's colour.
+// `.x-desc` is a row's descendant with its own colour (WP6's `.option-desc`).
+const PROBES = `
+<style id="x-probe-style">
+  .btn-terminal.x-approve { color: var(--success); }
+  .x-desc { color: var(--muted-foreground); }
+</style>
+<div class="demo-row">
+  <button type="button" class="btn-terminal btn-terminal--compact x-approve" id="x-approve-busy" aria-busy="true" aria-disabled="true">approving</button>
+  <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive x-approve" id="x-approve-bin" aria-label="remove"></button>
+  <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--edit x-approve" id="x-approve-pencil" aria-label="edit"></button>
+</div>
+<div class="demo-cols demo-static">
+  <ul class="select-panel" role="menu" aria-label="a Radix radio menu">
+    <li role="none"><div class="select-option" role="menuitemradio" aria-checked="true" id="x-opt-checked">radio item, checked</div></li>
+    <li role="none"><div class="select-option" role="menuitemradio" aria-checked="true" data-highlighted id="x-opt-checked-hl">checked, highlighted</div></li>
+  </ul>
+  <ul class="select-panel" role="listbox" aria-label="rows as options">
+    <li class="dropdown-item" role="option" aria-selected="true" id="x-item-selected">option, selected</li>
+  </ul>
+  <ul class="select-panel" role="listbox" aria-label="described options">
+    <li class="select-option" role="option" aria-selected="false" data-active="true" id="x-opt-desc"><span>/deploy</span><span class="x-desc" id="x-desc">ship it</span></li>
+  </ul>
+  <ul class="dropdown-panel" role="menu" aria-label="described items">
+    <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-highlighted id="x-item-desc"><span>open</span><span class="x-desc" id="x-desc-2">in a new view</span></button></li>
+  </ul>
+</div>
+<div style="padding: 0.5rem 0"><span class="term-caret" id="x-caret"></span></div>
+<div data-tone="destructive"><details class="fold" id="x-tone-fold" open>
+  <summary><span class="ico" data-icon="package" aria-hidden="true" id="x-tone-ico"></span>skills/ <span class="fold-count">3</span></summary>
+  <div class="fold-body"><p>an untoned fold, inside a toned container</p></div></details></div>`;
+
+const GLYPHS = [
+  ["busy spinner, filled button", "#btn-busy", "before"],
+  ["busy spinner, ghost button", "#btn-ghost-busy", "before"],
+  ["bin", "#btn-bin", "after"],
+  ["pencil", "#btn-edit", "after"],
+  ["busy spinner in a page's own button colour", "#x-approve-busy", "before"],
+  ["bin in a page's own button colour", "#x-approve-bin", "after"],
+  ["pencil in a page's own button colour", "#x-approve-pencil", "after"],
+  ["menu ✓ (aria-checked)", "#static-checked", "before"],
+  ["menu ✓ in the live theme menu", '#theme-menu [aria-checked="true"]', "before"],
+  ["listbox ✓ (aria-selected)", "#opt-chosen", "before"],
+  ["✓ on .select-option[aria-checked] (a Radix radio item)", "#x-opt-checked", "before"],
+  ["✓ on a highlighted chosen row", "#x-opt-checked-hl", "before"],
+  ["✓ on .dropdown-item[aria-selected]", "#x-item-selected", "before"],
+  ["zoom hint at rest", "#dgm", "after"],
+  ["theme dot", "#theme-menu .dd-dot", null],
+  ["icon in a button", "#btn-ico .ico", null],
+  ["icon in an option", "#static-listbox .select-option .ico", null],
+  ["icon in a fold summary", "#fold-count .ico", null],
+  ["icon in a toned fold", "#fold-tone .ico", null],
+  ["icon in an untoned fold inside a toned container", "#x-tone-ico", null],
+  ["icon in a dropdown summary", "#dd-history .ico", null],
+  ["block cursor", ".cursor-block", null],
+  ["typing caret (.term-caret)", "#x-caret", null],
+  ["minimap bar", ".minimap-bar:not([aria-current])", null],
+  ["minimap bar, current", '.minimap-bar[aria-current="true"]', null],
+  ["menu separator", "#static-menu .dropdown-sep", null],
+  ["select caret ▾", "#trigger-model", "after"],
+];
+const WORDS = [
+  ["listbox row, keyboard-active", "#opt-active"],
+  ["menu row, keyboard-active", '#static-menu [data-active="true"]'],
+  ["menu row, checked, under the pointer", "#static-checked", "#static-checked", ["hover"]],
+  ["menu row, where you are", "#static-current"],
+  ["menu row, where you are, under the pointer", "#static-current", "#static-current", ["hover"]],
+  ["menu row, danger, under the pointer", "#static-danger", "#static-danger", ["hover"]],
+  ["own-coloured text on a highlighted option (WP6's .option-desc)", "#x-desc", "#x-opt-desc"],
+  ["own-coloured text on a highlighted menu item", "#x-desc-2", "#x-item-desc"],
+];
+const PLAIN_OPTION = '#static-listbox .select-option[aria-selected="false"]:not([data-active]):not([aria-disabled])';
+const THEMES = ["warm", "green", "mono", "paper"];
+
+await section("FORCED — both palettes, four themes, painted pixels (X1)", async () => {
+  await evaluate(`(() => { const s = document.createElement("section"); s.id = "x-probes"; s.innerHTML = ${JSON.stringify(PROBES)};
+    document.querySelector("main").append(s); })()`);
   for (const scheme of ["light", "dark"]) {
     await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
     await sleep(120);
-    const r = await evaluate(FORCED);
-    check(`${scheme}: the forced-colours mode is on (the check can see it at all)`, r.forced, r.forced);
-    const lost = Object.entries(r.glyphs).filter(([, ratio]) => !(ratio >= 3));
-    check(`${scheme}: every mask glyph stands at least 3:1 off what it sits on (Canvas is ${r.canvas})`, lost.length === 0, r.glyphs);
-    const same = Object.entries(r.pairs).filter(([, [a, b]]) => a === b);
-    check(`${scheme}: every state differs from its neighbour — ${Object.keys(r.pairs).length} pairs`, same.length === 0, same);
-    check(`${scheme}: the select's caret survives — the mode drops its gradient, and a text glyph stands in`,
-      /▾/.test(r.caret[1]), r.caret);
-    const canvas = r.canvas.match(/\d+/g).map(Number);
-    const slabs = {};
-    for (const row of ["#opt-active", '#static-menu [data-active="true"]']) slabs[row] = await slabShare(row, canvas);
-    check(`${scheme}: a highlighted row's text is ink on Highlight, not lost in a Canvas-coloured backplate`,
-      Object.values(slabs).every((share) => share < 0.6), slabs);
+    check(`${scheme}: the forced-colours mode is on (the check can see it at all)`,
+      await evaluate(`matchMedia("(forced-colors: active)").matches`));
+    for (const theme of THEMES) {
+      const cell = `${scheme} · ${theme}`;
+      await evaluate(`document.documentElement.dataset.theme = "${theme}"; null`);
+      await sleep(60);
+      const misaligned = [];
+
+      // Glyphs: 3:1 against what they sit on.
+      await evaluate(`document.getElementById("theme-menu").open = true; null`);
+      await toggle("solid", true);
+      const glyphs = {};
+      for (const [name, selector, pseudo] of GLYPHS) glyphs[name] = await glyph(selector, pseudo);
+      const unchecked = await glyph('#static-menu [aria-checked="false"]', "before");
+      await toggle("solid", false);
+      await evaluate(`document.getElementById("theme-menu").open = false; null`);
+      for (const [name, g] of Object.entries(glyphs)) if (g.drawn && !g.aligned) misaligned.push(name);
+      const faint = Object.entries(glyphs).filter(([, g]) => !g.drawn || !(g.ratio >= 3))
+        .map(([name, g]) => (g.drawn ? `${name}: ${g.ratio}:1 (ink ${g.ink} on ${g.under})` : `${name}: not drawn`));
+      check(`${cell}: all ${GLYPHS.length} glyphs paint at least 3:1 against what they sit on`, faint.length === 0, faint);
+
+      // Words on a state: 4.5:1 against the state's own fill.
+      const texts = {};
+      for (const [name, textSel, rowSel, pseudoState] of WORDS) texts[name] = await words(textSel, rowSel, pseudoState);
+      for (const [name, t] of Object.entries(texts)) if (!t.aligned) misaligned.push(name);
+      const unread = Object.entries(texts).filter(([, t]) => !(t.ratio >= 4.5 && t.onFill))
+        .map(([name, t]) => `${name}: ${t.ratio}:1 (ink ${t.ink} on ${t.dominant}; the state's fill is ${t.fill}${t.onFill ? "" : " — NOT under the text"})`);
+      check(`${cell}: all ${WORDS.length} words on a state read at 4.5:1, with the state's fill under them`, unread.length === 0, unread);
+      if (process.env.DD_VERBOSE === "1") {
+        console.log(`      glyphs: ${Object.entries(glyphs).map(([n, g]) => `${n} ${g.ratio}`).join(" · ")}`);
+        console.log(`      words: ${Object.entries(texts).map(([n, t]) => `${n} ${t.ratio}`).join(" · ")}`);
+      }
+
+      // Pairs: each state is told apart from its neighbour.
+      const fillOf = async (selector) => { await reveal(selector); const r = await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return [e.left, e.top]; })()`);
+        return (await capture({ x: Math.floor(r[0]) + 4, y: Math.floor(r[1]) + 4, width: 1, height: 1 })).at(0, 0); };
+      const inkOf = async (selector) => (await words(selector)).ink;
+      const pairs = {
+        "listbox row, keyboard-active vs rest (fill, 3:1)": contrast(await fillOf("#opt-active"), await fillOf(PLAIN_OPTION)) >= 3,
+        "menu row, keyboard-active vs rest (fill, 3:1)": contrast(await fillOf('#static-menu [data-active="true"]'), await fillOf("#static-plain")) >= 3,
+        "menu row, off vs on (ink)": !near(await inkOf("#static-disabled"), await inkOf("#static-plain"), 24),
+        "listbox row, off vs on (ink)": !near(await inkOf("#opt-disabled"), await inkOf(PLAIN_OPTION), 24),
+        "menu row, where you are vs rest (ink)": !near(await inkOf("#static-current"), await inkOf("#static-plain"), 24),
+        "✓ column, chosen vs not": glyphs["menu ✓ (aria-checked)"].ratio >= 3 && unchecked.drawn && unchecked.ratio < 1.2,
+        "minimap bar, current vs rest": glyphs["minimap bar, current"].drawn && glyphs["minimap bar"].drawn
+          && !near(glyphs["minimap bar, current"].ink, glyphs["minimap bar"].ink, 24),
+      };
+      const same = Object.entries(pairs).filter(([, ok]) => !ok).map(([name]) => name);
+      check(`${cell}: all ${Object.keys(pairs).length} state pairs are told apart`, same.length === 0, same);
+
+      // Rings, after real key presses: an enabled row and an aria-disabled one (Q1).
+      await evaluate(`(() => { const d = document.getElementById("dd-actions"); d.scrollIntoView({ block: "start", behavior: "instant" });
+        window.scrollBy({ top: -120, behavior: "instant" }); d.querySelector("summary").focus(); })()`);
+      await press("ArrowDown");
+      const enabled = { who: await evaluate(`[document.activeElement.textContent.trim(), document.activeElement.matches(":focus-visible")]`), ...(await ring()) };
+      for (let i = 0; i < 3; i += 1) await press("ArrowDown");
+      const disabled = { who: await evaluate(`[document.activeElement.textContent.trim(), document.activeElement.matches(":focus-visible"), document.activeElement.getAttribute("aria-disabled")]`), ...(await ring()) };
+      await press("Escape");
+      if (!enabled.aligned) misaligned.push("ring on an enabled row");
+      if (!disabled.aligned) misaligned.push("ring on an aria-disabled row");
+      check(`${cell}: a keyboard-focused row's ring reaches 3:1 on its row — enabled (${enabled.ratio}:1) and aria-disabled (${disabled.ratio}:1)`,
+        enabled.who[1] && disabled.who[1] && disabled.who[2] === "true" && enabled.ratio >= 3 && disabled.ratio >= 3, { enabled, disabled });
+
+      check(`${cell}: every clip holds its own element (the marker pass painted where it was measured)`, misaligned.length === 0, misaligned);
+    }
   }
   await send("Emulation.setEmulatedMedia", { features: [] });
   await sleep(80);
   const plain = await evaluate(`[cs("#trigger-model", "::after").content, cs("#trigger-model").backgroundImage]`);
   check("without the mode the caret is the gradient again, and there is no text glyph", plain[0] === "none" && plain[1].includes("gradient"), plain);
+});
+
+/* ── HINT ─────────────────────────────────────────────────────────────────── */
+await section("HINT — the zoom hint reads at rest, 3:1 in painted pixels", async () => {
+  await toggle("solid", true);
+  const out = {};
+  for (const theme of THEMES) {
+    await evaluate(`document.documentElement.dataset.theme = "${theme}"; null`);
+    await sleep(60);
+    out[theme] = await glyph("#dgm", "after");
+  }
+  await toggle("solid", false);
+  check("the marker pass painted where the hint was measured, on every theme", Object.values(out).every((g) => g.drawn && g.aligned), out);
+  check(`the hint is 3:1 at rest on all four themes (${Object.entries(out).map(([t, g]) => `${t} ${g.ratio}`).join(", ")})`,
+    Object.values(out).every((g) => g.ratio >= 3), out);
+});
+
+/* ── CHOSEN ───────────────────────────────────────────────────────────────── */
+// With the masks ON: the forced pass switches them off to read a glyph's colour, so it cannot see
+// a ✓ that has no mask at all. The middle column of the ✓ crosses its stroke.
+await section("CHOSEN — every chosen row shape draws its ✓, in the page's own colours (M0)", async () => {
+  const shapes = [["listbox option, aria-selected", "#opt-chosen"], ["menu item, aria-checked", "#static-checked"],
+    [".select-option[aria-checked] (a Radix radio item)", "#x-opt-checked"], [".dropdown-item[aria-selected]", "#x-item-selected"]];
+  const out = {};
+  for (const theme of THEMES) {
+    await evaluate(`document.documentElement.dataset.theme = "${theme}"; null`);
+    await sleep(60);
+    for (const [name, selector] of shapes) {
+      const g = await glyph(selector, "before");
+      const mask = await evaluate(`cs(${JSON.stringify(selector)}, "::before").maskImage`);
+      if (!(g.drawn && g.aligned && g.ratio >= 3 && mask.startsWith("url("))) out[`${theme} · ${name}`] = { ...g, mask: mask.slice(0, 12) };
+    }
+  }
+  check(`all ${shapes.length} chosen shapes draw the ✓ mask at 3:1 on all four themes`, Object.keys(out).length === 0, out);
+});
+
+/* ── TONE ─────────────────────────────────────────────────────────────────── */
+// A colour as the page paints it, BESIDE the element it is compared with: the capture is
+// colour-managed and the page's scanline overlay darkens everything under it, so a painted pixel
+// is compared with a painted swatch in the same place, never with a computed colour string.
+const swatch = async (colour, beside) => {
+  const box = await evaluate(`(() => { const s = document.createElement("span"); s.id = "x-swatch";
+    s.style.cssText = "display: inline-block; inline-size: 14px; block-size: 14px; background: " + ${JSON.stringify(colour)};
+    document.querySelector(${JSON.stringify(beside)}).after(s); const r = s.getBoundingClientRect(); return [r.left, r.top]; })()`);
+  const img = await capture({ x: Math.ceil(box[0]) + 6, y: Math.ceil(box[1]) + 1, width: 1, height: 12 });
+  await evaluate(`document.getElementById("x-swatch").remove(); null`);
+  return modeOf(Array.from({ length: 12 }, (_, y) => img.at(0, y)));
+};
+
+await section("TONE — a fold's icon is its summary's colour (F7)", async () => {
+  await evaluate(`document.documentElement.dataset.theme = "warm"; null`);
+  const out = {};
+  let destructive = null;
+  for (const [name, fold] of [["an untoned fold inside a toned container", "#x-tone-fold"], ["a toned fold", "#fold-tone"], ["an untoned fold", "#fold-count"]]) {
+    await reveal(fold);
+    const summary = await swatch(await evaluate(`cs(${JSON.stringify(`${fold} > summary`)}).color`), `${fold} > summary .ico`);
+    destructive ??= await swatch(await evaluate(`token("--destructive")`), `${fold} > summary .ico`);
+    await toggle("solid", true);
+    const g = await glyph(`${fold} > summary .ico`, null);
+    await toggle("solid", false);
+    out[name] = { icon: g.mode, summary, aligned: g.aligned, same: !!g.mode && near(g.mode, summary, 3) };
+  }
+  check("each icon paints its summary's colour, as painted — and the untoned fold's is not the container's destructive",
+    Object.values(out).every((o) => o.aligned && o.same) && !near(out["an untoned fold inside a toned container"].icon, destructive, 3),
+    { destructive, ...out });
+  const tone = await evaluate(`[getComputedStyle(document.getElementById("x-tone-fold")).getPropertyValue("--tone").trim(),
+    getComputedStyle(document.getElementById("fold-tone")).getPropertyValue("--tone").trim()]`);
+  check("an untoned fold resets --tone at its root, and a toned one keeps its own", tone[0] === "" && tone[1] !== "", tone);
+  await evaluate(`document.getElementById("x-probes").remove(); null`);
 });
 
 /* ── FOCUS and FONT, with base.css switched off ───────────────────────────── */
@@ -308,26 +646,26 @@ const RINGS = [
   [".dropdown > summary", "#dd-actions > summary", "2px"], [".dropdown-item (inset)", "#static-plain", "-2px"],
   ["text field", "#in-text", "2px"], ["textarea", "#in-textarea", "2px"], [".select-trigger", "#trigger-model", "2px"],
   [".field-row > button.lbl", "#f-hint", "2px"], ["details.fold > summary", "#fold-plain > summary", "2px"],
-  [".dgm-zoomable", "#dgm", "2px"], [".minimap-bar", ".minimap-bar", "3px"],
+  [".dgm-zoomable", "#dgm", "2px"], [".minimap-bar", ".minimap-bar", "3px"], [".anim-toggle", ".anim-toggle", "2px"],
 ];
 const ringOf = async (selector) => {
   await force(selector, ["focus", "focus-visible"]);
-  const ring = await evaluate(`(() => { const c = cs(${JSON.stringify(selector)}); return [c.outlineStyle, c.outlineWidth, c.outlineColor, c.outlineOffset]; })()`);
+  const outline = await evaluate(`(() => { const c = cs(${JSON.stringify(selector)}); return [c.outlineStyle, c.outlineWidth, c.outlineColor, c.outlineOffset]; })()`);
   await force(selector, []);
-  return ring;
+  return outline;
 };
 
 await section("FOCUS — each component draws its own ring, base.css off (X2)", async () => {
   await evaluate(`document.querySelector('link[href$="base.css"]').disabled = true;
     const probe = document.createElement("button"); probe.id = "bare-probe"; probe.textContent = "probe"; document.body.append(probe); null`);
-  const ring = await evaluate(`token("--ring")`);
+  const want = await evaluate(`token("--ring")`);
   const bare = await ringOf("#bare-probe");
   check("with base.css off, an element with no component rule has no system ring — so this check can fail",
-    !(bare[0] === "solid" && bare[1] === "2px" && bare[2] === ring), bare);
+    !(bare[0] === "solid" && bare[1] === "2px" && bare[2] === want), bare);
   const wrong = [];
   for (const [name, selector, offset] of RINGS) {
     const [style, width, colour, off] = await ringOf(selector);
-    if (!(style === "solid" && width === "2px" && colour === ring && off === offset)) wrong.push({ name, style, width, colour, off, want: offset });
+    if (!(style === "solid" && width === "2px" && colour === want && off === offset)) wrong.push({ name, style, width, colour, off, want: offset });
   }
   check(`${RINGS.length} components each draw a 2px solid --ring ring at their offset, from their own rule`, wrong.length === 0, wrong);
 });
@@ -336,7 +674,7 @@ await section("FONT — a control takes its surroundings' font, not the browser'
   const fonts = await evaluate(`(() => {
     const fsBase = token("--fs-base", "fontSize");
     return ["#btn-cta", "#btn-ghost", "#btn-bin", "#lq-button", "#disc-1", "#card-button", "#f-hint", "#in-text", "#in-textarea",
-      "#trigger-model", "#static-plain"].map((sel) => {
+      "#trigger-model", "#static-plain", ".anim-toggle"].map((sel) => {
       const el = document.querySelector(sel); const c = getComputedStyle(el); const p = getComputedStyle(el.parentElement);
       return { sel, family: c.fontFamily, parentFamily: p.fontFamily, size: c.fontSize, ok: c.fontFamily === p.fontFamily && [p.fontSize, fsBase].includes(c.fontSize) };
     });
@@ -352,7 +690,7 @@ await section("HIDDEN — `hidden` hides every component (X3)", async () => {
     const sels = ["#btn-ghost", "#btn-bin", "#btn-cta", "#static-plain", "#opt-chosen", "#static-menu", "#static-listbox", "#row-default",
       "#row-default .field-val", "#f-model-desc", "#legend-label", "#legend-list", "#fold-plain", "#fold-plain > summary", "#fold-empty",
       "#disc-1", "#card-static", "#card-link", "#lq-a", "#lq-button", "#in-text", "#in-textarea", "#trigger-model", "#dgm",
-      "#theme-menu .dd-dot", "#dd-actions", ".minimap", ".minimap-bar"];
+      "#theme-menu .dd-dot", "#dd-actions", ".minimap", ".minimap-bar", ".anim-toggle"];
     return sels.map((sel) => {
       const el = document.querySelector(sel);
       const before = el.getClientRects().length > 0;
@@ -378,7 +716,7 @@ await section("STATES — disabled, busy, and a panel that starts with something
   const dim = await evaluate(`["button.btn-terminal:disabled", "#btn-ghost-disabled", "#in-disabled", "#trigger-disabled", "textarea:disabled"].map((s) => [s, cs(s).opacity])`);
   check("disabled buttons, fields, the trigger and a textarea are .45", dim.every(([, o]) => o === "0.45"), dim);
   const inert = {};
-  for (const sel of ["#btn-ghost-disabled", "#in-disabled", "#trigger-disabled"]) inert[sel] = await pointerProof(sel);
+  for (const sel of ["#btn-ghost-disabled", "#in-disabled", "#trigger-disabled", "#btn-busy", "#btn-ghost-busy", "#btn-bin-busy"]) inert[sel] = await pointerProof(sel);
   // WP6's filtering trigger holds a --primary edge at (0,2,0); a disabled one keeps it under the pointer.
   await evaluate(`(() => { const s = document.createElement("style"); s.id = "filtering-stand-in";
     s.textContent = '.x-filtering[data-active="true"] { border-color: var(--primary); }'; document.head.append(s);
@@ -387,15 +725,18 @@ await section("STATES — disabled, busy, and a panel that starts with something
   await evaluate(`(() => { document.getElementById("filtering-stand-in").remove(); const t = document.getElementById("trigger-disabled");
     t.classList.remove("x-filtering"); delete t.dataset.active; })()`);
   const moved = Object.entries(inert).filter(([, v]) => v.rest !== v.hovered);
-  check("a disabled button, field or trigger — a filtering trigger included — does not change under the pointer", moved.length === 0, moved);
-  const live = await pointerProof("#in-text");
-  check("...while an enabled field still does (so the pointer is really forced)", live.rest !== live.hovered, live);
+  check("a disabled button, field or trigger (a filtering trigger included) and a BUSY button do not change under the pointer", moved.length === 0, moved);
+  const live = await pointerProof("#btn-cta");
+  check("...while an enabled button still does (so the pointer is really forced)", live.rest !== live.hovered, live);
 
   const busy = await evaluate(`(() => { const b = document.getElementById("btn-busy"); b.focus();
     return { opacity: cs("#btn-busy").opacity, spinner: cs("#btn-busy", "::before").maskImage.startsWith("url("),
       focused: document.activeElement === b, disabled: b.disabled, ariaDisabled: b.getAttribute("aria-disabled") }; })()`);
   check("busy: full strength, the spinner drawn, focus kept — aria-disabled, never disabled (X5)",
     busy.opacity === "1" && busy.spinner && busy.focused && !busy.disabled && busy.ariaDisabled === "true", busy);
+
+  const pad = await evaluate(`cs(".anim-toggle").padding`);
+  check("the anim toggle declares its own padding, not the browser's button padding", pad === "0px", pad);
 
   const flush = await evaluate(`(() => {
     const panel = document.createElement("div"); panel.className = "select-panel"; panel.style.cssText = "position: fixed; left: 10px; top: 10px;";
@@ -419,7 +760,9 @@ await section("COARSE — a 44px target under a coarse pointer", async () => {
   const box = await evaluate(`(() => {
     const b = (sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return [Math.round(r.width * 100) / 100, Math.round(r.height * 100) / 100]; };
     return { coarse: matchMedia("(pointer: coarse)").matches, ghost: b("#btn-ghost"), bin: b("#btn-bin"), pencil: b("#btn-edit"), disclosure: b("#disc-1"),
-      label: b("#f-hint"), fold: b("#fold-plain > summary"), compactFold: b("#fold-compact > summary") };
+      label: b("#f-hint"), fold: b("#fold-plain > summary"), compactFold: b("#fold-compact > summary"),
+      item: b("#static-plain"), option: b("#opt-chosen"), textSummary: b("#dd-actions > summary"), iconSummary: b("#dd-history > summary"),
+      anim: b(".anim-toggle") };
   })()`);
   await send("Emulation.setEmulatedMedia", { features: [] });
   await send("Emulation.setTouchEmulationEnabled", { enabled: false });
@@ -427,6 +770,8 @@ await section("COARSE — a 44px target under a coarse pointer", async () => {
   check("buttons, a button label and every fold summary are 44px tall; the bin, the pencil and the disclosure 44px square",
     box.ghost[1] >= 44 && box.label[1] >= 44 && box.fold[1] >= 44 && box.compactFold[1] >= 44 &&
     [box.bin, box.pencil, box.disclosure].every(([w, h]) => w >= 44 && h >= 44), box);
+  check("a menu item and an option are 44px tall; a text summary, an icon summary and the anim toggle are 44px targets",
+    box.item[1] >= 44 && box.option[1] >= 44 && [box.textSummary, box.iconSummary, box.anim].every(([w, h]) => w >= 44 && h >= 44), box);
 });
 
 await section("MOTION — reduced motion stops the spinner and the blink", async () => {
@@ -436,11 +781,11 @@ await section("MOTION — reduced motion stops the spinner and the blink", async
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
   await sleep(80);
   const still = await evaluate(read);
-  const glyph = await evaluate(`cs("#btn-busy", "::before").maskImage.startsWith("url(")`);
+  const spinner = await evaluate(`cs("#btn-busy", "::before").maskImage.startsWith("url(")`);
   await send("Emulation.setEmulatedMedia", { features: [] });
   await evaluate(`document.getElementById("no-motion").disabled = false; null`);
   check("without the preference the spinner turns and the cursor blinks (so the check can fail)", moving.every((n) => n !== "none"), moving);
-  check("with it both stop, and the spinner's glyph stays", still.every((n) => n === "none") && glyph, { still, glyph });
+  check("with it both stop, and the spinner's glyph stays", still.every((n) => n === "none") && spinner, { still, spinner });
 });
 
 /* ── RADIUS ───────────────────────────────────────────────────────────────── */
@@ -457,6 +802,63 @@ await section("RADIUS — no rounded corner anywhere, a circle excepted", async 
     return out;
   })()`);
   check("every corner on the page is square (50% circles allowed)", round.length === 0, round.slice(0, 10));
+});
+
+/* ── INVALID ──────────────────────────────────────────────────────────────── */
+// Resolves every aria-invalid="true" in `doc` through its aria-describedby to a .field-error with text.
+const DESCRIBED = `(doc) => [...doc.querySelectorAll('[aria-invalid="true"]')].map((el) => {
+  const ids = (el.getAttribute("aria-describedby") || "").split(/\\s+/).filter(Boolean);
+  const said = ids.map((id) => doc.getElementById(id)).filter((n) => n && n.classList.contains("field-error") && n.textContent.trim() !== "");
+  return { field: el.id || el.outerHTML.slice(0, 90), says: said.map((n) => n.textContent.trim()) };
+})`;
+
+await section("INVALID — an invalid field says what is wrong in text (WCAG 1.4.1, 3.3.1)", async () => {
+  const demo = await evaluate(`(${DESCRIBED})(document)`);
+  const mute = demo.filter((d) => d.says.length === 0);
+  check(`demo: all ${demo.length} aria-invalid fields name a .field-error with text through aria-describedby`,
+    demo.length >= 4 && mute.length === 0, mute.length ? mute : demo);
+  const refs = ["components.md", "tables-and-forms.md"].flatMap((file) => {
+    const text = readFileSync(join(root, ".claude/skills/danieldeusing-design/references", file), "utf8");
+    return [...text.matchAll(/```html\n([\s\S]*?)```/g)].map((m) => ({ file, html: m[1] })).filter((b) => b.html.includes("aria-invalid"));
+  });
+  const found = await evaluate(`(() => { const describe = ${DESCRIBED};
+    return ${JSON.stringify(refs)}.flatMap(({ file, html }) => describe(new DOMParser().parseFromString(html, "text/html")).map((d) => ({ file, ...d }))); })()`);
+  const bare = found.filter((d) => d.says.length === 0);
+  check(`references: all ${found.length} aria-invalid examples name a .field-error with text through aria-describedby`,
+    found.length >= 2 && bare.length === 0, bare.length ? bare : found);
+});
+
+/* ── SILENT — what is for the eye stays out of the accessibility tree ────── */
+await section("SILENT — an icon and a menu's label are for the eye", async () => {
+  const demo = await evaluate(`({ icons: [...document.querySelectorAll(".ico")].filter((i) => i.getAttribute("aria-hidden") !== "true").map((i) => i.outerHTML),
+    labels: [...document.querySelectorAll('[role="menu"] .dropdown-label')].filter((l) => l.getAttribute("aria-hidden") !== "true").map((l) => l.outerHTML),
+    total: document.querySelectorAll(".ico").length })`);
+  check(`demo: all ${demo.total} .ico glyphs are aria-hidden, and every .dropdown-label in a menu is too`,
+    demo.total >= 5 && demo.icons.length === 0 && demo.labels.length === 0, demo);
+  const blocks = ["components.md", "tables-and-forms.md"].flatMap((file) =>
+    [...readFileSync(join(root, ".claude/skills/danieldeusing-design/references", file), "utf8").matchAll(/```html\n([\s\S]*?)```/g)].map((m) => m[1]));
+  const loud = await evaluate(`${JSON.stringify(blocks)}.flatMap((html) => [...new DOMParser().parseFromString(html, "text/html").querySelectorAll(".ico")]
+    .filter((i) => i.getAttribute("aria-hidden") !== "true").map((i) => i.outerHTML))`);
+  check("references: every .ico in an example is aria-hidden", loud.length === 0, loud);
+});
+
+/* ── REMOVED ──────────────────────────────────────────────────────────────── */
+// Code, not prose: the comments that record a removal name the class, so they are stripped first.
+await section("REMOVED — the classes 0.60.0 removed are not declared (§1.1)", async () => {
+  const css = readFileSync(join(root, "src/components.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const back = [".filter-ctl", ".filter-set", ".filter-set-label", ".tbl-toolbar", ".tbl-search", ".tbl-filter-input"]
+    .filter((name) => new RegExp(`${name.replace(".", "\\.")}(?![\\w-])`).test(css));
+  check("components.css declares none of .filter-ctl, .filter-set(-label), .tbl-toolbar, .tbl-search, .tbl-filter-input", back.length === 0, back);
+});
+
+/* ── STAND-INS ────────────────────────────────────────────────────────────── */
+await section("STAND-INS — what the demo still borrows from other packages", async () => {
+  const standins = await evaluate(`document.documentElement.dataset.standins ?? "(the page does not say)"`);
+  const inForce = [standins, selectStandIn].filter((s) => s && s !== "none");
+  console.log(`      in force: ${inForce.length ? inForce.join(" · ") : "none"}`);
+  if (process.env.DD_FORBID_STANDINS === "1") {
+    check("DD_FORBID_STANDINS=1: no demo stand-in is in force", inForce.length === 0, inForce);
+  }
 });
 
 console.log(failures ? `\ncheck-components: ${failures} FAILED` : "\ncheck-components: all checks passed");

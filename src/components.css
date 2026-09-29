@@ -212,13 +212,13 @@
 /* `none`, not `""`, since the button is a flex row: an empty string still generates a zero-width
    box, the gap is laid out beside it, and every ghost label sat 0.4rem right of centre. */
 .btn-terminal--ghost::before { content: none; }
-.btn-terminal--ghost:where(:not(:disabled)):hover {
+.btn-terminal--ghost:where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):hover {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   box-shadow: none;
 }
 
-.btn-terminal:where(:not(:disabled)):hover {
+.btn-terminal:where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):hover {
   box-shadow: 0 0 28px var(--glow);
   transform: translateY(-2px);
 }
@@ -230,9 +230,12 @@
    made it unavoidable: it is disabled far more often than not.
 
    A DISABLED BUTTON DOES NOT ANSWER THE POINTER (0.60.0): every hover rule in this family carries
-   `:where(:not(:disabled))`, as the fields' and the select's do — inside `:where()`, so no hover
-   gained weight and an override written against 0.59.0 still wins. Resetting the lift here was not
-   enough: a disabled ghost, verdict or bin still took its hover edge and tint.
+   `:where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"]))`, as the fields' and the
+   select's carry `:disabled` — inside `:where()`, so no hover gained weight and an override written
+   against 0.59.0 still wins. Resetting the lift here was not enough: a disabled ghost, verdict or bin
+   still took its hover edge and tint. A BUSY button is in the guard too: it ignores a press while
+   `aria-busy` + `aria-disabled` stand, so lifting under the pointer would invite exactly the second
+   press it exists to stop.
 
    Opacity and nothing else about the fill: a disabled PRIMARY button must stay filled and just go
    quiet. Setting `background: transparent` here would strip it to `--primary-foreground` text on
@@ -284,8 +287,8 @@
   color: var(--destructive);
   border-color: color-mix(in srgb, var(--destructive) 60%, var(--border));
 }
-.btn-terminal--success:where(:not(:disabled)):hover,
-.btn-terminal--danger:where(:not(:disabled)):hover {
+.btn-terminal--success:where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):hover,
+.btn-terminal--danger:where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):hover {
   border-color: currentColor;
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
@@ -331,7 +334,7 @@
   -webkit-mask: var(--ico-trash-2) center / contain no-repeat;
   mask: var(--ico-trash-2) center / contain no-repeat;
 }
-.btn-terminal--destructive:where(:not(:disabled)):hover {
+.btn-terminal--destructive:where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):hover {
   border-color: var(--destructive);
   background: color-mix(in srgb, var(--destructive) 12%, transparent);
   box-shadow: none;
@@ -479,11 +482,17 @@ button.link-quiet:disabled { opacity: 0.45; cursor: default; color: var(--muted-
 
 /* Animations on/off toggle — a chrome control (footer/status bar). Pairs with
    runtime/anim.js and the html.anim-off kill-switch. The [data-anim-box] glyph
-   lights up in the primary colour while animations are enabled. */
+   lights up in the primary colour while animations are enabled.
+
+   A BUTTON WITH A BOX OF ITS OWN (0.60.0). It declared no padding, so it wore the browser's (1px
+   6px in Chrome, another size elsewhere) beside summaries that have none, and no ring, so a keyboard
+   reader lost it in the footer. Padding 0 lines its text up with the dropdown summaries beside it;
+   the ring and the 44px touch target are every control's. */
 .anim-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 0;
   font: inherit;
   color: var(--muted-foreground);
   background: none;
@@ -494,8 +503,12 @@ button.link-quiet:disabled { opacity: 0.45; cursor: default; color: var(--muted-
 .anim-toggle:hover {
   color: var(--primary);
 }
+.anim-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .anim-toggle[aria-pressed="true"] [data-anim-box] {
   color: var(--primary);
+}
+@media (pointer: coarse) {
+  .anim-toggle { min-block-size: 44px; min-inline-size: 44px; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -748,26 +761,31 @@ button.card-terminal:focus-visible { outline: 2px solid var(--ring); outline-off
    changed its width; the ✓ is shape and position, and no label moves when the choice does. The
    label keeps its weight and its colour; the ✓ carries the state.
 
-   Reserved on every row of a `.select-panel`, on every choice row of a menu (`aria-checked`,
+   EVERY CHOSEN ROW SHAPE DRAWS IT: an option says `aria-selected`, a menu's choice says
+   `aria-checked` (or `aria-pressed`), and either class can wear either — a Radix radio or checkbox
+   item rendered as a `.select-option`, a listbox built of `.dropdown-item` rows. A row that says it
+   is chosen and draws nothing is a choice the reader cannot see.
+
+   Reserved on every row of a `.select-panel`, on every choice row (`aria-selected`, `aria-checked`,
    `aria-pressed`, `menuitemradio`, `menuitemcheckbox`), and on every row of a menu that holds one,
    so a "reset" under the choices lines up with them. That last selector needs :has() and is a rule
    of its own on purpose: in one list with the others, an engine without :has() drops the whole
    list — the always-safe selectors with it. */
 .select-panel :is(.select-option, .dropdown-item)::before,
-.dropdown-item:is([aria-checked], [aria-pressed], [role="menuitemradio"], [role="menuitemcheckbox"])::before {
+:is(.select-option, .dropdown-item):is([aria-selected], [aria-checked], [aria-pressed], [role="menuitemradio"], [role="menuitemcheckbox"])::before {
   content: "";
   flex: none;
   inline-size: var(--icon-sm);
   block-size: var(--icon-sm);
 }
-.dropdown-panel:has(:is([aria-checked], [aria-pressed], [role="menuitemradio"], [role="menuitemcheckbox"])) .dropdown-item::before {
+.dropdown-panel:has(:is([aria-selected], [aria-checked], [aria-pressed], [role="menuitemradio"], [role="menuitemcheckbox"])) .dropdown-item::before {
   content: "";
   flex: none;
   inline-size: var(--icon-sm);
   block-size: var(--icon-sm);
 }
-.select-option[aria-selected="true"]::before,
-.dropdown-item:is([aria-checked="true"], [aria-pressed="true"])::before {
+.select-option:is([aria-selected="true"], [aria-checked="true"])::before,
+.dropdown-item:is([aria-selected="true"], [aria-checked="true"], [aria-pressed="true"])::before {
   background: var(--primary);
   -webkit-mask: var(--ico-check) center / contain no-repeat;
   mask: var(--ico-check) center / contain no-repeat;
@@ -791,14 +809,30 @@ button.card-terminal:focus-visible { outline: 2px solid var(--ring); outline-off
 
 .dropdown-item--danger { color: var(--destructive); }
 
+/* A BORDER, NOT A 1px FILL: forced colours paint every background as Canvas, which erased the rule
+   between two groups of rows; a border keeps a system colour there. `border: 0` first, so an <hr>
+   drops its inset box. */
 .dropdown-sep {
-  block-size: 1px;
+  block-size: 0;
   margin: 0.25rem 0;
   padding: 0;
-  background: var(--border);
+  border: 0;
+  border-top: 1px solid var(--border);
 }
 
-/* A group heading inside a popup: an <optgroup>'s label in a listbox, `.dropdown-label` in a menu. */
+/* 44px under a thumb (house rule 4): a row in a popup is a target like any button, and at desktop
+   density it is 25px. A summary that is only text or a glyph gets the same box, centred — at no
+   weight, so a `.btn-icon` summary keeps its own. */
+@media (pointer: coarse) {
+  .select-option,
+  .dropdown-item { min-block-size: 44px; }
+  :where(.dropdown > summary) { min-block-size: 44px; min-inline-size: 44px; justify-content: center; }
+}
+
+/* A group heading inside a popup: an <optgroup>'s label in a listbox, `.dropdown-label` in a menu.
+   A menu's label is for the EYE: inside role="menu" its words would be loose text between the
+   items, so initDropdowns() takes it out of the accessibility tree (`aria-hidden`) and the menu
+   keeps the name its summary gives it. A page-built menu marks it the same way itself. */
 .dropdown-label,
 .select-group {
   padding: 0.35rem 0.9rem 0.15rem 0.5rem;
@@ -1301,8 +1335,16 @@ section.doc.tab-panel { margin-top: 1.35rem; }
    carries actions is a `.panel` with a `.disclosure-btn`. What a summary holds, after the ▸: an
    optional `.ico`, the label, and a `.fold-count` — "skills/ 12", "(3/17)" while a search narrows.
 
+   THE ICON IS THE SUMMARY'S COLOUR: muted, or the fold's tone. It is coloured through its parent,
+   never with a `color` of its own — under forced colours a glyph that declares a colour keeps that
+   AUTHOR colour instead of taking its label's, and a muted icon measured 2.89:1 there. One icon that
+   needs its own tone takes `data-tone` on the `.ico` (icons.css). And an untoned fold resets
+   `--tone` (F7): a fold inside a toned card or notice must not take the card's tone for its icon
+   while its label stays muted.
+
    initFolds() (runtime/fold.js) opens every closed <details> for a print and closes them again
    afterwards; without it a printout silently loses whatever the closed ones were holding. */
+details.fold:not([data-tone]) { --tone: initial; }
 details.fold { border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
 details.fold > summary {
   display: flex; align-items: center; gap: 0.5rem; cursor: pointer; list-style: none;
@@ -1315,9 +1357,7 @@ details.fold > summary::before { content: "\25B8"; content: "\25B8" / ""; flex: 
 details.fold[open] > summary::before { content: "\25BE"; content: "\25BE" / ""; }
 details.fold > summary:hover { color: var(--primary); }
 details.fold > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-details.fold > summary .ico {
-  inline-size: var(--icon-size); block-size: var(--icon-size); color: var(--tone, currentColor);
-}
+details.fold > summary .ico { inline-size: var(--icon-size); block-size: var(--icon-size); }
 .fold-count { color: var(--muted-foreground); font-weight: 400; font-variant-numeric: tabular-nums; }
 /* A tone colours the whole summary, so an error group reads as one before it is opened — and keeps
    its colour under the pointer, where the meaning matters more than the hover. */
@@ -1373,16 +1413,20 @@ details.fold--boxed > summary { padding-block: 0.5rem; }
    `<dialog class="dgm-overlay">`, and its rules live in overlays.css with the other dialogs.
 
    The affordance has to be visible without hovering — this portal is read from a phone — so the
-   corner hint is always drawn, not revealed on :hover. It is the maximize-2 glyph, a mask in
-   currentColor at the small icon size, so it has no text to announce. */
+   corner hint is always drawn, not revealed on :hover. It is the maximize-2 glyph, a mask at the
+   small icon size, so it has no text to announce.
+
+   FULL STRENGTH AT REST (0.60.0, lead ruling). It rested at .45 and measured 1.82–2.15:1 across the
+   four themes, and it is the only graphic that says the figure opens (WCAG 1.4.11 wants 3:1): so it
+   is --muted-foreground outright, 4.67–6.71:1, and turns --primary under the pointer and in focus. */
 .dgm-zoomable { position: relative; cursor: zoom-in; }
 .dgm-zoomable::after {
   content: ""; position: absolute; top: 0.4rem; right: 0.5rem;
-  inline-size: var(--icon-sm); block-size: var(--icon-sm); opacity: 0.45; pointer-events: none;
+  inline-size: var(--icon-sm); block-size: var(--icon-sm); pointer-events: none;
   background: var(--muted-foreground);
   -webkit-mask: var(--ico-maximize-2) center / contain no-repeat; mask: var(--ico-maximize-2) center / contain no-repeat;
 }
-.dgm-zoomable:hover::after, .dgm-zoomable:focus-visible::after { opacity: 1; background: var(--primary); }
+.dgm-zoomable:hover::after, .dgm-zoomable:focus-visible::after { background: var(--primary); }
 .dgm-zoomable:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 @media print { .dgm-overlay, .dgm-zoomable::after { display: none !important; } }
@@ -1452,7 +1496,7 @@ details.fold--boxed > summary { padding-block: 0.5rem; }
 /* The strip is navigation for a screen. On paper the page IS the map. */
 @media print { .minimap { display: none !important; } }
 
-/* ── TABLE TOOLS: search on top, sort + filter in the header ──────────────────
+/* ── TABLE TOOLS: sort + filter in the header ───────────────────────────────
    Paired with runtime/tabletools.js. The estate grew four generations of table
    filtering before this existed — cockpit's `tr.act-filters`, cockpit's older
    `tr.filters`, the family contacts table's bare box row — and each spent a
@@ -1462,24 +1506,9 @@ details.fold--boxed > summary { padding-block: 0.5rem; }
    act on. The filter is a `details.dropdown`, the SYSTEM's dropdown, so
    one-open / click-away / Escape come from initDropdowns() and are not
    reimplemented here. Only the parts that are genuinely table-specific are
-   declared below. */
-.tbl-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-block-end: 0.5rem;
-}
-.tbl-search {
-  flex: 1 1 auto;
-  min-inline-size: 0;
-  font: inherit;
-  font-size: var(--fs-base);
-  color: var(--foreground);
-  background: var(--background);
-  border: 1px solid var(--border);
-  padding: 0.25rem 0.5rem;
-}
-.tbl-search:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+   declared below. The search above the table and the filter panel's text box are
+   the system's `.filter-bar` and `.search-field` (filters.css) since 0.60.0;
+   `.tbl-toolbar`, `.tbl-search` and `.tbl-filter-input` are gone. */
 
 /* The header cell keeps its label on the baseline and parks the controls at its
    trailing edge, so a column of numbers still reads as a column of numbers. */
@@ -1516,16 +1545,6 @@ th[aria-sort]:not([aria-sort="none"]) .tbl-sort { opacity: 1; color: var(--prima
 .tbl-filter.is-on > summary::after { content: "•"; margin-inline-start: 0.1em; }
 
 .tbl-filter-panel { padding: 0.4rem; max-block-size: 60vh; overflow-y: auto; }
-.tbl-filter-input {
-  font: inherit;
-  font-size: var(--fs-base);
-  color: var(--foreground);
-  background: var(--background);
-  border: 1px solid var(--border);
-  padding: 0.2rem 0.4rem;
-  inline-size: 12rem;
-  max-inline-size: 100%;
-}
 
 /* ── WHAT IS IN FORCE GOES ON THE COLUMN ──────────────────────────────────────
    Not a bar above the table (Daniel, 2026-08-19). A separate strip is a second
@@ -1573,7 +1592,7 @@ th:has(.tbl-tools) { white-space: nowrap; }
     display: inline-flex; align-items: center; justify-content: center; }
 }
 @media print {
-  .tbl-toolbar, .tbl-tools { display: none !important; }
+  .tbl-tools { display: none !important; }
   /* The BADGE prints, and the underline with it. A printed table that is
      silently filtered is the same failure on paper, with no way to interrogate
      it at all — so the one part that says which rows are missing stays. */
@@ -1583,21 +1602,28 @@ th:has(.tbl-tools) { white-space: nowrap; }
 
 /* ── FORCED COLOURS (0.60.0) ─────────────────────────────────────────────────────────────────────
    A contrast theme repaints every background as Canvas and replaces every author colour; only a
-   system colour is kept as written. Three kinds of thing in this file are drawn by a background,
+   system colour is kept as written. Four kinds of thing in this file are drawn by a background,
    and each would vanish:
-   · the mask glyphs (the ✓, the bin, the pencil, the spinner, the zoom hint, the theme dot). They
-     opt out of the adjustment and paint in currentColor — and currentColor is the colour the
-     element was GIVEN, not the one the mode shows: an opted-out spinner on the filled button paints
-     --primary-foreground, cream on the white Canvas. So the controls that carry a glyph are given a
-     system colour here first (ButtonText, CanvasText, HighlightText, GrayText), and the glyph
-     inherits that;
-   · the states that are only a fill or a tint are redrawn in system colours: the one row the
-     pointer or the keys are on is Highlight under HighlightText, a row that is off is GrayText,
-     where you are in a navigation list is Highlight text, and the minimap's bars are CanvasText
-     with the current one in Highlight;
+   · the MASK GLYPHS (the spinner, the bin, the pencil, the ✓, the zoom hint, the theme dot) and the
+     two CURSORS. Each takes `preserve-parent-color` and paints `currentColor`, so its colour is the
+     one its host was FORCED to — ButtonText in a button, CanvasText in text, HighlightText on the
+     row the pointer is on, GrayText on a disabled control: always its label's colour, whatever
+     colour a page gave the host. NOT `forced-color-adjust: none`: forcing happens at used-value
+     time and inheritance carries the computed value, so under `none` a glyph keeps its host's
+     AUTHOR colour — cockpit's `.btn-terminal.btn-approve { color: var(--success) }` painted its
+     spinner, bin and pencil at 1.74:1 that way (RULES-CROSSCUT X1). For the same reason no glyph
+     here declares a `color` of its own, and a page must not give it one: a declared colour turns
+     `preserve-parent-color` back into `none`. An engine without the value paints CanvasText
+     instead — always visible, if not always its context's colour;
+   · the STATES that are only a fill or a tint are redrawn in system colours: the row the pointer
+     or the keys are on is Highlight under HighlightText, a row that is off is GrayText, where you
+     are in a navigation list is Highlight text, and the minimap's bars are CanvasText with the
+     current one in Highlight;
+   · the menu separator is a border (above), which the mode keeps in a system colour;
    · the select's caret is a gradient, and the mode drops gradients outright, so the trigger draws
      it as a text glyph instead.
-   scripts/check-components.mjs asserts each of these under the emulated mode, light and dark. */
+   scripts/check-components.mjs measures every one of these in PAINTED pixels, on the light and the
+   dark forced palette, on all four themes. */
 @media (forced-colors: active) {
   .btn-terminal { color: ButtonText; }
   .btn-terminal:disabled { color: GrayText; }
@@ -1605,36 +1631,63 @@ th:has(.tbl-tools) { white-space: nowrap; }
   .dropdown-item { color: CanvasText; }
   /* Before the highlight, so a current row under the pointer reads HighlightText on Highlight. */
   .dropdown-item[aria-current="true"] { color: Highlight; }
-  /* Opted out as well: the mode paints a Canvas backplate behind any text that keeps the
-     adjustment, and on a Highlight row that backplate is a solid box with the text lost in it. */
+  /* THE HIGHLIGHTED ROW opts out as well: the mode paints a Canvas backplate behind any text that
+     keeps the adjustment, and on a Highlight row that backplate is a solid box with the text lost in
+     it. `none` is inherited, so everything inside the row would then keep its AUTHOR colour on the
+     Highlight fill — a description in --muted-foreground (WP6's `.option-desc`) measured
+     1.31–3.59:1 — so every descendant takes the row's HighlightText, and nothing keeps an author
+     glow (the current row's text-shadow). `none` also stops forcing the outline, so the row owns its
+     ring: HighlightText, inset, on its own fill. */
   .select-option:is(:hover, [data-active="true"], [data-highlighted]),
   .dropdown-item:is(:hover, :focus-visible, [data-active="true"], [data-highlighted]) {
     forced-color-adjust: none;
     background: Highlight;
     color: HighlightText;
     outline-color: HighlightText;
+    text-shadow: none;
   }
+  .select-option:is(:hover, [data-active="true"], [data-highlighted]) *,
+  .dropdown-item:is(:hover, :focus-visible, [data-active="true"], [data-highlighted]) * {
+    color: inherit;
+    text-shadow: none;
+  }
+  /* A ROW THAT IS OFF takes no highlight, so it sits on the panel's Canvas — where the HighlightText
+     ring above measured 1.00:1 on both palettes when the keys landed on it. APG keeps an
+     aria-disabled item in the arrow-key walk, so it is focused often, and its ring is CanvasText:
+     the one colour certain to stand off Canvas. */
   :is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled) {
     background: none;
     color: GrayText;
+    outline-color: CanvasText;
   }
   .btn-terminal[aria-busy="true"]::before,
   .btn-terminal--destructive::after,
   .btn-terminal--edit::after,
-  .select-option[aria-selected="true"]::before,
-  .dropdown-item:is([aria-checked="true"], [aria-pressed="true"])::before {
-    forced-color-adjust: none;
+  .select-option:is([aria-selected="true"], [aria-checked="true"])::before,
+  .dropdown-item:is([aria-selected="true"], [aria-checked="true"], [aria-pressed="true"])::before,
+  .dgm-zoomable::after,
+  .dgm-zoomable:is(:hover, :focus-visible)::after,
+  .dd-dot,
+  .cursor-block,
+  .term-caret {
+    forced-color-adjust: preserve-parent-color;
     background: currentColor;
   }
-  .dgm-zoomable::after,
-  .dd-dot {
-    forced-color-adjust: none;
-    background: CanvasText;
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .btn-terminal[aria-busy="true"]::before,
+    .btn-terminal--destructive::after,
+    .btn-terminal--edit::after,
+    .select-option:is([aria-selected="true"], [aria-checked="true"])::before,
+    .dropdown-item:is([aria-selected="true"], [aria-checked="true"], [aria-pressed="true"])::before,
+    .dgm-zoomable::after,
+    .dgm-zoomable:is(:hover, :focus-visible)::after,
+    .dd-dot,
+    .cursor-block,
+    .term-caret {
+      forced-color-adjust: none;
+      background: CanvasText;
+    }
   }
-  /* An .ico (icons.css) opts out and paints currentColor. A button and a row hand it a system colour
-     above; a summary keeps its author one (muted, or a fold's tone), so its icon is given one here. */
-  details.fold > summary .ico,
-  .dropdown > summary .ico { color: CanvasText; }
   .minimap-bar,
   .minimap-bar:hover { background: CanvasText; }
   .minimap-bar[aria-current="true"] { background: Highlight; }

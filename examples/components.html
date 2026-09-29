@@ -21,20 +21,25 @@
 
     <!-- The package's own order, deliberately WITHOUT reset.css: every interactive class on this
          page has to render right without one (house rule 4), and a missing `font: inherit` shows
-         up here as a 13px system font. chrome.css is here for header.bar and .visually-hidden. -->
+         up here as a 13px system font. chrome.css is here for header.bar and .visually-hidden.
+         icons.css is WP4's new file (`.ico`): until it lands the link answers 404, and the I1
+         stand-in below covers for it. -->
     <link rel="stylesheet" href="../src/tokens.css" />
     <link rel="stylesheet" href="../src/base.css" />
     <link rel="stylesheet" href="../src/components.css" />
     <link rel="stylesheet" href="../src/chrome.css" />
+    <link rel="stylesheet" href="../src/icons.css" />
 
-    <style id="stand-in">
-      /* ⚠ STAND-IN — NOT PART OF THE PACKAGE, AND NOT A PATTERN TO COPY.
-         Every declaration in this block belongs to ANOTHER work package of 0.60.0 that is not on
-         this branch yet. It is here so this page can show the revised components as they will
-         render once those land, and it goes when they do. Values are SPEC.md's, verbatim.
-
-         WP1 (src/tokens.css): F1 size tokens, F3 elevation, F6 motion, F7 tones, I1 icon masks.
-         WP4 (I1's table): --ico-maximize-2, which WP1 does not ship. */
+    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
+         STAND-INS — NOT PART OF THE PACKAGE, AND NOT A PATTERN TO COPY.
+         Each block below belongs to ANOTHER work package of 0.60.0 that is not on this branch yet,
+         so this page can show the revised components as they will render once those land. Each is
+         DISABLED (media="not all"): the script at the top of <body> switches one on only when the
+         real rule is missing, and the page names the ones in force (html[data-standins]).
+         check-components.mjs with DD_FORBID_STANDINS=1 FAILS while any of them is.
+         ══════════════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- WP1 (tokens.css): F1 sizes, F3 elevation, F6 motion, F7 tones. Probed by --control-h. -->
+    <style id="standin-wp1" media="not all">
       :root {
         --control-h: 1.75rem;
         --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
@@ -44,32 +49,25 @@
         --icon-lg: 1rem;
         --icon-xl: 1.5rem;
         --elev-float: 0 0 20px var(--glow-soft);
-        --ico-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
-        --ico-trash-2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3C/svg%3E");
-        --ico-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
-        --ico-loader-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-6.219-8.56'/%3E%3C/svg%3E");
-        --ico-refresh-cw: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/%3E%3Cpath d='M8 16H3v5'/%3E%3C/svg%3E");
-        --ico-package: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/%3E%3Cpath d='M12 22V12'/%3E%3Cpolyline points='3.29 7 12 12 20.71 7'/%3E%3Cpath d='m7.5 4.27 9 5.15'/%3E%3C/svg%3E");
-        --ico-triangle-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
-        --ico-maximize-2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='m21 3-7 7'/%3E%3Cpath d='m3 21 7-7'/%3E%3Cpath d='M9 21H3v-6'/%3E%3C/svg%3E");
-        --ico-history: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3Cpath d='M12 7v5l4 2'/%3E%3C/svg%3E");
       }
       [data-tone="destructive"] { --tone: var(--destructive); }
       @keyframes dd-spin { to { transform: rotate(1turn); } }
       html.anim-off *, html.anim-off *::before, html.anim-off *::after { animation: none !important; transition: none !important; }
       html.anim-off .cursor-block { display: none; }
-      /* I1 (`.ico`, owned elsewhere): a mask in currentColor, named by data-icon. */
-      .ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
-      .ico[data-icon="refresh-cw"] { --ico: var(--ico-refresh-cw); }
-      .ico[data-icon="history"] { --ico: var(--ico-history); }
-      .ico[data-icon="package"] { --ico: var(--ico-package); }
-      .ico[data-icon="triangle-alert"] { --ico: var(--ico-triangle-alert); }
-      /* X1 for I1: the mask opts out of forced colours and paints currentColor (WP4's .ico rule). */
-      @media (forced-colors: active) { .ico { forced-color-adjust: none; } }
-      /* WP6 (runtime/select.js): writes `position: fixed` inline on the panel it appends. */
-      body > .select-panel { position: fixed; }
-      /* X3, WP1 (tokens.css): `hidden` beats every author `display`, once, for the whole system. */
+    </style>
+    <!-- X3 (WP1, tokens.css): `hidden` beats every author `display`, once, for the whole system.
+         Probed by a hidden .dd-dot that still draws. -->
+    <style id="standin-x3" media="not all">
       [hidden]:not([hidden="until-found"]) { display: none !important; }
+    </style>
+    <!-- I1 (WP1 + WP4): the --ico-* masks, the [data-icon] mapping and the .ico class with WP4's
+         forced-colours rule. The script fills in ONLY the pieces that are missing. -->
+    <style id="standin-i1" media="not all"></style>
+    <!-- WP6 (runtime/select.js) writes `position: fixed` inline on the panel it appends; this
+         branch's select.js does not yet. The selector stands down by itself on a panel that carries
+         it, and check-components.mjs opens a list to see which one placed it. -->
+    <style id="standin-wp6">
+      body > .select-panel:not([style*="position"]) { position: fixed; }
     </style>
 
     <style>
@@ -106,6 +104,76 @@
   </head>
 
   <body>
+    <script>
+      /* Switch on each stand-in only where the real rule is missing, and say which are in force.
+         WP1 is probed by --control-h, X3 by a hidden .dd-dot that still draws, and I1 piece by
+         piece: each absent --ico-* token, each name the [data-icon] mapping does not resolve, and
+         the .ico class. */
+      (() => {
+        const root = document.documentElement;
+        const token = (name) => getComputedStyle(root).getPropertyValue(name).trim() !== "";
+        const probe = (html, test) => {
+          const host = document.createElement("div");
+          host.innerHTML = html;
+          document.body.append(host);
+          const ok = test(getComputedStyle(host.firstElementChild));
+          host.remove();
+          return ok;
+        };
+        const inForce = [];
+        const use = (id, missing) => {
+          if (!missing) return;
+          document.getElementById(id).media = "all";
+          inForce.push(id.replace("standin-", ""));
+        };
+        use("standin-wp1", !token("--control-h"));
+        use("standin-x3", probe('<span class="dd-dot" hidden></span>', (s) => s.display !== "none"));
+
+        const ICONS = {
+          check: "<path d='M20 6 9 17l-5-5'/>",
+          "trash-2": "<path d='M10 11v6'/><path d='M14 11v6'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/><path d='M3 6h18'/><path d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/>",
+          pencil: "<path d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/><path d='m15 5 4 4'/>",
+          "loader-circle": "<path d='M21 12a9 9 0 1 1-6.219-8.56'/>",
+          "refresh-cw": "<path d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/><path d='M21 3v5h-5'/><path d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/><path d='M8 16H3v5'/>",
+          package: "<path d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/><path d='M12 22V12'/><polyline points='3.29 7 12 12 20.71 7'/><path d='m7.5 4.27 9 5.15'/>",
+          "triangle-alert": "<path d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/><path d='M12 9v4'/><path d='M12 17h.01'/>",
+          "maximize-2": "<path d='M15 3h6v6'/><path d='m21 3-7 7'/><path d='m3 21 7-7'/><path d='M9 21H3v-6'/>",
+          history: "<path d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/><path d='M3 3v5h5'/><path d='M12 7v5l4 2'/>",
+        };
+        const svg = (body) => "url(\"data:image/svg+xml," + encodeURIComponent(
+          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' " +
+          "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" + body + "</svg>") + "\")";
+        const absent = Object.keys(ICONS).filter((n) => !token("--ico-" + n));
+        const unmapped = Object.keys(ICONS).filter((n) =>
+          !probe('<span data-icon="' + n + '"></span>', (s) => s.getPropertyValue("--ico").trim() !== ""));
+        const drawn = probe('<span class="ico"></span>', (s) => s.display !== "inline");
+        const pieces = [];
+        let css = "";
+        if (absent.length) {
+          css += ":root {" + absent.map((n) => "--ico-" + n + ": " + svg(ICONS[n]) + ";").join("") + "}";
+          pieces.push("tokens " + absent.join(" "));
+        }
+        if (unmapped.length) {
+          css += unmapped.map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
+          pieces.push("mapping " + unmapped.join(" "));
+        }
+        if (!drawn) {
+          // WP4's .ico, forced-colours rule included: the glyph takes the colour its parent was FORCED to.
+          css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
+            " background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
+            "@media (forced-colors: active) { .ico { forced-color-adjust: none; background: CanvasText; }" +
+            " @supports (forced-color-adjust: preserve-parent-color) { .ico { forced-color-adjust: preserve-parent-color; background: currentColor; } } }";
+          pieces.push(".ico");
+        }
+        if (css) {
+          const block = document.getElementById("standin-i1");
+          block.textContent = css;
+          block.media = "all";
+          inForce.push("i1 (" + pieces.join("; ") + ")");
+        }
+        root.dataset.standins = inForce.join(" ") || "none";
+      })();
+    </script>
     <header class="bar">
       <span class="brand glow">components.css — 0.60.0 revisions<span class="cursor-block" aria-hidden="true"></span></span>
       <nav aria-label="page settings">
@@ -134,6 +202,7 @@
         Every element WP2 revised, in every state. Switch the theme top right — the switcher is itself a
         revised menu (arrow keys, Home/End, typeahead, Escape back to the summary).
       </p>
+      <p class="demo-note">Stand-ins for other packages in force: <span id="standins"></span></p>
 
       <!-- ── C1 ─────────────────────────────────────────────────────────── -->
       <section id="buttons">
@@ -142,7 +211,7 @@
           <button type="button" class="btn-terminal" id="btn-cta">deploy</button>
           <button type="button" class="btn-terminal btn-terminal--compact" id="btn-primary-compact">save</button>
           <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ghost">cancel</button>
-          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ico"><span class="ico" data-icon="refresh-cw"></span>refresh</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-ico"><span class="ico" data-icon="refresh-cw" aria-hidden="true"></span>refresh</button>
           <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-svg"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>history</button>
           <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success" id="btn-success">approve</button>
           <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger" id="btn-danger">deny</button>
@@ -201,12 +270,12 @@
           <label><span class="demo-label">email</span><input type="email" value="me@example.test" /></label>
           <label><span class="demo-label">date</span><input type="date" value="2026-09-28" /></label>
           <label><span class="demo-label">no type attribute</span><input id="in-notype" value="plain" /></label>
-          <label><span class="demo-label">invalid</span><input type="text" id="in-invalid" aria-invalid="true" value="not a repo" /></label>
+          <div><label class="demo-label" for="in-invalid">invalid</label><input type="text" id="in-invalid" aria-invalid="true" aria-describedby="in-invalid-err" value="not a repo" /><p class="field-error" id="in-invalid-err">not an owner/repo — write it as poi/vu3</p></div>
           <label><span class="demo-label">disabled</span><input type="text" id="in-disabled" disabled value="read only" /></label>
         </div>
         <div class="demo-cols" style="margin-top:1rem">
           <label><span class="demo-label">textarea</span><textarea id="in-textarea" rows="3">A reviewer note that wraps onto a second line.</textarea></label>
-          <label><span class="demo-label">textarea, invalid</span><textarea aria-invalid="true" rows="3" placeholder="required"></textarea></label>
+          <div><label class="demo-label" for="in-textarea-invalid">textarea, invalid</label><textarea id="in-textarea-invalid" aria-invalid="true" aria-describedby="in-textarea-invalid-err" rows="3" placeholder="required"></textarea><p class="field-error" id="in-textarea-invalid-err">a note is required before the review can run</p></div>
           <label><span class="demo-label">textarea, disabled</span><textarea disabled rows="3">frozen</textarea></label>
         </div>
       </section>
@@ -218,8 +287,9 @@
           <label>model <select id="sel-model"><option>claude-fable-5</option><option selected>gpt-5.9</option><option disabled>gpt-4 (retired)</option><optgroup label="local"><option>qwen</option></optgroup></select></label>
           <label>disabled <select disabled><option>locked</option></select></label>
           <!-- aria-invalid mirrored onto the trigger is WP6's select.js; the trigger here is the rendered markup. -->
-          <span class="select-field"><button type="button" class="select-trigger" id="trigger-invalid" aria-invalid="true" aria-haspopup="listbox" aria-expanded="false"><span class="select-value">pick a model</span></button></span>
+          <span class="select-field"><button type="button" class="select-trigger" id="trigger-invalid" aria-invalid="true" aria-describedby="trigger-invalid-err" aria-haspopup="listbox" aria-expanded="false"><span class="select-value">pick a model</span></button></span>
           <span class="demo-note">← invalid trigger (rendered markup)</span>
+          <span class="field-error" id="trigger-invalid-err">pick a model the agent supports</span>
         </div>
         <div class="demo-cols demo-static">
           <div>
@@ -231,13 +301,13 @@
               <li class="select-option" role="option" aria-selected="false" data-active="true" id="opt-active">gpt-5.10</li>
               <li class="select-option" role="option" aria-selected="false" aria-disabled="true" id="opt-disabled">gpt-4 (retired)</li>
               <li class="select-group" role="presentation">local</li>
-              <li class="select-option" role="option" aria-selected="false"><span class="ico" data-icon="history"></span>qwen (last used)</li>
+              <li class="select-option" role="option" aria-selected="false"><span class="ico" data-icon="history" aria-hidden="true"></span>qwen (last used)</li>
             </ul>
           </div>
           <div>
             <span class="demo-label">.dropdown-panel (menu) — shown open</span>
             <ul class="dropdown-panel" role="menu" aria-label="sort" id="static-menu">
-              <li role="none"><span class="dropdown-label">sort by</span></li>
+              <li role="none"><span class="dropdown-label" aria-hidden="true">sort by</span></li>
               <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="true" tabindex="-1" id="static-checked">name</button></li>
               <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" tabindex="-1">updated</button></li>
               <li role="none"><button type="button" class="dropdown-item" role="menuitemradio" aria-checked="false" tabindex="-1" data-active="true">stars</button></li>
@@ -279,7 +349,7 @@
             </ul>
           </details>
           <details class="dropdown" id="dd-history">
-            <summary aria-label="history"><span class="ico" data-icon="history"></span></summary>
+            <summary aria-label="history"><span class="ico" data-icon="history" aria-hidden="true"></span></summary>
             <ul class="dropdown-panel dropdown-panel--down">
               <li><a class="dropdown-item" href="#menus">/skills/review</a></li>
               <li><a class="dropdown-item" href="#menus" aria-current="true">/skills/deploy</a></li>
@@ -446,6 +516,8 @@
       import { initAnimToggle } from "../runtime/anim.js";
       import { initFolds } from "../runtime/fold.js";
       import { initMinimap } from "../runtime/minimap.js";
+
+      document.getElementById("standins").textContent = document.documentElement.dataset.standins;
 
       initThemeSwitcher();
       initDropdowns();

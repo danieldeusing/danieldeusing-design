@@ -67,7 +67,12 @@ export function initTooltips() {
   // covers all of them. And a tip is refused on an anchor whose OWN popup is open
   // (`[aria-haspopup][aria-expanded="true"]`, configr's rule): the popup the tip explains is on
   // screen, and the tip would sit on top of it.
-  const menuIsOpen = () => Boolean(document.querySelector(".select-panel, details.dropdown[open]"));
+  //
+  // ONLY WHAT IS OUTSIDE THE LIST WAITS (0.60.0). A tip on a row INSIDE the open list is the list's
+  // own — an option saying what it is, which select.js copies onto the row it builds — and refusing
+  // every tip while any list existed meant those never showed at all.
+  const listIsOpen = () => Boolean(document.querySelector(".select-panel, details.dropdown[open]"));
+  const inList = (el) => Boolean(el.closest(".select-panel, .dropdown-panel"));
   const OPEN_POPUP = '[aria-haspopup][aria-expanded="true"]';
   // SHOWN MEANS ON SCREEN, not "display was set": a panel left inside a dialog that has since
   // closed keeps its `display: grid` and has no box, and an Escape it swallowed would be an Escape
@@ -99,7 +104,7 @@ export function initTooltips() {
   // page scrolls, and a guard that made repositioning a no-op would trade a dead button for a
   // tooltip stranded where the anchor used to be.
   function show(el) {
-    if (menuIsOpen() || el.closest(OPEN_POPUP)) return;
+    if ((listIsOpen() && !inList(el)) || el.closest(OPEN_POPUP)) return;
     if (anchor === el) return;
     // POINT THE ANCHOR AT THE PANEL. `role="tooltip"` alone describes nothing: without
     // aria-describedby the panel is a div a screen reader never reaches, so `data-tip` was
@@ -274,21 +279,50 @@ export function initTooltips() {
   // pointing the button at it made a screen reader announce the same words twice, once as the name
   // and once as the description (the accessibility tree read name "refresh catalog", description
   // "refresh catalog"). Such a tip still SHOWS; it is only not wired up as a description.
+  //
+  // ONE TOKEN OF THE LIST, NEVER THE LIST (0.60.0). `aria-describedby` is a space-separated list,
+  // and a control may already carry one — a select trigger pointing at its `.field-error`, anything
+  // a page wrote. Overwriting it hid that error while the tip showed and lost it for good when the
+  // tip went. So the tip adds its id to the list and takes back only that id, and the attribute is
+  // dropped only when nothing else is left in it. Written only when that changes it (see above).
+  const describedBy = (el) => (el.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean);
   function describe(el) {
     if (repeatsName(el)) return;
-    if (el.getAttribute("aria-describedby") !== "ddtip") el.setAttribute("aria-describedby", "ddtip");
+    const ids = describedBy(el);
+    if (!ids.includes("ddtip")) el.setAttribute("aria-describedby", [...ids, "ddtip"].join(" "));
   }
-  // The name as far as a tip can repeat it: aria-label, else aria-labelledby, else the element's own
-  // text. Compared without case or runs of whitespace, because a listener hears them the same.
-  const words = (text) => String(text ?? "").replace(/\s+/g, " ").trim().toLowerCase();
-  function repeatsName(el) {
+  // The name as a screen reader computes it, in accname's order: aria-labelledby, then aria-label,
+  // then a <label for>, then the rendered text — an image counts by its alt, and what is hidden
+  // (display: none, aria-hidden) does not count. Taking textContent instead read a hidden badge
+  // into the name and missed an icon image's alt, so the net caught the wrong tips. Compared
+  // without case, runs of whitespace or trailing punctuation: a listener hears "Refresh catalog."
+  // and "refresh catalog" as the same words.
+  const words = (text) => String(text ?? "").replace(/\s+/g, " ").trim().toLowerCase().replace(/[\s.,;:!?…]+$/, "");
+  function rendered(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node.data;
+    if (node.nodeType !== Node.ELEMENT_NODE || node.getAttribute("aria-hidden") === "true") return "";
+    if (getComputedStyle(node).display === "none") return "";
+    if (node.tagName === "IMG") return node.getAttribute("alt") ?? "";
+    return [...node.childNodes].map(rendered).join(" ");
+  }
+  function accessibleName(el) {
     const ids = el.getAttribute("aria-labelledby");
-    const name = el.getAttribute("aria-label")
-      || (ids ? ids.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? "").join(" ") : el.textContent);
-    return words(name) === words(el.getAttribute("data-tip"));
+    const byIds = ids ? ids.split(/\s+/).map((id) => { const n = document.getElementById(id); return n ? rendered(n) : ""; }).join(" ") : "";
+    if (byIds.trim()) return byIds;
+    const label = el.getAttribute("aria-label");
+    if (label?.trim()) return label;
+    if (el.labels?.length) return [...el.labels].map(rendered).join(" ");
+    return rendered(el);
+  }
+  function repeatsName(el) {
+    return words(accessibleName(el)) === words(el.getAttribute("data-tip"));
   }
   function removeDescription(el) {
-    if (el.getAttribute("aria-describedby") === "ddtip") el.removeAttribute("aria-describedby");
+    const ids = describedBy(el);
+    if (!ids.includes("ddtip")) return;
+    const rest = ids.filter((id) => id !== "ddtip");
+    if (rest.length) el.setAttribute("aria-describedby", rest.join(" "));
+    else el.removeAttribute("aria-describedby");
   }
 
   document.addEventListener("mouseover", (event) => {

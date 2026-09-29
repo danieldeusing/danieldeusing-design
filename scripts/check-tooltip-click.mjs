@@ -324,10 +324,29 @@ const source = readFileSync(join(root, "runtime/tooltip.js"), "utf8")
 check("pointerdown hides the PANEL and does not touch the anchor's aria",
   /addEventListener\("pointerdown",\s*hidePanel\s*,\s*true\)/.test(source),
   source.match(/addEventListener\("pointerdown"[^\n]*/g));
-check("...and the aria association is written only when it would change",
-  /!== "ddtip"\)\s*el\.setAttribute/.test(source));
-check("...and removed only when it is actually set",
-  /=== "ddtip"\)\s*el\.removeAttribute/.test(source));
+// The other half is behaviour, counted: every aria-describedby write on the anchor, across a hover
+// the browser re-fires five times (as it does on a live-refreshing table), a leave, and further
+// hovers elsewhere. (It was a regex over the source until 0.60.0, when the attribute became a token
+// list and the one-liners it matched were rewritten.)
+const writes = await evaluate(`(async () => {
+  const el = document.getElementById("outsidetip"), other = document.getElementById("outside");
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  await sleep(30);
+  const count = { set: 0, remove: 0 };
+  const set = el.setAttribute, remove = el.removeAttribute;
+  el.setAttribute = function (name, value) { if (name === "aria-describedby") count.set += 1; return set.call(this, name, value); };
+  el.removeAttribute = function (name) { if (name === "aria-describedby") count.remove += 1; return remove.call(this, name); };
+  for (let i = 0; i < 5; i += 1) { el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); await sleep(10); }
+  const whileHovered = { ...count };
+  for (let i = 0; i < 3; i += 1) { other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); await sleep(10); }
+  delete el.setAttribute; delete el.removeAttribute;
+  return { whileHovered, total: count };
+})()`);
+check("...and the aria association is written only when it would change (one write across five re-fired hovers)",
+  writes.whileHovered.set === 1 && writes.whileHovered.remove === 0, writes);
+check("...and removed only when it is actually set (one removal across three leaves)",
+  writes.total.set === 1 && writes.total.remove === 1, writes);
 
 console.log(failures
   ? `\n\x1b[31m-- check-tooltip-click: ${failures} FAILED --\x1b[0m`

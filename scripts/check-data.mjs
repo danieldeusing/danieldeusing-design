@@ -362,6 +362,10 @@ await check("X2 — with no base.css ring in the page, a focused tab draws data.
 await evaluate(`document.getElementById("tab-activity").focus(); null`);
 await check("...and on the SELECTED tab the ring is the page colour, or it would vanish into the --primary fill",
   async () => (await css("#tab-activity", "outlineColor")) === (await tok("var(--background)")) && (await css("#tab-activity", "outlineStyle")) === "solid");
+// Let go of the focus. Left on the tab, X3 hides its row and focus falls back to the body, but Chromium
+// never repaints the tab: a stale 2px ring stayed in the pixels of every later shot (white on the light
+// forced palette), which the two-shot ownership proof below found and a computed style cannot see.
+await evaluate(`document.activeElement.blur(); null`);
 
 /* ── X3 · hidden hides every component ────────────────────────────────────────────────────────── */
 
@@ -389,7 +393,10 @@ await check(`X3 — \`hidden\` hides each of ${HIDE.length} components whatever 
 const shoot = async (sel) => {
   await evaluate(`document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: "center", behavior: "instant" }); null`);
   const clip = await evaluate(`(() => { const q = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();
-    return { x: q.left + scrollX - 6, y: q.top + scrollY - 6, width: q.width + 12, height: q.height + 12, scale: 1 }; })()`);
+    // Whole CSS pixels: a fractional clip origin is registered a pixel or two off by the capture, and
+    // every px() below would read its neighbour's paint (the ownership proof found 2.5px on a tab).
+    const x = Math.floor(q.left + scrollX - 6), y = Math.floor(q.top + scrollY - 6);
+    return { x, y, width: Math.ceil(q.right + scrollX + 6) - x, height: Math.ceil(q.bottom + scrollY + 6) - y, scale: 1 }; })()`);
   const { data } = await send("Page.captureScreenshot", { format: "png", clip });
   await evaluate(`(async () => {
     const img = await createImageBitmap(await (await fetch("data:image/png;base64,${data}")).blob());
@@ -423,18 +430,42 @@ const measure = (body) => evaluate(`(() => { ${PIXELS} return JSON.stringify((()
 const r2 = (n) => (typeof n === "number" ? Math.round(n * 100) / 100 : n);
 const shown = (v) => () => JSON.stringify(v, (k, n) => r2(n));
 
-/* X1's capture rule, last step: before a ratio is trusted, the clip must hold the element's own ink,
-   and none of it with the element taken away — read again, on the same palette. A clip that lands on
-   a neighbour, or on ink the palette painted for something else, fails here instead of passing below. */
-const owns = async (sel, regions) => {
-  const read = () => measure(`return ${regions}.map((r) => ink(r).ratio);`);
-  await shoot(sel);
-  const on = await read();
-  await evaluate(`document.querySelector(${JSON.stringify(sel)}).style.visibility = "hidden"; null`);
-  await shoot(sel);
-  const off = await read();
-  await evaluate(`document.querySelector(${JSON.stringify(sel)}).style.visibility = ""; null`);
-  return { sel, on, off, ok: on.every((r) => r >= 1.5) && off.every((r) => r < 1.2) };
+/* X1's capture rule, last step, as a TWO-SHOT DIFF: the same clip is captured twice, the second time
+   with ONLY the target hidden. The pixels that changed are the target's ink — at least 3 of them, by
+   at least 1.5:1 — and their bounding box must sit where the target is: its rect within ±1px for a
+   fill, inside its rect (a text range, a mark's box) ±1px otherwise. A clip that lands on a neighbour
+   finds its ink in the wrong place; one that slides against its own mapping (captureBeyondViewport's
+   re-layout, or a clip moved after it was measured) reads the target's ink off by the slide. The first
+   form of this proof hid the whole clip element, which says "there is ink here" and nothing about
+   WHERE: an 8px vertical slide of #dense-table and of #page-tabs passed it. */
+const owns = async (clip, target, kind) => {
+  const sel = JSON.stringify(target);
+  await shoot(clip);
+  await evaluate(`window.SHOT_A = window.SHOT; document.querySelector(${sel}).style.visibility = "hidden"; null`);
+  await shoot(clip);
+  await evaluate(`document.querySelector(${sel}).style.visibility = ""; null`);
+  return measure(`
+    const A = window.SHOT_A, B = S, el = document.querySelector(${sel});
+    let n = 0, carried = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let row = 0; row < A.h; row += 1) for (let col = 0; col < A.w; col += 1) {
+      const i = (row * A.w + col) * 4;
+      // The two shots differ in nothing but the target, so ANY change is its paint — including the
+      // light palette's 80% Highlight over the tab row's black rule, which moves less than 1.2:1.
+      if (Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2])) <= 2) continue;
+      const q = M.ratio([A.d[i], A.d[i + 1], A.d[i + 2]], [B.d[i], B.d[i + 1], B.d[i + 2]]);
+      n += 1; carried = Math.max(carried, q);
+      x0 = Math.min(x0, col); x1 = Math.max(x1, col + 1); y0 = Math.min(y0, row); y1 = Math.max(y1, row + 1);
+    }
+    const ink = n ? { left: x0 / A.k + A.x0 - scrollX, right: x1 / A.k + A.x0 - scrollX, top: y0 / A.k + A.y0 - scrollY, bottom: y1 / A.k + A.y0 - scrollY } : null;
+    const r = ${kind === "text" ? "text(el)" : "box(el)"};
+    // An SVG mark's box leaves out its stroke, which paints half its width outside.
+    const half = el instanceof SVGElement ? (parseFloat(getComputedStyle(el).strokeWidth) || 0) / 2 : 0;
+    const rect = { left: r.left - half, right: r.right + half, top: r.top - half, bottom: r.bottom + half };
+    const edges = ["left", "right", "top", "bottom"];
+    const fits = !!ink && (${JSON.stringify(kind)} === "fill"
+      ? edges.every((e) => Math.abs(ink[e] - rect[e]) <= 1)
+      : ink.left >= rect.left - 1 && ink.right <= rect.right + 1 && ink.top >= rect.top - 1 && ink.bottom <= rect.bottom + 1);
+    return { target: ${sel}, kind: ${JSON.stringify(kind)}, n, carried, ink, rect, ok: n >= 3 && carried >= 1.5 && fits };`);
 };
 
 /* ── Q6 · a series is never told apart by colour alone ──────────────────────────────────────────
@@ -505,17 +536,15 @@ for (const scheme of ["light", "dark"]) {
   await settle();
   console.log(`forced colours, ${scheme} palette (Canvas / CanvasText / Highlight / HighlightText / GrayText): ${await evaluate(
     `["Canvas", "CanvasText", "Highlight", "HighlightText", "GrayText"].map(M.tok).join(" / ")`)}`);
-  const owned = [
-    await owns("#page-tabs", `[grow(box("#tab-activity"), 2), text("#tab-activity"), text("#tab-queue"), text("#tab-modes")]`),
-    await owns("#tab-syntax", `[text("#tab-syntax")]`),
-    await owns("#dense-table", `[(() => { const r = box("#row-pinned > td:first-child"); return { left: r.left - 1, right: r.left + 6, top: r.top + 2, bottom: r.bottom - 2 }; })(),
-      text("#row-disabled > td:nth-child(3)")]`),
-    await owns("#trend", `(() => { const d = [...document.querySelectorAll("#trend .chart-dot")], a = box(d[2]), b = box(d[3]);
-      const mx = (a.left + a.right + b.left + b.right) / 4, my = (a.top + a.bottom + b.top + b.bottom) / 4;
-      return [box("#trend text"), { left: mx - 2, right: mx + 2, top: my - 3, bottom: my + 3 }, grow(a, 1), grow(box(d.find((x) => x.classList.contains("chart-dot--hollow"))), 1)]; })()`),
-  ];
-  await check(`X1 ${scheme} — every clip below reads its own element: ink with it, none with it taken away`,
-    () => owned.every((o) => o.ok), shown(owned.filter((o) => !o.ok).length ? owned.filter((o) => !o.ok) : owned));
+  const owned = [];
+  for (const [clip, target, kind] of [
+    ["#page-tabs", "#tab-activity", "fill"], ["#page-tabs", "#tab-queue", "text"], ["#page-tabs", "#tab-modes", "text"],
+    ["#tab-syntax", "#tab-syntax", "text"],
+    ["#dense-table", "#row-pinned > td:first-child", "mark"], ["#dense-table", "#row-disabled > td:nth-child(3)", "text"],
+    ["#trend", "#trend text", "mark"], ["#trend", "#trend circle.chart-dot:nth-of-type(3)", "mark"], ["#trend", "#trend .chart-dot--hollow", "mark"],
+  ]) owned.push(await owns(clip, target, kind));
+  await check(`X1 ${scheme} — every clip below reads its own element: hiding ONLY it changes ≥3 pixels by ≥1.5:1, where it is (±1px)`,
+    () => owned.every((o) => o.ok), shown(owned.filter((o) => !o.ok).length ? owned.filter((o) => !o.ok) : owned.map((o) => [o.target, o.n, o.carried])));
 
   await shoot("#page-tabs");
   const tabs = await measure(`

@@ -417,6 +417,18 @@ const [plain, filled] = await evaluate(`Promise.all(["star", "star-filled"].map(
   for (let i = 3; i < d.length; i += 4) if (d[i] > 128) n2 += 1; return n2; }))`);
 check(`--ico-star-filled is the star with its fill closed (${filled} solid pixels vs ${plain})`, filled > plain * 1.5);
 
+/* ── the parent-coloured glyph really has a coloured parent ───────────────── */
+
+// In forced colours a glyph whose parent is tinted and one whose parent is not paint the same, so
+// the forced pass below proves the ruling only if this holds in normal colours first.
+const tint = await evaluate(`(() => { const li = document.querySelector("#icon-list li");
+  const glyph = li.querySelector(":scope > :nth-child(2) > .demo-ico");
+  return { parent: getComputedStyle(glyph.parentElement).color, glyph: getComputedStyle(glyph).backgroundColor,
+    plain: getComputedStyle(li.querySelector(":scope > .demo-ico")).backgroundColor, primary: M.tok("--primary") }; })()`);
+check("the icon list's second column is coloured by its parent: the parent is --primary, the glyph wears it, column 1 does not",
+  tint.parent === tint.primary && tint.glyph === tint.parent && tint.glyph !== tint.plain,
+  `measured: parent ${tint.parent}, glyph ${tint.glyph}, column 1 ${tint.plain}, --primary ${tint.primary}`);
+
 /* ── X1 · forced colours: what WP1 draws by tint or mask still shows ─────── */
 
 // Forced colours (Windows High Contrast) swap every author background for Canvas, keeping its
@@ -459,7 +471,7 @@ const pixelsOf = async (selector, pad = 3) => {
 // One glyph of each kind the recipe draws: plain, listed, coloured by its PARENT (the icon list's
 // second column — the lead's ruling: colour the parent, never the glyph) and spinning.
 const FORCED_GLYPHS = [["the --icon-size glyph", "#ico-md"], ["an icon-list glyph", "#icon-list .demo-ico"],
-  ["a glyph coloured by its parent", "#icon-list li:first-child > :nth-child(2)"], ["the spinner", "#spin"]];
+  ["a glyph coloured by its parent", "#icon-list li:first-child > :nth-child(2) > .demo-ico"], ["the spinner", "#spin"]];
 for (const theme of ["warm", "green", "mono", "paper"]) for (const palette of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { media: "", features: [
     { name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: palette }] });

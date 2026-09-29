@@ -146,6 +146,12 @@
     padding-right: 0 !important;
     padding-block-end: 0 !important;
   }
+  /* A banner stacked with the header (.bar-stack) prints: "2 alerts" is content. The header in it
+     is hidden above, and nothing sticks on paper. */
+  .bar-stack {
+    position: static;
+    margin-right: 0 !important;
+  }
 
   /* NOTHING IS NEEDED FOR [data-tip] ON PAPER ANY MORE, and that is worth saying rather than
      leaving two overrides of rules that no longer exist. Both were undo-rules: `cursor: auto`

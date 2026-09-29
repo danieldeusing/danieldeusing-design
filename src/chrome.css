@@ -382,6 +382,21 @@ header.bar .brand, header.bar .brand a { color: inherit; text-decoration: none; 
 header.bar .dropdown > summary:not(.btn-icon) { padding: 0.6rem 0.4rem; }
 .bar-right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
 
+/* ── .bar-stack — A BANNER AND THE HEADER STICK AS ONE LAYER (0.60.0) ──────────────────────────
+   A page-wide banner ("2 alerts", "control is frozen") and the header both want the top of the
+   viewport, and two sticky elements at `top: 0` do not stack — they overlap. Measured before this:
+   a sticky banner at 0-53px and the header at 0-44px, so the header was entirely hidden under the
+   banner as soon as the page scrolled, `ls -l` and its toggle with it.
+
+   So they stick as ONE box: the stack is the sticky element, at the bar's own layer, and inside it
+   the banner comes first and the header after it, in flow — the header does not stick on its own,
+   it rides in the stack. initLsNav() measures the STACK's bottom edge, and re-measures whenever the
+   stack changes size (a banner mounted or dismissed after load), so the rail, the page toolbar and
+   the table of contents park under both. The stack bleeds past the rail's inset as the header
+   used to (below); its children must not bleed a second time. */
+.bar-stack { position: sticky; top: 0; z-index: 30; }
+.bar-stack > header.bar { position: relative; top: auto; }
+
 /* ── THE BAR'S THREE SLOTS (0.60.0) ────────────────────────────────────────────────────────────
    danieldeusing.de and seedr both put browser history and the current path in the MIDDLE of the
    bar, between the brand and the nav — two sources, so it is an element and not a local layout.
@@ -838,7 +853,12 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
      alert is fine when hidden and wrong when shown".
      A class rather than naming `.alert-banner` here: the design system should not know what
      cockpit calls its banner, and the next full-bleed strip should not have to rediscover this. */
-  .bleed-rail { margin-right: calc(-1 * var(--ls-nav-inset)); }
+  .bleed-rail,
+  .bar-stack { margin-right: calc(-1 * var(--ls-nav-inset)); }
+  /* Inside the stack the STACK has already bled; a header or banner that bled again would run
+     17rem past the viewport's edge. */
+  .bar-stack > header.bar,
+  .bar-stack > .bleed-rail { margin-right: 0; }
 
   /* Between the chrome, never over it. */
   .ls-nav {
@@ -1057,4 +1077,25 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
 }
 @media (max-width: 40rem) {
   .bar-history + .crumbs { margin-inline-start: 0.5rem; }
+}
+
+/* ── FORCED COLOURS (0.60.0) ────────────────────────────────────────────────────────────────────
+   Windows' high-contrast modes repaint every background with Canvas, drop every box-shadow and
+   give every link one colour. Two states in the chrome were drawn ONLY with those: the rail's
+   current row (a tint and an inset edge) and the TOC's current entry (colour alone, on purpose, so
+   the list never re-wraps while the reader scrolls). Under forced colours both were identical to
+   their neighbours. They take the system's own "selected" pair instead, and opt out of the
+   adjustment so the pair is not repainted too — which is why every piece of text inside them
+   names HighlightText explicitly: forced-color-adjust is inherited, and the theme's --primary on
+   Highlight is nobody's contrast pair. A disabled text action says so in GrayText, the system's
+   word for unavailable.
+
+   Everything else here already survives: the tick strip's state is a glyph, the rail's arrow is a
+   character, the anim box is text, the crumbs' current segment is text and not a link. */
+@media (forced-colors: active) {
+  .ls-row[aria-current="page"] { forced-color-adjust: none; background: Highlight; box-shadow: none; }
+  .ls-row[aria-current="page"] :is(.ls-name, .ls-perm),
+  .ls-row[aria-current="page"]::after { color: HighlightText; text-shadow: none; }
+  .navlist a[aria-current="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  button:is(.doc-link, .doc-link--forward):disabled { color: GrayText; }
 }

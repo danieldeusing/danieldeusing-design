@@ -45,12 +45,22 @@ const TOGGLE = "[data-ls-nav-toggle]";
  * page toolbar's height. The table of contents and a sticky filter bar park there, and the
  * viewport's scroll padding keeps anchors below it. It is measured for the same reason the rail's
  * top is: an alert banner above the header, or a toolbar that wraps to a second line, moves it.
+ *
+ * A `.bar-stack` (a banner and the header sticking as one layer) is measured INSTEAD of the bar:
+ * its bottom edge is where the chrome ends, whichever of its children is last.
  */
+function chrome() {
+  const bar = document.querySelector("header.bar");
+  return {
+    edge: document.querySelector(".bar-stack") ?? bar,
+    status: document.querySelector("footer.status"),
+    toolbar: document.querySelector(".page-toolbar"),
+  };
+}
+
 function measureChrome() {
   const root = document.documentElement;
-  const bar = document.querySelector("header.bar");
-  const status = document.querySelector("footer.status");
-  const toolbar = document.querySelector(".page-toolbar");
+  const { edge, status, toolbar } = chrome();
   // THE RAIL'S TOP IS THE HEADER'S BOTTOM EDGE, NOT THE HEADER'S HEIGHT. Those are the same
   // number only when nothing sits above the header — and something does: cockpit's alerts.js
   // mounts the alert banner as the FIRST CHILD OF BODY. Measured with a 73px banner, the header
@@ -73,7 +83,7 @@ function measureChrome() {
   // Both chrome elements are opaque and sit ABOVE the rail (z-index 30 and 50 vs 25),
   // so a pixel of tuck is invisible, whereas a pixel of gap is not.
   // A page with no header has nothing above its content: 0, not the CSS fallback's 3rem.
-  const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom / zoom - 1) : 0;
+  const top = edge ? Math.max(0, edge.getBoundingClientRect().bottom / zoom - 1) : 0;
   write(root, "--ls-nav-top", `${top}px`);
   // A hidden footer (mobile folds it into the burger) reserves nothing.
   write(root, "--ls-nav-bottom", `${Math.max(0, h(status) - 1)}px`);
@@ -105,6 +115,14 @@ export function initLsNav() {
   addEventListener("scroll", measureChrome, { passive: true });
   // The bar reflows when webfonts land, which changes its height after first paint.
   if (document.fonts?.ready) document.fonts.ready.then(measureChrome).catch(() => {});
+  // …and the chrome changes size WITHOUT any of those events: a banner mounted into the stack or
+  // dismissed from it, a toolbar that wraps when a filter chip is added, a status word that grows.
+  // Nothing scrolled and the window did not resize, so without this the rail and the TOC would sit
+  // at the old edge — under the new banner — until the reader happened to scroll.
+  if (typeof ResizeObserver === "function") {
+    const sizes = new ResizeObserver(measureChrome);
+    for (const el of Object.values(chrome())) if (el) sizes.observe(el);
+  }
 
   const root = document.documentElement;
   const sync = () => {

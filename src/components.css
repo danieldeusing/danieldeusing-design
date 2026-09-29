@@ -1605,10 +1605,14 @@ th:has(.tbl-tools) { white-space: nowrap; }
   .dropdown-item { color: CanvasText; }
   /* Before the highlight, so a current row under the pointer reads HighlightText on Highlight. */
   .dropdown-item[aria-current="true"] { color: Highlight; }
+  /* Opted out as well: the mode paints a Canvas backplate behind any text that keeps the
+     adjustment, and on a Highlight row that backplate is a solid box with the text lost in it. */
   .select-option:is(:hover, [data-active="true"], [data-highlighted]),
   .dropdown-item:is(:hover, :focus-visible, [data-active="true"], [data-highlighted]) {
+    forced-color-adjust: none;
     background: Highlight;
     color: HighlightText;
+    outline-color: HighlightText;
   }
   :is(.select-option, .dropdown-item):is([aria-disabled="true"], :disabled) {
     background: none;

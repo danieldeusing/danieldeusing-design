@@ -11,7 +11,9 @@
  *   FORCED  under forced colours, light and dark, every mask glyph stands 3:1 off what it sits on
  *           and every state still differs from its neighbour — the mode repaints backgrounds as
  *           Canvas, which erases both. "Not the Canvas colour" is not enough: an opted-out glyph
- *           paints the colour its element was GIVEN, so cream on the white Canvas passes that test;
+ *           paints the colour its element was GIVEN, so cream on the white Canvas passes that test.
+ *           And a highlighted row is read in PIXELS: the mode paints a Canvas backplate behind text
+ *           that keeps the adjustment, which every computed colour misses;
  *   FOCUS   each component draws its OWN 2px --ring focus ring. Asserted with base.css switched
  *           off: base.css draws a global ring that would answer for a component that lost its rule;
  *   FONT    a control renders in its surroundings' font, not the browser's 13.33px control font;
@@ -32,6 +34,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname, normalize, extname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateSync } from "node:zlib";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHROME = process.env.DD_CHROME
@@ -111,6 +114,49 @@ const nodeOf = async (selector) => {
   return nodeId;
 };
 const force = async (selector, states) => send("CSS.forcePseudoState", { nodeId: await nodeOf(selector), forcedPseudoClasses: states });
+
+// A PNG from captureScreenshot, decoded to RGB(A) bytes: 8-bit, non-interlaced, as Chromium writes it.
+const decodePng = (base64) => {
+  const buf = Buffer.from(base64, "base64");
+  const idat = [];
+  let width = 0, height = 0, bpp = 4;
+  for (let pos = 8; pos < buf.length;) {
+    const len = buf.readUInt32BE(pos);
+    const type = buf.toString("ascii", pos + 4, pos + 8);
+    const data = buf.subarray(pos + 8, pos + 8 + len);
+    if (type === "IHDR") { width = data.readUInt32BE(0); height = data.readUInt32BE(4); bpp = data[9] === 6 ? 4 : 3; }
+    if (type === "IDAT") idat.push(data);
+    pos += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * bpp;
+  const px = Buffer.alloc(height * stride);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x += 1) {
+      const a = x >= bpp ? px[y * stride + x - bpp] : 0;
+      const b = y ? px[(y - 1) * stride + x] : 0;
+      const c = x >= bpp && y ? px[(y - 1) * stride + x - bpp] : 0;
+      const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+      const predict = [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][filter];
+      px[y * stride + x] = (raw[y * (stride + 1) + 1 + x] + predict) & 255;
+    }
+  }
+  return { width, height, bpp, px };
+};
+// The share of a row's TEXT box painted in one colour: a backplate is a slab of it, text is strokes.
+const slabShare = async (selector, rgb) => {
+  const box = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.scrollIntoView({ block: "center" });
+    const range = document.createRange(); range.selectNodeContents(el); const r = range.getBoundingClientRect();
+    return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }; })()`);
+  const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { ...box, scale: 1 } });
+  const { width, height, bpp, px } = decodePng(data);
+  let hits = 0;
+  for (let i = 0; i < width * height; i += 1) {
+    if ([0, 1, 2].every((k) => Math.abs(px[i * bpp + k] - rgb[k]) <= 16)) hits += 1;
+  }
+  return +(hits / (width * height)).toFixed(2);
+};
 
 await send("Page.enable");
 await send("DOM.enable");
@@ -235,6 +281,11 @@ await section("FORCED — forced colours keep every glyph and every state (X1)",
     check(`${scheme}: every state differs from its neighbour — ${Object.keys(r.pairs).length} pairs`, same.length === 0, same);
     check(`${scheme}: the select's caret survives — the mode drops its gradient, and a text glyph stands in`,
       /▾/.test(r.caret[1]), r.caret);
+    const canvas = r.canvas.match(/\d+/g).map(Number);
+    const slabs = {};
+    for (const row of ["#opt-active", '#static-menu [data-active="true"]']) slabs[row] = await slabShare(row, canvas);
+    check(`${scheme}: a highlighted row's text is ink on Highlight, not lost in a Canvas-coloured backplate`,
+      Object.values(slabs).every((share) => share < 0.6), slabs);
   }
   await send("Emulation.setEmulatedMedia", { features: [] });
   await sleep(80);

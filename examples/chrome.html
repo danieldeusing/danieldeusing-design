@@ -25,6 +25,9 @@
         try {
           if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
         } catch {}
+        // ?reveal: the terminal gate PRE-PAINT, as danieldeusing.de sets it, so the rail's listing
+        // prints row by row on load (data-term-list on the list, --i on each row).
+        if (!animOff && new URLSearchParams(location.search).has("reveal")) document.documentElement.classList.add("term-anim");
       })();
     </script>
 
@@ -475,6 +478,7 @@
       //   ?burger     the burger open with both accordions open (the phone screenshot)
       //   ?nobanner   no banner in the stack (the header alone)
       //   ?bare       tokens.css + chrome.css only (see the <head>)
+      //   ?reveal     the rail's listing prints row by row (html.term-anim, set pre-paint above)
       const params = new URLSearchParams(location.search);
       if (params.has("norail")) document.querySelectorAll(".ls-nav, .ls-nav-head, [data-ls-nav-toggle]").forEach((el) => el.remove());
       if (params.has("nomf")) document.querySelector(".mobile-footer")?.remove();

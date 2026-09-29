@@ -214,7 +214,9 @@ set the height, not the declared 2rem — and every page guessed: danieldeusing.
 **The page clears it, not each column.** `body` reserves `--status-h` below its content and the
 viewport's scroll padding does the same, so the last line and anything scrolled into view — a
 focused control, a link target — land above the footer (WCAG 2.4.11). **Do not pad a column for the
-footer any more**; a `padding-block-end` sized "to get past the footer" now counts it twice.
+footer any more**; a `padding-block-end` sized "to get past the footer" now counts it twice. This
+keys on the page-level footer, so `footer.status` is a direct child of `<body>`, as in the
+templates; one nested in a wrapper is not cleared.
 
 On a phone:
 

@@ -82,10 +82,17 @@
  * on a pick row: none of it is in the page's markup, so a renderer that PATCHES attributes and
  * children into the header (cockpit's `cockpitPatch`) takes every one of them away on each poll.
  * The observer below watches the header as well as the body, and puts back what this file owns.
+ * The same goes one level out: the box this file put in the bar and the count after the table are
+ * not in the page's markup either, so a renderer that patches the whole MOUNT takes both — and the
+ * search stayed in force with no box to show it. A second observer, on the bar and on the wrapper's
+ * parent, puts the same nodes back. A renderer can draw them itself instead, and they are adopted:
+ * an `input[type=search][data-table-search]` in the bar, a `p.result-count[role=status]
+ * [data-table-count]` after the table (or after its pager). Then a patch keeps its own nodes.
  * Every write is conditional — an attribute set to the value it already has is still a mutation,
  * and an observer that answers its own writes never stops.
  */
 
+import { positionPopup } from "./popup.js";
 import { initSearchFields } from "./search.js";
 
 const STORE_PREFIX = "table-view:";
@@ -410,11 +417,11 @@ function placeholderRow(inst) {
   const cell = row.insertCell();
   const head = inst.table.tHead && inst.table.tHead.rows[0];
   cell.colSpan = head ? [...head.cells].reduce((n, th) => n + th.colSpan, 0) : 1;
+  // S1's inline markup as feedback.html documents it: the sentence is the box's own text, the reset
+  // follows it on the same line. No <p>: a block inside would be aligned by .empty's grid rules.
   const box = document.createElement("div");
   box.className = "empty empty--inline";
-  const line = document.createElement("p");
-  line.textContent = text;
-  box.append(line);
+  box.append(none ? text : text + " ");
   if (!none) {
     const reset = document.createElement("button");
     reset.type = "button";
@@ -432,7 +439,7 @@ function writeCount(inst, shown, hidden) {
   if (!inst.count) return;
   const text = hidden ? `${shown} of ${shown + hidden} ${unitOf(inst)} — ${hidden} hidden by the filters` : "";
   clearTimeout(inst.countTimer);
-  inst.countTimer = setTimeout(() => setText(inst.count, text), COUNT_DELAY);
+  inst.countTimer = setTimeout(() => { inst.countText = text; setText(inst.count, text); }, COUNT_DELAY);
 }
 
 function paintHeader(inst) {
@@ -483,6 +490,9 @@ function paintHeaderBadges(inst) {
         inst.view.filters[col.key] = "";
         if (col.filterInput) setSearchValue(col.filterInput, "");
         save(inst); applyTableView(inst.table);
+        // The badge has just removed itself, and focus would fall to <body>: it goes to the control
+        // that set what was cleared, where the next Tab carries on along the header.
+        col.filterWrap?.querySelector(":scope > summary")?.focus();
       });
       col.th.appendChild(badge);
       col.badge = badge;
@@ -527,8 +537,16 @@ const pickValues = (inst, col) => {
     if (raw) seen.set(raw.toLowerCase(), raw);
   }
   col.pickLabels = seen;
-  return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }));
 };
+
+/* 128px is `.dropdown-panel`'s own floor (components.css): positionPopup() writes the width floor
+   inline, which would otherwise shrink the panel to its 16px summary. */
+function placePanel(wrap) {
+  const panel = wrap.querySelector(":scope > .dropdown-panel");
+  const summary = wrap.querySelector(":scope > summary");
+  if (panel && summary) positionPopup(panel, summary, { minWidth: 128 });
+}
 
 function buildHeaderControls(inst) {
   for (const col of inst.columns) {
@@ -604,6 +622,10 @@ function buildHeaderControls(inst) {
     }
 
     wrap.appendChild(panel);
+    // Out of the wrapper's clip: `.tablewrap` scrolls, so a panel absolute inside it was cut off at
+    // the wrapper's edge — on a table filtered down to its placeholder, most of the list. Placed
+    // fixed against its summary, as select.js places its list (WP6's popup.js).
+    wrap.addEventListener("toggle", () => { if (wrap.open) placePanel(wrap); });
     col.filterWrap = wrap;
     tools.appendChild(wrap);
     col.th.appendChild(tools);
@@ -692,6 +714,100 @@ function refreshPickOptions(inst) {
   }
 }
 
+/* The PAGE'S bar, when it put one directly before the table's wrapper. */
+const pageBarOf = (anchor) => {
+  const before = anchor.previousElementSibling;
+  return before && before.matches("search.filter-bar[data-table-bar]") ? before : null;
+};
+
+const boundBoxes = new WeakSet();
+// Which table a count speaks for. A count another table already holds is never adopted: a table
+// rendered between a neighbour and its count would otherwise take that count, and the two would
+// re-assert their own text over each other's for ever — measured, a renderer that never answered.
+const countOwners = new WeakMap();
+
+/* The box the table search reads. A box the page drew is bound once and given the query in force. */
+function useSearchBox(inst, input) {
+  inst.searchInput = input;
+  if (boundBoxes.has(input)) return;
+  boundBoxes.add(input);
+  setSearchValue(input, inst.view.search || "");
+  input.addEventListener("input", () => {
+    inst.view.search = input.value.trim().toLowerCase();
+    save(inst); applyTableView(inst.table);
+  });
+}
+
+/*
+ * THE BAR'S BOX AND THE COUNT, put where they belong and put BACK when a renderer's patch took them.
+ *
+ * The search goes FIRST in the page's bar (`data-table-bar`) — its spacer and its action stay — or in
+ * a `<search class="filter-bar">` of the engine's own, before the wrapper, never inside it:
+ * `.tablewrap` scrolls sideways, and a box in there slides out of reach on the wide tables that need
+ * one. The count follows the wrapper, and the pager when there is one; it is there from the start,
+ * empty, because a status region that appears as it speaks is not announced.
+ *
+ * Either can be the page's own (adopted, above). Every write here is conditional, so the observer
+ * that calls this hears its own re-insertion once, finds everything in place, and stops.
+ */
+function ensureChrome(inst) {
+  const table = inst.table;
+  if (!table.isConnected) return;
+  const anchor = table.closest(".tablewrap") || table;
+
+  if (inst.wantsSearch) {
+    const pageBar = pageBarOf(anchor);
+    const theirs = pageBar && pageBar.querySelector('input[type="search"][data-table-search]');
+    if (theirs) {
+      useSearchBox(inst, theirs);
+    } else {
+      if (!inst.searchField) {
+        const { field, input } = searchField("search this table", "search this table…", "clear table search");
+        inst.searchField = field;
+        inst.searchBox = input;
+      }
+      useSearchBox(inst, inst.searchBox);
+      let bar = pageBar;
+      if (!bar) {
+        if (!inst.ownBar) {
+          inst.ownBar = document.createElement("search");
+          inst.ownBar.className = "filter-bar";
+          if (inst.label) inst.ownBar.setAttribute("aria-label", "search " + inst.label);
+        }
+        bar = inst.ownBar;
+      }
+      if (!bar.contains(inst.searchField)) bar.prepend(inst.searchField);
+      if (!bar.isConnected) anchor.before(bar);
+    }
+    if (pageBar && pageBar !== inst.bar) {
+      inst.bar = pageBar;
+      inst.chrome.observe(pageBar, { childList: true, subtree: true });
+    }
+  }
+
+  if (!inst.count || !inst.count.isConnected) {
+    let at = anchor;
+    if (at.nextElementSibling && at.nextElementSibling.classList.contains("table-pager")) at = at.nextElementSibling;
+    const next = at.nextElementSibling;
+    const free = next && next.matches("p.result-count[role=status][data-table-count]") && (countOwners.get(next) || inst) === inst;
+    let count = free ? next : inst.count;
+    if (!count) {
+      count = document.createElement("p");
+      count.className = "result-count";
+      count.setAttribute("role", "status");
+      count.setAttribute("data-table-count", "");
+    }
+    if (!count.isConnected) at.after(count);
+    if (count !== inst.count) {
+      countOwners.set(count, inst);
+      inst.count = count;
+      inst.chrome.observe(count, { childList: true, characterData: true, subtree: true });
+    }
+  }
+  // What it last said, back in place — a patch writing the page's empty count would silence it.
+  setText(inst.count, inst.countText);
+}
+
 function enhance(table) {
   if (instances.has(table)) return;
   const columns = columnsOf(table);
@@ -714,9 +830,6 @@ function enhance(table) {
   instances.set(table, inst);
   inst.view = restore(inst);
 
-  // Before the scroll wrapper, never inside it — `.tablewrap` scrolls sideways,
-  // and a search box in there slides out of reach on exactly the wide tables
-  // that need one. Same reasoning as the pager's anchor, opposite side.
   const anchor = table.closest(".tablewrap") || table;
 
   /*
@@ -731,41 +844,17 @@ function enhance(table) {
    */
   const wantsSearch = table.getAttribute("data-table-search") !== "off";
 
-  // A `<search>` landmark, named after the table when the table has a name: a
-  // page with three tables would otherwise offer three identical landmarks. The PAGE'S bar when it
-  // put one directly before the table (`data-table-bar`) — its spacer and its action stay, and the
-  // search goes first — so a table with one action does not grow a second bar for it.
-  const before = anchor.previousElementSibling;
-  const pageBar = before && before.matches("search.filter-bar[data-table-bar]") ? before : null;
-  const toolbar = pageBar || document.createElement("search");
-  if (!pageBar) toolbar.className = "filter-bar";
-  const tableName = table.getAttribute("aria-label") || textOf(table.caption);
-  if (tableName && !toolbar.hasAttribute("aria-label")) toolbar.setAttribute("aria-label", "search " + tableName);
-  const { field, input: search } = searchField("search this table", "search this table…", "clear table search");
-  setSearchValue(search, inst.view.search || "");
-  search.addEventListener("input", () => {
-    inst.view.search = search.value.trim().toLowerCase();
-    save(inst); applyTableView(table);
-  });
-  if (wantsSearch) {
-    toolbar.prepend(field);
-    inst.searchInput = search;
-  } else {
-    inst.view.search = "";       // a restored search with no box is invisible in force
-  }
-
-  if (wantsSearch && !pageBar) anchor.before(toolbar);
-
-  // The count: in the page from the start, empty — a status region that appears as it speaks is
-  // not announced. After the pager when the pager is already there; a pager that comes later puts
-  // itself directly after the wrapper, which is still before this.
-  const count = document.createElement("p");
-  count.className = "result-count";
-  count.setAttribute("role", "status");
-  count.setAttribute("data-table-count", "");
-  const next = anchor.nextElementSibling;
-  (next && next.classList.contains("table-pager") ? next : anchor).after(count);
-  inst.count = count;
+  inst.wantsSearch = wantsSearch;
+  if (!wantsSearch) inst.view.search = "";       // a restored search with no box is invisible in force
+  inst.label = table.getAttribute("aria-label") || textOf(table.caption);
+  // A page bar with no name of its own is named after the table: a page with three tables would
+  // otherwise offer three identical landmarks.
+  const bar = pageBarOf(anchor);
+  if (bar && inst.label && !bar.hasAttribute("aria-label")) bar.setAttribute("aria-label", "search " + inst.label);
+  inst.countText = "";
+  inst.chrome = new MutationObserver(() => ensureChrome(inst));
+  if (anchor.parentElement) inst.chrome.observe(anchor.parentElement, { childList: true });
+  ensureChrome(inst);
 
   // snapshot() builds the header controls itself when they are absent, and it
   // must run FIRST: a `pick` column's option list is derived from the rows, so
@@ -916,6 +1005,16 @@ export function initTableTools(root = document) {
   // that builds its tables after a fetch calls this once, at startup, like every other init.
   if (watching) return;
   watching = true;
+  // Capture, because the summary usually sits in a `.tablewrap` that scrolls on its own and a scroll
+  // there does not bubble. A panel scrolling its own list moves nothing and is skipped.
+  const follow = (event) => {
+    for (const wrap of document.querySelectorAll("details.tbl-filter[open]")) {
+      if (event.type === "scroll" && event.target instanceof Node && wrap.querySelector(":scope > .dropdown-panel")?.contains(event.target)) continue;
+      placePanel(wrap);
+    }
+  };
+  addEventListener("resize", follow);
+  addEventListener("scroll", follow, true);
   new MutationObserver((records) => {
     for (const record of records) {
       for (const node of record.addedNodes) {

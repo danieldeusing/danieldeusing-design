@@ -74,7 +74,7 @@ window.build = (opts = {}) => {
   const rows = opts.rows || [
     ["ada", "core", "30"], ["linus", "core", "10"], ["grace", "ops", "20"],
   ];
-  document.getElementById("mount").innerHTML = (opts.before || "") +
+  document.getElementById("mount").innerHTML = window.lastSource = (opts.before || "") +
     '<table data-table-tools data-table-id="' + (opts.id || "probe") + '" data-sort-key="' +
     (opts.sortKey || "name") + '"' + (opts.attrs || "") + '><thead><tr>' +
     cols.map((c) => '<th data-col="' + c + '"' + (c === "team" ? ' data-filter="pick"' : "") +
@@ -83,7 +83,7 @@ window.build = (opts = {}) => {
     rows.map((r, i) => "<tr" + (opts.pin && opts.pin(r, i) ? " data-pin" : "") +
       (opts.searchText ? ' data-search-text="' + opts.searchText(r, i) + '"' : "") + ">" +
       r.map((v) => "<td>" + v + "</td>").join("") + "</tr>").join("") +
-    "</tbody></table>";
+    "</tbody></table>" + (opts.after || "");
   const table = document.querySelector("#mount table[data-table-tools]");
   if (opts.paged) window.initTablePagination(document.getElementById("mount"));
   window.initTableTools(document.getElementById("mount"));
@@ -117,6 +117,16 @@ window.setSearch = (text) => {
   box.value = text;
   box.dispatchEvent(new Event("input", { bubbles: true }));
 };
+// The table's own chrome: the boxes in its bar (never a column's), the count, and what is shown.
+window.chromeState = () => {
+  const bar = document.querySelector("#mount search.filter-bar");
+  const boxes = bar ? [...bar.querySelectorAll('input[type="search"]')] : [];
+  const counts = [...document.querySelectorAll("#mount p.result-count[role=status]")];
+  return { bars: document.querySelectorAll("#mount search.filter-bar").length, boxes: boxes.length,
+    first: !!boxes[0] && bar.firstElementChild.contains(boxes[0]), value: boxes[0] ? boxes[0].value : null,
+    counts: counts.length, count: counts[0] ? counts[0].textContent : null,
+    countAfterTable: !!counts[0] && [counts[0].previousElementSibling, counts[0].previousElementSibling?.matches(".table-pager") ? counts[0].previousElementSibling.previousElementSibling : null].includes(document.querySelector("#mount table")), rows: window.order().join() };
+};
 window.sortBy = (key) => document.querySelector('#mount th[data-col="' + key + '"] .tbl-sort').click();
 window.ready = true;
 <\/script></body></html>`;
@@ -124,7 +134,7 @@ window.ready = true;
 // A real origin, because localStorage is the subject.
 const server = await serve(root, { "/__tabletools.html": HARNESS });
 const browser = await launch("tabletools");
-const { evaluate, until, navigate } = browser;
+const { evaluate, until, navigate, send } = browser;
 await navigate(`${server.origin}/__tabletools.html`);
 await until("window.ready === true", "the harness module to load");
 
@@ -334,9 +344,14 @@ await check("...or the table's own data-table-empty sentence", async () =>
 await evaluate(`localStorage.clear(); window.build({ attrs: ' data-table-unit="runs"' }); window.setFilter("name", "zzz"); null`);
 await check("D2 — rows, but none match: \"no runs match these filters.\" and a reset that is a real button", async () =>
   evaluate(`(() => { const p = window.placeholder(); const b = p && p.querySelector("button.doc-link.doc-link--forward");
-    return !!p && p.getAttribute("data-table-placeholder") === "no-match" && p.querySelector("p").textContent === "no runs match these filters." &&
+    return !!p && p.getAttribute("data-table-placeholder") === "no-match" && p.querySelector(".empty--inline").textContent.startsWith("no runs match these filters.") &&
       !!b && b.type === "button" && b.textContent === "reset filters"; })()`),
   async () => evaluate(`window.placeholder() ? window.placeholder().outerHTML : "no placeholder"`));
+await check("...in S1's documented inline markup: the sentence is the box's own text and the reset follows it, no <p> between (feedback.html)", async () =>
+  evaluate(`(() => { const box = window.placeholder()?.querySelector(".empty.empty--inline");
+    return !!box && !box.querySelector("p") && box.firstChild.nodeType === 3 && box.firstChild.nodeValue === "no runs match these filters. " &&
+      box.lastElementChild === box.querySelector("button.doc-link") && box.childNodes.length === 2; })()`),
+  async () => evaluate(`window.placeholder()?.querySelector(".empty")?.outerHTML || "no placeholder"`));
 await check("...and the placeholder is not data: the rows a reader sees are none", async () => (await evaluate("window.order()")).length === 0);
 await evaluate("window.placeholder()?.querySelector('button')?.click(); null");
 await check("...its reset brings every row back and takes the placeholder away", async () =>
@@ -376,6 +391,69 @@ await check("D2 — the sort button and the filter summary carry no glyph TEXT (
 await check("...and the badge has no native title: its text is the value and its name says what a press does", async () =>
   evaluate(`(() => { const b = document.querySelector("#mount .tbl-badge");
     return !!b && !b.hasAttribute("title") && b.textContent === "ops" && b.getAttribute("aria-label") === "clear the team filter"; })()`));
+
+/* ── fix round 1 · a pick menu orders values the way a reader counts ──────────────────────────────
+   gpt-5.9 before gpt-5.10: a plain localeCompare files "10" before "9". "all" stays first. */
+
+await evaluate(`localStorage.clear(); window.build({ rows: [["a", "gpt-5.10", "1"], ["b", "gpt-5.9", "2"], ["c", "gpt-5.2", "3"], ["d", "claude", "4"]] }); null`);
+const pickOrder = await evaluate(`[...document.querySelectorAll('#mount th[data-col="team"] .dropdown-item')].map((b) => b.textContent).join()`);
+await check("fix round 1 — a pick menu sorts numerically: all, claude, gpt-5.2, gpt-5.9, gpt-5.10", async () =>
+  pickOrder === "all,claude,gpt-5.2,gpt-5.9,gpt-5.10", pickOrder);
+
+/* ── fix round 1 · clearing a filter by its badge leaves focus on that column ──────────────────────
+   The badge is removed as it clears, so its focus fell to <body> and the next Tab started over at the
+   top of the page. It goes to the column's filter summary: the control that set what was just cleared. */
+
+await evaluate(`localStorage.clear(); window.build(); window.pick("team", "ops"); document.querySelector("#mount .tbl-badge").focus(); null`);
+for (const type of ["keyDown", "keyUp"]) {
+  await send("Input.dispatchKeyEvent", type === "keyDown"
+    ? { type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r", unmodifiedText: "\r" }
+    : { type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+}
+await sleep(100);
+const afterBadge = await evaluate(`JSON.stringify({ badge: !!document.querySelector("#mount .tbl-badge"), rows: window.order().join(),
+  focus: document.activeElement === document.querySelector('#mount th[data-col="team"] .tbl-filter > summary') ? "team summary" : document.activeElement.tagName })`);
+await check("fix round 1 — Enter on a filter's badge clears it, and focus lands on that column's filter summary, not <body>", async () =>
+  afterBadge === JSON.stringify({ badge: false, rows: "ada,grace,linus", focus: "team summary" }), afterBadge);
+
+/* ── fix round 1 · the box in the bar and the count are the engine's, and it keeps them ───────────
+   A renderer that patches the MOUNT writes the bar and the wrapper back from its own markup, which has
+   neither the engine's box nor its count: both went, and the search stayed in force with no box to
+   show it or clear it. The engine puts back the same nodes, the box FIRST in the bar and holding the
+   query, the count after the table saying what it said. Or a renderer draws them itself, and the
+   engine adopts them: an input[type=search][data-table-search] in the bar, a p.result-count[role=status]
+   [data-table-count] after the table. */
+
+const BAR = '<search class="filter-bar" data-table-bar aria-label="runs"><span class="filter-bar-spacer"></span><button type="button" id="new-run">new run</button></search>';
+const THEIR_BAR = '<search class="filter-bar" data-table-bar aria-label="runs"><div class="search-field"><input type="search" data-table-search aria-label="search runs"><button type="button" class="search-clear" aria-label="clear the search" hidden></button></div><span class="filter-bar-spacer"></span></search>';
+const THEIR_COUNT = '<p class="result-count" role="status" data-table-count></p>';
+const chromeNow = () => evaluate("JSON.stringify(window.chromeState())");
+const WHOLE = JSON.stringify({ bars: 1, boxes: 1, first: true, value: "a", counts: 1, count: "2 of 3 runs — 1 hidden by the filters", countAfterTable: true, rows: "ada,grace" });
+
+await evaluate(`localStorage.clear(); window.build({ before: ${JSON.stringify(BAR)}, attrs: ' data-table-unit="runs"' }); window.setSearch("a"); null`);
+await sleep(500);
+const chromeBefore = await chromeNow();
+await evaluate(`window.keepBox = document.querySelector("#mount search .search-field"); window.keepCount = document.querySelector("#mount p.result-count");
+  window.keepBox.remove(); window.keepCount.remove(); null`);
+await sleep(100);
+const chromeHand = await chromeNow();
+await check("fix round 1 — the page takes the bar's box and the count away: the SAME box goes back first in the bar with the query, the SAME count after the table", async () =>
+  chromeBefore === WHOLE && chromeHand === WHOLE &&
+    (await evaluate(`document.querySelector("#mount search .search-field") === window.keepBox && document.querySelector("#mount p.result-count") === window.keepCount`)),
+  JSON.stringify({ before: chromeBefore, after: chromeHand }));
+const chromeQuiet = await evaluate(`new Promise((resolve) => { let n = 0;
+  const o = new MutationObserver((r) => { n += r.length; }); o.observe(document.getElementById("mount"), { subtree: true, childList: true, attributes: true, characterData: true });
+  setTimeout(() => { o.disconnect(); resolve(n); }, 300); })`);
+await check("...and it settles: nothing answers its own re-insertion", async () => chromeQuiet === 0, `${chromeQuiet} mutation record(s) in 300 ms`);
+
+await evaluate(`localStorage.clear(); window.build({ before: ${JSON.stringify(THEIR_BAR)}, after: ${JSON.stringify(THEIR_COUNT)}, attrs: ' data-table-unit="runs"' });
+  window.theirBox = document.querySelector("#mount input[data-table-search]"); window.theirCount = document.querySelector("#mount p[data-table-count]");
+  window.theirBox.value = "a"; window.theirBox.dispatchEvent(new Event("input", { bubbles: true })); null`);
+await sleep(500);
+const adopted = await chromeNow();
+await check("fix round 1 — a renderer draws the box and the count itself: the engine ADOPTS both, adding neither — the page's box searches, the page's count speaks", async () =>
+  adopted === WHOLE && (await evaluate(`document.querySelector("#mount search input[type=search]") === window.theirBox && document.querySelector("#mount p.result-count") === window.theirCount`)),
+  adopted);
 
 /* ── a table that arrives later ──────────────────────────────────────────────────────────────────── */
 
@@ -441,7 +519,54 @@ if (!DOM_PATCH) {
   console.log(`dom-patch: ${DOM_PATCH}`);
   await check("D2 — cockpit's cockpitPatch re-renders the header: the engine puts back what it owns, the same nodes, the view intact", async () =>
     afterPatch === beforePatch && JSON.parse(afterPatch).sameTools, JSON.stringify({ before: beforePatch, after: afterPatch }));
+
+  // The whole MOUNT, as a cockpit load() writes it: the bar, the table and nothing after it.
+  await evaluate(`localStorage.clear(); window.build({ before: ${JSON.stringify(BAR)}, attrs: ' data-table-unit="runs"' }); window.setSearch("a"); null`);
+  await sleep(500);
+  await evaluate(`window.keepBox = document.querySelector("#mount search .search-field"); window.keepCount = document.querySelector("#mount p.result-count");
+    window.cockpitPatch(document.getElementById("mount"), window.lastSource); null`);
+  await sleep(600);
+  const mountPatched = await chromeNow();
+  await check("fix round 1 — cockpitPatch re-renders the whole mount: the engine's box is back first in the bar with the query, its count after the table, the view intact", async () =>
+    mountPatched === WHOLE &&
+      (await evaluate(`document.querySelector("#mount search .search-field") === window.keepBox && document.querySelector("#mount p.result-count") === window.keepCount`)),
+    mountPatched);
+  await evaluate(`localStorage.clear(); window.build({ before: ${JSON.stringify(THEIR_BAR)}, after: ${JSON.stringify(THEIR_COUNT)}, attrs: ' data-table-unit="runs"' });
+    window.theirBox = document.querySelector("#mount input[data-table-search]"); window.theirCount = document.querySelector("#mount p[data-table-count]");
+    window.theirBox.value = "a"; window.theirBox.dispatchEvent(new Event("input", { bubbles: true })); null`);
+  await sleep(500);
+  await evaluate(`window.cockpitPatch(document.getElementById("mount"), window.lastSource); null`);
+  await sleep(100);
+  const adoptedPatched = await chromeNow();
+  // The count is not asked to be the same node: the pager this mount carries sits between the table
+  // and the page's count, so the patch matches the count's markup against the pager and draws a fresh
+  // one — which is the renderer's own, and is adopted.
+  await check("...and when the renderer draws them itself, its patch keeps its box (the same node, holding the query) and its count still says it", async () =>
+    adoptedPatched === WHOLE && (await evaluate(`document.querySelector("#mount search input[type=search]") === window.theirBox`)),
+    adoptedPatched);
 }
+
+/* ── fix round 1 · a count belongs to one table ────────────────────────────────────────────────────
+   LAST, because the failure it guards is a page that never answers again: a table rendered between a
+   neighbour and its count adopted that count, and the two re-asserted their own text over each other's
+   in an endless run of observer callbacks. The wait is bounded here, in node, so a hang reads as a
+   FAIL rather than a stalled suite. */
+const answered = (promise, ms) => Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve("no answer in " + ms + " ms"), ms))]);
+const shared = await answered(evaluate(`(async () => {
+  const later = document.getElementById("later");
+  later.innerHTML = '<table data-table-tools data-table-unit="runs" aria-label="first"><thead><tr><th data-col="a">a</th></tr></thead><tbody><tr><td>x</td></tr><tr><td>y</td></tr></tbody></table>';
+  await new Promise((r) => setTimeout(r, 50));
+  const first = later.querySelector("table");
+  first.insertAdjacentHTML("afterend", '<table data-table-tools data-table-unit="runs" aria-label="second"><thead><tr><th data-col="b">b</th></tr></thead><tbody><tr><td>p</td></tr><tr><td>q</td></tr></tbody></table>');
+  await new Promise((r) => setTimeout(r, 50));
+  const box = [...later.querySelectorAll("search.filter-bar")].find((b) => b.getAttribute("aria-label") === "search second").querySelector("input");
+  box.value = "p"; box.dispatchEvent(new Event("input", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 600));
+  const counts = [...later.querySelectorAll("p.result-count[role=status]")];
+  return JSON.stringify({ counts: counts.map((c) => c.textContent), afterSecond: counts[0].previousElementSibling.getAttribute("aria-label") });
+})()`), 5000);
+await check("fix round 1 — a table drawn between a neighbour and its count makes its own count, and the two say their own things", async () =>
+  shared === JSON.stringify({ counts: ["1 of 2 runs — 1 hidden by the filters", ""], afterSecond: "second" }), shared);
 
 browser.close();
 server.close();

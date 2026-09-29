@@ -280,8 +280,10 @@ th[aria-sort="descending"] .tbl-sort::before { --tbl-glyph: var(--ico-arrow-down
 .tbl-filter > summary:hover,
 th[aria-sort]:not([aria-sort="none"]) .tbl-sort,
 .tbl-filter.is-on > summary { color: var(--primary); }
+/* The house ring, 2px off. Measured whole in the header — the dense cell's padding leaves it room
+   inside the scrolling wrapper, so nothing clips it (check-data, fix round 1). */
 .tbl-sort:focus-visible,
-.tbl-filter > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.tbl-filter > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 .tbl-filter-panel { padding: 0.4rem; max-block-size: 60vh; overflow-y: auto; }
 .tbl-filter > ul.dropdown-panel { max-block-size: 60vh; overflow-y: auto; }
@@ -315,7 +317,7 @@ th:has(.tbl-tools) { white-space: nowrap; }
   cursor: pointer;
 }
 .tbl-badge:hover { background: color-mix(in srgb, var(--primary) 22%, var(--background)); }
-.tbl-badge:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.tbl-badge:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 /* THE TWO NOTHINGS. The placeholder row spans the table and holds S1's inline empty state: "no runs
    yet" when there are none, "no runs match these filters." and its reset when a filter withheld
@@ -328,6 +330,8 @@ tr[data-table-placeholder] > td { text-align: start; background: none; }
 @media (pointer: coarse) {
   .tbl-sort,
   .tbl-filter > summary { min-inline-size: 44px; min-block-size: 44px; }
+  /* The badge too: 40 × 16 was a press that missed. It grows to the header's 44px row, value centred. */
+  .tbl-badge { min-inline-size: 44px; min-block-size: 44px; justify-content: center; }
 }
 
 /* ── KEY/VALUE — a table of pairs and a list of pairs look the same ──────────────────────── (D3)

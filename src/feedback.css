@@ -75,11 +75,8 @@
 .empty > * { margin: 0; }
 /* BLOCK, not the centred grid: in a grid a line of text and the `reset` button after it become
    two stacked items, and in a narrow pane they should flow as one sentence. Block children still
-   get the grid's gap, so a prompt and its message do not run together. `justify-items: normal` too:
-   Chromium now aligns block children by it, and .empty's `center` shrank each line to its words and
-   centred it — measured, D2's "no runs yet" sat mid-table. Not `start`: in block layout that also
-   shrinks the line to its words, just at the left (0.60.0). */
-.empty--inline { display: block; justify-items: normal; padding-block: 0.75rem; text-align: start; }
+   get the grid's gap, so a prompt and its message do not run together. */
+.empty--inline { display: block; padding-block: 0.75rem; text-align: start; }
 .empty--inline > * + * { margin-block-start: 0.5rem; }
 
 /* THE GLYPH SAYS WHICH KIND OF EMPTY before the words do — a warning triangle over a failure, an

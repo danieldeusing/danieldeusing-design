@@ -53,12 +53,56 @@
  * boxes that had one. search.js owns the clear and Escape; this file only keeps
  * the clear's `hidden` in step when IT writes a value (a restored view, a reset),
  * because a value set from code fires no `input` for search.js to hear.
+ *
+ * ── WHAT COCKPIT'S ENGINE KNEW, NOW HERE (D2, 0.60.0) ────────────────────────
+ *
+ * cockpit's `cockpitTable` keeps fetching, `setRows`/`fail` and its column vocabulary; the
+ * rest of what it had learned moves into the system:
+ *   · THE HAYSTACK. A row's `data-search-text` is matched with its text, so a search can find
+ *     what no column prints (a review id, a job id) without a second box.
+ *   · THE PAGE'S OWN BAR. A `<search class="filter-bar" data-table-bar>` directly before the
+ *     table's wrapper is used, not duplicated: the search goes FIRST in it, and whatever the page
+ *     put there (a `.filter-bar-spacer` and its one action) stays.
+ *   · THE COUNT. A `p.result-count[role=status]` after the wrapper (and after the pager) says
+ *     "7 of 55 runs — 48 hidden by the filters" while rows are withheld, and NOTHING at rest: the
+ *     pager already states the total. It is written 400 ms after the last apply, so it announces
+ *     a settled result rather than every keystroke. It exists, empty, from the start, because a
+ *     live region created at the moment it speaks is not heard.
+ *   · TWO NOTHINGS. With no rows at all a placeholder row says "no <unit> yet" (or the table's
+ *     `data-table-empty`); with rows and no match it says "no <unit> match these filters." and
+ *     offers the reset. Two different sentences, because "nothing here" is a lie in one of the two
+ *     cases. A failure and a load are the page's (S1's alert, S6's .loading) — three sentences.
+ *   · THE HEADER GLYPHS ARE MASKS. The sort and filter controls carry no text; data.css draws the
+ *     arrows, the funnel and the badge's x from the icon set, so they take the header's colour in
+ *     every mode, forced colours included, and a screen reader hears only the `aria-label`.
+ *
+ * ── WHAT THIS WRITES, IT KEEPS WRITING ───────────────────────────────────────
+ *
+ * `aria-sort` and `.is-filtered` on a header, the controls and the badge inside it, `aria-checked`
+ * on a pick row: none of it is in the page's markup, so a renderer that PATCHES attributes and
+ * children into the header (cockpit's `cockpitPatch`) takes every one of them away on each poll.
+ * The observer below watches the header as well as the body, and puts back what this file owns.
+ * The same goes one level out: the box this file put in the bar and the count after the table are
+ * not in the page's markup either, so a renderer that patches the whole MOUNT takes both — and the
+ * search stayed in force with no box to show it. A second observer, on the bar and on the wrapper's
+ * parent, puts the same nodes back. A renderer can draw them itself instead, and they are adopted:
+ * an `input[type=search][data-table-search]` in the bar, a `p.result-count[role=status]
+ * [data-table-count]` after the table (or after its pager). Then a patch keeps its own nodes.
+ * Every write is conditional — an attribute set to the value it already has is still a mutation,
+ * and an observer that answers its own writes never stops.
  */
 
+import { positionPopup } from "./popup.js";
 import { initSearchFields } from "./search.js";
 
 const STORE_PREFIX = "table-view:";
+const PLACEHOLDER = "data-table-placeholder";
+const COUNT_DELAY = 400;
 const instances = new WeakMap();
+
+// Only a CHANGE is written: the observer hears every write, and one that changes nothing would wake it.
+const setAttr = (el, name, value) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
+const setText = (el, value) => { if (el.textContent !== value) el.textContent = value; };
 
 const textOf = (el) => (el ? (el.textContent || "").trim() : "");
 
@@ -255,7 +299,9 @@ function restore(inst) {
 const matches = (inst, row) => {
   const view = inst.view;
   if (view.search) {
-    const hay = textOf(row).toLowerCase();
+    // `data-search-text` is matched with what the row prints: a search can find a review id or a
+    // job id no column shows, which is why cockpit had grown a second box beside this one.
+    const hay = (textOf(row) + " " + (row.getAttribute("data-search-text") || "")).toLowerCase();
     if (!hay.includes(view.search)) return false;
   }
   for (const col of inst.columns) {
@@ -322,6 +368,10 @@ export function applyTableView(table) {
     for (const child of inst.childrenOf.get(row) || []) child.remove();
     row.remove();
   }
+  const placeholder = keep.length ? null : placeholderRow(inst);
+  if (inst.placeholder && inst.placeholder !== placeholder) inst.placeholder.remove();
+  inst.placeholder = placeholder;
+  if (placeholder) frag.appendChild(placeholder);
   body.appendChild(frag);
   // What we just wrote, so the observer can tell OUR output from a real
   // re-render. A synchronous "applying" flag cannot: MutationObserver delivers
@@ -332,6 +382,7 @@ export function applyTableView(table) {
 
   paintHeader(inst);
   paintHeaderBadges(inst);
+  writeCount(inst, keep.length, drop.length);
 
   /*
    * A page that prints its own "N of M" has to be told, or it reports the count
@@ -346,13 +397,64 @@ export function applyTableView(table) {
   }));
 }
 
+const unitOf = (inst) => inst.table.getAttribute("data-table-unit") || "rows";
+
+/*
+ * The row that stands in for no rows. Spans every column, carries `data-table-placeholder` so the
+ * pager, the match and the sort all pass over it, and is REPLACED rather than edited when what it
+ * says changes: its text is written before it is inserted, so the only record it makes is a
+ * childList one on the body, which the observer knows is this file's own.
+ */
+function placeholderRow(inst) {
+  const unit = unitOf(inst);
+  const none = inst.allRows.length === 0;
+  const kind = none ? "empty" : "no-match";
+  const text = none ? (inst.table.getAttribute("data-table-empty") || `no ${unit} yet`) : `no ${unit} match these filters.`;
+  const held = inst.placeholder;
+  if (held && held.getAttribute(PLACEHOLDER) === kind && held.textContent.startsWith(text)) return held;
+  const row = document.createElement("tr");
+  row.setAttribute(PLACEHOLDER, kind);
+  const cell = row.insertCell();
+  const head = inst.table.tHead && inst.table.tHead.rows[0];
+  cell.colSpan = head ? [...head.cells].reduce((n, th) => n + th.colSpan, 0) : 1;
+  // S1's inline markup as feedback.html documents it: the sentence is the box's own text, the reset
+  // follows it on the same line. No <p>: a block inside would be aligned by .empty's grid rules.
+  const box = document.createElement("div");
+  box.className = "empty empty--inline";
+  box.append(none ? text : text + " ");
+  if (!none) {
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "doc-link doc-link--forward";
+    reset.textContent = "reset filters";
+    reset.addEventListener("click", () => resetTableView(inst.table));
+    box.append(reset);
+  }
+  cell.append(box);
+  return row;
+}
+
+/* Silent at rest — the pager states the total — and settled: written once the applies stop. */
+function writeCount(inst, shown, hidden) {
+  if (!inst.count) return;
+  const text = hidden ? `${shown} of ${shown + hidden} ${unitOf(inst)} — ${hidden} hidden by the filters` : "";
+  clearTimeout(inst.countTimer);
+  inst.countTimer = setTimeout(() => { inst.countText = text; setText(inst.count, text); }, COUNT_DELAY);
+}
+
 function paintHeader(inst) {
   for (const col of inst.columns) {
     const sorted = inst.view.sortKey === col.key;
-    col.th.setAttribute("aria-sort", sorted ? (inst.view.dir === 1 ? "ascending" : "descending") : "none");
-    if (col.sortBtn) col.sortBtn.textContent = sorted ? (inst.view.dir === 1 ? "▲" : "▼") : "↕";
+    setAttr(col.th, "aria-sort", sorted ? (inst.view.dir === 1 ? "ascending" : "descending") : "none");
     const on = Boolean(inst.view.filters[col.key]);
     if (col.filterWrap) col.filterWrap.classList.toggle("is-on", on);
+    // The pick rows are menuitemradios: exactly one is checked — "all" when nothing is filtered.
+    if (col.pickPanel) {
+      const want = inst.view.filters[col.key] || "";
+      for (const item of col.pickPanel.querySelectorAll(".dropdown-item")) {
+        setAttr(item, "aria-checked", String(item.getAttribute("data-pick") === want));
+      }
+    }
   }
 }
 
@@ -376,7 +478,10 @@ function paintHeaderBadges(inst) {
       if (badge) { badge.remove(); col.badge = null; }
       continue;
     }
-    if (!badge || !badge.isConnected) {
+    // A patch of the header takes the badge out with everything else it did not write: the same
+    // node goes back, so a badge that has focus keeps it.
+    if (badge && !col.th.contains(badge)) col.th.appendChild(badge);
+    if (!badge) {
       badge = document.createElement("button");
       badge.type = "button";
       badge.className = "tbl-badge";
@@ -385,6 +490,9 @@ function paintHeaderBadges(inst) {
         inst.view.filters[col.key] = "";
         if (col.filterInput) setSearchValue(col.filterInput, "");
         save(inst); applyTableView(inst.table);
+        // The badge has just removed itself, and focus would fall to <body>: it goes to the control
+        // that set what was cleared, where the next Tab carries on along the header.
+        col.filterWrap?.querySelector(":scope > summary")?.focus();
       });
       col.th.appendChild(badge);
       col.badge = badge;
@@ -393,19 +501,63 @@ function paintHeaderBadges(inst) {
     // The stored value is lower-cased because that is what matching needs. Showing
     // it back would print "cash" where the dropdown offered "Cash" — the badge is
     // the reader's own choice quoted back at them, so it uses their casing.
-    badge.textContent = (exact && col.pickLabels && col.pickLabels.get(value))
+    setText(badge, (exact && col.pickLabels && col.pickLabels.get(value))
       || (col.filterInput && col.filterInput.value.trim())
-      || value;
-    badge.title = (exact ? `${col.label} is exactly “${value}”` : `${col.label} contains “${value}”`)
-                  + " — click to clear";
-    badge.setAttribute("aria-label", `clear the ${col.label} filter`);
+      || value);
+    // No native `title` (house rule 7): the badge's text IS the value, and its name says what a
+    // press does. A tip on a header control was dropped on 2026-08-21 for the same reason.
+    setAttr(badge, "aria-label", `clear the ${col.label} filter`);
   }
+}
+
+/* A pick row: a menuitemradio carrying the value it sets (`""` for "all"). */
+function pickItem(inst, col, value, label) {
+  const li = document.createElement("li");
+  li.setAttribute("role", "none");
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "dropdown-item";
+  item.setAttribute("role", "menuitemradio");
+  item.setAttribute("aria-checked", "false");
+  item.setAttribute("data-pick", value);
+  item.textContent = label;
+  item.addEventListener("click", () => {
+    inst.view.filters[col.key] = value;
+    col.filterWrap.open = false;
+    save(inst); applyTableView(inst.table);
+  });
+  li.append(item);
+  return li;
+}
+
+const pickValues = (inst, col) => {
+  const seen = new Map();
+  for (const row of inst.allRows) {
+    const raw = cellValue(row, col.index);
+    if (raw) seen.set(raw.toLowerCase(), raw);
+  }
+  col.pickLabels = seen;
+  return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }));
+};
+
+/* 128px is `.dropdown-panel`'s own floor (components.css): positionPopup() writes the width floor
+   inline, which would otherwise shrink the panel to its 16px summary. */
+function placePanel(wrap) {
+  const panel = wrap.querySelector(":scope > .dropdown-panel");
+  const summary = wrap.querySelector(":scope > summary");
+  if (panel && summary) positionPopup(panel, summary, { minWidth: 128 });
 }
 
 function buildHeaderControls(inst) {
   for (const col of inst.columns) {
+    // Already built: put the same controls back where a patch took them from, never a second set.
+    if (col.tools) {
+      if (!col.th.contains(col.tools)) col.th.appendChild(col.tools);
+      continue;
+    }
     const tools = document.createElement("span");
     tools.className = "tbl-tools";
+    col.tools = tools;
 
     const sort = document.createElement("button");
     sort.type = "button";
@@ -416,8 +568,8 @@ function buildHeaderControls(inst) {
     // sort arrow already sitting under the label it sorts, which is the definition of a tooltip
     // that repeats its own control. `aria-label` STAYS: the glyph is decoration, but a screen
     // reader still has to be told what an unlabelled ↕ button does.
+    // No text: data.css draws the arrows as a mask from `aria-sort` on the header.
     sort.setAttribute("aria-label", "sort by " + col.label);
-    sort.textContent = "↕";
     sort.addEventListener("click", () => {
       if (inst.view.sortKey === col.key) inst.view.dir = inst.view.dir === 1 ? -1 : 1;
       else { inst.view.sortKey = col.key; inst.view.dir = 1; }
@@ -442,36 +594,23 @@ function buildHeaderControls(inst) {
     wrap.className = "dropdown tbl-filter";
     const summary = document.createElement("summary");
     summary.setAttribute("aria-label", "filter " + col.label);
-    summary.textContent = "⌕";
     wrap.appendChild(summary);
 
-    const panel = document.createElement("div");
-    panel.className = "dropdown-panel dropdown-panel--down tbl-filter-panel";
-
+    let panel;
     if (col.filter === "pick") {
-      // The list is built from the column's own cells, so it can never offer a
-      // value the table does not contain.
-      const seen = new Map();
-      for (const row of inst.allRows) {
-        const raw = cellValue(row, col.index);
-        if (raw) seen.set(raw.toLowerCase(), raw);
-      }
-      col.pickLabels = seen;
-      const any = document.createElement("button");
-      any.type = "button"; any.className = "dropdown-item"; any.textContent = "(any)";
-      any.addEventListener("click", () => {
-        inst.view.filters[col.key] = ""; wrap.open = false; save(inst); applyTableView(inst.table);
-      });
-      panel.appendChild(any);
-      for (const [lower, label] of [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))) {
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "dropdown-item"; b.textContent = label;
-        b.addEventListener("click", () => {
-          inst.view.filters[col.key] = lower; wrap.open = false; save(inst); applyTableView(inst.table);
-        });
-        panel.appendChild(b);
-      }
+      // The list is built from the column's own cells, so it can never offer a value the table
+      // does not contain. A menu of menuitemradios (M5's word "all" first, where this used to write
+      // "(any)"): M1 gives it the arrow keys and M0 draws the ✓ on the checked row.
+      panel = document.createElement("ul");
+      panel.className = "dropdown-panel dropdown-panel--down";
+      panel.setAttribute("role", "menu");
+      panel.setAttribute("aria-label", "filter " + col.label);
+      panel.append(pickItem(inst, col, "", "all"));
+      for (const [lower, label] of pickValues(inst, col)) panel.append(pickItem(inst, col, lower, label));
+      col.pickPanel = panel;
     } else {
+      panel = document.createElement("div");
+      panel.className = "dropdown-panel dropdown-panel--down tbl-filter-panel";
       const { field, input } = searchField(
         "filter " + col.label, col.label + " contains…", "clear the " + col.label + " filter");
       input.addEventListener("input", () => {
@@ -483,6 +622,10 @@ function buildHeaderControls(inst) {
     }
 
     wrap.appendChild(panel);
+    // Out of the wrapper's clip: `.tablewrap` scrolls, so a panel absolute inside it was cut off at
+    // the wrapper's edge — on a table filtered down to its placeholder, most of the list. Placed
+    // fixed against its summary, as select.js places its list (WP6's popup.js).
+    wrap.addEventListener("toggle", () => { if (wrap.open) placePanel(wrap); });
     col.filterWrap = wrap;
     tools.appendChild(wrap);
     col.th.appendChild(tools);
@@ -502,7 +645,8 @@ function buildHeaderControls(inst) {
 function snapshot(inst) {
   const body = inst.table.tBodies[0];
   if (!body) return;
-  const rows = [...body.rows];
+  // A placeholder is this file's own stand-in for no rows, never data.
+  const rows = [...body.rows].filter((row) => !row.hasAttribute(PLACEHOLDER));
   inst.childrenOf = new Map();
   inst.allRows = [];
   const byKey = new Map();
@@ -542,10 +686,12 @@ function snapshot(inst) {
       col.filterWrap = prev.filterWrap;
       col.badge = prev.badge;
       col.pickLabels = prev.pickLabels;
+      col.pickPanel = prev.pickPanel;
+      col.tools = prev.tools;
     }
     inst.columns = fresh;
-    if (!inst.table.querySelector(".tbl-tools")) buildHeaderControls(inst);
-    else refreshPickOptions(inst);
+    buildHeaderControls(inst);
+    refreshPickOptions(inst);
   }
 }
 
@@ -558,30 +704,144 @@ function snapshot(inst) {
  */
 function refreshPickOptions(inst) {
   for (const col of inst.columns) {
-    if (col.filter !== "pick" || !col.filterWrap) continue;
-    const seen = new Map();
-    for (const row of inst.allRows) {
-      const raw = cellValue(row, col.index);
-      if (raw) seen.set(raw.toLowerCase(), raw);
-    }
-    col.pickLabels = seen;
-    const wanted = [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-    const panel = col.filterWrap.querySelector(".tbl-filter-panel");
-    if (!panel) continue;
-    const current = [...panel.querySelectorAll(".dropdown-item")].slice(1).map((b) => b.textContent);
+    if (col.filter !== "pick" || !col.pickPanel) continue;
+    const wanted = pickValues(inst, col);
+    const panel = col.pickPanel;
+    const current = [...panel.children].slice(1).map((li) => li.textContent);
     if (current.length === wanted.length && current.every((v, i) => v === wanted[i][1])) continue;
-    for (const b of [...panel.querySelectorAll(".dropdown-item")].slice(1)) b.remove();
-    for (const [lower, label] of wanted) {
-      const b = document.createElement("button");
-      b.type = "button"; b.className = "dropdown-item"; b.textContent = label;
-      b.addEventListener("click", () => {
-        inst.view.filters[col.key] = lower;
-        col.filterWrap.open = false;
-        save(inst); applyTableView(inst.table);
-      });
-      panel.appendChild(b);
+    for (const li of [...panel.children].slice(1)) li.remove();
+    for (const [lower, label] of wanted) panel.append(pickItem(inst, col, lower, label));
+  }
+}
+
+/* The PAGE'S bar, when it put one directly before the table's wrapper. */
+const pageBarOf = (anchor) => {
+  const before = anchor.previousElementSibling;
+  return before && before.matches("search.filter-bar[data-table-bar]") ? before : null;
+};
+
+const boundBoxes = new WeakSet();
+// Which table a count speaks for. A count another table already holds is never adopted: a table
+// rendered between a neighbour and its count would otherwise take that count, and the two would
+// re-assert their own text over each other's for ever — measured, a renderer that never answered.
+const countOwners = new WeakMap();
+
+/* The box the table search reads. A box the page drew is bound once and given the query in force. */
+function useSearchBox(inst, input) {
+  inst.searchInput = input;
+  if (boundBoxes.has(input)) return;
+  boundBoxes.add(input);
+  setSearchValue(input, inst.view.search || "");
+  input.addEventListener("input", () => {
+    inst.view.search = input.value.trim().toLowerCase();
+    save(inst); applyTableView(inst.table);
+  });
+}
+
+/*
+ * THE BAR'S BOX AND THE COUNT, put where they belong and put BACK when a renderer's patch took them.
+ *
+ * The search goes FIRST in the page's bar (`data-table-bar`) — its spacer and its action stay — or in
+ * a `<search class="filter-bar">` of the engine's own, before the wrapper, never inside it:
+ * `.tablewrap` scrolls sideways, and a box in there slides out of reach on the wide tables that need
+ * one. The count follows the wrapper, and the pager when there is one; it is there from the start,
+ * empty, because a status region that appears as it speaks is not announced.
+ *
+ * Either can be the page's own (adopted, above). Every write here is conditional, so the observer
+ * that calls this hears its own re-insertion once, finds everything in place, and stops.
+ */
+function ensureChrome(inst) {
+  const table = inst.table;
+  if (!table.isConnected) return;
+  const anchor = table.closest(".tablewrap") || table;
+
+  if (inst.wantsSearch) {
+    const pageBar = pageBarOf(anchor);
+    const theirs = pageBar && pageBar.querySelector('input[type="search"][data-table-search]');
+    if (theirs) {
+      useSearchBox(inst, theirs);
+    } else {
+      if (!inst.searchField) {
+        const { field, input } = searchField("search this table", "search this table…", "clear table search");
+        inst.searchField = field;
+        inst.searchBox = input;
+      }
+      useSearchBox(inst, inst.searchBox);
+      let bar = pageBar;
+      if (!bar) {
+        if (!inst.ownBar) {
+          inst.ownBar = document.createElement("search");
+          inst.ownBar.className = "filter-bar";
+          if (inst.label) inst.ownBar.setAttribute("aria-label", "search " + inst.label);
+        }
+        bar = inst.ownBar;
+      }
+      if (!bar.contains(inst.searchField)) bar.prepend(inst.searchField);
+      if (!bar.isConnected) anchor.before(bar);
+    }
+    if (pageBar && pageBar !== inst.bar) {
+      inst.bar = pageBar;
+      inst.chrome.observe(pageBar, { childList: true, subtree: true });
     }
   }
+
+  if (!inst.count || !inst.count.isConnected) {
+    let at = anchor;
+    if (at.nextElementSibling && at.nextElementSibling.classList.contains("table-pager")) at = at.nextElementSibling;
+    const next = at.nextElementSibling;
+    const free = next && next.matches("p.result-count[role=status][data-table-count]") && (countOwners.get(next) || inst) === inst;
+    let count = free ? next : inst.count;
+    if (!count) {
+      count = document.createElement("p");
+      count.className = "result-count";
+      count.setAttribute("role", "status");
+      count.setAttribute("data-table-count", "");
+    }
+    if (!count.isConnected) at.after(count);
+    if (count !== inst.count) {
+      countOwners.set(count, inst);
+      inst.count = count;
+      inst.chrome.observe(count, { childList: true, characterData: true, subtree: true });
+    }
+  }
+  // What it last said, back in place — a patch writing the page's empty count would silence it.
+  setText(inst.count, inst.countText);
+}
+
+/*
+ * WHICH TABLE THIS NODE IS. A patcher matching by position can hand one table's NODE another table's
+ * markup — two engine tables in one mount, and the first <table> in the new markup lands on whichever
+ * <table> is first. The instance that node carried would go on governing it with the OTHER table's
+ * view: measured, B showed 0 of 4 under A's search. So a node whose `data-table-id` (or `aria-label`,
+ * without one) is no longer the one it was enhanced as is dropped and enhanced again, as itself.
+ */
+const identityOf = (table) => table.getAttribute("data-table-id") || table.getAttribute("aria-label") || "";
+
+function retire(inst) {
+  inst.retired = true;
+  inst.observer?.disconnect();
+  inst.chrome.disconnect();
+  clearTimeout(inst.countTimer);
+  instances.delete(inst.table);
+  if (inst.count) countOwners.delete(inst.count);
+  // What is still unmistakably its own goes with it; a node a patch already rewrote is the page's now.
+  if (inst.searchField && inst.searchField.contains(inst.searchBox)) inst.searchField.remove();
+  if (inst.ownBar && !inst.ownBar.childElementCount) inst.ownBar.remove();
+  if (inst.placeholder && inst.placeholder.hasAttribute(PLACEHOLDER)) inst.placeholder.remove();
+  for (const col of inst.columns) {
+    if (col.tools && col.tools.classList.contains("tbl-tools")) col.tools.remove();
+    if (col.badge && col.badge.classList.contains("tbl-badge")) col.badge.remove();
+    col.th.classList.remove("is-filtered");
+  }
+}
+
+/* true when the node is no longer this instance's table — it has been handed to a fresh one. */
+function renewed(inst) {
+  if (inst.retired) return true;
+  if (identityOf(inst.table) === inst.identity) return false;
+  retire(inst);
+  enhance(inst.table);
+  return true;
 }
 
 function enhance(table) {
@@ -593,6 +853,7 @@ function enhance(table) {
 
   const inst = {
     table, columns,
+    identity: identityOf(table),
     id: table.getAttribute("data-table-id") || "",
     allRows: [],
     childrenOf: new Map(),
@@ -606,9 +867,6 @@ function enhance(table) {
   instances.set(table, inst);
   inst.view = restore(inst);
 
-  // Before the scroll wrapper, never inside it — `.tablewrap` scrolls sideways,
-  // and a search box in there slides out of reach on exactly the wide tables
-  // that need one. Same reasoning as the pager's anchor, opposite side.
   const anchor = table.closest(".tablewrap") || table;
 
   /*
@@ -623,27 +881,17 @@ function enhance(table) {
    */
   const wantsSearch = table.getAttribute("data-table-search") !== "off";
 
-  // A `<search>` landmark, named after the table when the table has a name: a
-  // page with three tables would otherwise offer three identical landmarks.
-  const toolbar = document.createElement("search");
-  toolbar.className = "filter-bar";
-  const tableName = table.getAttribute("aria-label") || textOf(table.caption);
-  if (tableName) toolbar.setAttribute("aria-label", "search " + tableName);
-  const { field, input: search } = searchField("search this table", "search this table…", "clear table search");
-  setSearchValue(search, inst.view.search || "");
-  search.addEventListener("input", () => {
-    inst.view.search = search.value.trim().toLowerCase();
-    save(inst); applyTableView(table);
-  });
-  if (wantsSearch) {
-    toolbar.appendChild(field);
-    inst.searchInput = search;
-  } else {
-    inst.view.search = "";       // a restored search with no box is invisible in force
-  }
-
-
-  if (wantsSearch) anchor.before(toolbar);
+  inst.wantsSearch = wantsSearch;
+  if (!wantsSearch) inst.view.search = "";       // a restored search with no box is invisible in force
+  inst.label = table.getAttribute("aria-label") || textOf(table.caption);
+  // A page bar with no name of its own is named after the table: a page with three tables would
+  // otherwise offer three identical landmarks.
+  const bar = pageBarOf(anchor);
+  if (bar && inst.label && !bar.hasAttribute("aria-label")) bar.setAttribute("aria-label", "search " + inst.label);
+  inst.countText = "";
+  inst.chrome = new MutationObserver(() => { if (!renewed(inst)) ensureChrome(inst); });
+  if (anchor.parentElement) inst.chrome.observe(anchor.parentElement, { childList: true });
+  ensureChrome(inst);
 
   // snapshot() builds the header controls itself when they are absent, and it
   // must run FIRST: a `pick` column's option list is derived from the rows, so
@@ -667,6 +915,7 @@ function enhance(table) {
    * the first version hung the page.
    */
   inst.observer = new MutationObserver((records) => {
+    if (renewed(inst)) return;
     const body = table.tBodies[0];
     if (!body) return;
     const now = body.rows;
@@ -703,9 +952,23 @@ function enhance(table) {
     const rewritten = !moved && records.some((rec) =>
       rec.target !== body && body.contains(rec.target));
 
-    if (!moved && !rewritten) return;
-    snapshot(inst);
-    applyTableView(table);
+    if (moved || rewritten) {
+      snapshot(inst);
+      applyTableView(table);
+      return;
+    }
+    // THE HEADER, patched: `aria-sort`, `.is-filtered`, the controls, the badge and `aria-checked`
+    // are this file's, and a renderer writing the header's markup back removes all of them. Put
+    // back what is missing; every write is conditional, so answering our own writes ends here.
+    const head = table.tHead;
+    if (records.some((rec) => (head && head.contains(rec.target)) ||
+        (rec.target === table && [...rec.addedNodes, ...rec.removedNodes].some((n) => n.nodeName === "THEAD")))) {
+      const fresh = columnsOf(table);
+      if (fresh.some((col, i) => !inst.columns[i] || inst.columns[i].th !== col.th)) snapshot(inst);
+      else buildHeaderControls(inst);
+      paintHeader(inst);
+      paintHeaderBadges(inst);
+    }
   });
   /*
    * characterData and attributes are NOT optional here — see the callback. A patching
@@ -768,10 +1031,43 @@ export function resetTableView(table) {
  *
  * @param {ParentNode} [root=document]
  */
+let watching = false;
+
 export function initTableTools(root = document) {
   // The search boxes built here are `.search-field`s, and a clear button that
   // does nothing because the page never called initSearchFields() would be a
   // control that lies. So the table asks for it itself; the call is idempotent.
   initSearchFields(root);
   for (const table of root.querySelectorAll("table[data-table-tools]")) enhance(table);
+  // A table rendered LATER is enhanced when it arrives, as select.js does for a <select>: a page
+  // that builds its tables after a fetch calls this once, at startup, like every other init.
+  if (watching) return;
+  watching = true;
+  // Capture, because the summary usually sits in a `.tablewrap` that scrolls on its own and a scroll
+  // there does not bubble. A panel scrolling its own list moves nothing and is skipped.
+  // A summary scrolled out of its wrapper leaves the panel floating beside nothing: the reader scrolled
+  // away, so it closes — and focus stays where it is, since nothing was asked of it.
+  const follow = (event) => {
+    for (const wrap of document.querySelectorAll("details.tbl-filter[open]")) {
+      if (event.type === "scroll" && event.target instanceof Node && wrap.querySelector(":scope > .dropdown-panel")?.contains(event.target)) continue;
+      const clip = wrap.closest(".tablewrap");
+      const summary = wrap.querySelector(":scope > summary");
+      if (clip && summary) {
+        const s = summary.getBoundingClientRect(), c = clip.getBoundingClientRect();
+        if (s.right <= c.left || s.left >= c.right || s.bottom <= c.top || s.top >= c.bottom) { wrap.open = false; continue; }
+      }
+      placePanel(wrap);
+    }
+  };
+  addEventListener("resize", follow);
+  addEventListener("scroll", follow, true);
+  new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (!(node instanceof Element)) continue;
+        if (node.matches("table[data-table-tools]")) enhance(node);
+        for (const table of node.querySelectorAll("table[data-table-tools]")) enhance(table);
+      }
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
 }

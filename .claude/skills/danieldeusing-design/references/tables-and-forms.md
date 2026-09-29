@@ -412,8 +412,8 @@ bare boxes, which is the one that prompted this rule.
 
 **3. What is in force marks its own column.** A filtering column's header takes the
 primary colour and an underline and carries a **badge with the selected value**; the
-badge is a button that clears that filter. Sort direction shows as `▲`/`▼` on the same
-header.
+badge is a button that clears that filter. Sort direction shows as an up or down arrow on
+the same header.
 
 **Not a bar above the table.** 0.30.0 shipped one — a `.tbl-view` strip with a chip per
 filter — and it was removed in 0.33.0. A separate strip is a second place to look, costs
@@ -429,6 +429,81 @@ from "was this restored", so it cannot go stale while the filter is still in for
 
 It composes with the pager (0.22.0): filtered-out rows are detached from the tbody, so
 the pager slices exactly the matching set and needs to know nothing about filtering.
+
+### What the engine does besides (D2, 0.60.0 — cockpit's table, moved into the system)
+
+```html
+<search class="filter-bar" data-table-bar aria-label="runs">
+  <span class="filter-bar-spacer"></span>
+  <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">new run</button>
+</search>
+<div class="tablewrap">
+  <table class="dense" data-table-tools data-table-id="review-runs" data-table-unit="runs"
+         data-sort-key="started" data-sort-dir="desc" aria-label="runs">
+    <thead><tr><th data-col="repo">repository</th><th data-col="state" data-filter="pick">state</th>…</tr></thead>
+    <tbody><tr data-search-text="review 4417 job j-88">…</tr></tbody>
+  </table>
+</div>
+```
+
+- **The search finds what no column prints.** A row's `data-search-text` is matched with its text,
+  so a review id or a job id needs no second box. `data-table-search="off"` is still there for a page
+  whose search cannot be expressed per row (the contacts book searches conversation summaries).
+- **The page's bar is used, not duplicated.** A `<search class="filter-bar" data-table-bar>` directly
+  before the table's wrapper gets the search FIRST in it; the page's `.filter-bar-spacer` and its one
+  action stay. Without one, the engine builds the bar (WP6's `.filter-bar` + `.search-field`).
+- **The box and the count survive a re-render.** Neither is in the page's markup, so a renderer that
+  patches the whole mount takes both; the engine puts the same nodes back, the box holding the query.
+  A patching renderer (cockpit's `cockpitPatch`) should draw them itself instead, and the engine adopts
+  them, so a patch never has anything of the engine's to take away:
+
+  ```html
+  <search class="filter-bar" data-table-bar aria-label="runs">
+    <div class="search-field"><input type="search" data-table-search aria-label="search runs">
+      <button type="button" class="search-clear" aria-label="clear the search" hidden></button></div>
+    <span class="filter-bar-spacer"></span>…
+  </search>
+  <div class="tablewrap"><table data-table-tools …>…</table></div>
+  <p class="result-count" role="status" data-table-count></p>
+  ```
+
+  A count another table already speaks through is never adopted.
+- **Give every engine table a stable `data-table-id`.** It keys the remembered view, and it is how the
+  engine knows which table a node IS: a positional patcher can hand one `<table>` node another table's
+  markup (two engine tables in one mount), and a node whose `data-table-id` — or `aria-label`, without
+  one — has changed is dropped and enhanced again as the table it now is. Without an id, renaming a
+  table's `aria-label` counts as a different table.
+- **The count is silent at rest.** A `p.result-count[role=status]` sits after the wrapper, after the
+  pager when there is one, from the start and empty. While rows are withheld it says
+  "7 of 55 runs — 48 hidden by the filters" (`data-table-unit`, default "rows"), written 400 ms after
+  the last change. At rest it says nothing: the pager already states the total.
+- **Two nothings, two sentences.** With no rows the engine's placeholder row says the table's
+  `data-table-empty`, or "no runs yet". With rows and no match it says "no runs match these filters."
+  and offers a real button, "reset filters", which is `resetTableView()`. The row spans every column,
+  is `tr[data-table-placeholder]`, and is passed over by the match, the sort and the pager. It holds
+  S1's inline empty state as feedback.html documents it: the sentence is the `.empty--inline` box's own
+  text, the reset follows it, no `<p>` between.
+- **A failure and a load are the page's.** A failed fetch is S1's failure in the table's place
+  (`.empty[data-tone="warning"][role="alert"]` with a retry); until the first rows arrive the mount
+  holds S6's `.loading`, not an empty table — which would otherwise say "no runs yet" and be wrong.
+  Every exit path replaces it. Three sentences, never one "nothing here".
+- **A pick filter is a menu.** `ul.dropdown-panel[role=menu] > li[role=none] >
+  button.dropdown-item[role=menuitemradio][aria-checked]`, "all" first and checked at rest, then the
+  values counted as a reader counts (gpt-5.9 before gpt-5.10). M1 gives it the keys and M0 draws the ✓.
+  A filter's panel is placed `fixed` against its summary (WP6's `popup.js`, as `select.js` does), so the
+  scrolling `.tablewrap` never clips it — a table filtered down to its placeholder is shorter than its
+  own menu. It follows its summary through every scroll, and closes (moving no focus) once the reader
+  scrolls the column out of the wrapper.
+- **The header glyphs are the icon set's masks**, in the header's colour at `--icon-sm`: the sort
+  arrows follow `aria-sort`, the funnel turns `--primary` while it filters, the badge ends in an x. The
+  controls carry no text, only their `aria-label`; the badge carries no native `title`. They take the
+  house ring, 2px off, and under a coarse pointer each — the badge too — is at least 44 × 44. Clearing a
+  filter by its badge leaves focus on that column's filter summary.
+- **A table rendered later is enhanced when it arrives**: call `initTableTools()` once at startup.
+- **A renderer that re-renders the header gets the engine's parts back.** `aria-sort`, `.is-filtered`,
+  the controls, the badge and `aria-checked` are the engine's; a patcher (cockpit's `cockpitPatch`)
+  that writes the header's markup removes them, and the engine puts the same nodes back. Its
+  `.tbl-*` rules are in `data.css`, so a surface loading tokens + chrome + data draws the same header.
 
 ## `.field-row` — a settings panel is a two-column table, so write it as one
 

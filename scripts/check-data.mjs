@@ -346,6 +346,101 @@ const snapshot = () => evaluate(`JSON.stringify({
   sizes: ${JSON.stringify(SIZED)}.map(([sel, dims]) => { const b = M.box(sel); return (dims.includes("w") ? b.w.toFixed(2) : "") + " " + (dims.includes("h") ? b.h.toFixed(2) : ""); }),
 })`);
 const full = JSON.parse(await snapshot());
+// D2's placeholder on the FULL page, where feedback.css's .empty--inline dresses it. `?bare` cannot see
+// this: there .empty has no rule at all. Chromium aligns block children by `justify-items`, so the
+// inline look inherited .empty's `center` and the line shrank to its words mid-table — measured.
+const placeholderLine = () => evaluate(`JSON.stringify((() => { const p = document.querySelector("#engine-empty tr[data-table-placeholder]");
+  if (!p) return null; const box = p.querySelector(".empty--inline"), words = document.createRange(); words.selectNodeContents(box);
+  const line = words.getBoundingClientRect(), b = box.getBoundingClientRect(), c = p.cells[0].getBoundingClientRect();
+  return { lineLeft: Math.round(line.left), cellLeft: Math.round(c.left), boxW: Math.round(b.width), cellW: Math.round(c.width) }; })())`);
+const line = JSON.parse(await placeholderLine());
+await check("D2 — on the full page the empty table's sentence starts at its cell's edge, in a box that runs the cell's width (S1's inline look, not centred)",
+  () => line && line.lineLeft - line.cellLeft < 16 && line.boxW > line.cellW - 32, () => JSON.stringify(line));
+
+/* ── fix round 1 · F3: every control the engine puts in a header is a 44px target on a touch screen ──
+   The badge was 40 × 16 there — the one control in the header the coarse rule had left out. */
+await evaluate(`document.querySelector("#engine-table th[data-col=state] .dropdown-item[data-pick=ok]").click(); null`);
+await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+await until("matchMedia('(pointer: coarse)').matches", "the coarse pointer");
+const touch = await evaluate(`JSON.stringify(["th[data-col=repo] .tbl-sort", "th[data-col=repo] .tbl-filter > summary", ".tbl-badge"].map((sel) => {
+  const b = document.querySelector("#engine-table " + sel).getBoundingClientRect(); return [sel, Math.round(b.width * 10) / 10, Math.round(b.height * 10) / 10]; }))`);
+await check("fix round 1 — under a coarse pointer the engine's sort, filter and badge are each at least 44 × 44", () => JSON.parse(touch).every(([, w, h]) => w >= 44 && h >= 44), touch);
+await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+await until("!matchMedia('(pointer: coarse)').matches", "the fine pointer again");
+
+/* ── fix round 1 · item 8: a pick panel is never clipped by the wrapper that scrolls its table ──────
+   A table with every row filtered away is a header and one placeholder row: a 58px .tablewrap, which
+   scrolls, so it clipped a 136px panel and a press on a lower item landed on <html>. */
+await evaluate(`(() => { const wrap = document.createElement("div"); wrap.className = "tablewrap"; wrap.id = "clip-wrap";
+  wrap.innerHTML = '<table class="dense" data-table-tools data-table-unit="runs" aria-label="short runs"><thead><tr><th data-col="repo">repository</th>' +
+    '<th data-col="state" data-filter="pick">state</th></tr></thead><tbody>' +
+    ["asked", "ok", "failed", "queued", "running"].map((v, i) => "<tr><td>repo " + i + "</td><td>" + v + "</td></tr>").join("") + "</tbody></table>";
+  document.getElementById("engine").append(wrap); })(); null`);
+await sleep(150);
+await evaluate(`(() => { const box = document.querySelector("#clip-wrap").previousElementSibling.querySelector("input[type=search]");
+  box.value = "zzz"; box.dispatchEvent(new Event("input", { bubbles: true }));
+  document.querySelector("#clip-wrap").scrollIntoView({ block: "center", behavior: "instant" }); })(); null`);
+// Scrolled and SETTLED before it opens: a scroll event arriving after the open would place the panel
+// through the scroll follower, and the open itself would go unproven.
+await sleep(200);
+await evaluate(`document.querySelector("#clip-wrap th[data-col=state] .tbl-filter > summary").click(); null`);
+await sleep(200);
+const reach = await evaluate(`JSON.stringify((() => { const wrap = document.querySelector("#clip-wrap").getBoundingClientRect();
+  const panel = document.querySelector("#clip-wrap th[data-col=state] .dropdown-panel").getBoundingClientRect();
+  const items = [...document.querySelectorAll("#clip-wrap th[data-col=state] .dropdown-item")];
+  return { placeholder: !!document.querySelector("#clip-wrap tr[data-table-placeholder=no-match]"), wrapH: Math.round(wrap.height), panelH: Math.round(panel.height),
+    items: items.map((it) => { const r = it.getBoundingClientRect(); const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+      return [it.textContent, !!hit && hit.closest(".dropdown-item") === it]; }) }; })())`);
+const reached = JSON.parse(reach);
+await check("fix round 1 — in a no-match table shorter than its pick panel, every item of the panel is where a press lands",
+  () => reached.placeholder && reached.panelH > reached.wrapH && reached.items.length === 6 && reached.items.every(([, hit]) => hit), reach);
+const last = await evaluate(`(() => { const r = [...document.querySelectorAll("#clip-wrap th[data-col=state] .dropdown-item")].pop().getBoundingClientRect();
+  return [(r.left + r.right) / 2, (r.top + r.bottom) / 2]; })()`);
+await clickAt(last[0], last[1]);
+await sleep(100);
+await check("...and a real press on the lowest one filters by it", async () =>
+  evaluate(`document.querySelector("#clip-wrap .tbl-badge")?.textContent === "running" && !document.querySelector("#clip-wrap th[data-col=state] .tbl-filter").open`));
+await evaluate(`(() => { const wrap = document.querySelector("#clip-wrap"); wrap.previousElementSibling.remove(); wrap.nextElementSibling?.matches("p.result-count") && wrap.nextElementSibling.remove(); wrap.remove();
+  localStorage.removeItem("table-view:demo-engine"); })(); null`);
+/* ── fix round 2 · N-A: an open panel stays on its summary through every scroll; N-B: it closes when the
+   reader scrolls its column out of the wrapper ──────────────────────────────────────────────────────
+   A table wider and taller than its wrapper, with the pick column in the middle of what shows at the
+   far right. Each scroll must MOVE what it names (the page, the wrapper down, the wrapper sideways), and
+   the panel must keep its offset from the summary. Then a real wheel takes the column out of the
+   wrapper: a panel beside nothing is closed, and focus stays where it was. */
+await evaluate(`(() => { const wrap = document.createElement("div"); wrap.className = "tablewrap"; wrap.id = "scroll-wrap";
+  wrap.style.setProperty("--tablewrap-max-h", "160px");
+  const cols = ["repo", "a", "b", "c", "d", "state", "e", "f"];
+  wrap.innerHTML = '<table class="dense" data-table-tools aria-label="wide runs"><thead><tr>' +
+    cols.map((c) => '<th data-col="' + c + '"' + (c === "state" ? ' data-filter="pick"' : "") + ">" + c + "</th>").join("") + "</tr></thead><tbody>" +
+    Array.from({ length: 12 }, (_, i) => "<tr>" + cols.map((c) => "<td>" + (c === "state" ? ["ok", "failed", "asked"][i % 3] : c + i) + "</td>").join("") + "</tr>").join("") +
+    "</tbody></table>";
+  wrap.firstElementChild.style.minWidth = "2400px";
+  document.getElementById("engine").append(wrap); })(); null`);
+await sleep(150);
+await evaluate(`(() => { const w = document.querySelector("#scroll-wrap"); w.scrollIntoView({ block: "center", behavior: "instant" }); w.scrollLeft = w.scrollWidth; })(); null`);
+await sleep(200);
+await evaluate(`document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter > summary").click(); window.focusedBefore = document.activeElement; null`);
+await sleep(200);
+const attach = async () => JSON.parse(await evaluate(`JSON.stringify((() => { const w = document.querySelector("#scroll-wrap"), d = w.querySelector("th[data-col=state] .tbl-filter");
+  const s = d.firstElementChild.getBoundingClientRect(), p = d.querySelector(".dropdown-panel").getBoundingClientRect(), r = w.getBoundingClientRect();
+  return { open: d.open, dx: Math.round(p.left - s.left), dy: Math.round(p.top - s.bottom), inWrap: s.left >= r.left && s.right <= r.right,
+    y: Math.round(scrollY), top: Math.round(w.scrollTop), left: Math.round(w.scrollLeft) }; })())`));
+const opened = await attach();
+const moves = {};
+await evaluate("scrollBy(0, 60); null"); await sleep(200); moves.page = await attach();
+await evaluate(`document.querySelector("#scroll-wrap").scrollTop += 40; null`); await sleep(200); moves.down = await attach();
+await evaluate(`document.querySelector("#scroll-wrap").scrollLeft -= 100; null`); await sleep(200); moves.sideways = await attach();
+await check("fix round 2 — an open pick panel stays on its summary while the page scrolls, the wrapper scrolls down, and the wrapper scrolls sideways", () =>
+  opened.open && opened.inWrap && moves.page.y > opened.y && moves.down.top > moves.page.top && moves.sideways.left < moves.down.left &&
+    Object.values(moves).every((m) => m.open && Math.abs(m.dx - opened.dx) <= 1 && Math.abs(m.dy - opened.dy) <= 1), JSON.stringify({ opened, moves }));
+const wheelAt = await evaluate(`(() => { const r = document.querySelector("#scroll-wrap").getBoundingClientRect(); return [r.left + 20, r.top + r.height / 2]; })()`);
+await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: wheelAt[0], y: wheelAt[1], deltaX: -4000, deltaY: 0 });
+await sleep(500);
+const away = await attach();
+await check("fix round 2 — wheeled back until its column is out of the wrapper, the panel is closed, and focus has not moved", async () =>
+  away.left === 0 && !away.inWrap && !away.open && (await evaluate("document.activeElement === window.focusedBefore")), JSON.stringify(away));
+await evaluate(`(() => { const wrap = document.querySelector("#scroll-wrap"); wrap.previousElementSibling.remove(); wrap.nextElementSibling?.matches("p.result-count") && wrap.nextElementSibling.remove(); wrap.remove(); })(); null`);
 await open("bare&theme=warm");
 const bare = JSON.parse(await snapshot());
 const drift = [];
@@ -373,8 +468,59 @@ const HIDE = ["#page-tabs", "#tab-queue", "#dense-table", "#kv-table", "#kv-list
   "#trend", "#sec-activity", "#tickers"];
 const shownWhenHidden = await evaluate(`${JSON.stringify(HIDE)}.filter((sel) => { const el = document.querySelector(sel); el.hidden = true;
   const d = getComputedStyle(el).display; el.hidden = false; return d !== "none"; })`);
-await check(`X3 — \`hidden\` hides each of ${HIDE.length} components whatever display it sets (tokens.css's rule; a marked stand-in until WP1 lands)`,
+await check(`X3 — \`hidden\` hides each of ${HIDE.length} components whatever display it sets (tokens.css's rule, WP1)`,
   () => shownWhenHidden.length === 0, JSON.stringify(shownWhenHidden));
+
+/* ── D2 · the table engine's header, count and placeholder ─────────────────────────────────────────
+   On the ?bare page on purpose: data.css carries every .tbl-* rule since 0.60.0, so a tokens-only
+   surface draws the same header. The glyphs were TEXT (↕ ▲ ▼ ⌕ ×) at .55 — 2.22–2.60:1 against the
+   page — and are now the icon set's masks at full strength. */
+const showD2 = (v) => () => JSON.stringify(v);
+const masks = () => evaluate(`(() => {
+  const maskOf = (name) => { const p = document.createElement("i"); p.style.maskImage = "var(--ico-" + name + ")"; document.body.append(p);
+    const v = getComputedStyle(p).maskImage; p.remove(); return v; };
+  const at = (sel, pseudo) => { const el = document.querySelector(sel); if (!el) throw new Error("no " + sel); return getComputedStyle(el, pseudo); };
+  const glyph = (sel, pseudo, name) => { const c = at(sel, pseudo); return c.maskImage === maskOf(name) && c.width === "12px" && c.height === "12px"; };
+  return {
+    rest: glyph('#engine-table th[data-col="repo"] .tbl-sort', "::before", "arrow-up-down"),
+    down: glyph('#engine-table th[data-col="findings"] .tbl-sort', "::before", "arrow-down"),
+    up: glyph('#engine-empty th[data-col="repo"] .tbl-sort', "::before", "arrow-up"),
+    funnel: glyph('#engine-table th[data-col="agent"] .tbl-filter > summary', "::before", "filter"),
+    x: document.querySelector("#engine-table .tbl-badge") ? glyph("#engine-table .tbl-badge", "::after", "x") : "no badge",
+    text: [...document.querySelectorAll("#engine-table .tbl-sort, #engine-table .tbl-filter > summary")].every((c) => c.textContent === ""),
+    restColour: at('#engine-table th[data-col="repo"] .tbl-sort').color === M.tok("var(--muted-foreground)") && at('#engine-table th[data-col="repo"] .tbl-sort').opacity === "1",
+    sortedColour: at('#engine-table th[data-col="findings"] .tbl-sort').color === M.tok("var(--primary)"),
+  };
+})()`);
+const countBox = () => evaluate(`(() => { const c = document.querySelector("#engine-table").closest(".tablewrap").nextElementSibling;
+  return c && c.matches(".result-count[data-table-count]") ? { text: c.textContent, h: c.getBoundingClientRect().height, mt: getComputedStyle(c).marginTop } : null; })()`);
+const rest = await masks();
+const quietCount = await countBox();
+await check("D2 — the header glyphs are the icon set's masks at --icon-sm: ↕ at rest, ↓ on the descending column, ↑ on an ascending one, the funnel — and no glyph text",
+  () => rest.rest && rest.down && rest.up && rest.funnel && rest.text, showD2(rest));
+await check("...at rest in --muted-foreground at FULL strength (the .55 measured 2.22–2.60:1), --primary on the column that is sorting",
+  () => rest.restColour && rest.sortedColour, showD2(rest));
+await check("D2 — the count is silent at rest and takes no room: an empty status region, 0px high",
+  () => quietCount && quietCount.text === "" && quietCount.h === 0 && quietCount.mt === "0px", showD2(quietCount));
+// Tolerant on purpose: on an engine without pick rows this must reach the checks below and FAIL
+// them, not abort the suite.
+await evaluate(`document.querySelector('#engine-table th[data-col="state"] .dropdown-item[data-pick="ok"]')?.click(); null`);
+await sleep(500);
+const filtered = await masks();
+const saidCount = await countBox();
+await check("D2 — a pick filter marks its column: the funnel turns --primary, and the badge naming the value carries the x mask",
+  async () => filtered.x === true && (await css('#engine-table th[data-col="state"] .tbl-filter > summary', "color")) === (await tok("var(--primary)")) &&
+    (await css('#engine-table th[data-col="state"] .tbl-filter > summary', "content", "::after")) !== '"•"',
+  () => evaluate(`JSON.stringify([document.querySelector("#engine-table .tbl-badge")?.outerHTML, getComputedStyle(document.querySelector('#engine-table th[data-col="state"] .tbl-filter > summary')).color])`));
+await check("...and the count, settled, says what is withheld in the table's unit",
+  () => saidCount && saidCount.text === "3 of 5 runs — 2 hidden by the filters" && saidCount.h > 0, showD2(saidCount));
+await check("D2 — a table with no rows says so in a placeholder row across every column, start-aligned in S1's inline look",
+  () => evaluate(`(() => { const p = document.querySelector("#engine-empty tr[data-table-placeholder]"); if (!p) return false;
+    const box = p.querySelector(".empty--inline"), cell = p.cells[0], words = document.createRange(); words.selectNodeContents(box);
+    return p.cells.length === 1 && cell.colSpan === 2 && box.textContent === "no runs yet" &&
+      Math.abs(words.getBoundingClientRect().left - cell.getBoundingClientRect().left) < 16; })()`),
+  () => evaluate(`JSON.stringify((() => { const p = document.querySelector("#engine-empty tr[data-table-placeholder]"); if (!p) return null;
+    const words = document.createRange(); words.selectNodeContents(p.querySelector(".empty--inline")); return [p.outerHTML, words.getBoundingClientRect().left, p.cells[0].getBoundingClientRect().left]; })())`));
 
 /* ── X1 · forced colours: two palettes, PAINTED pixels ───────────────────────────────────────────
    Under a forced palette the browser rewrites colours at PAINT time — it forces them, drops shadows,
@@ -439,11 +585,20 @@ const shown = (v) => () => JSON.stringify(v, (k, n) => r2(n));
    form of this proof hid the whole clip element, which says "there is ink here" and nothing about
    WHERE: an 8px vertical slide of #dense-table and of #page-tabs passed it. */
 const owns = async (clip, target, kind) => {
-  const sel = JSON.stringify(target);
+  // `host::after` hides ONLY the pseudo-element (a class the check's own adopted sheet hides) — the
+  // badge's x is one, and hiding the whole badge would find its word and border and prove nothing
+  // about the x. Its box is read off its computed size, at the end of its host's content box.
+  const pseudo = target.endsWith("::after");
+  const sel = JSON.stringify(pseudo ? target.slice(0, -"::after".length) : target);
+  // A target that is not on the page fails the proof; it must not abort the suite.
+  if (!(await evaluate(`!!document.querySelector(${sel})`))) return { target, kind, missing: true, ok: false };
+  if (pseudo) await evaluate(`(() => { if (window.M_HIDE) return; window.M_HIDE = new CSSStyleSheet();
+    window.M_HIDE.replaceSync(".m-hide-after::after { visibility: hidden !important; }"); document.adoptedStyleSheets = [...document.adoptedStyleSheets, window.M_HIDE]; })(); null`);
+  const hide = (on) => pseudo ? `classList.toggle("m-hide-after", ${on})` : `style.visibility = "${on ? "hidden" : ""}"`;
   await shoot(clip);
-  await evaluate(`window.SHOT_A = window.SHOT; document.querySelector(${sel}).style.visibility = "hidden"; null`);
+  await evaluate(`window.SHOT_A = window.SHOT; document.querySelector(${sel}).${hide(true)}; null`);
   await shoot(clip);
-  await evaluate(`document.querySelector(${sel}).style.visibility = ""; null`);
+  await evaluate(`document.querySelector(${sel}).${hide(false)}; null`);
   return measure(`
     const A = window.SHOT_A, B = S, el = document.querySelector(${sel});
     let n = 0, carried = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -457,7 +612,10 @@ const owns = async (clip, target, kind) => {
       x0 = Math.min(x0, col); x1 = Math.max(x1, col + 1); y0 = Math.min(y0, row); y1 = Math.max(y1, row + 1);
     }
     const ink = n ? { left: x0 / A.k + A.x0 - scrollX, right: x1 / A.k + A.x0 - scrollX, top: y0 / A.k + A.y0 - scrollY, bottom: y1 / A.k + A.y0 - scrollY } : null;
-    const r = ${kind === "text" ? "text(el)" : "box(el)"};
+    const afterBox = (host) => { const b = host.getBoundingClientRect(), cs = getComputedStyle(host), a = getComputedStyle(host, "::after");
+      const w = parseFloat(a.width), h = parseFloat(a.height), right = b.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+      const top = b.top + (b.height - h) / 2; return { left: right - w, right, top, bottom: top + h }; };
+    const r = ${pseudo ? "afterBox(el)" : kind === "text" ? "text(el)" : "box(el)"};
     // An SVG mark's box leaves out its stroke, which paints half its width outside.
     const half = el instanceof SVGElement ? (parseFloat(getComputedStyle(el).strokeWidth) || 0) / 2 : 0;
     const rect = { left: r.left - half, right: r.right + half, top: r.top - half, bottom: r.bottom + half };
@@ -530,6 +688,41 @@ for (const t of ["warm", "green"]) {
   await check(`Q6 normal ${t} — ...and each series paints its own hue: green, red, blue`, () => on.hue.every(Boolean), shown(on.hue));
 }
 await theme("warm");
+
+/* ── fix round 1 · N1: the header controls take the house ring — 2px, 2px off — and nothing clips it ──
+   Measured, not assumed: a real Tab lands on the control, and the ring is the pixels that change
+   between that shot and one with nothing focused. They must stand 4px (offset + width) off every edge
+   of the control's box; a side the wrapper clips would come in short. */
+const tabKey = async () => { for (const type of ["rawKeyDown", "keyUp"]) await send("Input.dispatchKeyEvent", { type, key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 }); await sleep(50); };
+const ringOf = async (from, target) => {
+  await evaluate(`document.activeElement?.blur(); null`);
+  await settle();
+  await shoot("#engine-table thead");
+  await evaluate(`window.SHOT_A = window.SHOT; document.querySelector(${JSON.stringify(from)}).focus(); null`);
+  await tabKey();
+  await settle();
+  await shoot("#engine-table thead");
+  const ring = await measure(`
+    const A = window.SHOT_A, B = S, el = document.querySelector(${JSON.stringify(target)});
+    let n = 0, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let row = 0; row < A.h; row += 1) for (let col = 0; col < A.w; col += 1) {
+      const i = (row * A.w + col) * 4;
+      if (Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2])) <= 2) continue;
+      n += 1; x0 = Math.min(x0, col); x1 = Math.max(x1, col + 1); y0 = Math.min(y0, row); y1 = Math.max(y1, row + 1);
+    }
+    const r = box(el), cs = getComputedStyle(el), ink = n ? { left: x0 / A.k + A.x0 - scrollX, right: x1 / A.k + A.x0 - scrollX, top: y0 / A.k + A.y0 - scrollY, bottom: y1 / A.k + A.y0 - scrollY } : null;
+    return { focused: document.activeElement === el, offset: cs.outlineOffset, width: cs.outlineWidth, n,
+      out: ink && [r.left - ink.left, r.top - ink.top, ink.right - r.right, ink.bottom - r.bottom] };`);
+  await evaluate(`document.activeElement?.blur(); null`);
+  return ring;
+};
+const rings = [
+  await ringOf("#engine .filter-bar > button", "#engine-table th[data-col=repo] .tbl-sort"),
+  await ringOf("#engine-table th[data-col=state] .tbl-filter > summary", "#engine-table .tbl-badge"),
+];
+await check(`fix round 1 — a keyboard-focused sort button and badge take the house ring, 2px wide and 2px off, painted whole — ${rings.map((r) => (r.out || []).map(r2).join("/")).join(" and ")}px out`,
+  () => rings.every((r) => r.focused && r.offset === "2px" && r.width === "2px" && r.out && r.out.every((d) => Math.abs(d - 4) <= 0.75)), shown(rings));
+
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   await until("matchMedia('(forced-colors: active)').matches", "forced colours");
@@ -542,9 +735,29 @@ for (const scheme of ["light", "dark"]) {
     ["#tab-syntax", "#tab-syntax", "text"], ["#stale-tabs", "#tab-stale", "fill"],
     ["#dense-table", "#row-pinned > td:first-child", "mark"], ["#dense-table", "#row-disabled > td:nth-child(3)", "text"],
     ["#trend", "#trend text", "mark"], ["#trend", "#trend circle.chart-dot:nth-of-type(3)", "mark"], ["#trend", "#trend .chart-dot--hollow", "mark"],
+    ["#engine-table thead", '#engine-table th[data-col="repo"] .tbl-sort', "mark"],
+    ["#engine-table thead", '#engine-table th[data-col="agent"] .tbl-filter > summary', "mark"],
+    ["#engine-table thead", "#engine-table .tbl-badge", "mark"],
+    ["#engine-table thead", "#engine-table .tbl-badge::after", "mark"],
   ]) owned.push(await owns(clip, target, kind));
   await check(`X1 ${scheme} — every clip below reads its own element: hiding ONLY it changes ≥3 pixels by ≥1.5:1, where it is (±1px)`,
     () => owned.every((o) => o.ok), shown(owned.filter((o) => !o.ok).length ? owned.filter((o) => !o.ok) : owned.map((o) => [o.target, o.n, o.carried])));
+  // The table engine's glyphs are masks, which a forced palette would erase: each must be PAINTED, in
+  // its own place, at 3:1 or more against what it sits on — read from the same two-shot diff.
+  const glyphs = owned.filter((o) => o.target.startsWith("#engine-table"));
+  await check(`X1 ${scheme} — the table engine's sort, filter, badge and the badge's own x are painted, each where it is: ${glyphs.map((o) => r2(o.carried)).join(", ")}:1`,
+    () => glyphs.length === 4 && glyphs.every((o) => o.ok && o.carried >= 3), shown(glyphs));
+  // F5: the filtered header's underline is a shadow, which a forced palette drops, so data.css makes it
+  // a 2px CanvasText border there. Read as the run of ink down the header's padding at its foot.
+  await shoot("#engine-table thead");
+  const edges = await measure(`
+    const run = (sel) => { const r = box(sel), bg = common(r), x = r.left + 2.5, step = 1 / S.k; let y = r.bottom + 2, n = 0;
+      while (y > r.bottom - 8 && M.ratio(px(x, y), bg) < 3) y -= step;
+      while (y > r.bottom - 8 && M.ratio(px(x, y), bg) >= 3) { n += 1; y -= step; }
+      return n * step; };
+    return { filtered: run('#engine-table th[data-col="state"]'), plain: run('#engine-table th[data-col="findings"]') };`);
+  await check(`X1 ${scheme} — the filtered header keeps its underline as a ${r2(edges.filtered)}px rule of ink, where an unfiltered one has ${r2(edges.plain)}px`,
+    () => edges.filtered >= 2 && edges.filtered >= edges.plain + 1, shown(edges));
 
   await shoot("#page-tabs");
   const tabs = await measure(`
@@ -678,6 +891,8 @@ const PAIRS = [
   ["chart line, dot, bar: --primary (graphic)", "var(--primary)", [], 3],
   ...["green", "red", "blue"].map((hue) => [`chart series and key swatch: --cat-${hue} (graphic)`, `var(--cat-${hue})`, [], 3]),
   ["chart marker and floor tick: --muted-foreground (graphic)", "var(--muted-foreground)", [], 3],
+  ["table engine glyph at rest (sort, funnel): --muted-foreground at full strength (graphic)", "var(--muted-foreground)", [], 3],
+  ["table engine glyph in force, filtered header and badge: --primary (graphic)", "var(--primary)", [], 3],
   ["chart axis: --border (decoration; the values are also in a table)", "var(--border)", [], 0],
   ["chart grid: --border 55% (decoration)", "color-mix(in srgb, var(--border) 55%, transparent)", [], 0],
   ["tab row rule: --border 80% (decoration)", "color-mix(in srgb, var(--border) 80%, transparent)", [], 0],

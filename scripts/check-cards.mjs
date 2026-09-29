@@ -43,7 +43,7 @@
  *   node scripts/check-cards.mjs
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname, extname, sep } from "node:path";
@@ -96,7 +96,14 @@ const chrome = spawn(CHROME, [
   "--window-size=1280,900", `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 let socket;
-const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+// The throwaway profile goes too: one per run, and a release gate runs this often.
+const shutdown = () => {
+  try { socket?.close(); } catch {}
+  chrome.kill("SIGKILL");
+  server.close();
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
+  catch (error) { console.log(`note: could not remove the browser profile ${profile}: ${error.message}`); }
+};
 process.on("exit", shutdown);
 
 let port = 0;

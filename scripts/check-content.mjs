@@ -1,0 +1,907 @@
+#!/usr/bin/env node
+/*
+ * check-content.mjs — src/content.css and templates/error-page.html, measured in a browser.
+ *
+ * WHAT IT GUARDS. Nothing in content.css fails loudly. A title one step too small still renders a
+ * title; a gutter number that leaks into a copied selection still looks like a gutter; a list
+ * marker at 3:1 still looks like a marker; a class that quietly leans on base.css looks perfect on
+ * every page that happens to load base.css and wrong on the tokens-only surface nobody opens. So
+ * every one of those is asserted by measuring it:
+ *
+ *   · computed metrics of every class, P1–P10, against the spec's numbers
+ *   · the same values on ?bare — tokens.css + content.css and nothing else — as on the full page
+ *   · contrast of every text and glyph colour the file introduces, from the browser's own computed
+ *     colours, on four themes and the three surfaces (--background, --card, --muted); code on the
+ *     --muted it always sits on. The table is printed so it can be held against the comments.
+ *   · hover, keyboard focus, print, a coarse pointer, the animation switch, a phone width
+ *   · no border-radius anywhere
+ *   · the error-page template: its structure, and its title rendering at the display step
+ *
+ * It drives examples/content.html, the package's demo page, served from this checkout by a loopback
+ * server. Where another 0.60.0 package has not landed yet the demo switches on a stand-in for it, and
+ * this prints which, every run: a stand-in is a copy of someone else's work and the reader must know
+ * when a green result leans on one.
+ *
+ * A REAL BROWSER, and no dependency — the headless chromium Playwright caches, over the DevTools
+ * protocol with Node's own fetch and WebSocket. With no browser it SKIPS loudly; DD_REQUIRE_BROWSER=1
+ * makes that skip a failure.
+ *
+ *   node scripts/check-content.mjs
+ */
+import { spawn } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { dirname, extname, join, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const CHROME = process.env.DD_CHROME
+  ? (existsSync(process.env.DD_CHROME) ? process.env.DD_CHROME : null)
+  : [
+    `${process.env.HOME}/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
+    `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1228/chrome-mac/Chromium.app/Contents/MacOS/Chromium`,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ].find((path) => existsSync(path));
+
+if (!CHROME) {
+  console.log("check-content: SKIPPED — no headless chromium on this machine.");
+  console.log("  Metrics and contrast are read from computed styles; no stub can stand in for them.");
+  console.log("  Install one with `npx playwright install chromium`.");
+  if (process.env.DD_REQUIRE_BROWSER === "1") {
+    console.log("  DD_REQUIRE_BROWSER=1: a skip counts as a FAILURE here.");
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+const THEMES = ["warm", "green", "mono", "paper"];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ── the worktree over loopback; the template's CDN urls are pointed at this checkout ────────── */
+
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+// The template pins a published release, which predates content.css. Served here, its stylesheet is
+// this checkout's bundle source plus content.css, and its runtime is this checkout's — so what is
+// measured is the template's markup under the code that will ship with it. If tokens.css does not
+// declare --fs-display yet (WP1 lands it), the same stand-in the demo uses is injected and REPORTED.
+const tokensHaveDisplay = /--fs-display\s*:/.test(readFileSync(join(root, "src/tokens.css"), "utf8"));
+const DISPLAY_STANDIN = "<style data-standin>:root{--fs-display:1.875rem}@media (min-width:48rem){:root{--fs-display:2.25rem}}</style>";
+const templateHtml = () => {
+  const cdn = `https://cdn.jsdelivr.net/npm/@danieldeusing/design@${pkg.version}`;
+  let html = readFileSync(join(root, "templates/error-page.html"), "utf8");
+  html = html.replace(/<link\s+rel="stylesheet"\s+href="[^"]*fonts\.css"[^>]*>/, "");
+  html = html.replace(/<link\s+rel="stylesheet"\s+href="[^"]*danieldeusing-design\.min\.css"[^>]*>/,
+    '<link rel="stylesheet" href="/src/index.css"><link rel="stylesheet" href="/src/content.css">' +
+    (tokensHaveDisplay ? "" : DISPLAY_STANDIN));
+  return html.split(`${cdn}/runtime/index.js`).join("/runtime/index.js");
+};
+const server = createServer((req, res) => {
+  const path = decodeURIComponent(new URL(req.url, "http://127.0.0.1").pathname);
+  if (path.startsWith("/__template/")) {
+    res.writeHead(200, { "content-type": TYPES[".html"] });
+    res.end(templateHtml());
+    return;
+  }
+  const file = join(root, path);
+  let body = null;
+  if (file.startsWith(root + sep)) { try { body = readFileSync(file); } catch {} }
+  if (!body) { res.writeHead(404); res.end(); return; }
+  res.writeHead(200, { "content-type": TYPES[extname(file)] || "application/octet-stream" });
+  res.end(body);
+}).listen(0, "127.0.0.1");
+await new Promise((ok) => server.on("listening", ok));
+const ORIGIN = `http://127.0.0.1:${server.address().port}`;
+
+/* ── the browser, on a port it picks itself so parallel suites cannot collide ─────────────────── */
+
+const profile = mkdtempSync(join(tmpdir(), "dd-content-"));
+const chrome = spawn(CHROME, [
+  "--remote-debugging-port=0", "--remote-allow-origins=*", "--headless=new",
+  "--no-first-run", "--no-default-browser-check", "--disable-gpu",
+  "--window-size=1280,900", `--user-data-dir=${profile}`, "about:blank",
+], { stdio: "ignore" });
+let socket;
+const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close(); };
+process.on("exit", shutdown);
+
+let port = 0;
+for (let i = 0; ; i += 1) {
+  try {
+    port = Number(readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]);
+    await fetch(`http://127.0.0.1:${port}/json/version`);
+    break;
+  } catch {}
+  if (i > 80) { shutdown(); throw new Error("headless chromium did not come up"); }
+  await sleep(250);
+}
+const target = await (await fetch(`http://127.0.0.1:${port}/json/new`, { method: "PUT" })).json();
+socket = new WebSocket(target.webSocketDebuggerUrl);
+await new Promise((ok, bad) => { socket.onopen = ok; socket.onerror = bad; });
+let messageId = 0;
+const pending = new Map();
+const consoleErrors = [];
+socket.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  if (message.method === "Runtime.exceptionThrown") consoleErrors.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text);
+  if (message.method === "Runtime.consoleAPICalled" && message.params.type === "error") consoleErrors.push(message.params.args.map((a) => a.value ?? a.description).join(" "));
+  const slot = pending.get(message.id);
+  if (!slot) return;
+  pending.delete(message.id);
+  message.error ? slot.bad(new Error(JSON.stringify(message.error))) : slot.ok(message.result);
+};
+const send = (method, params = {}) => new Promise((ok, bad) => {
+  messageId += 1;
+  pending.set(messageId, { ok, bad });
+  socket.send(JSON.stringify({ id: messageId, method, params }));
+});
+const evaluate = async (expression) => {
+  const { result, exceptionDetails } = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+  if (exceptionDetails) throw new Error(exceptionDetails.exception?.description || exceptionDetails.text);
+  return result.value;
+};
+await send("Page.enable");
+await send("Runtime.enable");
+
+/* ── reporting: a check takes a THUNK, so one throw is one FAIL and never ends the run ───────── */
+
+let failures = 0;
+let passes = 0;
+let lastPassed = "(none)";
+const check = async (label, thunk) => {
+  let problems;
+  try { problems = await thunk(); } catch (error) { problems = [`threw: ${String(error.message).split("\n")[0]}`]; }
+  if (problems === true || (Array.isArray(problems) && problems.length === 0)) {
+    console.log(`PASS  ${label}`);
+    passes += 1;
+    lastPassed = label;
+    return;
+  }
+  failures += 1;
+  const lines = Array.isArray(problems) ? problems : [String(problems)];
+  console.log(`FAIL  ${label}${lines.map((line) => `\n        ${line}`).join("")}`);
+};
+// Anything that still escapes is a FAIL that says where the suite got to, never a bare stack.
+process.on("uncaughtException", (error) => {
+  console.log(`FAIL  the suite threw after: ${lastPassed}\n        ${String(error?.message || error).split("\n")[0]}`);
+  console.log("\ncheck-content: ABORTED");
+  process.exit(1);
+});
+
+/* ── in the page: computed-style assertions and colour maths ────────────────────────────────── */
+
+const HELPERS = String.raw`
+window.__t = (() => {
+  const el = (sel) => { const e = typeof sel === "string" ? document.querySelector(sel) : sel; if (!e) throw new Error("no element " + sel); return e; };
+  const cs = (sel, pseudo) => getComputedStyle(el(sel), pseudo || null);
+  const probe = (prop, expr) => {
+    const p = document.createElement("span");
+    p.style.cssText = "position:absolute;visibility:hidden";
+    p.style.setProperty(prop, expr);
+    document.body.append(p);
+    const value = getComputedStyle(p).getPropertyValue(prop);
+    p.remove();
+    return value;
+  };
+  const token = (name) => probe("color", "var(" + name + ")");
+  // want: { prop: "exact" | { token: "--x" } | { re: "..." } | { px: n } }
+  const expect = (sel, pseudo, want) => {
+    const s = cs(sel, pseudo);
+    const out = [];
+    for (const [prop, w] of Object.entries(want)) {
+      const got = s.getPropertyValue(prop).trim();
+      let ok, show;
+      if (typeof w === "string") { ok = got === w; show = JSON.stringify(w); }
+      else if (w.token) { const t = token(w.token); ok = got === t; show = w.token + " (" + t + ")"; }
+      else if (w.re) { ok = new RegExp(w.re).test(got); show = "/" + w.re + "/"; }
+      else if ("px" in w) { ok = Math.abs(parseFloat(got) - w.px) < 0.05; show = w.px + "px"; }
+      if (!ok) out.push(sel + (pseudo || "") + " " + prop + ": got " + JSON.stringify(got) + ", want " + show);
+    }
+    return out;
+  };
+  const rect = (sel) => { const r = el(sel).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom }; };
+
+  const toLin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const fromLin = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+  const clamp = (x) => Math.min(1, Math.max(0, x));
+  const oklch = (L, C, H) => {
+    const h = (H * Math.PI) / 180, a = C * Math.cos(h), b = C * Math.sin(h);
+    const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+    const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+    const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+    return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s].map((c) => clamp(fromLin(c)));
+  };
+  const nums = (s) => s.split(/[\s,/]+/).filter(Boolean).map((v) => (v.endsWith("%") ? parseFloat(v) / 100 : Number(v)));
+  const parse = (str) => {
+    let m;
+    if ((m = /^rgba?\((.+)\)$/.exec(str))) { const p = nums(m[1]); return { r: p[0] / 255, g: p[1] / 255, b: p[2] / 255, a: p.length > 3 ? p[3] : 1 }; }
+    if ((m = /^color\(srgb (.+)\)$/.exec(str))) { const p = nums(m[1]); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; }
+    if ((m = /^oklch\((.+)\)$/.exec(str))) { const p = nums(m[1]); const [r, g, b] = oklch(p[0], p[1], p[2]); return { r, g, b, a: p.length > 3 ? p[3] : 1 }; }
+    throw new Error("cannot parse colour " + str);
+  };
+  const over = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
+  const lum = (c) => 0.2126 * toLin(c.r) + 0.7152 * toLin(c.g) + 0.0722 * toLin(c.b);
+  const ratio = (fg, bg) => { const b = parse(bg), f = over(parse(fg), b); const [hi, lo] = [lum(f), lum(b)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05); };
+  const surface = (name) => probe("background-color", "var(" + name + ")");
+  return { el, cs, probe, token, expect, rect, ratio, surface };
+})();
+null`;
+
+const load = async (query, { width = 1280, height = 900 } = {}) => {
+  await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: `${ORIGIN}/examples/content.html${query}` });
+  for (let i = 0; i < 60; i += 1) {
+    await sleep(100);
+    try { if (await evaluate(`document.readyState === "complete" && document.getElementById("standins").textContent !== ""`)) break; } catch {}
+  }
+  await evaluate(HELPERS);
+};
+const expect = (sel, pseudo, want) => evaluate(`__t.expect(${JSON.stringify(sel)}, ${JSON.stringify(pseudo)}, ${JSON.stringify(want)})`);
+const expectAll = async (list) => (await Promise.all(list.map(([sel, pseudo, want]) => expect(sel, pseudo, want)))).flat();
+const rect = (sel) => evaluate(`__t.rect(${JSON.stringify(sel)})`);
+const center = async (sel) => evaluate(`(() => { const e = __t.el(${JSON.stringify(sel)}); e.scrollIntoView({ block: "center", behavior: "instant" }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+const hover = async (sel) => { const p = await center(sel); await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: p.x, y: p.y }); await sleep(250); };
+// :focus-visible follows the last input modality, so a key goes down before the focus moves.
+const focusByKeyboard = async (sel) => {
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16 });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16 });
+  await evaluate(`__t.el(${JSON.stringify(sel)}).focus(); null`);
+  await sleep(50);
+};
+const ring = (sel) => expect(sel, null, { "outline-style": "solid", "outline-width": { px: 2 }, "outline-color": { token: "--ring" }, "outline-offset": { px: 2 } });
+
+/* ═════════════════════════════════════════════════════════════════════════════════════════════ */
+
+await load("?theme=warm");
+console.log(`stand-ins in force (full page): ${await evaluate("document.documentElement.dataset.standins")}`);
+console.log(tokensHaveDisplay ? "--fs-display: declared by tokens.css" : "--fs-display: NOT in tokens.css yet — the template check injects the demo's stand-in");
+
+/* ── P1 page title and lede ─────────────────────────────────────────────────────────────────── */
+
+await check("P1 .page-title: 24px, 700, tight, -0.025em, --primary, the large glow, 1.5rem under the prompt", () => expectAll([
+  ["#p1-app .page-title", null, {
+    "font-size": "24px", "font-weight": "700", "line-height": { px: 31.2 }, "letter-spacing": { px: -0.6 },
+    color: { token: "--primary" }, "text-shadow": { re: "12px$" }, "overflow-wrap": "anywhere",
+    "margin-top": "24px", "margin-bottom": "0px", "margin-left": "0px", "margin-right": "0px",
+  }],
+]));
+await check("P1 .page-title--display is --fs-display: 36px from 48rem", () => expectAll([
+  ["#p1-display .page-title", null, { "font-size": "36px", "line-height": { px: 46.8 }, "letter-spacing": { px: -0.9 } }],
+]));
+await check("P1 .lede: muted, .5rem under the title, no other margin", () => expectAll([
+  ["#p1-app .lede", null, { color: { token: "--muted-foreground" }, "margin-top": "8px", "margin-bottom": "0px" }],
+]));
+await check("P1 a leading glyph is the 24px step with .5rem after it", () => expectAll([
+  ["#p1-glyph .page-title > .ico", null, { width: "24px", height: "24px", "margin-right": "8px" }],
+]));
+await check("P1 a long token wraps inside its column instead of overflowing it", async () => {
+  const [title, frame] = await Promise.all([rect("#p1-long .page-title"), rect("#p1-long")]);
+  return title.r <= frame.r + 0.5 ? [] : [`title right ${title.r} > frame right ${frame.r}`];
+});
+
+/* ── P2 eyebrow ─────────────────────────────────────────────────────────────────────────────── */
+
+await check("P2 .eyebrow: body size, 500, upper case, .05em, muted, no margin", () => expectAll([
+  ["#eyebrow-plain", null, {
+    "font-size": "12px", "font-weight": "500", "letter-spacing": { px: 0.6 }, "text-transform": "uppercase",
+    "line-height": { px: 15.6 }, color: { token: "--muted-foreground" },
+    "margin-top": "0px", "margin-bottom": "0px",
+  }],
+]));
+await check("P2 data-tone colours an eyebrow (warning, primary)", () => expectAll([
+  ["#eyebrow-warning", null, { color: { token: "--warning" } }],
+  ["#eyebrow-primary", null, { color: { token: "--primary" } }],
+]));
+await check("P2 an h2.eyebrow.comment still reads at body size (the class beats the heading step)", () => expectAll([
+  ["#eyebrow-comment", null, { "font-size": "12px", "font-weight": "500" }],
+]));
+
+/* ── P3 section head and sub-head ───────────────────────────────────────────────────────────── */
+
+await check("P3 .section-head: a wrapping flex row on the baseline, 4px 16px gaps, 1rem under it", () => expectAll([
+  ["#head-link", null, {
+    display: "flex", "flex-wrap": "wrap", "align-items": "baseline", "justify-content": "space-between",
+    "row-gap": "4px", "column-gap": "16px", "margin-bottom": "16px",
+  }],
+  ["#head-link > h2", null, { "margin-top": "0px", "margin-bottom": "0px" }],
+]));
+await check("P3 the trailing item never shrinks or wraps; a <time> there is muted", () => expectAll([
+  ["#head-link > a", null, { "flex-shrink": "0", "flex-grow": "0", "white-space": "nowrap" }],
+  ["#head-time > time", null, { color: { token: "--muted-foreground" }, "white-space": "nowrap" }],
+]));
+await check("P3 a row that ends in an icon button centres instead (it has no baseline)", () => expectAll([
+  ["#head-button", null, { "align-items": "center" }],
+]));
+await check("P3 in a narrow column the trailing link drops under the heading and stays one line", async () => {
+  const [h, a] = await Promise.all([rect("#head-narrow > h2"), rect("#head-narrow > a")]);
+  const lh = await evaluate(`parseFloat(getComputedStyle(__t.el("#head-narrow > a")).lineHeight)`);
+  const out = [];
+  if (!(a.y >= h.b - 0.5)) out.push(`link top ${a.y} is not below the heading bottom ${h.b}`);
+  if (a.h > lh + 1) out.push(`link is ${a.h}px tall — it wrapped (line height ${lh})`);
+  return out;
+});
+await check("P3 .subhead: body size, 700, 1.4rem above and .3rem below, the first flush", () => expectAll([
+  ["#subheads .subhead:first-child", null, { "margin-top": "0px", "margin-bottom": "4.8px", "font-size": "12px", "font-weight": "700" }],
+  ["#subheads .subhead:nth-of-type(2)", null, { "margin-top": "22.4px", "margin-bottom": "4.8px" }],
+]));
+
+/* ── P4 markdown and the lists ──────────────────────────────────────────────────────────────── */
+
+await check("P4 .markdown: 1.625, a .5rem rhythm, .75rem above a heading, headings --foreground", () => expectAll([
+  ["#md-article", null, { "line-height": { px: 19.5 }, "overflow-wrap": "break-word" }],
+  ["#md-article > p", null, { "margin-top": "8px", "margin-bottom": "0px" }],
+  ["#md-article > h1", null, { "font-size": "18px", "margin-top": "0px", color: { token: "--foreground" } }],
+  ["#md-article > h2", null, { "font-size": "18px", "font-weight": "700", "margin-top": "12px", "line-height": { px: 23.4 }, color: { token: "--foreground" } }],
+  ["#md-article > h3", null, { "font-size": "15px", "margin-top": "12px" }],
+  ["#md-article > h4", null, { "font-size": "12px", "margin-top": "12px" }],
+  ["#md-article strong", null, { color: { token: "--foreground" } }],
+  ["#md-article > hr", null, { "margin-top": "16px", "margin-bottom": "16px" }],
+]));
+await check("P4 lists: disc / decimal at 1rem, .25rem between items, muted markers", () => expectAll([
+  ["#md-article > ul", null, { "list-style-type": "disc", "padding-left": "16px" }],
+  ["#md-article > ol", null, { "list-style-type": "decimal", "padding-left": "16px" }],
+  ["#md-article > ul > li + li", null, { "margin-top": "4px" }],
+  ["#md-article > ul > li > ul", null, { "margin-top": "4px" }],
+  ["#md-article > ul > li", "::marker", { color: { token: "--muted-foreground" } }],
+]));
+await check("P4 a link is the accent AND underlined at rest (never colour alone); del is muted", () => expectAll([
+  ["#md-article a", null, { color: { token: "--primary" }, "text-decoration-line": "underline", "text-underline-offset": "4px" }],
+  ["#md-article del", null, { color: { token: "--muted-foreground" } }],
+  ["#md-article img", null, { "max-width": "100%", "border-top-width": "1px", "border-top-style": "solid" }],
+]));
+await check("P4 an embedded document is muted, and its headings and strong return to --foreground", () => expectAll([
+  ["#md-embedded > p", null, { color: { token: "--muted-foreground" } }],
+  ["#md-embedded > h2", null, { color: { token: "--foreground" } }],
+  ["#md-embedded strong", null, { color: { token: "--foreground" } }],
+]));
+await check("P4 ol.steps: the number in --primary, bold, right-aligned in a 1.5rem gutter", () => expectAll([
+  ["#list-steps", null, { "list-style-type": "none", "padding-left": "0px" }],
+  ["#list-steps > li", null, { "padding-left": "36px", "margin-top": "9.6px", position: "relative" }],
+  ["#list-steps > li", "::before", { color: { token: "--primary" }, "font-weight": "700", width: "24px", "text-align": "end", position: "absolute" }],
+]));
+await check("P4 ul.plain: indented 1.1rem, no marker, .35rem between items", () => expectAll([
+  ["#list-plain", null, { "list-style-type": "none", "padding-left": "17.6px" }],
+  ["#list-plain > li + li", null, { "margin-top": "5.6px" }],
+]));
+await check("P4 ul.dash: a drawn dash with no alt text, and a real hanging indent", async () => {
+  const out = await expectAll([
+    ["#list-dash > li", "::before", { content: '"-" / ""', color: { token: "--primary" }, position: "absolute" }],
+    ["#list-dash > li + li", null, { "margin-top": "6px" }],
+  ]);
+  const geo = await evaluate(`(() => {
+    const li = document.querySelectorAll("#list-dash > li")[1];
+    const text = li.firstChild;
+    const range = document.createRange(); range.selectNodeContents(text);
+    const rects = [...range.getClientRects()];
+    const dash = li.getBoundingClientRect().left;
+    const first = document.querySelector("#list-dash > li");
+    return { lines: rects.length, x1: rects[0].left, x2: rects[1]?.left, li: dash,
+             display: getComputedStyle(first).display,
+             mixedTop: first.getBoundingClientRect().top, strongTop: first.querySelector("strong").getBoundingClientRect().top };
+  })()`);
+  if (geo.lines < 2) out.push("the long item did not wrap — the hang is untested");
+  else if (Math.abs(geo.x1 - geo.x2) > 0.5) out.push(`second line starts at ${geo.x2}, first at ${geo.x1} — not hanging`);
+  if (!(geo.x1 > geo.li + 4)) out.push(`text starts at ${geo.x1}, the dash column at ${geo.li} — no room for the dash`);
+  if (geo.display !== "list-item" && geo.display !== "block") out.push(`li is display:${geo.display} — a flex row splits mixed inline content`);
+  if (Math.abs(geo.mixedTop - geo.strongTop) > 6) out.push("the <strong> in the first item is not on its first line");
+  return out;
+});
+
+/* ── P5 code ────────────────────────────────────────────────────────────────────────────────── */
+
+const CODE_BOX = {
+  display: "block", "padding-top": "12px", "padding-left": "16px", "font-size": "12px", "line-height": "18px",
+  "white-space": "pre", "tab-size": "2", color: { token: "--foreground" },
+  "background-color": { re: "." }, "border-top-width": "1px", "border-top-style": "solid", "margin-top": "0px",
+};
+await check("P5 .code-block: F5's pre look — --muted, --border, 12px/1.5, pre, tab 2", async () => {
+  const out = await expectAll([["#code-plain", null, CODE_BOX]]);
+  const bg = await evaluate(`[getComputedStyle(__t.el("#code-plain")).backgroundColor, __t.surface("--muted"), getComputedStyle(__t.el("#code-plain")).borderTopColor, __t.probe("color", "var(--border)")]`);
+  if (bg[0] !== bg[1]) out.push(`background ${bg[0]} is not --muted ${bg[1]}`);
+  if (bg[2] !== bg[3]) out.push(`border ${bg[2]} is not --border ${bg[3]}`);
+  return out;
+});
+await check("P5 a div.code-block computes the same box as a pre.code-block", async () => {
+  const props = ["display", "padding-top", "padding-left", "font-family", "font-size", "line-height", "white-space", "tab-size", "color", "background-color", "border-top-width", "border-top-color"];
+  const [pre, div] = await evaluate(`[${JSON.stringify("#code-plain")}, ${JSON.stringify("#code-div")}].map((s) => ${JSON.stringify(props)}.map((p) => getComputedStyle(__t.el(s)).getPropertyValue(p)))`);
+  return props.filter((p, i) => pre[i] !== div[i]).map((p) => `${p}: pre ${pre[props.indexOf(p)]} vs div ${div[props.indexOf(p)]}`);
+});
+await check("P5 --wrap breaks a long line instead of scrolling it", async () => {
+  const out = await expectAll([["#code-wrap", null, { "white-space": "pre-wrap", "overflow-wrap": "anywhere" }]]);
+  const s = await evaluate(`[__t.el("#code-wrap").scrollWidth, __t.el("#code-wrap").clientWidth]`);
+  if (s[0] > s[1]) out.push(`scrollWidth ${s[0]} > clientWidth ${s[1]}`);
+  return out;
+});
+await check("P5 --scroll caps at --code-max-h and scrolls, without trapping the wheel", async () => {
+  const out = await expectAll([["#code-scroll", null, { "max-height": "96px", "overflow-y": "auto", "overscroll-behavior-y": "auto" }]]);
+  const s = await evaluate(`[__t.el("#code-scroll").scrollHeight, __t.el("#code-scroll").clientHeight]`);
+  if (!(s[0] > s[1])) out.push(`scrollHeight ${s[0]} <= clientHeight ${s[1]} — it does not scroll`);
+  return out;
+});
+await check("P5 .code-view: a counter gutter 3ch wide, end-aligned, muted, unselectable, with empty alt text", async () => {
+  const out = await expectAll([
+    ["#code-view", null, { "white-space": "pre-wrap" }],
+    ["#code-view .line", null, { display: "block", "overflow-wrap": "anywhere" }],
+    ["#code-view .line", "::before", { content: 'counter(line) / ""', "text-align": "end", color: { token: "--muted-foreground" }, "user-select": "none" }],
+  ]);
+  const w = await evaluate(`(() => { const s = document.createElement("span"); s.style.cssText = "display:inline-block;inline-size:3ch"; __t.el("#code-view").append(s); const w = s.getBoundingClientRect().width; s.remove(); return [parseFloat(getComputedStyle(__t.el("#code-view .line"), "::before").width), w]; })()`);
+  if (Math.abs(w[0] - w[1]) > 0.5) out.push(`gutter ${w[0]}px, 3ch is ${w[1]}px`);
+  return out;
+});
+await check("P5 a wrapped .code-view line continues at the text column, never under the number", async () => {
+  // Column 0 is where line 1's "{" starts; the wrapped comment (line 5) must continue there, which is
+  // .75rem right of the gutter — not back at the numbers.
+  const g = await evaluate(`(() => {
+    const first = document.querySelector("#code-view .line .tok-punct").firstChild;
+    const r0 = document.createRange(); r0.selectNodeContents(first);
+    const line = document.querySelectorAll("#code-view .line")[4];
+    const text = line.querySelector(".tok-comment").firstChild;
+    const range = document.createRange(); range.selectNodeContents(text);
+    const rects = [...range.getClientRects()];
+    const gutter = parseFloat(getComputedStyle(line, "::before").width);
+    return { n: rects.length, col0: r0.getClientRects()[0].left, cont: rects[rects.length - 1].left,
+             box: line.getBoundingClientRect().left, gutter };
+  })()`);
+  if (g.n < 2) return ["the long line did not wrap — the hanging gutter is untested"];
+  const out = [];
+  if (Math.abs(g.col0 - g.cont) > 0.5) out.push(`continuation starts at ${g.cont}, column 0 is at ${g.col0}`);
+  if (!(g.cont >= g.box + g.gutter + 12 - 0.5)) out.push(`continuation at ${g.cont} is not clear of the ${g.gutter}px gutter + .75rem`);
+  return out;
+});
+await check("P5 selecting a .code-view copies the file: its line breaks, and none of the numbers", async () => {
+  const [sel, text] = await evaluate(`(() => {
+    const r = document.createRange(); r.selectNodeContents(__t.el("#code-view"));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    const out = [s.toString(), __t.el("#code-view").textContent]; s.removeAllRanges(); return out;
+  })()`);
+  const out = [];
+  if (sel !== text.replace(/\n$/, "")) out.push(`selection ${JSON.stringify(sel.slice(0, 60))}… differs from the file text`);
+  if (/^\d/m.test(sel)) out.push("a line of the copied selection starts with a digit — a gutter number leaked");
+  if (sel.split("\n").length !== 7) out.push(`copied ${sel.split("\n").length} lines, the view shows 7`);
+  return out;
+});
+await check("P5 syntax colours: categorical hues, never the status tokens", () => expectAll([
+  ["#code-view .tok-string", null, { color: { token: "--cat-green" } }],
+  ["#code-view .tok-number", null, { color: { token: "--cat-amber" } }],
+  ["#code-view .tok-key", null, { color: { token: "--primary" } }],
+  ["#code-view .tok-keyword", null, { color: { token: "--primary" } }],
+  ["#code-view .tok-punct", null, { color: { token: "--muted-foreground" } }],
+  ["#code-view .tok-comment", null, { color: { token: "--muted-foreground" }, "font-style": "italic" }],
+  ["#code-view .tok-literal", null, { color: { token: "--muted-foreground" }, "font-style": "italic" }],
+  ["#code-view .tok-heading", null, { color: { token: "--foreground" }, "font-weight": "700" }],
+]));
+await check("P5 diff lines: add/del/hunk/meta tokens; a context line inherits", () => expectAll([
+  ["#code-diff .diff-add", null, { color: { token: "--success" } }],
+  ["#code-diff .diff-del", null, { color: { token: "--destructive" } }],
+  ["#code-diff .diff-hunk", null, { color: { token: "--primary" } }],
+  ["#code-diff .diff-meta", null, { color: { token: "--muted-foreground" } }],
+  ["#code-diff", null, { color: { token: "--foreground" } }],
+]));
+await check("P5 a scrollable block takes the --ring focus ring from the keyboard", async () => {
+  await focusByKeyboard("#code-plain");
+  return ring("#code-plain");
+});
+
+/* ── P6 command block ───────────────────────────────────────────────────────────────────────── */
+
+await check("P6 .cmd: the code box as a flex row, 8px 12px, the button does not shrink", () => expectAll([
+  ["#cmd-one", null, {
+    display: "flex", "align-items": "center", "column-gap": "8px", "padding-top": "8px", "padding-left": "12px",
+    "border-top-width": "1px", "border-top-style": "solid",
+  }],
+  ["#cmd-one > button", null, { "flex-shrink": "0" }],
+  ["#cmd-multi", null, { "align-items": "flex-start" }],
+]));
+await check("P6 .cmd-text cancels the inline-code box and wraps anywhere", async () => {
+  const out = await expectAll([
+    ["#cmd-one .cmd-text", null, {
+      "flex-grow": "1", "min-width": "0px", "padding-left": "0px", "border-top-width": "0px",
+      "background-color": "rgba(0, 0, 0, 0)", "white-space": "pre-wrap", "overflow-wrap": "anywhere",
+      color: { token: "--foreground" }, "margin-top": "0px",
+    }],
+    ["#cmd-multi .cmd-text", null, { "margin-top": "0px", "padding-top": "0px", "border-top-width": "0px", "background-color": "rgba(0, 0, 0, 0)" }],
+  ]);
+  // The cancel only proves something if inline code HAS a box on this page.
+  const box = await evaluate(`getComputedStyle(__t.el("#md-article > p code")).borderTopWidth`);
+  if (box !== "1px") console.log(`        note: inline code has no box here (${box}), so the cancel is not exercised`);
+  return out;
+});
+await check("P6 with a 28px button the row is 44px inside its border", async () => {
+  const [cmd, btn] = await Promise.all([rect("#cmd-one"), rect("#cmd-one > button")]);
+  const out = [];
+  if (Math.abs(btn.h - 28) > 0.5) out.push(`button is ${btn.h}px, not 28 — C2 changed?`);
+  if (Math.abs(cmd.h - 46) > 0.5) out.push(`row is ${cmd.h}px outside, want 44 + 2 borders`);
+  return out;
+});
+await check("P6 a long command wraps and ends before the button, which stays in the box", async () => {
+  const [cmd, text, btn] = await Promise.all([rect("#cmd-long"), rect("#cmd-long .cmd-text"), rect("#cmd-long > button")]);
+  const out = [];
+  if (!(text.h > 20)) out.push(`the command did not wrap (${text.h}px tall)`);
+  if (text.r > btn.x - 8 + 0.5) out.push(`text right ${text.r} runs into the 8px gap before the button at ${btn.x}`);
+  if (btn.r > cmd.r - 12 - 1 + 0.5) out.push(`button right ${btn.r} is outside the padding (${cmd.r - 13})`);
+  return out;
+});
+await check("P6 a multi-line command puts the button at the top", async () => {
+  const [cmd, btn] = await Promise.all([rect("#cmd-multi"), rect("#cmd-multi > button")]);
+  return Math.abs(btn.y - (cmd.y + 1 + 8)) <= 0.5 ? [] : [`button top ${btn.y}, content top ${cmd.y + 9}`];
+});
+
+/* ── P7 copy states ─────────────────────────────────────────────────────────────────────────── */
+
+const icoIs = (sel, token) => evaluate(`getComputedStyle(__t.el(${JSON.stringify(sel)})).getPropertyValue("--ico").trim() === getComputedStyle(document.documentElement).getPropertyValue(${JSON.stringify(token)}).trim()`);
+await check("P7 copied: the glyph is the check, in --success", async () => {
+  const out = await expectAll([["#states-icon .btn-icon:not(.btn-icon--bare)[data-state=copied]", null, { color: { token: "--success" } }]]);
+  if (!(await icoIs("#states-icon .btn-icon:not(.btn-icon--bare)[data-state=copied]", "--ico-check"))) out.push("--ico is not --ico-check");
+  if (!(await icoIs("#states-icon .btn-icon:not(.btn-icon--bare):not([data-state])", "--ico-copy"))) out.push("at rest --ico is not --ico-copy");
+  return out;
+});
+await check("P7 failed: the glyph is the x, in --destructive", async () => {
+  const out = await expectAll([["#states-icon .btn-icon:not(.btn-icon--bare)[data-state=failed]", null, { color: { token: "--destructive" } }]]);
+  if (!(await icoIs("#states-icon .btn-icon:not(.btn-icon--bare)[data-state=failed]", "--ico-x"))) out.push("--ico is not --ico-x");
+  return out;
+});
+await check("P7 a bare copied button stays --success, at rest AND under the pointer", async () => {
+  const sel = "#states-icon .btn-icon--bare[data-state=copied]";
+  const out = await expectAll([[sel, null, { color: { token: "--success" } }]]);
+  await hover(sel);
+  out.push(...(await expectAll([[sel, null, { color: { token: "--success" } }]])));
+  return out;
+});
+await check("P7 the text form takes the state colour too", () => expectAll([
+  ["#states-text [data-state=copied]", null, { color: { token: "--success" } }],
+  ["#states-text [data-state=failed]", null, { color: { token: "--destructive" } }],
+]));
+
+/* ── P8 meta ────────────────────────────────────────────────────────────────────────────────── */
+
+await check("P8 .meta: a muted, wrapping flex line, 4px 8px gaps, no margin", () => expectAll([
+  ["#meta-article", null, {
+    display: "flex", "flex-wrap": "wrap", "align-items": "baseline", "row-gap": "4px", "column-gap": "8px",
+    "margin-top": "0px", "margin-bottom": "0px", color: { token: "--muted-foreground" },
+  }],
+  ["#meta-kv .meta-val", null, { color: { token: "--foreground" } }],
+]));
+await check("P8 .meta-stat: glyph + tabular count; the glyph is 12px whatever class it carries", () => expectAll([
+  // inline-flex, blockified to flex because .meta is itself a flex row
+  ["#meta-stats .meta-stat", null, { display: { re: "^(inline-)?flex$" }, "align-items": "center", "column-gap": "4px", "font-variant-numeric": "tabular-nums" }],
+  ["#meta-stats .meta-stat:first-child > .ico", null, { width: "12px", height: "12px" }],
+  ["#meta-stats .meta-stat:last-child > .ico", null, { width: "12px", height: "12px" }],
+]));
+
+/* ── P9 series navigation ───────────────────────────────────────────────────────────────────── */
+
+await check("P9 .seq-list: a grid .375rem apart; rows flex on the baseline; numbers muted", () => expectAll([
+  ["#seq .seq-list", null, { display: "grid", "row-gap": "6px", "margin-top": "12px", "padding-left": "0px", "list-style-type": "none" }],
+  ["#seq .seq-list > li", null, { display: "flex", "column-gap": "8px", "align-items": "baseline" }],
+  ["#seq .seq-num", null, { color: { token: "--muted-foreground" }, "flex-shrink": "0" }],
+]));
+await check("P9 links are muted and undecorated; the current part is --primary AND bold", () => expectAll([
+  ["#seq li:first-child a", null, { color: { token: "--muted-foreground" }, "text-decoration-line": "none" }],
+  ["#seq a[aria-current=page]", null, { color: { token: "--primary" }, "font-weight": "700" }],
+]));
+await check("P9 a link warms to --primary under the pointer", async () => {
+  await hover("#seq li:first-child a");
+  await sleep(200);
+  return expectAll([["#seq li:first-child a", null, { color: { token: "--primary" } }]]);
+});
+await check("P9 a link takes the --ring focus ring from the keyboard", async () => {
+  await focusByKeyboard("#seq li:first-child a");
+  return ring("#seq li:first-child a");
+});
+await check("P4 a markdown link takes the --ring focus ring from the keyboard", async () => {
+  await focusByKeyboard("#md-article a");
+  return ring("#md-article a");
+});
+
+/* ── P10 boot log ───────────────────────────────────────────────────────────────────────────── */
+
+await check("P10 .boot-log: muted rows .375rem apart; 14rem step column; [ ok ] bold --primary with no alt text", () => expectAll([
+  ["#boot", null, { display: "grid", "row-gap": "6px", color: { token: "--muted-foreground" } }],
+  ["#boot .boot-line", null, { display: "grid", "grid-template-columns": { re: "^224px \\d" }, "column-gap": "8px", "margin-top": "0px", "align-items": "baseline" }],
+  ["#boot .boot-step", null, { "white-space": "nowrap" }],
+  ["#boot .boot-step", "::before", { content: '"[ ok ]" / ""', "font-weight": "700", color: { token: "--primary" } }],
+  ["#boot .boot-val", null, { color: { token: "--foreground" } }],
+  ["#boot .boot-note", null, { "margin-top": "0px", "margin-bottom": "0px" }],
+]));
+await check("P10 the [ ok ] marker sits 1ch before the step name", async () => {
+  const [mr, ch] = await evaluate(`(() => { const s = document.createElement("span"); s.style.cssText = "display:inline-block;inline-size:1ch"; __t.el("#boot .boot-step").append(s); const w = s.getBoundingClientRect().width; s.remove(); return [parseFloat(getComputedStyle(__t.el("#boot .boot-step"), "::before").marginRight), w]; })()`);
+  return Math.abs(mr - ch) <= 0.5 ? [] : [`margin ${mr}px, 1ch is ${ch}px`];
+});
+
+/* ── S9 the error page body (demo frames) ───────────────────────────────────────────────────── */
+
+await check("S9 404: the display title 1.5rem under the prompt, the lede .5rem under it, the way out 1.5rem further", () => expectAll([
+  ["#s9-404 .page-title", null, { "font-size": "36px", "margin-top": "24px", color: { token: "--primary" } }],
+  ["#s9-404 .lede", null, { "margin-top": "8px" }],
+  ["#s9-404 .lede + p", null, { "margin-top": "24px" }],
+]));
+await check("S9 crash: the same title, and the body is an alert", async () => {
+  const out = await expectAll([["#s9-crash .page-title", null, { "font-size": "36px" }]]);
+  if ((await evaluate(`__t.el("#s9-crash > div").getAttribute("role")`)) !== "alert") out.push("the crash body is not role=alert");
+  return out;
+});
+
+/* ── nothing is rounded ─────────────────────────────────────────────────────────────────────── */
+
+await check("no border-radius on any element or pseudo-element content.css styles", () => evaluate(`(() => {
+  const sel = ".page-title, .lede, .eyebrow, .section-head, .subhead, .markdown, .markdown *, ol.steps, ol.steps > li, ul.plain, ul.dash, ul.dash > li, .code-block, .code-view .line, .cmd, .cmd-text, [data-copy], .meta, .meta-stat, .seq-list, .seq-list a, .boot-log, .boot-line, .boot-step";
+  const out = [];
+  for (const e of document.querySelectorAll(sel)) for (const pseudo of [null, "::before"]) {
+    const s = getComputedStyle(e, pseudo);
+    for (const c of ["borderTopLeftRadius", "borderTopRightRadius", "borderBottomLeftRadius", "borderBottomRightRadius"])
+      if (s[c] !== "0px") out.push(e.tagName.toLowerCase() + "." + e.className + (pseudo || "") + " " + c + " " + s[c]);
+  }
+  return out.slice(0, 8);
+})()`));
+
+/* ── states: the animation switch, print, a coarse pointer ──────────────────────────────────── */
+
+await check("html.anim-off stops the link transition (WP1's switch reaching this file's rule)", async () => {
+  const before = await evaluate(`getComputedStyle(__t.el("#seq li:first-child a")).transitionDuration`);
+  await evaluate(`document.documentElement.classList.add("anim-off"); null`);
+  const after = await evaluate(`getComputedStyle(__t.el("#seq li:first-child a")).transitionDuration`);
+  await evaluate(`document.documentElement.classList.remove("anim-off"); null`);
+  const out = [];
+  if (before !== "0.15s") out.push(`at rest the transition is ${before}, want 0.15s`);
+  if (after !== "0s") out.push(`under anim-off it is ${after}`);
+  return out;
+});
+await send("Emulation.setEmulatedMedia", { media: "print" });
+await check("print: copy buttons are gone, code and commands wrap uncapped, the title loses its glow", async () => {
+  const out = await evaluate(`[...document.querySelectorAll("[data-copy]")].filter((b) => getComputedStyle(b).display !== "none").map((b) => "a [data-copy] button still displays: " + (b.getAttribute("aria-label") || b.textContent))`);
+  out.push(...(await expectAll([
+    ["#code-plain", null, { "white-space": "pre-wrap", "overflow-wrap": "anywhere" }],
+    ["#code-scroll", null, { "max-height": "none", "overflow-y": "visible" }],
+    ["#cmd-one .cmd-text", null, { "white-space": "pre-wrap" }],
+    ["#p1-app .page-title", null, { "text-shadow": "none" }],
+  ])));
+  return out;
+});
+await send("Emulation.setEmulatedMedia", { media: "" });
+await check("a coarse pointer makes each series link a 44px target", async () => {
+  // Touch emulation is what flips (pointer: coarse) in Chromium; the media-feature override is tried first.
+  try { await send("Emulation.setEmulatedMedia", { features: [{ name: "pointer", value: "coarse" }] }); } catch {}
+  if (!(await evaluate(`matchMedia("(pointer: coarse)").matches`))) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  if (!(await evaluate(`matchMedia("(pointer: coarse)").matches`))) return ["could not emulate (pointer: coarse) — this check proved nothing"];
+  // inline-flex, blockified to flex because the li is a flex row
+  const out = await expectAll([["#seq li:first-child a", null, { "min-height": "44px", display: { re: "^(inline-)?flex$" }, "align-items": "center" }]]);
+  const h = (await rect("#seq li:first-child a")).h;
+  if (h < 44) out.push(`the link is ${h}px tall`);
+  return out;
+});
+try { await send("Emulation.setEmulatedMedia", { features: [] }); } catch {}
+await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+
+/* ── the same classes on tokens.css alone ───────────────────────────────────────────────────── */
+
+const IDENTITY = [
+  ["#p1-app .page-title", null, ["font-size", "font-weight", "line-height", "letter-spacing", "color", "margin-top", "margin-bottom", "text-shadow", "overflow-wrap"]],
+  ["#p1-app .lede", null, ["color", "margin-top", "margin-bottom"]],
+  ["#p1-display .page-title", null, ["font-size"]],
+  ["#p1-glyph .page-title > .ico", null, ["width", "height", "margin-right", "vertical-align"]],
+  ["#eyebrow-plain", null, ["font-size", "font-weight", "letter-spacing", "text-transform", "color", "margin-top", "margin-bottom", "line-height"]],
+  ["#eyebrow-warning", null, ["color"]],
+  ["#head-link", null, ["display", "flex-wrap", "align-items", "justify-content", "row-gap", "column-gap", "margin-bottom"]],
+  ["#head-link > h2", null, ["margin-top", "margin-bottom"]],
+  ["#head-link > a", null, ["flex-shrink", "white-space"]],
+  ["#head-button", null, ["align-items"]],
+  ["#head-time > time", null, ["color"]],
+  ["#subheads .subhead:nth-of-type(2)", null, ["margin-top", "margin-bottom", "font-size", "font-weight", "line-height"]],
+  ["#md-article", null, ["line-height", "overflow-wrap"]],
+  ["#md-article > p", null, ["margin-top", "margin-bottom"]],
+  ["#md-article > h2", null, ["font-size", "font-weight", "color", "margin-top", "line-height"]],
+  ["#md-article > h3", null, ["font-size"]],
+  ["#md-article > ul", null, ["list-style-type", "padding-left"]],
+  ["#md-article > ol", null, ["list-style-type", "padding-left"]],
+  ["#md-article > ul > li + li", null, ["margin-top"]],
+  ["#md-article > ul > li", "::marker", ["color"]],
+  ["#md-article a", null, ["color", "text-decoration-line", "text-underline-offset"]],
+  ["#md-article del", null, ["color"]],
+  ["#md-article > hr", null, ["margin-top", "margin-bottom"]],
+  ["#list-steps > li", null, ["padding-left", "margin-top"]],
+  ["#list-steps > li", "::before", ["color", "font-weight", "width", "text-align", "position"]],
+  ["#list-plain", null, ["list-style-type", "padding-left", "margin-top"]],
+  ["#list-dash > li", null, ["padding-left", "position"]],
+  ["#list-dash > li", "::before", ["content", "color", "position"]],
+  ["#code-plain", null, ["display", "padding-top", "padding-left", "font-size", "line-height", "white-space", "tab-size", "color", "background-color", "border-top-width", "border-top-color", "margin-top"]],
+  ["#code-div", null, ["padding-top", "font-size", "line-height", "white-space", "background-color"]],
+  ["#code-view .line", null, ["display", "padding-left"]],
+  ["#code-view .line", "::before", ["content", "width", "margin-left", "margin-right", "text-align", "color", "user-select"]],
+  ["#code-view .tok-string", null, ["color"]],
+  ["#code-view .tok-comment", null, ["color", "font-style"]],
+  ["#code-diff .diff-add", null, ["color"]],
+  ["#cmd-one", null, ["display", "align-items", "column-gap", "padding-top", "padding-left", "background-color", "border-top-width"]],
+  ["#cmd-one .cmd-text", null, ["flex-grow", "min-width", "padding-left", "border-top-width", "background-color", "white-space", "overflow-wrap", "color"]],
+  ["#states-icon .btn-icon--bare[data-state=copied]", null, ["color", "--ico"]],
+  ["#meta-article", null, ["display", "flex-wrap", "row-gap", "column-gap", "color", "margin-top"]],
+  ["#meta-stats .meta-stat:first-child > .ico", null, ["width", "height"]],
+  ["#seq .seq-list", null, ["display", "row-gap", "margin-top", "padding-left", "list-style-type"]],
+  ["#seq a[aria-current=page]", null, ["color", "font-weight"]],
+  ["#boot", null, ["display", "row-gap", "color"]],
+  ["#boot .boot-line", null, ["grid-template-columns", "column-gap", "margin-top"]],
+  ["#boot .boot-step", "::before", ["content", "font-weight", "color", "margin-right"]],
+  ["#boot .boot-val", null, ["color"]],
+];
+// The value column of a boot line is whatever width is left, and the card around it only exists on
+// the full page — so for grid-template-columns only the first track (the step column) is compared.
+const snapshot = () => evaluate(`${JSON.stringify(IDENTITY)}.map(([sel, pseudo, props]) => props.map((p) => {
+  const v = getComputedStyle(__t.el(sel), pseudo).getPropertyValue(p).trim();
+  return p === "grid-template-columns" ? v.split(" ")[0] : v;
+}))`);
+const full = await snapshot();
+await load("?theme=warm&bare");
+console.log(`stand-ins in force (?bare):     ${await evaluate("document.documentElement.dataset.standins")}`);
+await check("?bare: reset, base, components and chrome dropped — the page really lost them", async () => {
+  const n = await evaluate(`[...document.styleSheets].map((s) => (s.href || "").split("/").pop()).filter((f) => /^(reset|base|components|chrome)\\.css$/.test(f)).length`);
+  return n === 0 ? [] : [`${n} of those stylesheets are still loaded`];
+});
+await check("?bare: every content.css class computes exactly what it computes on the full page", async () => {
+  const bare = await snapshot();
+  const out = [];
+  IDENTITY.forEach(([sel, pseudo, props], i) => props.forEach((p, j) => {
+    if (full[i][j] !== bare[i][j]) out.push(`${sel}${pseudo || ""} ${p}: full ${JSON.stringify(full[i][j])} vs bare ${JSON.stringify(bare[i][j])}`);
+  }));
+  return out;
+});
+
+/* ── a phone ────────────────────────────────────────────────────────────────────────────────── */
+
+await load("?theme=warm", { width: 375, height: 812 });
+await check("375px: the display title steps down to 30px; the app title stays 24px", () => expectAll([
+  ["#p1-display .page-title", null, { "font-size": "30px" }],
+  ["#p1-app .page-title", null, { "font-size": "24px" }],
+]));
+await check("375px: a boot line is one column, the value under its step", async () => {
+  const out = await expectAll([["#boot .boot-line", null, { "grid-template-columns": { re: "^\\d+(\\.\\d+)?px$" } }]]);
+  const [step, val] = await Promise.all([rect("#boot .boot-line .boot-step"), rect("#boot .boot-line .boot-val")]);
+  if (!(val.y >= step.b - 0.5)) out.push(`value top ${val.y} is not under the step (bottom ${step.b})`);
+  return out;
+});
+await check("375px: nothing on the page scrolls sideways", async () => {
+  const [sw, cw] = await evaluate(`[document.documentElement.scrollWidth, document.documentElement.clientWidth]`);
+  return sw <= cw ? [] : [`page is ${sw}px wide in a ${cw}px viewport`];
+});
+
+/* ── contrast: every colour this file puts on text or a glyph, four themes, three surfaces ─── */
+
+const ON_SURFACES = [
+  // [label, selector, pseudo, minimum]
+  ["page title --primary", "#p1-app .page-title", null, 4.5],
+  ["lede --muted-foreground", "#p1-app .lede", null, 4.5],
+  ["eyebrow (muted)", "#eyebrow-plain", null, 4.5],
+  ["eyebrow data-tone=warning", "#eyebrow-warning", null, 4.5],
+  ["eyebrow data-tone=primary", "#eyebrow-primary", null, 4.5],
+  ["section-head <time>", "#head-time > time", null, 4.5],
+  ["markdown body", "#md-article > p", null, 4.5],
+  ["markdown heading", "#md-article > h2", null, 4.5],
+  ["markdown link", "#md-article a", null, 4.5],
+  ["markdown list marker", "#md-article > ul > li", "::marker", 4.5],
+  ["markdown del", "#md-article del", null, 4.5],
+  ["embedded markdown body (muted)", "#md-embedded > p", null, 4.5],
+  ["ol.steps number", "#list-steps > li", "::before", 4.5],
+  ["ul.dash dash", "#list-dash > li", "::before", 4.5],
+  ["meta (muted)", "#meta-article", null, 4.5],
+  ["meta-val", "#meta-kv .meta-val", null, 4.5],
+  ["seq number / link (muted)", "#seq .seq-num", null, 4.5],
+  ["seq current part", "#seq a[aria-current=page]", null, 4.5],
+  ["boot step / note (muted)", "#boot .boot-step", null, 4.5],
+  ["boot [ ok ]", "#boot .boot-step", "::before", 4.5],
+  ["boot value", "#boot .boot-val", null, 4.5],
+  ["copy text: copied", "#states-text [data-state=copied]", null, 4.5],
+  ["copy text: failed", "#states-text [data-state=failed]", null, 4.5],
+  ["copy glyph: copied (non-text)", "#states-icon .btn-icon--bare[data-state=copied]", null, 3],
+  ["copy glyph: failed (non-text)", "#states-icon .btn-icon--bare[data-state=failed]", null, 3],
+];
+const ON_MUTED = [
+  ["code text", "#code-plain", null, 4.5],
+  ["code gutter number", "#code-view .line", "::before", 4.5],
+  ["tok-comment / literal / punct", "#code-view .tok-comment", null, 4.5],
+  ["tok-string --cat-green", "#code-view .tok-string", null, 4.5],
+  ["tok-number --cat-amber", "#code-view .tok-number", null, 4.5],
+  ["tok-keyword / key --primary", "#code-view .tok-keyword", null, 4.5],
+  ["diff-add --success", "#code-diff .diff-add", null, 4.5],
+  ["diff-del --destructive", "#code-diff .diff-del", null, 4.5],
+  ["diff-hunk --primary", "#code-diff .diff-hunk", null, 4.5],
+  ["cmd text", "#cmd-one .cmd-text", null, 4.5],
+  ["copy glyph at rest in .cmd (non-text)", "#cmd-one > button", null, 3],
+];
+const table = new Map();
+for (const theme of THEMES) {
+  await load(`?theme=${theme}`);
+  await check(`contrast, ${theme}: every text pairing >= 4.5:1 and every glyph >= 3:1`, async () => {
+    const rows = await evaluate(`(() => {
+      const surfaces = ["--background", "--card", "--muted"].map((s) => __t.surface(s));
+      const fg = (sel, pseudo) => getComputedStyle(__t.el(sel), pseudo).color;
+      const onSurfaces = ${JSON.stringify(ON_SURFACES)}.map(([label, sel, pseudo, min]) => [label, min, surfaces.map((bg) => __t.ratio(fg(sel, pseudo), bg))]);
+      const onMuted = ${JSON.stringify(ON_MUTED)}.map(([label, sel, pseudo, min]) => {
+        const host = __t.el(sel).closest(".code-block, .cmd");
+        return [label, min, [__t.ratio(fg(sel, pseudo), getComputedStyle(host).backgroundColor)]];
+      });
+      const ringRow = ["focus ring --ring (non-text)", 3, surfaces.map((bg) => __t.ratio(__t.token("--ring"), bg))];
+      return [...onSurfaces, ringRow, ...onMuted];
+    })()`);
+    const out = [];
+    for (const [label, min, ratios] of rows) {
+      if (!table.has(label)) table.set(label, {});
+      table.get(label)[theme] = ratios;
+      ratios.forEach((r, i) => { if (r < min) out.push(`${label}: ${r.toFixed(2)}:1 on ${ratios.length === 1 ? "--muted (own)" : ["--background", "--card", "--muted"][i]}, needs ${min}`); });
+    }
+    return out;
+  });
+}
+console.log("\ncontrast (bg / card / muted; code and commands on their own --muted):");
+console.log(`| pairing | ${THEMES.join(" | ")} |`);
+console.log(`|---|${THEMES.map(() => "---").join("|")}|`);
+for (const [label, byTheme] of table) {
+  console.log(`| ${label} | ${THEMES.map((t) => (byTheme[t] || []).map((r) => r.toFixed(2)).join(" / ")).join(" | ")} |`);
+}
+console.log();
+
+/* ── the error-page template ────────────────────────────────────────────────────────────────── */
+
+const templateSource = readFileSync(join(root, "templates/error-page.html"), "utf8");
+await check("template: noindex, one h1 at the display step with an aria-hidden cursor, the lede and the way home", async () => {
+  consoleErrors.length = 0;
+  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: `${ORIGIN}/__template/error-page.html` });
+  await sleep(900);
+  await evaluate(HELPERS);
+  const t = await evaluate(`({
+    robots: document.querySelector('meta[name="robots"]')?.content,
+    h1s: document.querySelectorAll("h1").length,
+    h1class: document.querySelector("h1")?.className,
+    h1text: document.querySelector("h1")?.textContent,
+    cursor: document.querySelector("h1 .cursor-block")?.getAttribute("aria-hidden"),
+    prompt: document.querySelector("main .prompt + h1") !== null,
+    lede: document.querySelector("h1 + .lede")?.textContent,
+    home: document.querySelector('main a.link-quiet[href="/"]')?.textContent,
+    chrome: !!document.querySelector("header.bar") && !!document.querySelector("footer.status"),
+  })`);
+  const out = [];
+  if (t.robots !== "noindex") out.push(`robots meta is ${t.robots}`);
+  if (t.h1s !== 1) out.push(`${t.h1s} h1 elements`);
+  if (t.h1class !== "page-title page-title--display") out.push(`h1 class is "${t.h1class}"`);
+  if (!/^404: command not found/.test(t.h1text || "")) out.push(`h1 reads "${t.h1text}"`);
+  if (t.cursor !== "true") out.push("the cursor is not aria-hidden");
+  if (!t.prompt) out.push("the prompt does not precede the title");
+  if (t.lede !== "no such file or directory.") out.push(`lede reads "${t.lede}"`);
+  if (t.home !== "cd ~") out.push("no cd ~ link home");
+  if (!t.chrome) out.push("header.bar / footer.status missing");
+  out.push(...(await expectAll([
+    ["main h1", null, { "font-size": "36px", "margin-top": "24px", color: { token: "--primary" } }],
+    ["main .lede", null, { "margin-top": "8px", color: { token: "--muted-foreground" } }],
+    ["main .lede + p", null, { "margin-top": "24px" }],
+  ])));
+  return out;
+});
+await check("template: the prompt is filled from the address bar, as text", async () => {
+  await send("Page.navigate", { url: `${ORIGIN}/__template/articles/%3Cb%3Enope%3C%2Fb%3E` });
+  await sleep(900);
+  const p = await evaluate(`[document.querySelector("[data-requested-path]").textContent, document.querySelector("[data-requested-path] b") === null]`);
+  const out = [];
+  if (p[0] !== "__template/articles/<b>nope</b>") out.push(`prompt reads ${JSON.stringify(p[0])}`);
+  if (!p[1]) out.push("the path was parsed as markup");
+  return out;
+});
+await check("template: no script error on load", () => consoleErrors.filter((e) => !/favicon/.test(e)));
+await check("template: the crash variant is documented — alert, 'something broke', a reload button", () => {
+  const block = (templateSource.match(/THE CRASH VARIANT, in place of[\s\S]*?-->/) || [""])[0];
+  const out = [];
+  if (!block) out.push("no crash-variant block after <main>");
+  for (const want of ['role="alert"', "something broke", 'class="page-title page-title--display"', 'class="btn-terminal btn-terminal--compact" data-reload', "{{ERROR_MESSAGE}}"]) {
+    if (!block.includes(want)) out.push(`crash block lacks ${want}`);
+  }
+  return out;
+});
+
+console.log(failures
+  ? `\ncheck-content: ${failures} FAILED, ${passes} passed`
+  : `\ncheck-content: all ${passes} checks passed`);
+process.exit(failures ? 1 : 0);

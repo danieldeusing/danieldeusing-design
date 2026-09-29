@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>typography and content</title>
+
+    <!-- Theme pre-paint: ?theme= wins (screenshots, checks), then the stored choice. -->
+    <script>
+      (() => {
+        const themes = ["warm", "green", "mono", "paper"];
+        let theme = new URLSearchParams(location.search).get("theme");
+        if (!themes.includes(theme)) {
+          try { theme = localStorage.getItem("theme"); } catch {}
+        }
+        document.documentElement.dataset.theme = themes.includes(theme) ? theme : "warm";
+      })();
+    </script>
+
+    <!-- tokens + the one file this package ships. `data-full` links are what a page usually has
+         beside them (the build-free bundle's reset, base, components, chrome) and what the examples
+         borrow for their surrounding markup (.prompt, .cursor-block, .card-terminal, .doc-link);
+         `?bare` drops them, which is the tokens-only surface content.css must render identically on. -->
+    <link rel="stylesheet" href="../src/reset.css" data-full />
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" data-full />
+    <link rel="stylesheet" href="../src/components.css" data-full />
+    <link rel="stylesheet" href="../src/chrome.css" data-full />
+    <link rel="stylesheet" href="../src/content.css" />
+
+    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
+         STAND-INS — NOT PART OF THIS PACKAGE, AND NOT IN src/.
+         Other work packages of 0.60.0 own these and land in parallel. Each block is DISABLED
+         (media="not all"); the script at the top of <body> switches one on only when the real thing
+         is missing, so once WP1 / WP4 / WP5 are integrated this page renders and measures the real
+         tokens and classes, not these copies. The header names the ones in force.
+         ══════════════════════════════════════════════════════════════════════════════════════════ -->
+    <style id="standin-wp1-tokens" media="not all">
+      /* WP1 · the display title step (lead ruling on P1): 30px, 36px from 48rem */
+      :root { --fs-display: 1.875rem; }
+      @media (min-width: 48rem) { :root { --fs-display: 2.25rem; } }
+      /* WP1 · F1 control and glyph sizes */
+      :root {
+        --control-h: 1.75rem;
+        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
+        --icon-sm: 0.75rem; --icon-size: 0.875rem; --icon-lg: 1rem; --icon-xl: 1.5rem;
+      }
+      /* WP1 · F2 categorical colours */
+      :root {
+        --cat-l: 0.45; --cat-c: 0.075;
+        --cat-red: oklch(var(--cat-l) var(--cat-c) 25);
+        --cat-orange: oklch(var(--cat-l) var(--cat-c) 50);
+        --cat-amber: oklch(var(--cat-l) var(--cat-c) 80);
+        --cat-lime: oklch(var(--cat-l) var(--cat-c) 125);
+        --cat-green: oklch(var(--cat-l) var(--cat-c) 150);
+        --cat-teal: oklch(var(--cat-l) var(--cat-c) 185);
+        --cat-cyan: oklch(var(--cat-l) var(--cat-c) 210);
+        --cat-blue: oklch(var(--cat-l) var(--cat-c) 255);
+        --cat-indigo: oklch(var(--cat-l) var(--cat-c) 275);
+        --cat-violet: oklch(var(--cat-l) var(--cat-c) 295);
+        --cat-purple: oklch(var(--cat-l) var(--cat-c) 315);
+        --cat-pink: oklch(var(--cat-l) var(--cat-c) 350);
+      }
+      html[data-theme="green"],
+      html[data-theme="mono"] { --cat-l: 0.74; --cat-c: 0.12; }
+      /* WP1 · F7 tone mapping */
+      [data-tone="primary"] { --tone: var(--primary); }
+      [data-tone="success"] { --tone: var(--success); }
+      [data-tone="warning"] { --tone: var(--warning); }
+      [data-tone="destructive"] { --tone: var(--destructive); }
+      [data-tone="info"] { --tone: var(--info); }
+      [data-tone="pending"] { --tone: var(--pending); }
+      [data-tone="muted"] { --tone: var(--muted-foreground); }
+      /* WP1 · F6 motion: the kill switch stops transitions too */
+      html.anim-off *, html.anim-off *::before, html.anim-off *::after {
+        animation: none !important; transition: none !important;
+      }
+    </style>
+    <!-- WP1 · F5 element defaults + F8 text colour, base.css. Only in the full rendering: a
+         tokens-only surface does not load base.css, and ?bare must show exactly that. -->
+    <style id="standin-wp1-base" media="not all">
+      code, kbd, samp, pre { font: inherit; font-size: var(--fs-base); }
+      pre { line-height: var(--lh-base); }
+      :where(:not(pre) > code, kbd) {
+        padding: 0.05rem 0.35rem; background: var(--muted); border: 1px solid var(--border); overflow-wrap: anywhere;
+      }
+      :where(pre) {
+        margin: 0; padding: 0.75rem 1rem; overflow-x: auto; background: var(--muted); border: 1px solid var(--border); tab-size: 2;
+      }
+      :where(pre code) { padding: 0; background: none; border: 0; }
+      :where(mark) { background: color-mix(in srgb, var(--warning) 30%, transparent); color: var(--foreground); }
+      :where(hr) { border: 0; border-top: 1px solid var(--border); margin-block: 1.5rem; }
+      :where(blockquote) {
+        margin: 0; padding-inline-start: 0.75rem; border-inline-start: 2px solid var(--border); color: var(--muted-foreground);
+      }
+      :where(blockquote cite) { display: block; margin-top: 0.4rem; font-style: normal; }
+      :where(figure) { margin: 0; }
+      .text-muted-foreground { color: var(--muted-foreground); }
+    </style>
+    <!-- WP4 · I1 glyphs: the --ico-<word> masks this page needs, the [data-icon] → --ico mapping and
+         the .ico class. The script fills in ONLY the pieces that are missing and names them. -->
+    <style id="standin-wp4" media="not all"></style>
+    <!-- WP5 · C2 .btn-icon — what the copy buttons and the section-head toggle need -->
+    <style id="standin-wp5" media="not all">
+      .btn-icon {
+        position: relative; display: inline-grid; place-items: center; place-content: center; box-sizing: border-box;
+        inline-size: var(--control-h); block-size: var(--control-h); margin: 0; padding: 0; font: inherit;
+        vertical-align: middle; color: var(--btn-icon-color, var(--primary)); background: transparent;
+        border: 1px solid var(--control-edge); cursor: pointer;
+        transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+      }
+      .btn-icon[data-icon]::before {
+        content: ""; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor;
+        -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
+      }
+      .btn-icon:where(:not(:disabled, [aria-disabled="true"]):hover, [aria-expanded="true"], [aria-pressed="true"]) {
+        border-color: currentColor; background: color-mix(in srgb, currentColor 12%, transparent);
+      }
+      .btn-icon--sm { inline-size: 1.5rem; block-size: 1.5rem; }
+      .btn-icon--sm[data-icon]::before { inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+      .btn-icon--bare { --btn-icon-color: var(--muted-foreground); border-color: transparent; }
+      .btn-icon--bare:where(:not(:disabled, [aria-disabled="true"]):hover, [aria-expanded="true"], [aria-pressed="true"]) {
+        --btn-icon-color: var(--primary); border-color: transparent; background: var(--muted);
+      }
+      .btn-icon:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+      .btn-icon:is(:disabled, [aria-disabled="true"]) { opacity: 0.45; cursor: default; }
+      @media (pointer: coarse) { .btn-icon { min-inline-size: 44px; min-block-size: 44px; } }
+      @media print { .btn-icon { display: none !important; } }
+    </style>
+
+    <style>
+      /* Page-only layout. Nothing here styles a class content.css ships, so every measurement of
+         one is a measurement of content.css. It sets the body font and colours itself, because in
+         ?bare base.css is not loaded — which is exactly what a tokens-only surface does. */
+      body {
+        margin: 0; font-family: var(--font-mono); font-size: var(--fs-base); line-height: var(--lh-base);
+        background: var(--background); color: var(--foreground);
+      }
+      .demo-main { max-width: 64rem; margin-inline: auto; padding: 1.5rem 1.5rem 6rem; }
+      .demo-head {
+        position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center;
+        gap: 0.5rem 1rem; padding: 0.6rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border);
+      }
+      .demo-head h1 { margin: 0; font-size: var(--fs-base); font-weight: 700; }
+      .demo-head .spacer { flex: 1; }
+      .demo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+      .demo-btn {
+        font: inherit; padding: 0.2rem 0.5rem; color: var(--muted-foreground); background: none;
+        border: 1px solid var(--border); cursor: pointer; text-decoration: none;
+      }
+      .demo-btn[aria-pressed="true"] { color: var(--primary); border-color: var(--primary); }
+      .demo-note { color: var(--muted-foreground); }
+      .demo-section { margin-top: 2.5rem; }
+      .demo-section > h2 { margin: 0 0 0.25rem; font-size: var(--fs-lg); font-weight: 700; }
+      .demo-intro { margin: 0 0 0.75rem; color: var(--muted-foreground); max-width: 80ch; }
+      .demo-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr)); }
+      .demo-cell { border: 1px solid var(--border); padding: 0.75rem; min-width: 0; }
+      /* :where() — zero specificity, so this page's own spacing never outranks a class under test. */
+      :where(.demo-cell > * + *) { margin-top: 0.6rem; }
+      .demo-cap { margin: 0 0 0.35rem; color: var(--muted-foreground); font-style: italic; }
+      .demo-frame { border: 1px dashed var(--border); padding: 1.5rem; min-width: 0; }
+      .demo-frame[data-surface="card"] { background: var(--card); }
+      .demo-frame[data-surface="muted"] { background: var(--muted); }
+      .demo-card { background: var(--card); border: 1px solid var(--border); padding: 0.75rem; }
+      :where(.demo-stack > * + *) { margin-top: 0.75rem; }
+      /* ?bare drops chrome.css and components.css, which own .doc-link and .link-quiet; a tokens-only
+         surface colours its own links, and so does this page there. */
+      html[data-bare] :is(.doc-link, .link-quiet) { color: var(--muted-foreground); }
+      html[data-bare] .doc-link--forward { color: var(--primary); }
+    </style>
+  </head>
+  <body>
+    <script>
+      /* Switch on each stand-in only where the real thing is missing, and say which are in force.
+         `?bare` first drops the data-full stylesheets and marks the page. */
+      (() => {
+        const root = document.documentElement;
+        const bare = new URLSearchParams(location.search).has("bare");
+        if (bare) {
+          document.querySelectorAll("link[data-full]").forEach((link) => link.remove());
+          root.dataset.bare = "";
+        }
+        const token = (name) => getComputedStyle(root).getPropertyValue(name).trim() !== "";
+        const probe = (html, test) => {
+          const host = document.createElement("div");
+          host.innerHTML = html;
+          document.body.append(host);
+          const ok = test(host.firstElementChild);
+          host.remove();
+          return ok;
+        };
+        /* lucide 0.559.0 path data (ISC), the same drawings WP1/WP4 generate their tokens from. */
+        const ICONS = {
+          copy: "<rect width='14' height='14' x='8' y='8' rx='2' ry='2'/><path d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/>",
+          check: "<path d='M20 6 9 17l-5-5'/>",
+          x: "<path d='M18 6 6 18'/><path d='m6 6 12 12'/>",
+          home: "<path d='M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8'/><path d='M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/>",
+          package: "<path d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/><path d='M12 22V12'/><polyline points='3.29 7 12 12 20.71 7'/><path d='m7.5 4.27 9 5.15'/>",
+          "chevrons-up-down": "<path d='m7 15 5 5 5-5'/><path d='m7 9 5-5 5 5'/>",
+        };
+        const url = (body) => "url(\"data:image/svg+xml," + encodeURIComponent(
+          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' " +
+          "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" + body + "</svg>") + "\")";
+        const glyphs = [];
+        let css = "";
+        const missingTokens = Object.keys(ICONS).filter((name) => !token("--ico-" + name));
+        if (missingTokens.length) {
+          css += ":root {" + missingTokens.map((n) => "--ico-" + n + ": " + url(ICONS[n]) + ";").join("") + "}";
+          glyphs.push("--ico-" + missingTokens.join(" --ico-"));
+        }
+        if (!probe('<i data-icon="check"></i>', (el) => getComputedStyle(el).getPropertyValue("--ico").trim() !== "")) {
+          css += Object.keys(ICONS).map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
+          glyphs.push("[data-icon] mapping");
+        }
+        if (!probe('<span class="ico"></span>', (el) => getComputedStyle(el).display === "inline-block")) {
+          css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
+            " vertical-align: -0.125em; background: var(--tone, currentColor);" +
+            " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
+            ".ico--sm { inline-size: var(--icon-sm); block-size: var(--icon-sm); }" +
+            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }";
+          glyphs.push(".ico");
+        }
+        document.getElementById("standin-wp4").textContent = css;
+
+        const inForce = [];
+        const use = (id, missing, what) => {
+          if (!missing) return;
+          document.getElementById(id).media = "all";
+          inForce.push(what);
+        };
+        use("standin-wp1-tokens", !token("--fs-display"), "WP1 tokens (--fs-display, F1, F2, F6, F7)");
+        use("standin-wp1-base", !bare && probe("<code>x</code>", (el) => getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)"),
+          "WP1 base.css (F5, F8)");
+        use("standin-wp4", glyphs.length > 0, "WP4 " + glyphs.join(", "));
+        use("standin-wp5", !probe('<button class="btn-icon"></button>', (el) => getComputedStyle(el).display === "inline-grid"),
+          "WP5 .btn-icon");
+        root.dataset.standins = inForce.join(" · ") || "none";
+      })();
+    </script>
+
+    <header class="demo-head">
+      <h1>WP12 · typography and content</h1>
+      <span class="spacer"></span>
+      <span class="demo-row" role="group" aria-label="theme">
+        <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
+        <button type="button" class="demo-btn" data-theme-pick="green">green</button>
+        <button type="button" class="demo-btn" data-theme-pick="mono">mono</button>
+        <button type="button" class="demo-btn" data-theme-pick="paper">paper</button>
+      </span>
+      <a class="demo-btn" id="bare-link" href="?bare">tokens only</a>
+      <span class="demo-note">stand-ins in force: <span id="standins"></span></span>
+    </header>
+
+    <main class="demo-main">
+      <p class="demo-intro">
+        Every element of spec entries P1–P10 and S9 in every state it has at rest. The page loads
+        tokens.css and content.css; reset, base, components and chrome only for the surrounding markup
+        the examples borrow. Open it with <code>?bare</code> for the tokens-only rendering. Hover,
+        focus, print and a coarse pointer are asserted by <code>scripts/check-content.mjs</code>, the
+        copy runtime by <code>scripts/check-copy.mjs</code>.
+      </p>
+
+      <!-- ── P1 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p1">
+        <h2>P1 · .page-title and .lede</h2>
+        <p class="demo-intro">An app view title is <code>--fs-2xl</code> at every width; a public site's
+          page title is <code>.page-title--display</code>, 30px and 36px from 48rem (lead ruling).</p>
+        <div class="demo-grid">
+          <div class="demo-frame" id="p1-app">
+            <p class="demo-cap">app view — .page-title</p>
+            <p class="prompt">ls ~/automation/review</p>
+            <h1 class="page-title">review<span class="cursor-block" aria-hidden="true"></span></h1>
+            <p class="lede">Every pull request the reviewers have seen, and what they said about it.</p>
+          </div>
+          <div class="demo-frame" id="p1-display">
+            <p class="demo-cap">public page — .page-title--display</p>
+            <p class="prompt">cat ~/about.txt</p>
+            <h1 class="page-title page-title--display">about<span class="cursor-block" aria-hidden="true"></span></h1>
+            <p class="lede">Engineer in São Paulo. I build terminal-flavoured tools for my own infrastructure.</p>
+          </div>
+          <div class="demo-frame" id="p1-glyph" data-surface="card">
+            <p class="demo-cap">a leading glyph, on --card</p>
+            <h1 class="page-title"><span class="ico" data-icon="home" aria-hidden="true"></span>~ (global)</h1>
+            <p class="lede">Global configuration applied to all AI agent tools across your system.</p>
+          </div>
+          <div class="demo-frame" id="p1-long" data-surface="muted">
+            <p class="demo-cap">a long token wraps anywhere, on --muted</p>
+            <h1 class="page-title page-title--display">@danieldeusing/design/runtime/copy.js</h1>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── P2 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p2">
+        <h2>P2 · .eyebrow</h2>
+        <div class="demo-grid">
+          <div class="demo-cell">
+            <h3 class="eyebrow" id="eyebrow-plain">install</h3>
+            <p>Body size, 500, upper case by CSS, .05em, muted. It sets no margin — the cell spaces it.</p>
+          </div>
+          <div class="demo-cell">
+            <p class="eyebrow" data-tone="warning" id="eyebrow-warning">untrusted</p>
+            <p class="eyebrow" data-tone="primary" id="eyebrow-primary">settings</p>
+            <p class="eyebrow" data-tone="success">installed</p>
+          </div>
+          <div class="demo-cell">
+            <h2 class="eyebrow comment" id="eyebrow-comment">overview</h2>
+            <p>With <code>.comment</code>, the <code># </code> prefix in <code>--border</code> precedes it.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── P3 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p3">
+        <h2>P3 · .section-head and .subhead</h2>
+        <div class="demo-stack">
+          <div class="section-head" id="head-link">
+            <h2 class="prompt">whoami</h2>
+            <a class="doc-link doc-link--forward" href="#p3">man daniel →</a>
+          </div>
+          <div class="section-head" id="head-time">
+            <h2 class="prompt">cat ~/briefs/latest.md</h2>
+            <time datetime="2026-09-28">28 Sep 2026</time>
+          </div>
+          <div class="section-head" id="head-button">
+            <h3 class="prompt">cat README.md</h3>
+            <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="chevrons-up-down"
+                    aria-expanded="false" aria-label="show full content"></button>
+          </div>
+          <div style="max-width: 18rem" class="demo-frame">
+            <div class="section-head" id="head-narrow">
+              <h2 class="prompt">a section name long enough to fill the row</h2>
+              <a class="doc-link doc-link--forward" href="#p3">open →</a>
+            </div>
+          </div>
+          <div class="demo-cell" id="subheads">
+            <h3 class="subhead">first sub-head — flush with its container</h3>
+            <p>Text under the first sub-head.</p>
+            <h3 class="subhead">second sub-head — 1.4rem above, .3rem below</h3>
+            <p>Text under the second sub-head.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── P4 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p4">
+        <h2>P4 · .markdown, and lists outside it</h2>
+        <div class="demo-grid">
+          <article class="markdown demo-cell" id="md-article">
+            <h1>seedr</h1>
+            <p>A registry for <strong>skills</strong>, agents and <a href="#p4">MCP servers</a>. Install one with <code>seedr add review</code> and copy with <kbd>⌘C</kbd>.</p>
+            <h2>install</h2>
+            <ul>
+              <li>macOS: through brew
+                <ul><li>or the release tarball</li></ul>
+              </li>
+              <li>anywhere else: npm</li>
+            </ul>
+            <ol>
+              <li>clone the repository</li>
+              <li>run the build</li>
+            </ol>
+            <h3>configuration</h3>
+            <blockquote><p>A skill is a folder with a SKILL.md in it.</p><cite>— the registry docs</cite></blockquote>
+            <pre><code>npm install -g @danieldeusing/seedr</code></pre>
+            <h4>notes</h4>
+            <p><del>seedr sync</del> is gone; <mark>seedr pull</mark> replaces it.</p>
+            <hr />
+            <p>An image stays inside the column:</p>
+            <img alt="a placeholder chart" width="480" height="120"
+                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 120'%3E%3Crect width='480' height='120' fill='%23888' fill-opacity='.15'/%3E%3Cpath d='M0 100 L80 70 L160 80 L240 40 L320 55 L400 20 L480 30' fill='none' stroke='%23888' stroke-width='3'/%3E%3C/svg%3E" />
+          </article>
+          <div class="markdown text-muted-foreground demo-cell" id="md-embedded" data-surface="card">
+            <h2>README.md (embedded)</h2>
+            <p>A document inside a detail view is quieter: the container adds <code>.text-muted-foreground</code>,
+              and <strong>headings and strong</strong> return to the foreground colour.</p>
+            <ul><li>one</li><li>two</li></ul>
+            <p><a href="#p4">a link</a> is still the accent, underlined at rest.</p>
+          </div>
+        </div>
+        <div class="demo-grid" style="margin-top: 0.75rem">
+          <div class="demo-cell">
+            <p class="demo-cap">ol.steps</p>
+            <ol class="steps" id="list-steps">
+              <li>Clone the repository.</li>
+              <li>Run <code>npm run build</code>.</li>
+              <li>Push; the push is the release.</li>
+            </ol>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">ul.plain</p>
+            <ul class="plain" id="list-plain">
+              <li>cockpit</li>
+              <li>netmon</li>
+              <li>docs</li>
+            </ul>
+          </div>
+          <div class="demo-cell" style="max-width: 22rem">
+            <p class="demo-cap">ul.dash — mixed inline content stays one line of text</p>
+            <ul class="dash" id="list-dash">
+              <li>Led the <strong>migration</strong> of <code>@danieldeusing/design</code> to a <a class="link-quiet" href="#p4">single release</a>.</li>
+              <li>A long item that has to wrap, and its second line hangs under the text rather than under the dash.</li>
+              <li>short</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── P5 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p5">
+        <h2>P5 · .code-block, .code-view, syntax tokens, diff lines</h2>
+        <div class="demo-grid">
+          <div class="demo-cell">
+            <p class="demo-cap">.code-block (scrolls sideways)</p>
+            <pre class="code-block" id="code-plain" tabindex="0">git commit -F "$msgfile" -- HANDOFF.md SESSIONLOG.md   # a pathspec, never git add -A
+git push</pre>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">.code-block--wrap</p>
+            <pre class="code-block code-block--wrap" id="code-wrap">Failed to fetch PAT user login: network fetch failed ... api.porscheholding.ghe.com/very/long/unbreakable/path/that/wraps/anywhere</pre>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">.code-block--scroll (--code-max-h: 6rem)</p>
+            <pre class="code-block code-block--scroll" id="code-scroll" tabindex="0" style="--code-max-h: 6rem">line 1
+line 2
+line 3
+line 4
+line 5
+line 6
+line 7
+line 8
+line 9</pre>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">a div.code-block (no base.css pre behind it)</p>
+            <div class="code-block" id="code-div">{ "div": "renders as code too" }</div>
+          </div>
+        </div>
+        <div class="demo-grid" style="margin-top: 0.75rem">
+          <div class="demo-cell">
+            <p class="demo-cap">.code-view — gutter, tokens, a wrapped line</p>
+<pre class="code-block code-view" id="code-view" style="--code-gutter: 3ch" tabindex="0" role="region" aria-label="package.json"><code><span class="line"><span class="tok-punct">{</span>
+</span><span class="line">  <span class="tok-key">"name"</span><span class="tok-punct">:</span> <span class="tok-string">"@danieldeusing/design"</span><span class="tok-punct">,</span>
+</span><span class="line">  <span class="tok-key">"version"</span><span class="tok-punct">:</span> <span class="tok-number">60</span><span class="tok-punct">,</span>
+</span><span class="line">  <span class="tok-key">"private"</span><span class="tok-punct">:</span> <span class="tok-literal">false</span><span class="tok-punct">,</span>
+</span><span class="line">  <span class="tok-comment">// a comment long enough to wrap: the continuation stays right of the gutter, never under the number</span>
+</span><span class="line">  <span class="tok-keyword">export</span> <span class="tok-heading">default</span>
+</span><span class="line"><span class="tok-punct">}</span>
+</span></code></pre>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">diff lines</p>
+<pre class="code-block" id="code-diff"><span class="diff-meta">--- a/src/content.css</span>
+<span class="diff-meta">+++ b/src/content.css</span>
+<span class="diff-hunk">@@ -1,3 +1,4 @@</span>
+ .page-title {
+<span class="diff-del">-  font-size: 3rem;</span>
+<span class="diff-add">+  font-size: var(--fs-2xl);</span>
+<span class="diff-add">+  color: var(--primary);</span>
+ }</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── P6 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p6">
+        <h2>P6 · .cmd</h2>
+        <div class="demo-grid">
+          <div class="demo-cell">
+            <p class="eyebrow">install</p>
+            <div class="cmd" id="cmd-one">
+              <code class="cmd-text">npm install -g @danieldeusing/seedr</code>
+              <button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy aria-label="copy install command"></button>
+            </div>
+          </div>
+          <div class="demo-cell" style="max-width: 20rem">
+            <p class="eyebrow">a long command wraps before the button</p>
+            <div class="cmd" id="cmd-long">
+              <code class="cmd-text">npx --yes @danieldeusing/design@0.60.0/scripts/check-release.mjs --next</code>
+              <button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy aria-label="copy release check"></button>
+            </div>
+          </div>
+          <div class="demo-cell">
+            <p class="eyebrow">several lines — the button sits at the top</p>
+            <div class="cmd" id="cmd-multi">
+              <pre class="cmd-text">cd ~/Work/danieldeusing/danieldeusing-design
+npm run build &amp;&amp; npm run check:release
+git push</pre>
+              <button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy aria-label="copy release commands"></button>
+            </div>
+          </div>
+          <div class="demo-cell">
+            <p class="eyebrow">inline — code, then a button with the value</p>
+            <p id="cmd-inline">Restart it with <code>bin/hermes poi start</code>
+              <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="copy" data-copy="bin/hermes poi start" aria-label="copy start command"></button></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── P7 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p7">
+        <h2>P7 · copy button [data-copy]</h2>
+        <p class="demo-intro">The states are set by <code>runtime/copy.js</code> for 2000ms after a press;
+          the first row shows them fixed. Press any button in the second row.</p>
+        <div class="demo-grid">
+          <div class="demo-cell">
+            <p class="demo-cap">icon button — at rest, copied, failed</p>
+            <div class="demo-row" id="states-icon">
+              <button type="button" class="btn-icon" data-icon="copy" data-copy="at rest" aria-label="copy at rest"></button>
+              <button type="button" class="btn-icon" data-icon="copy" data-copy="copied" data-state="copied" aria-label="copy (shown copied)"></button>
+              <button type="button" class="btn-icon" data-icon="copy" data-copy="failed" data-state="failed" aria-label="copy (shown failed)"></button>
+              <button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy="at rest" aria-label="copy bare at rest"></button>
+              <button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy="copied" data-state="copied" aria-label="copy bare (shown copied)"></button>
+              <button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy="failed" data-state="failed" aria-label="copy bare (shown failed)"></button>
+            </div>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">text button — at rest, copied, failed</p>
+            <div class="demo-row" id="states-text">
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-copy="x">copy</button>
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-copy="x" data-state="copied" aria-label="copy">copied</button>
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-copy="x" data-state="failed" aria-label="copy">copy failed</button>
+            </div>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">live — a literal, another element's text, the text form</p>
+            <div class="demo-row" id="copy-live">
+              <button type="button" class="btn-icon" data-icon="copy" id="copy-literal" data-copy="docker compose up -d" aria-label="copy compose command"></button>
+              <button type="button" class="btn-icon" data-icon="copy" id="copy-from" data-copy data-copy-from="#file-body" aria-label="copy file body"></button>
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="copy-text" data-copy="npm run build">copy</button>
+            </div>
+            <pre class="code-block" id="file-body">name: poi
+context: vu3
+</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── P8 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p8">
+        <h2>P8 · .meta and the quiet-text rule</h2>
+        <div class="demo-grid">
+          <div class="demo-cell">
+            <p class="demo-cap">an article's meta line</p>
+            <p class="meta" id="meta-article"><time datetime="2026-09-02">02 Sep 2026</time><span class="meta-sep" aria-hidden="true">·</span><a class="doc-link" href="#p8">by Daniel Deusing</a><span class="meta-sep" aria-hidden="true">·</span><span>~6 min read</span></p>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">key and value — .meta-val</p>
+            <p class="meta" id="meta-kv"><span>version <span class="meta-val">0.60.0</span></span><span class="meta-sep" aria-hidden="true">·</span><span>source <span class="meta-val">official</span></span></p>
+          </div>
+          <div class="demo-cell">
+            <p class="demo-cap">stats — glyph + count (the glyph is 12px whatever class it carries)</p>
+            <p class="meta" id="meta-stats">
+              <span class="meta-stat"><span class="ico" data-icon="package" aria-hidden="true" style="color: var(--cat-teal)"></span>12</span>
+              <span class="meta-stat"><span class="ico ico--sm" data-icon="copy" aria-hidden="true" style="color: var(--cat-violet)"></span>1,204</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── P9 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p9">
+        <h2>P9 · .seq-nav</h2>
+        <div style="max-width: 36rem">
+          <nav class="seq-nav card-terminal" aria-labelledby="seq-label" id="seq">
+            <p class="eyebrow" id="seq-label">in this series</p>
+            <ol class="seq-list">
+              <li><span class="seq-num">part 1</span><a href="#p9">AI agents play fantasy football</a></li>
+              <li><span class="seq-num">part 2</span><a href="#p9" aria-current="page">What the agents got wrong about waivers, and why a long title wraps under itself</a></li>
+              <li><span class="seq-num">part 3</span><a href="#p9">The season ends</a></li>
+            </ol>
+          </nav>
+        </div>
+      </section>
+
+      <!-- ── P10 ────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="p10">
+        <h2>P10 · .boot-log</h2>
+        <div class="boot-log card-terminal" id="boot">
+          <p class="boot-note">Last login: <time datetime="2026-09-28">today</time> · from a browser near you</p>
+          <p class="boot-line"><span class="boot-step">init timezone</span><span class="boot-val">America/Sao_Paulo · 14:03:12 BRT (UTC−3)</span></p>
+          <p class="boot-line"><span class="boot-step">mount data</span><span class="boot-val">/home/danieldeusing</span></p>
+          <p class="boot-line"><span class="boot-step">build animations</span><span class="boot-val"><button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations"><span data-anim-box aria-hidden="true">[x]</span> anim</button></span></p>
+          <p class="boot-line"><span class="boot-step">secure network</span><span class="boot-val">no trackers, no cookies</span></p>
+          <p class="boot-note">welcome, visitor.</p>
+        </div>
+      </section>
+
+      <!-- ── S9 ─────────────────────────────────────────────────────────────── -->
+      <section class="demo-section" id="s9">
+        <h2>S9 · the error page (templates/error-page.html)</h2>
+        <p class="demo-intro">The body of the template, both variants. The status line is
+          <code>.page-title--display</code> (lead ruling), and the way out sits 1.5rem under the lede.</p>
+        <div class="demo-grid">
+          <div class="demo-frame" id="s9-404">
+            <p class="prompt">articles/no-such-post</p>
+            <h1 class="page-title page-title--display">404: command not found<span class="cursor-block" aria-hidden="true"></span></h1>
+            <p class="lede">no such file or directory.</p>
+            <p style="margin-block-start: 1.5rem"><a class="link-quiet" href="#s9">cd ~</a></p>
+          </div>
+          <div class="demo-frame" id="s9-crash">
+            <div role="alert">
+              <p class="prompt">skills/review</p>
+              <h1 class="page-title page-title--display">something broke<span class="cursor-block" aria-hidden="true"></span></h1>
+              <p class="lede">Cannot read properties of undefined (reading 'files')</p>
+              <p style="margin-block-start: 1.5rem"><button type="button" class="btn-terminal btn-terminal--compact" data-reload>reload</button></p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { initCopyButtons } from "../runtime/copy.js";
+      import { initAnimToggle } from "../runtime/anim.js";
+
+      initCopyButtons();
+      initAnimToggle();
+
+      const root = document.documentElement;
+      document.getElementById("standins").textContent = root.dataset.standins;
+      const bareLink = document.getElementById("bare-link");
+      if ("bare" in root.dataset) { bareLink.href = "?"; bareLink.textContent = "full page"; }
+
+      const picks = [...document.querySelectorAll("[data-theme-pick]")];
+      const mark = () => picks.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themePick === root.dataset.theme)));
+      picks.forEach((b) => b.addEventListener("click", () => {
+        root.dataset.theme = b.dataset.themePick;
+        try { localStorage.setItem("theme", b.dataset.themePick); } catch {}
+        mark();
+      }));
+      mark();
+    </script>
+  </body>
+</html>

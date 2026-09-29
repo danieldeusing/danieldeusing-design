@@ -37,8 +37,11 @@
         --ico-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 7-7 7 7M12 19V5'/%3E%3C/svg%3E");
         --ico-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M19 12l-7 7-7-7'/%3E%3C/svg%3E");
         --ico-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z'/%3E%3C/svg%3E");
-        --ico-git-branch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9'/%3E%3C/svg%3E");
+        --ico-file: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5'/%3E%3C/svg%3E");
+        --ico-folder: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
       }
+      /* X3 · the ONE [hidden] rule, which WP1 adds to tokens.css. Until then this page carries it. */
+      [hidden]:not([hidden="until-found"]) { display: none !important; }
     </style>
 
     <link rel="stylesheet" href="../src/tokens.css" />
@@ -65,7 +68,8 @@
       /* WP4 · I1 the .ico glyph span */
       .ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
       .ico[data-icon="star"] { --ico: var(--ico-star); }
-      .ico[data-icon="git-branch"] { --ico: var(--ico-git-branch); }
+      .ico[data-icon="file"] { --ico: var(--ico-file); }
+      .ico[data-icon="folder"] { --ico: var(--ico-folder); }
     </style>
     <style id="preview-wp3-doclink">
       /* WP3 · C16 a text action on a <button> */
@@ -91,6 +95,8 @@
       .demo-card h3 { font-size: var(--fs-base); margin: 0; }
       .demo-card .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted-foreground); }
       .theme-bar { display: flex; align-items: center; gap: 0.75rem; }
+      .sticky-demo { max-block-size: 14rem; overflow: auto; padding: 0 0.75rem; border: 1px solid var(--border); }
+      .sticky-rows { list-style: none; margin: 0; padding: 0 0 0.75rem; display: grid; gap: 0.35rem; color: var(--muted-foreground); }
     </style>
   </head>
 
@@ -143,10 +149,27 @@
           <span class="sep" aria-hidden="true"></span>
           <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="refresh">refresh</button>
         </search>
-        <div class="filter-chips" id="in-force" aria-label="filters in force"></div>
+        <div class="filter-chips" id="in-force" role="group" aria-label="filters in force"></div>
         <p class="result-count" role="status" id="count"></p>
         <ul class="demo-list" id="list"></ul>
         <p class="load-more" id="more"></p>
+      </section>
+
+      <!-- ── M7 --sticky: the bar stays while the list scrolls ───────────────────── -->
+      <section class="demo">
+        <p class="prompt">man filter-bar --sticky</p>
+        <p class="lede"><code>.filter-bar--sticky</code> pins the bar at <code>--sticky-top</code> on an opaque <code>--background</code>. Scroll the box: the rows pass under the bar, never through it.</p>
+        <div class="sticky-demo" tabindex="0" role="region" aria-label="hosts, under a sticky filter bar">
+          <search class="filter-bar filter-bar--sticky" aria-label="hosts">
+            <div class="search-field">
+              <input type="search" aria-label="search hosts" placeholder="search…" autocomplete="off" spellcheck="false" data-1p-ignore />
+              <button type="button" class="search-clear" aria-label="clear search" hidden></button>
+            </div>
+            <span class="filter-bar-spacer"></span>
+            <select data-filter aria-label="role"><option value="">all</option><option value="edge">edge</option><option value="compute">compute</option></select>
+          </search>
+          <ul class="sticky-rows" id="sticky-rows"></ul>
+        </div>
       </section>
 
       <!-- ── M4 search field states ─────────────────────────────────────────────── -->
@@ -161,6 +184,8 @@
             <div class="search-field" data-pending style="--pending-ms: 600000ms"><input type="search" aria-label="search, pending" value="revi" /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
           <div class="state"><span class="label">disabled</span>
             <div class="search-field"><input type="search" aria-label="search, disabled" placeholder="search…" disabled /><button type="button" class="search-clear" aria-label="clear search" hidden></button></div></div>
+          <div class="state"><span class="label">disabled, holding a query</span>
+            <div class="search-field"><input type="search" aria-label="search, disabled with a query" value="review" disabled /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
           <div class="state"><span class="label">with a match count</span>
             <div class="row" style="gap: 0.5rem"><div class="search-field"><input type="search" aria-label="search logs" value="error" /><button type="button" class="search-clear" aria-label="clear search"></button></div><span class="match-count" role="status">3/17</span></div></div>
         </div>
@@ -181,7 +206,7 @@
           <div class="state"><span class="label">long list: a search row</span>
             <select data-filter aria-label="model" id="f-model"></select></div>
           <div class="state"><span class="label">option icons · invalid (C8)</span>
-            <select aria-label="branch" aria-invalid="true"><option data-icon="git-branch">main</option><option data-icon="git-branch">wp6-filters</option><option data-icon="star">release</option></select></div>
+            <select aria-label="kind" aria-invalid="true"><option data-icon="file">skill</option><option data-icon="folder">plugin</option><option data-icon="star">favourite</option></select></div>
         </div>
       </section>
 
@@ -224,7 +249,7 @@
       <!-- ── M9 / M10 / M11 / M12 ────────────────────────────────────────────────── -->
       <section class="demo">
         <p class="prompt">man filter-chips</p>
-        <div class="filter-chips" aria-label="filters in force">
+        <div class="filter-chips" role="group" aria-label="filters in force">
           <button type="button" class="chip chip--remove" aria-label="remove filter source: seedr"><span class="chip-key">source:</span> seedr</button>
           <button type="button" class="chip chip--remove" aria-label="remove filter type: agent"><span class="chip-key">type:</span> agent</button>
           <button type="button" class="doc-link doc-link--forward">reset filters</button>
@@ -283,6 +308,8 @@
       $("#f-label").innerHTML = '<option value="">all</option>' + LABELS.map((l) => `<option value="${l}">${l}</option>`).join("");
       $("#f-model").innerHTML = '<option value="">all</option>' +
         Array.from({ length: 24 }, (_, i) => `<option value="m${i}">model-${String(i + 1).padStart(2, "0")}</option>`).join("");
+      $("#sticky-rows").innerHTML = Array.from({ length: 16 }, (_, i) =>
+        `<li>host-${String(i + 1).padStart(2, "0")} · ${i % 3 ? "compute" : "edge"}</li>`).join("");
 
       const theme = $("#theme");
       theme.value = document.documentElement.dataset.theme || "warm";
@@ -433,7 +460,8 @@
       let active = -1;
       const options = () => [...list.children];
       const highlight = (index) => {
-        options().forEach((row, i) => row.toggleAttribute("data-active", i === index));
+        // "true", never an empty attribute: the system's highlight reads [data-active="true"].
+        options().forEach((row, i) => (i === index ? row.setAttribute("data-active", "true") : row.removeAttribute("data-active")));
         active = index;
         if (index >= 0) cmd.setAttribute("aria-activedescendant", options()[index].id);
         else cmd.removeAttribute("aria-activedescendant");

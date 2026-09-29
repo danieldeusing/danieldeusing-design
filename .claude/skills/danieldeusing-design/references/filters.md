@@ -11,7 +11,7 @@ Contents:
 - The bar they sit in — `.filter-bar`
 - A search box — `.search-field` and `initSearchFields()`
 - A filter — `<select data-filter>`
-- A long list gets a search row — `data-search`
+- A long filter gets a search row — `data-search`
 - A sort — `.sort-ctl` and `initSortControls()`
 - Several values at once — `.chip-set` of `.chip`
 - What is in force — `.filter-chips`
@@ -115,6 +115,9 @@ delegated, so a field rendered later needs nothing.
 - **The clear is there exactly when there is something to clear.** It toggles `hidden` from the
   value on every `input`. A value set FROM CODE fires no `input` — restore a query from the URL and
   set the clear's `hidden` yourself, or the box shows a query with no way to clear it.
+- **…and usable exactly when the box is.** A disabled box that holds a query keeps it visible, and
+  its clear is `disabled` with it (followed when the page switches the box off or on later): it
+  clears nothing and fires nothing.
 - **The clear is a real edit.** It empties the box and dispatches `input` then `change`, bubbling,
   from the input — exactly what a person clearing it by hand produces — and puts focus back in the
   box. A page's handler cannot tell the difference, so there is no second path to drift. A press on
@@ -144,6 +147,8 @@ input.addEventListener("input", () => {
   wrapper and `outline: none` on the input; pagr's `grep` ended up with a box inside a box.
 - `.match-count` ("3/17") sits beside a search that steps through matches. The field is not a live
   region; the count is.
+- A query the page cannot use (a broken regex) is `aria-invalid="true"` on the input: its edge turns
+  `--destructive` and stays so under the pointer and in focus.
 - `data-1p-ignore` because a password manager otherwise offers to fill every filter box on a page.
 
 ## A filter — `<select data-filter>`
@@ -171,6 +176,14 @@ That is all a page writes. `initSelects()` renders seedr's and configr's filter 
 </span>
 ```
 
+> **`span.filter-dd` is built by the runtime, exactly like `span.select-field` inside it.** A renderer
+> that patches the DOM (cockpit's `dom-patch.js`) must treat `.filter-dd` as a SLOT standing in for
+> the `<select>` it holds — as it already treats `.select-field` — and descend to the select, never
+> replace the span. Otherwise "the DOM says `<span>`, my markup says `<select>`" resolves to replace,
+> and a patch landing while the list is open destroys the panel mid-click. A select that is moved out
+> of its wrapper anyway is wrapped again where it lands (the old wrapper is removed), so it never
+> falls back to the OS list — but the open panel is still lost.
+
 - **The `<select>` stays the control.** It holds the value; it fires `input` then `change` on a pick
   and on a clear, bubbling. Listen on it exactly as on any select.
 - **The facet is the select's name** — `aria-label`, `aria-labelledby` or a `<label>` — so write it
@@ -194,25 +207,45 @@ That is all a page writes. `initSelects()` renders seedr's and configr's filter 
   changes nothing; Tab moves on. Focus stays on the trigger; the highlighted row is pointed at with
   `aria-activedescendant`.
 - **This control needs `components.css`**: it is an enhanced select, and the select's wrapper, panel
-  and rows live there. Everything else in `filters.css` works on tokens alone.
+  and rows live there. Everything else in `filters.css` works on tokens alone. Which half of the pair
+  is drawn on top — the focused one above the hovered one — is `.btn-group`'s (`controls.css`).
 
 An `<option data-icon="…">` shows its `.ico` before its label in the row and, while it is the value,
 in the trigger (configr's option icons). `aria-invalid="true"` on the `<select>` is mirrored onto the
 trigger, whose edge turns `--destructive` — the select itself is transparent and hidden from
 assistive technology, so an error pinned to it reaches nobody.
 
-## A long list gets a search row — `data-search`
+## A long filter gets a search row — `data-search`
 
-A list of more than twenty options opens with a search row at the top (configr's threshold); add
-`data-search` to ask for one on a shorter list. It is sticky and opaque, so rows scroll under it.
+A **filter** (`select[data-filter]`) of more than twenty options opens with a search row (configr's
+threshold); `data-search` asks for one on any select, of any length. **A plain select never gets
+one unasked**, however long: it keeps the listbox keys — a typed letter jumps to the first option it
+starts, Home and End move the highlight, Space picks (C8).
 
-- **Opening moves focus into the box**, which carries `aria-controls` (the list) and
-  `aria-activedescendant` (the highlighted row). Typing narrows the rows to labels containing the
-  text, case-insensitively; the "all" row steps aside while anything is typed. The value in force
-  stays highlighted while it matches, otherwise the first match is — so "type, Enter" picks what was
-  narrowed to. "no matches" says so.
+```html
+<div class="select-panel">                              <!-- the popup; it scrolls -->
+  <div class="select-search"><div class="search-field">
+    <input type="search" aria-label="search label" aria-controls="dd-select-4-listbox" aria-activedescendant="dd-select-4-o3">
+  </div></div>
+  <ul class="select-list" role="listbox" id="dd-select-4-listbox" aria-label="label">
+    <li class="select-option" role="option" id="dd-select-4-o3" aria-selected="false">label 2</li> …
+  </ul>
+  <div class="select-empty" hidden>no matches</div>
+</div>
+```
+
+- **The row sits ABOVE the listbox, never in it.** A listbox may own only options and groups; a text
+  box inside one is read as part of the list. So a list with a search row is a `div.select-panel`
+  holding the row, then `ul.select-list[role=listbox]`, then the "no matches" line. The row is
+  sticky and opaque, so rows scroll under it.
+- **Opening moves focus into the box**, which keeps `type="search"` and carries `aria-controls` (the
+  listbox) and `aria-activedescendant` (the highlighted row). Typing narrows the rows to labels
+  containing the text, case-insensitively; the "all" row steps aside while anything is typed. **Once
+  anything is typed, the first match is the highlight** — even when the value in force matches too —
+  so "type, Enter" picks what was narrowed to. "no matches" says so.
 - ↑/↓ move, Enter picks, Escape closes and hands focus back to the trigger, Tab closes and moves on
-  from the trigger. Home and End move the caret, as they do in any text box.
+  from the trigger. Home and End move the caret, as they do in any text box. Only a press on the box
+  itself takes focus; a press anywhere else in the panel leaves it in the box.
 - A letter typed on the closed trigger opens the list with that letter already in the box.
 - The side the list opened on is kept while it shrinks under the typing: re-choosing it would jump
   the box being typed in from one side of the trigger to the other.
@@ -263,7 +296,21 @@ cockpit's said "on" by colour alone.
 - **An identity chip** — a host, a tag, a person, a netmon series — sets `--chip-accent` to one of the
   categorical `--cat-*` colours; hover and pressed then take that hue instead of `--primary`.
 - **A chip that is a link** (pagr's static tag pages) is `<a class="chip" href>`, and the current one
-  wears the pressed look on `aria-current="page"`. It navigates with no JS at all.
+  wears the pressed look on `aria-current="page"`. It navigates with no JS at all. **Never
+  `aria-pressed` on an `<a>`** — a link is not a toggle, and ARIA does not allow it there. When JS
+  runs and the chip starts TOGGLING a filter in place instead of navigating, it becomes a toggle,
+  and says so one of two ways:
+
+  ```html
+  <!-- preferred: the page renders a button once JS is up -->
+  <button type="button" class="chip" aria-pressed="true">#agents</button>
+  <!-- only if it must stay a link (its href is the no-JS fallback): the role, the state, and the
+       key a button answers to — Space, which a link ignores, as well as Enter -->
+  <a class="chip" href="/tags/agents" role="button" aria-pressed="true">#agents</a>
+  ```
+
+  The second form needs its own keydown handler for Space (prevent the page scroll, toggle), and
+  its click handler must `preventDefault()` the navigation.
 - A count inside a pressed chip takes the chip's ink, not muted: `--muted-foreground` on the 12%
   fill measures 3.91:1 on warm. The weight still separates it from the label.
 - A chip's resting edge is the `--border` hairline, like `.btn-terminal--ghost`: its label is what
@@ -273,11 +320,14 @@ cockpit's said "on" by colour alone.
 ## What is in force — `.filter-chips`
 
 ```html
-<div class="filter-chips" aria-label="filters in force">
+<div class="filter-chips" role="group" aria-label="filters in force">
   <button type="button" class="chip chip--remove" aria-label="remove filter source: seedr"><span class="chip-key">source:</span> seedr</button>
   <button type="button" class="doc-link doc-link--forward">reset filters</button>
 </div>
 ```
+
+`role="group"` is what lets the `aria-label` count: on a bare `<div>` a label names nothing and is
+dropped.
 
 seedr's Browse: under the bar, one chip per filter in force, then "reset filters". **The whole chip is
 the remove button** — cockpit's put an unlabelled 9px × inside a chip. Its `aria-label` says what it
@@ -366,11 +416,27 @@ after the table when the table has an `aria-label` or `<caption>`), and each tex
 ## Framework apps, and a surface that loads only tokens
 
 **seedr and configr render the same classes on their own components and keep their own keyboard
-models** — never run `initSelects()` or any other enhancer over nodes React owns. The contract is the
-markup above: `.search-field` with a `hidden` clear, `.select-trigger--filter` with `data-active`
-beside a `.filter-clear`, `.sort-ctl` with `data-dir` named by the next action, `.chip[aria-pressed]`.
-State (URL params, a store) stays the app's.
+models** — never run `initSelects()` or any other enhancer over nodes React owns. State (URL params, a
+store) stays the app's. The contract is the markup the runtime builds, every class of it; a framework
+component renders the same classes on the same roles:
+
+| the part | the markup |
+|---|---|
+| a search box | `div.search-field` > `input[type=search]` + `button.search-clear[aria-label]` — `hidden` while the box is empty, `disabled` while the box is |
+| a filter, closed | `span.filter-dd.btn-group[role=group][aria-label="<facet> filter"]` > `span.select-field` (the `<select>` and its trigger) + `button.filter-clear[aria-label="clear <facet> filter"]` |
+| its trigger | `button.select-trigger.select-trigger--filter[role=combobox][aria-expanded][aria-controls=<listbox id>]`, `data-active="true"` while it filters |
+| the popup, no search row | `ul.select-panel[role=listbox]` |
+| the popup, with one | `div.select-panel` > `div.select-search` (> `div.search-field` > `input[type=search]`), then `ul.select-list[role=listbox]`, then `div.select-empty` ("no matches", `hidden` while anything matches) |
+| a row | `li.select-option[role=option][aria-selected]`, `data-active="true"` on the highlighted one, an `.ico` before the label when the option has an icon |
+| an `<optgroup>` | `div.select-optgroup[role=group][aria-label=<label>]` > `div.select-group[aria-hidden=true]` (the visible heading), then its rows |
+| a sort | `div.sort-ctl.btn-group[role=group]` > `button.sort-dir[data-dir]` named by the NEXT action + the field |
+| several values | `div.chip-set[role=group][aria-label]` of `button.chip[aria-pressed]` |
+
+A listbox owns only options and groups — a framework's search box goes above its listbox, not in it.
 
 **A surface that loads `tokens.css` and `filters.css`, and nothing else, gets working controls** —
-every class here declares its own box, font, edge, focus ring, disabled state and 44px touch target.
-The filter dropdown is the one exception: it needs `components.css`, because it is an enhanced select.
+every class here declares its own box, font, edge, focus ring, disabled state and 44px touch target,
+and draws itself in a forced-colours palette: each glyph in its control's forced colour, a pressed or
+current chip `HighlightText` on `Highlight`, a filtering trigger's edge `Highlight`, disabled
+`GrayText`. The filter dropdown is the one exception: it needs `components.css`, because it is an
+enhanced select — and its search row needs `filters.css`.

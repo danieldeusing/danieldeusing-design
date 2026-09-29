@@ -22,9 +22,11 @@
  *
  * DECORATION, BY CONTRACT: every `.ico` carries aria-hidden="true". The glyph repeats what the
  * label beside it says, or it is a control's only content, and then the CONTROL is named by its
- * aria-label ("remove poi/vu3" — the target, never "trash icon"). A glyph that means something on
- * its own, with no label beside it, is `role="img"` with an aria-label instead. A stylesheet cannot
- * set either attribute; the markup owes both.
+ * aria-label ("remove poi/vu3" — the target, never "trash icon"). A data-tip on that control says
+ * what the name does not, or is left off: tooltip.js makes the tip the control's description, so a
+ * tip that repeats the name is read out twice. A glyph that means something on its own, with no
+ * label beside it, is `role="img"` with an aria-label instead. A stylesheet cannot set either
+ * attribute; the markup owes both.
  *
  * SIZE comes from a token, never from font-size (one text size): 12px `--sm` beside a label, in a
  * tag or chip, on a trigger; 14px default inside a control; 16px `--lg` standalone beside body
@@ -111,14 +113,28 @@
 
 /* FORCED COLOURS (Windows High Contrast) replace every author background with the system Canvas,
    and a mask glyph IS a background: measured in Chromium, every .ico painted nothing at all, which
-   leaves an icon-only link or control as an empty box. A system colour survives the replacement,
-   so the glyph takes CanvasText, the colour the text around it is forced to. Not
-   `forced-color-adjust: none`: that keeps the author's colour, and warm's brown foreground measured
-   1.78:1 on a dark high-contrast palette. The tone goes too, as every colour does in this mode —
-   which is why a tone is never the only thing that says what a glyph means. */
+   leaves an icon-only link or control as an empty box. `preserve-parent-color` gives the glyph the
+   colour its parent was FORCED to — CanvasText in text, LinkText in a link, ButtonText in a button,
+   GrayText when disabled, HighlightText on a selection a component redrew — and leaves the
+   background it paints with alone, so the glyph is its label's colour in this mode too.
+   Not `forced-color-adjust: none` on its own: forcing happens at used-value time and inheritance
+   carries computed values, so the glyph kept the AUTHOR's colour — warm's brown measured 1.78:1 on
+   a dark palette, and green's and mono's glyphs vanished on a light one. An engine without
+   `preserve-parent-color` takes the first rule, CanvasText: always visible, if not always its
+   context's colour. The tone goes as every colour does in this mode, which is why a tone is never
+   the only thing that says what a glyph means. tokens.css gives every component's
+   `[data-icon]::before` glyph the same default. */
 @media (forced-colors: active) {
   .ico,
   .ico[data-tone] {
+    forced-color-adjust: none;
     background: CanvasText;
+  }
+  @supports (forced-color-adjust: preserve-parent-color) {
+    .ico,
+    .ico[data-tone] {
+      forced-color-adjust: preserve-parent-color;
+      background: currentColor;
+    }
   }
 }

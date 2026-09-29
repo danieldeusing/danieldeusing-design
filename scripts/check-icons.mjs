@@ -181,13 +181,56 @@ if (!CHROME) {
 }
 
 // The harness pages exist only in memory; everything else is this checkout, read off the disk.
+const ICONS_CSS = readFileSync(join(root, "src/icons.css"), "utf8");
+// Both files with every `@supports (forced-color-adjust: preserve-parent-color)` block cut out —
+// what an engine without that value sees, so the fallback rule is asserted, not assumed.
+const PRESERVE = "@supports (forced-color-adjust: preserve-parent-color)";
+const withoutPreserve = (css) => {
+  let out = css;
+  for (let at = out.indexOf(PRESERVE); at >= 0; at = out.indexOf(PRESERVE)) {
+    let depth = 0;
+    let i = out.indexOf("{", at);
+    for (; i < out.length; i += 1) {
+      if (out[i] === "{") depth += 1;
+      if (out[i] === "}" && --depth === 0) break;
+    }
+    out = out.slice(0, at) + out.slice(i + 1);
+  }
+  return out;
+};
+const X3_IN_TOKENS = /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important;?\s*\}/.test(TOKENS_CSS);
+const forcedPage = (tokensHref, iconsHref) => `<!doctype html><html data-theme="warm"><head>
+<link rel="stylesheet" href="${tokensHref}"><link rel="stylesheet" href="${iconsHref}">
+<style>
+  body { margin: 0; background: var(--background); color: var(--foreground); font: 12px/1.5 monospace; }
+  p { margin: 6px; }
+  a { color: var(--primary); }
+  button { font: inherit; color: var(--primary); background: var(--card); border: 1px solid var(--control-edge); }
+  .probe { border: 0; padding: 0; background: none; line-height: 0; }
+  .probe[data-icon]::before { content: ""; display: inline-block; inline-size: 24px; block-size: 24px; background: currentColor;
+    -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+  .probe--toned[data-icon]::before { background: var(--tone, var(--primary)); }
+  .probe-selected { display: inline-block; padding: 4px; }
+  @media (forced-colors: active) { .probe-selected { forced-color-adjust: none; background: Highlight; color: HighlightText; } }
+</style></head><body>
+<p id="ctx-text"><span class="ico ico--xl" id="g-text" data-icon="refresh-cw" aria-hidden="true"></span> text</p>
+<p><a href="#x" id="ctx-link"><span class="ico ico--xl" id="g-link" data-icon="external-link" aria-hidden="true"></span> link</a></p>
+<p><button type="button" id="ctx-button"><span class="ico ico--xl" id="g-button" data-icon="download" aria-hidden="true"></span> button</button></p>
+<p><button type="button" id="ctx-disabled" disabled><span class="ico ico--xl" id="g-disabled" data-icon="trash-2" aria-hidden="true"></span> disabled</button></p>
+<p><span class="probe-selected" id="ctx-selected"><span class="ico ico--xl" id="g-selected" data-icon="check" aria-hidden="true"></span> selected</span></p>
+<p id="ctx-toned"><span class="ico ico--xl" id="g-toned" data-tone="destructive" data-icon="circle-x" aria-hidden="true"></span> toned</p>
+<p><button type="button" class="probe" id="g-pseudo" data-icon="refresh-cw" aria-label="refresh the list"></button>
+  <button type="button" class="probe probe--toned" id="g-pseudo-toned" data-tone="warning" data-icon="triangle-alert" aria-label="retry the deploy"></button>
+  <button type="button" class="probe probe--toned" id="g-pseudo-untoned" data-icon="home" aria-label="install for this user"></button>
+  <button type="button" class="probe" id="g-pseudo-disabled" data-icon="trash-2" aria-label="remove poi/vu3" disabled></button></p>
+</body></html>`;
 // A component's state glyph, the way controls.css writes one: set --ico on the element that
 // carries the word. `wrap` puts it in a layer, or leaves it unlayered.
 const STATE_GLYPHS = `.probe[aria-busy="true"] { --ico: var(--ico-loader-circle); }
   .probe[data-icon="star"][aria-pressed="true"] { --ico: var(--ico-star-filled); }`;
 const cascadePage = (head) => `<!doctype html><html data-theme="warm"><head>${head}</head><body>
 <button class="probe" id="idle" data-icon="refresh-cw"></button>
-<button class="probe" id="busy" data-icon="refresh-cw" aria-busy="true"></button>
+<button class="probe" id="busy" data-icon="refresh-cw" aria-busy="true" aria-disabled="true"></button>
 <button class="probe" id="pressed" data-icon="star" aria-pressed="true"></button>
 <span class="u-ico-x" id="utility" data-icon="check"></span>
 </body></html>`;
@@ -205,12 +248,32 @@ const HARNESS = {
 <link rel="stylesheet" href="/src/tokens.css">
 <style>.glyph[data-icon]::before { content: ""; display: inline-block; inline-size: 24px; block-size: 24px;
   background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }</style>
-</head><body><span class="glyph" id="pseudo" data-icon="inbox"></span></body></html>`,
+</head><body><span class="glyph" id="pseudo" data-icon="folder"></span></body></html>`,
+  // X1: a glyph in every context it lives in — text, a link, a button, a disabled button, a
+  // selection a component redrew with system colours, a toned .ico — and a component's
+  // [data-icon]::before glyph drawn the way controls.css and feedback.css draw theirs, painting
+  // currentColor or var(--tone, var(--primary)). The probe buttons carry no border or fill of
+  // their own, so a screenshot of one is the glyph and nothing else.
+  "/__harness/forced.html": forcedPage("/src/tokens.css", "/src/icons.css"),
+  "/__harness/forced-fallback.html": forcedPage("/__harness/tokens-fallback.css", "/__harness/icons-fallback.css"),
+  "/__harness/tokens-fallback.css": withoutPreserve(TOKENS_CSS),
+  "/__harness/icons-fallback.css": withoutPreserve(ICONS_CSS),
+  // X3: `hidden` hides a .ico although .ico sets its own display.
+  "/__harness/hidden.html": `<!doctype html><html data-theme="warm"><head>
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/icons.css">
+${X3_IN_TOKENS ? "" : `<style id="standin-x3">/* STAND-IN for X3's tokens.css rule, which WP1 adds; used only while tokens.css lacks it */
+[hidden]:not([hidden="until-found"]) { display: none !important; }</style>`}
+</head><body><span class="ico" id="shown" data-icon="x" aria-hidden="true"></span>
+<span class="ico" id="hid" data-icon="x" aria-hidden="true" hidden></span></body></html>`,
 };
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript" };
 const server = createServer((req, res) => {
   const pathname = decodeURIComponent(new URL(req.url, "http://x").pathname);
-  if (HARNESS[pathname]) { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(HARNESS[pathname]); return; }
+  if (HARNESS[pathname]) {
+    res.writeHead(200, { "content-type": `${TYPES[extname(pathname)] || "text/html"}; charset=utf-8` });
+    res.end(HARNESS[pathname]);
+    return;
+  }
   const path = normalize(join(root, pathname));
   if (!path.startsWith(root) || !existsSync(path) || statSync(path).isDirectory()) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "content-type": `${TYPES[extname(path)] || "application/octet-stream"}; charset=utf-8` });
@@ -400,19 +463,6 @@ const printAdjust = await evaluate(`(() => { const s = getComputedStyle(document
 await send("Emulation.setEmulatedMedia", { media: "" });
 check("on paper a glyph keeps its paint (print-color-adjust: exact)", printAdjust.includes("exact"), JSON.stringify(printAdjust));
 
-// Forced colours: every author background becomes Canvas, and a mask glyph IS a background.
-for (const scheme of ["light", "dark"]) {
-  await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
-  await sleep(100);
-  const on = await evaluate(`matchMedia("(forced-colors: active)").matches`);
-  const glyph = await inkOf("#size-xl");
-  const link = await inkOf("#icon-only .ico");
-  check(`forced colours (${scheme} palette): a glyph and an icon-only link stay visible (${glyph.strongest.toFixed(2)}:1, ${link.strongest.toFixed(2)}:1)`,
-    on && glyph.inside > 40 && glyph.strongest >= 3 && link.inside > 20 && link.strongest >= 3,
-    `forced=${on} glyph ${JSON.stringify(glyph)} link ${JSON.stringify(link)}`);
-}
-await send("Emulation.setEmulatedMedia", { features: [] });
-
 await load("/examples/icons.html?theme=warm&bare");
 const sheets = await evaluate(`[...document.styleSheets].map((s) => (s.href || "").split("/").pop()).filter(Boolean)`);
 check(`precondition: ?bare loads tokens.css and icons.css and nothing else (${sheets.join(", ")})`,
@@ -423,7 +473,7 @@ await icoChecks("tokens + icons only");
 
 await load("/__harness/tokens-only.html");
 check("with tokens.css alone, a component's ::before glyph reads its mask through data-icon",
-  (await style("#pseudo", "mask-image", "::before")) === await token("--ico-inbox") && (await token("--ico-inbox")) !== "");
+  (await style("#pseudo", "mask-image", "::before")) === await token("--ico-folder") && (await token("--ico-folder")) !== "");
 
 const named = async (value) => {
   for (const w of ["refresh-cw", "loader-circle", "star", "star-filled", "check", "x"]) if (value && value === await token(`--ico-${w}`)) return w;
@@ -438,6 +488,90 @@ for (const [entry, path] of [["Tailwind entry", "/__harness/cascade-tailwind.htm
   check(`${entry}: ...and the pressed favourite shows star-filled`, glyph.pressed === "star-filled", glyph.pressed);
   check(`${entry}: ...and a utility-style override beats it too`, glyph.utility === "x", glyph.utility);
 }
+
+/* ── forced colours (X1): a glyph is its context's forced colour, never Canvas ─────────────────── */
+
+// Chromium replaces every author background with Canvas in this mode, and a mask glyph IS a
+// background. Three things are asserted per glyph, because each catches a different failure:
+//   · it does not compute Canvas — the glyph that vanished (no rule at all);
+//   · it computes its CONTEXT's forced colour — the glyph that `forced-color-adjust: none` alone
+//     leaves in the author's colour, which is never Canvas and so passes the first assertion while
+//     measuring 1.78:1 on a dark palette;
+//   · it renders at 3:1 or better against what is behind it — measured from pixels, not styles.
+const GLYPHS = [
+  ["text", "#g-text", null, "#ctx-text"], ["link", "#g-link", null, "#ctx-link"], ["button", "#g-button", null, "#ctx-button"],
+  ["disabled", "#g-disabled", null, "#ctx-disabled"], ["selected", "#g-selected", null, "#ctx-selected"], ["toned .ico", "#g-toned", null, "#ctx-toned"],
+  ["[data-icon]::before", "#g-pseudo", "::before", "#g-pseudo"], ["toned ::before", "#g-pseudo-toned", "::before", "#g-pseudo-toned"],
+  ["var(--tone, --primary) ::before", "#g-pseudo-untoned", "::before", "#g-pseudo-untoned"], ["disabled ::before", "#g-pseudo-disabled", "::before", "#g-pseudo-disabled"],
+];
+const readGlyphs = () => evaluate(`(() => {
+  const sys = (name) => { const p = document.createElement("span"); p.style.cssText = "forced-color-adjust: none; color: " + name;
+    document.body.append(p); const v = getComputedStyle(p).color; p.remove(); return v; };
+  return { canvas: sys("Canvas"), canvasText: sys("CanvasText"), forced: matchMedia("(forced-colors: active)").matches,
+    glyphs: ${JSON.stringify(GLYPHS)}.map(([name, sel, pseudo, ctx]) => {
+      let back = pseudo ? document.querySelector(sel) : document.querySelector(sel).parentElement;
+      // alpha exactly 0 — not "ends in 0)", which opaque black rgb(0, 0, 0) does; Highlight is translucent
+      const clear = (c) => c === "transparent" || (c.startsWith("rgba(") && c.endsWith(", 0)"));
+      while (back && clear(getComputedStyle(back).backgroundColor)) back = back.parentElement;
+      return { name, paint: getComputedStyle(document.querySelector(sel), pseudo).backgroundColor,
+        context: getComputedStyle(document.querySelector(ctx)).color, behind: back ? getComputedStyle(back).backgroundColor : "none" };
+    }) };
+})()`);
+// `expect` says what each glyph must be painted in; `skip` names glyphs whose rendering is a known
+// limit — printed, not asserted.
+const forcedPass = async ({ path, label, themes, expect, rule, skip = [] }) => {
+  for (const theme of themes) for (const palette of ["light", "dark"]) {
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: palette }] });
+    await load(path);
+    await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
+    const got = await readGlyphs();
+    const where = `${label}, ${theme}, ${palette} palette`;
+    check(`${where}: precondition — forced colours are on`, got.forced);
+    // "Never Canvas" is the rule on Canvas; on the Highlight selection HighlightText may share Canvas's
+    // rgb, so the general statement is: never the colour behind it.
+    const lost = got.glyphs.filter((g) => g.paint === g.behind || (g.behind === got.canvas && g.paint === got.canvas));
+    check(`${where}: no glyph is painted in the colour behind it — Canvas, or the selection's Highlight (${got.glyphs.length} glyphs)`,
+      lost.length === 0 && got.glyphs.every((g) => g.behind !== "none"), lost.map((g) => `${g.name} on ${g.behind}`).join(", "));
+    const wrong = got.glyphs.filter((g) => !expect(g, got));
+    check(`${where}: every glyph is ${rule}`, wrong.length === 0,
+      wrong.map((g) => `${g.name}: ${g.paint} (context ${g.context}, CanvasText ${got.canvasText})`).join("; "));
+    const faint = [];
+    for (const [name, sel] of GLYPHS) {
+      const ink = await inkOf(sel);
+      const reading = `${name} ${ink.inside}px ${ink.strongest.toFixed(2)}:1`;
+      if (skip.includes(name)) { console.log(`      known limit, not asserted — ${where}: ${reading}`); continue; }
+      if (!(ink.inside > 20 && ink.strongest >= 3)) faint.push(reading);
+    }
+    check(`${where}: every glyph renders at 3:1 or better against what is behind it`, faint.length === 0, faint.join("; "));
+  }
+};
+await forcedPass({ path: "/__harness/forced.html", label: "preserve-parent-color", themes: ["warm", "green", "mono", "paper"],
+  rule: "its context's forced text colour", expect: (g) => g.paint === g.context });
+// The fallback, as an engine without preserve-parent-color sees it: the @supports blocks cut out.
+const declares = (css) => /forced-color-adjust:\s*preserve-parent-color/.test(css.replace(/\/\*[\s\S]*?\*\//g, ""));
+check("precondition: the fallback harness declares no preserve-parent-color, and both shipped files do",
+  !declares(HARNESS["/__harness/tokens-fallback.css"]) && !declares(HARNESS["/__harness/icons-fallback.css"]) && declares(TOKENS_CSS) && declares(ICONS_CSS));
+// A CanvasText glyph on a selection a component redrew in Highlight is the fallback's known limit.
+await forcedPass({ path: "/__harness/forced-fallback.html", label: "the fallback", themes: ["warm", "green"],
+  rule: "CanvasText", expect: (g, got) => g.paint === got.canvasText, skip: ["selected"] });
+// Outside forced colours none of it applies: the defaults sit inside the media query.
+await send("Emulation.setEmulatedMedia", { features: [] });
+await load("/__harness/forced.html");
+const normal = await readGlyphs();
+const paintOf = (name) => normal.glyphs.find((g) => g.name === name).paint;
+check("outside forced colours the defaults are inert: a ::before glyph is its button's --primary, a toned one its tone",
+  paintOf("[data-icon]::before") === await evaluate(`M.tok("--primary")`) && paintOf("toned ::before") === await evaluate(`M.tok("--warning")`)
+  && paintOf("text") === await evaluate(`M.tok("--foreground")`), JSON.stringify(normal.glyphs.slice(0, 8).map((g) => `${g.name}: ${g.paint}`)));
+
+/* ── hidden (X3): `hidden` hides a .ico, whose display is its own ──────────────────────────────── */
+
+if (!X3_IN_TOKENS) {
+  console.log("      STAND-IN: tokens.css does not yet carry X3's [hidden] rule (WP1 adds it); the hidden harness");
+  console.log("      carries it, so this asserts that .ico does not defeat that rule — not that the rule exists.");
+}
+await load("/__harness/hidden.html");
+check("precondition: a .ico without `hidden` is displayed (inline-block)", (await style("#shown", "display")) === "inline-block");
+check(`a .ico with \`hidden\` is not displayed${X3_IN_TOKENS ? " — tokens.css alone does it" : " (X3 stand-in)"}`, (await style("#hid", "display")) === "none");
 
 /* ── contrast: a glyph is a graphical object, WCAG 1.4.11 asks 3:1 ────────── */
 

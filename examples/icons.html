@@ -103,7 +103,7 @@
       <!-- ── I1 · the set ──────────────────────────────────────────────── -->
       <section id="set" aria-labelledby="set-h">
         <h2 id="set-h">I1 · the set</h2>
-        <p class="demo-lede">58 lucide 0.559.0 outlines at stroke 2, each at 14px and 24px. The name is the <code>data-icon</code>
+        <p class="demo-lede">The 51 words of the spec's icon table: lucide 0.559.0 outlines at stroke 2, each at 14px and 24px. The name is the <code>data-icon</code>
           word and the token is <code>--ico-&lt;word&gt;</code>.</p>
         <h3>the controls' glyphs <span class="demo-label">· WP1 · C1, C2, C6, M0, M4–M6, M9, S6, and part 1's markup</span></h3>
         <ul class="demo-icons">
@@ -171,16 +171,6 @@
           <li><span class="ico" data-icon="file" aria-hidden="true"></span><span class="ico ico--xl" data-icon="file" aria-hidden="true"></span><code>file</code></li>
           <li><span class="ico" data-icon="panel-left-close" aria-hidden="true"></span><span class="ico ico--xl" data-icon="panel-left-close" aria-hidden="true"></span><code>panel-left-close</code></li>
         </ul>
-        <h3>named by the other packages' markup <span class="demo-label">· WP5 segmented and filter options, WP6 option icons, WP7 empty state, tag and count</span></h3>
-        <ul class="demo-icons">
-          <li><span class="ico" data-icon="git-branch" aria-hidden="true"></span><span class="ico ico--xl" data-icon="git-branch" aria-hidden="true"></span><code>git-branch</code></li>
-          <li><span class="ico" data-icon="code" aria-hidden="true"></span><span class="ico ico--xl" data-icon="code" aria-hidden="true"></span><code>code</code></li>
-          <li><span class="ico" data-icon="file-text" aria-hidden="true"></span><span class="ico ico--xl" data-icon="file-text" aria-hidden="true"></span><code>file-text</code></li>
-          <li><span class="ico" data-icon="type" aria-hidden="true"></span><span class="ico ico--xl" data-icon="type" aria-hidden="true"></span><code>type</code></li>
-          <li><span class="ico" data-icon="inbox" aria-hidden="true"></span><span class="ico ico--xl" data-icon="inbox" aria-hidden="true"></span><code>inbox</code></li>
-          <li><span class="ico" data-icon="bell" aria-hidden="true"></span><span class="ico ico--xl" data-icon="bell" aria-hidden="true"></span><code>bell</code></li>
-          <li><span class="ico" data-icon="lock" aria-hidden="true"></span><span class="ico ico--xl" data-icon="lock" aria-hidden="true"></span><code>lock</code></li>
-        </ul>
       </section>
 
       <!-- ── I1 · sizes ────────────────────────────────────────────────── -->
@@ -197,7 +187,7 @@
         <p id="inline-text">The build <span class="ico" data-icon="circle-check" aria-hidden="true"></span> passed and the deploy
           <span class="ico" data-icon="circle-x" aria-hidden="true"></span> did not: in running text the glyph sits on the x-height.</p>
         <p class="demo-row"><span class="demo-pair"><span class="ico ico--sm" data-icon="clock" aria-hidden="true"></span>3 min ago</span>
-          <span class="demo-pair"><span class="ico ico--sm" data-icon="git-branch" aria-hidden="true"></span>main</span>
+          <span class="demo-pair"><span class="ico ico--sm" data-icon="folder" aria-hidden="true"></span>src</span>
           <span class="demo-pair"><span class="ico ico--sm" data-icon="file-code" aria-hidden="true"></span>12 files</span></p>
       </section>
 
@@ -205,7 +195,9 @@
       <section id="colour" aria-labelledby="colour-h">
         <h2 id="colour-h">I1 · colour: the text's, or its own tone</h2>
         <p class="demo-lede">A glyph is its label's colour. <code>data-tone</code> on the <code>.ico</code> itself paints it in that
-          tone; a tone on a container does not reach it.</p>
+          tone; a tone on a container does not reach it. Under forced colours (Windows High Contrast) every glyph takes the
+          colour its context is forced to — CanvasText, LinkText in a link, ButtonText in a button, GrayText when disabled —
+          and the tone goes, as every colour does in that mode.</p>
         <div class="demo-cols">
           <div class="demo-surface" data-surface="background">
             <p class="demo-label">currentColor, on --background</p>
@@ -244,7 +236,7 @@
               <td><a class="demo-link" href="#i3" aria-label="GitHub profile" id="icon-only"><span class="ico ico--lg" data-icon="github" aria-hidden="true"></span></a></td>
               <td>the LINK is named, for its destination</td></tr>
             <tr><td><code>role="img" aria-label</code> standing alone</td>
-              <td><span class="ico" role="img" aria-label="private" data-icon="lock" id="meaningful"></span></td>
+              <td><span class="ico" role="img" aria-label="passed" data-icon="circle-check" id="meaningful"></span></td>
               <td>a glyph that means something with no word beside it</td></tr>
             <tr><td>a word with no token</td>
               <td><span id="bad-word-host"></span></td>

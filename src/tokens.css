@@ -528,19 +528,19 @@ html.anim-off .cursor-block {
  * through lucide-react, so a mask here and a lucide component there are the same drawing.
  *
  * Source: lucide 0.559.0, the version configr's lucide-react resolves. seedr's resolves 0.575.0,
- * and the two agree on all but two of these drawings byte for byte: `clock` lists its two strokes
- * in the other order (the same picture), and 0.575.0 redrew `git-branch` as a single path, so
- * seedr's <GitBranch> and this mask are two drawings of one idea until both are regenerated from
- * one version. Token names are the estate's `data-icon` words, which are not always lucide's
- * current file names: `filter` is lucide's `funnel` and `home` is its `house` (lucide renamed
- * both and ships the old names as aliases; markup keeps the word a reader expects). `star-filled`
- * is `star` with its fill closed, the pressed state of a favourite toggle. `github` is one of
- * lucide's brand glyphs, which lucide deprecates and drops at 1.0: this token is a copy, so the
- * drop cannot reach it, and a regeneration from lucide 1.x carries this one over unchanged.
+ * and every drawing here is the same there, byte for byte, but one: `clock` lists its two strokes
+ * in the other order, which is the same picture. Token names are the estate's `data-icon` words,
+ * which are not always lucide's current file names: `filter` is lucide's `funnel` and `home` is
+ * its `house` (lucide renamed both and ships the old names as aliases; markup keeps the word a
+ * reader expects). `star-filled` is `star` with its fill closed, the pressed state of a favourite
+ * toggle. `github` is one of lucide's brand glyphs, which lucide deprecates and drops at 1.0: this
+ * token is a copy, so the drop cannot reach it, and a regeneration from lucide 1.x carries this
+ * one over unchanged.
  *
- * THE SET is what a spec entry or a surface's markup names — 58 words — not lucide's
- * catalogue: every token is bytes on every page that loads this file. The skill's
- * references/icons.md lists each word and what needs it.
+ * THE SET is the 0.60.0 spec's icon table (I1), 51 words, and nothing else: every token is
+ * bytes on every page that loads this file, and a name outside the set is an empty box on the page
+ * that uses it. A glyph a surface needs and the set lacks is a new spec entry first, then a line
+ * here. The skill's references/icons.md lists each word and what needs it.
  *
  * EXTENDING IT. One declaration per icon, in this block, generated from lucide rather than drawn
  * by hand, named after its `data-icon` word, and one mapping line for it further down. Two
@@ -650,13 +650,6 @@ html.anim-off .cursor-block {
   --ico-folder: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
   --ico-file: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5'/%3E%3C/svg%3E");
   --ico-panel-left-close: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'/%3E%3Cpath d='M9 3v18'/%3E%3Cpath d='m16 15-3-3 3-3'/%3E%3C/svg%3E");
-  --ico-git-branch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='6' x2='6' y1='3' y2='15'/%3E%3Ccircle cx='18' cy='6' r='3'/%3E%3Ccircle cx='6' cy='18' r='3'/%3E%3Cpath d='M18 9a9 9 0 0 1-9 9'/%3E%3C/svg%3E");
-  --ico-code: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 18 6-6-6-6'/%3E%3Cpath d='m8 6-6 6 6 6'/%3E%3C/svg%3E");
-  --ico-file-text: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5'/%3E%3Cpath d='M10 9H8'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E");
-  --ico-type: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v16'/%3E%3Cpath d='M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2'/%3E%3Cpath d='M9 20h6'/%3E%3C/svg%3E");
-  --ico-inbox: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 16 12 14 15 10 15 8 12 2 12'/%3E%3Cpath d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/%3E%3C/svg%3E");
-  --ico-bell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.268 21a2 2 0 0 0 3.464 0'/%3E%3Cpath d='M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326'/%3E%3C/svg%3E");
-  --ico-lock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E");
 }
 
 /*
@@ -737,11 +730,33 @@ html.anim-off .cursor-block {
   [data-icon="folder"] { --ico: var(--ico-folder); }
   [data-icon="file"] { --ico: var(--ico-file); }
   [data-icon="panel-left-close"] { --ico: var(--ico-panel-left-close); }
-  [data-icon="git-branch"] { --ico: var(--ico-git-branch); }
-  [data-icon="code"] { --ico: var(--ico-code); }
-  [data-icon="file-text"] { --ico: var(--ico-file-text); }
-  [data-icon="type"] { --ico: var(--ico-type); }
-  [data-icon="inbox"] { --ico: var(--ico-inbox); }
-  [data-icon="bell"] { --ico: var(--ico-bell); }
-  [data-icon="lock"] { --ico: var(--ico-lock); }
+
+  /* FORCED COLOURS (Windows High Contrast) replace every author background with the system
+     Canvas, and a mask glyph IS a background: measured in Chromium, every glyph the mapping feeds
+     painted nothing, on every theme and both palettes. `preserve-parent-color` is the fix the
+     property exists for: the glyph's `color` becomes the colour its parent was FORCED to —
+     CanvasText in text, LinkText in a link, ButtonText in a button, GrayText when disabled,
+     HighlightText on a selection a component redrew — and the background it paints with is left
+     alone. `--tone: currentColor` brings the glyphs that paint `var(--tone, …)` along.
+     NOT `forced-color-adjust: none` alone: forcing happens at used-value time and inheritance
+     carries computed values, so the glyph keeps the AUTHOR's colour — warm's brown measured 1.78:1
+     on a dark palette, and green's and mono's glyphs vanished on a light one. An engine without
+     `preserve-parent-color` gets the first rule, CanvasText: always visible, if not always its
+     context's colour. The default reaches every `[data-icon]::before` glyph; one drawn from a
+     named token, on ::after, or painted from a private variable is its own file's to cover.
+     In `base` for the reason the mapping is: a component's own forced-colours rule wins. */
+  @media (forced-colors: active) {
+    [data-icon]::before {
+      forced-color-adjust: none;
+      color: CanvasText;
+      --tone: CanvasText;
+    }
+    @supports (forced-color-adjust: preserve-parent-color) {
+      [data-icon]::before {
+        forced-color-adjust: preserve-parent-color;
+        color: inherit;
+        --tone: currentColor;
+      }
+    }
+  }
 }

@@ -227,8 +227,17 @@
 /* FILTERING. Colour is the third signal here, not the only one: the trigger's words change from
    the facet to the value, the clear button appears, and the accessible name says
    "source filter: seedr". seedr intended exactly this edge and never rendered it — its
-   `border-primary` lost to the Button's own outline variant. */
-.select-trigger.select-trigger--filter[data-active="true"] {
+   `border-primary` lost to the Button's own outline variant.
+
+   INVALID BEATS FILTERING (lead ruling): a filter that is both paints --destructive, edge and text,
+   and keeps its --primary funnel, so it still says it filters. Not by out-weighing the filtering
+   rule — that rule does not match an invalid trigger at all. The invalid one is declared first and
+   weighs the same, so the `:not()` is what holds it. */
+.select-trigger.select-trigger--filter:where([data-active="true"])[aria-invalid="true"] {
+  color: var(--destructive);
+  border-color: var(--destructive);
+}
+.select-trigger.select-trigger--filter[data-active="true"]:not([aria-invalid="true"]) {
   color: var(--primary);
   border-color: var(--primary);
 }
@@ -673,7 +682,10 @@
     forced-color-adjust: none;
     background: Highlight;
   }
-  .select-trigger.select-trigger--filter[data-active="true"] { border-color: Highlight; }
+  /* Not when invalid: a palette has no error colour, so an invalid filter drops the Highlight edge
+     rather than read as plain filtering. Its words and its .field-error say the rest. The `:not()`
+     also keeps this rule level with the --primary one above, which it must outrank by order. */
+  .select-trigger.select-trigger--filter[data-active="true"]:not([aria-invalid="true"]) { border-color: Highlight; }
   .chip:is([aria-pressed="true"], [aria-current="page"]),
   .chip:is([aria-pressed="true"], [aria-current="page"]):hover:not(:disabled) {
     forced-color-adjust: none;

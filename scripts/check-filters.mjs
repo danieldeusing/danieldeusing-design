@@ -1532,7 +1532,20 @@ await evaluate(`mount(\`
   <div id="offs"><select data-filter aria-label="kind" id="fx-off" disabled><option value="">all</option><option value="k" selected>skill</option></select>
     <button type="button" class="chip" id="chip-off" aria-pressed="false" disabled>off</button>
     <button type="button" class="value-filter" id="vf-off" disabled>official</button></div>
+  <div><select data-filter aria-label="source" id="fx-bad" aria-invalid="true"><option value="">all</option><option value="s" selected>seedr</option></select></div>
 \`); initSelects(); initSearchFields(); null`);
+
+// INVALID BEATS FILTERING (lead ruling): both states at once paint --destructive, edge and text,
+// and the filtering funnel and clear stay.
+const invalidFiltering = () => evaluate(`(() => { const t = $("#fx-bad ~ .select-trigger");
+  return { active: t.getAttribute("data-active"), invalid: t.getAttribute("aria-invalid"), edge: cs(t, "border-top-color"),
+    ink: cs(t, "color"), funnel: cs(t, "background-color", "::before"), clear: drawn($(".filter-dd:has(#fx-bad) > .filter-clear")),
+    destructive: probe("var(--destructive)"), primary: probe("var(--primary)", "background-color") }; })()`);
+await park();
+await check("css: a filter that is filtering AND invalid paints --destructive, edge and text — and keeps its --primary funnel and its clear",
+  async () => { const s = await invalidFiltering(); return s.active === "true" && s.invalid === "true" && s.edge === s.destructive &&
+    s.ink === s.destructive && s.funnel === s.primary && s.clear; },
+  async () => JSON.stringify(await invalidFiltering()));
 const boxOf = (selector) => evaluate(`(() => { const b = $(${JSON.stringify(selector)}).getBoundingClientRect();
   return { x: Math.floor(b.left), y: Math.floor(b.top), width: Math.ceil(b.right) - Math.floor(b.left), height: Math.ceil(b.bottom) - Math.floor(b.top) }; })()`);
 // What a mark paints against what it covers: the same clip shot with the mark and without it. Only
@@ -1655,9 +1668,12 @@ for (const scheme of ["light", "dark"]) {
   const fills = { chip: await fillPaint("#chip"), chipOn: await fillPaint("#chip-on"), link: await fillPaint("#link"), linkOn: await fillPaint("#link-on") };
   await check(`forced colours (${scheme}): a PRESSED chip and the current LINK chip paint a fill their neighbours do not`,
     () => fills.chipOn !== fills.chip && fills.linkOn !== fills.link, () => JSON.stringify(fills));
-  const edges = { rest: await edgePaint("#fx-rest ~ .select-trigger", canvas), on: await edgePaint("#fx-on ~ .select-trigger", canvas) };
+  const edges = { rest: await edgePaint("#fx-rest ~ .select-trigger", canvas), on: await edgePaint("#fx-on ~ .select-trigger", canvas),
+    bad: await edgePaint("#fx-bad ~ .select-trigger", canvas) };
   await check(`forced colours (${scheme}): a FILTERING trigger paints a different edge from one at rest`,
     () => edges.on !== edges.rest, () => JSON.stringify(edges));
+  await check(`forced colours (${scheme}): a filtering trigger that is also INVALID paints a different edge from plain filtering`,
+    () => edges.bad !== edges.on, () => JSON.stringify(edges));
   const texts = [];
   for (const [name, selector] of [["pressed chip", "#chip-on"], ["its count", "#chip-on .chip-count"], ["current link chip", "#link-on"]]) {
     texts.push([name, await textPaint(selector)]);

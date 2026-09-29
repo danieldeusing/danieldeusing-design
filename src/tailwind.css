@@ -53,7 +53,16 @@
 @import "./base.css" layer(base);
 @import "./components.css" layer(components);
 @import "./chrome.css" layer(components);
+@import "./icons.css" layer(components);
+@import "./controls.css" layer(components);
+@import "./tags.css" layer(components);
+@import "./feedback.css" layer(components);
+@import "./filters.css" layer(components);
+@import "./data.css" layer(components);
+@import "./cards.css" layer(components);
+@import "./overlays.css" layer(components);
 @import "./tooltip.css" layer(components);
+@import "./content.css" layer(components);
 @import "./print.css";
 
 @theme inline {

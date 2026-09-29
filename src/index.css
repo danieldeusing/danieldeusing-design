@@ -19,7 +19,19 @@
 @import "./base.css";
 @import "./components.css";
 @import "./chrome.css";
+/* The 0.60.0 component files. Each needs tokens.css and nothing else, so their order only settles a
+   tie between two rules of equal specificity in two files: cards.css restates `.card-terminal`
+   after components.css, and overlays.css comes before tooltip.css, as each package measured it. */
+@import "./icons.css";
+@import "./controls.css";
+@import "./tags.css";
+@import "./feedback.css";
+@import "./filters.css";
+@import "./data.css";
+@import "./cards.css";
+@import "./overlays.css";
 @import "./tooltip.css";
+@import "./content.css";
 /* After every component file, so a text utility written on a component wins at equal
    specificity, as it does in a Tailwind app. print.css stays last: on paper, print wins. */
 @import "./utilities.css";

@@ -178,10 +178,16 @@ function syncLock(dialog) {
     }
   }
 }
-const lockObserver = new MutationObserver((records) => {
-  const touched = new Set(records.map((r) => r.target.closest?.("dialog")).filter(Boolean));
-  for (const dialog of touched) syncLock(dialog);
-});
+// Made on first use, not at import: a server-side render imports the runtime barrel, and Node has
+// no MutationObserver.
+let lockObserver = null;
+const observeLocks = (root) => {
+  lockObserver ??= new MutationObserver((records) => {
+    const touched = new Set(records.map((r) => r.target.closest?.("dialog")).filter(Boolean));
+    for (const dialog of touched) syncLock(dialog);
+  });
+  observeLocks(root);
+};
 
 function installKeys() {
   if (keysInstalled) return;
@@ -286,5 +292,5 @@ export function initDialogs(root = document) {
   installKeys();
   root.addEventListener("pointerdown", onPointerDown);
   root.addEventListener("click", onClick);
-  lockObserver.observe(root, { subtree: true, attributes: true, attributeFilter: ["aria-busy"] });
+  observeLocks(root);
 }

@@ -115,6 +115,8 @@
       .demo-pulse { animation: dd-pulse 2s ease-in-out infinite; }
       .demo-fade { padding: 0.3rem 0.6rem; border: 1px solid var(--control-edge); transition: background-color 0.15s ease, color 0.15s ease; }
       .demo-fade:hover { background: var(--primary); color: var(--primary-foreground); }
+      /* A pseudo-element that transitions, for check-foundations: forced colours must stop it too. */
+      .demo-fade::before { content: ""; transition: opacity 0.15s ease; }
       .demo-cursor { display: inline-block; inline-size: 0.55em; block-size: 1em; background: var(--primary); vertical-align: -0.1em; }
       .demo-tone { padding: 0.4rem 0.6rem; color: var(--foreground); border: 1px solid color-mix(in srgb, var(--tone, var(--border)) 60%, transparent); background: color-mix(in srgb, var(--tone, transparent) 6%, transparent); }
       .demo-tone b { color: var(--tone, var(--muted-foreground)); }

@@ -283,6 +283,9 @@ Rules for a Tailwind author:
   (`animation: dd-pulse 2s ease-in-out infinite`). Use them rather than a local `spin`; the `dd-`
   prefix keeps Tailwind's own `spin` from shadowing them.
 - Transitions are `.15s ease`.
+- **Forced colours stop every transition too** (`tokens.css`, the same `!important` switch). A colour
+  in mid-transition is a plain colour, not a system colour: for .15s a redrawn state painted the
+  author's palette on the forced page (a segment word at 1.02:1).
 - **A file that runs an animation also stops it under `@media (prefers-reduced-motion: reduce)`**
   itself. The switch covers a page whose pre-paint script maps the preference onto the class, and a
   page may not have one.

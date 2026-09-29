@@ -1101,8 +1101,8 @@ const snapshot = () => evaluate(`${JSON.stringify(IDENTITY)}.map(([sel, pseudo, 
 const full = await snapshot();
 await load("?theme=warm&bare");
 await standins("?bare", await evaluate("document.documentElement.dataset.standins"));
-await check("?bare: reset, base, components and chrome dropped — the page really lost them", async () => {
-  const n = await evaluate(`[...document.styleSheets].map((s) => (s.href || "").split("/").pop()).filter((f) => /^(reset|base|components|chrome)\\.css$/.test(f)).length`);
+await check("?bare: reset, base, components, chrome and utilities dropped — the page really lost them", async () => {
+  const n = await evaluate(`[...document.styleSheets].map((s) => (s.href || "").split("/").pop()).filter((f) => /^(reset|base|components|chrome|utilities)\\.css$/.test(f)).length`);
   return n === 0 ? [] : [`${n} of those stylesheets are still loaded`];
 });
 await check("?bare: every content.css class computes exactly what it computes on the full page", async () => {

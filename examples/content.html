@@ -27,6 +27,9 @@
     <link rel="stylesheet" href="../src/components.css" data-full />
     <link rel="stylesheet" href="../src/chrome.css" data-full />
     <link rel="stylesheet" href="../src/content.css" />
+    <!-- The text colour utilities (WP1's utilities.css), after every component file as index.css
+         orders them. #md-embedded is `.markdown.text-muted-foreground`, the embedded-document idiom. -->
+    <link rel="stylesheet" href="../src/utilities.css" data-full />
 
     <!-- ══════════════════════════════════════════════════════════════════════════════════════════
          STAND-INS — NOT PART OF THIS PACKAGE, AND NOT IN src/.
@@ -95,6 +98,9 @@
       }
       :where(blockquote cite) { display: block; margin-top: 0.4rem; font-style: normal; }
       :where(figure) { margin: 0; }
+    </style>
+    <!-- WP1 · the text colour utility #md-embedded wears, while src/utilities.css does not exist yet -->
+    <style id="standin-wp1-utilities" media="not all">
       .text-muted-foreground { color: var(--muted-foreground); }
     </style>
     <!-- WP1 · X3: `hidden` hides everything, answered once in tokens.css. An author `display` (every
@@ -270,6 +276,8 @@
           "WP1 [hidden] (X3)");
         use("standin-wp1-base", !bare && probe("<code>x</code>", (el) => getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)"),
           "WP1 base.css (F5, F8)");
+        use("standin-wp1-utilities", !bare && probe('<p class="text-muted-foreground"></p>',
+          (el) => getComputedStyle(el).color === getComputedStyle(document.body).color), "WP1 utilities.css (.text-muted-foreground)");
         use("standin-wp4", glyphs.length > 0, "WP4 " + glyphs.join(", "));
         use("standin-wp5", !probe('<button class="btn-icon"></button>', (el) => getComputedStyle(el).display === "inline-grid"),
           "WP5 .btn-icon");

@@ -491,10 +491,11 @@ what this replaces).
 - **Forced colours** (Windows high contrast) paint every background `Canvas` and lay a `Canvas`
   backplate behind text. The dialog, the tip and the menu are text and borders, which survive. The
   glyphs they show are drawn by the files that own them — the X and the back arrow by
-  `controls.css`, the alert glyph by `icons.css` — and a glyph shows only while nothing hands it an
-  author colour. So **the X's ink is `--btn-icon-color`, never `color`**: a `color` on `.dialog-close`
-  outranked the icon button's forced system colour and its opted-out glyph painted the theme's ink,
-  1.27–1.78:1 in four of the eight theme × palette cells. The one row this file colours, the stated
+  `controls.css`, the alert glyph by `icons.css` — and each takes the forced colour of what it sits in
+  (`forced-color-adjust: preserve-parent-color`). Never opt one out with `none` from a page or a
+  variant: an opted-out X painted the theme's ink, 1.27–1.78:1 in four of the eight theme × palette
+  cells. (Its ink is set through `--btn-icon-color`, never `color`, which would tie with
+  `.btn-icon`'s own on specificity.) The one row this file colours, the stated
   context-menu row, is `GrayText` there; without it the row read like an action and, under the keys,
   painted the theme's muted ink at 3.00–3.52:1. Its focus ring is `Highlight`: the popup row's ring
   is `HighlightText`, drawn for a `Highlight` fill, and a disabled row has no fill — `HighlightText`

@@ -143,11 +143,12 @@ dialog.dialog--fit { inline-size: max-content; max-inline-size: 90vw; }
 /* THE X AND THE BACK ARROW ARE THE SYSTEM'S ICON BUTTON — bordered, 28px, "just an X and border as
    button". In the foreground ink rather than the icon button's --primary: they are the dialog's
    furniture, not an action it offers, and the one primary action lives in the footer.
-   THE CUSTOM PROPERTY, NEVER `color`. Under forced colours controls.css hands the icon button a
-   system colour and its glyph paints that. A `color` here — as deep as controls.css's forced rule
-   and later in the bundle — would win over it, and the glyph, opted out of forcing so that it shows
-   at all, would paint this author ink on the forced Canvas instead: measured in painted pixels,
-   1.27-1.78:1 in four of the eight theme x palette cells. */
+   THE CUSTOM PROPERTY, NEVER `color`. The icon button reads its ink from --btn-icon-color, as its own
+   tone and bare variants do; a `color` here would tie with `.btn-icon { color }` on specificity and
+   leave the X's ink to the order of two stylesheets. Under forced colours the glyph takes its
+   button's forced colour (controls.css, preserve-parent-color), so nothing here may opt it out: a
+   glyph switched to `forced-color-adjust: none` painted this author ink instead, 1.27-1.78:1 on the
+   forced Canvas in four of the eight theme x palette cells. */
 .dialog-close,
 .dialog-back {
   --btn-icon-color: var(--foreground);

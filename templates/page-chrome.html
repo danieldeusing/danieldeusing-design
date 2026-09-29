@@ -163,8 +163,8 @@
                .ls-row), and the page you are on carries aria-current="page" on it — derived
                per page by whatever renders the nav, never hand-written into a shared nav.
                To have the rows print one by one under a typed `ls -l`, add
-               `data-term-list` to this <ul> and `style="--i: N"` (its index) to each <li>,
-               and set html.term-anim PRE-PAINT. -->
+               `data-term-list` to this <ul> and set html.term-anim PRE-PAINT (each row's
+               step comes from its position; no inline style). -->
           <!-- `.ls-group` is a heading inside the rail, and since 0.8.0 the package STYLES it.
                It did not before, so every surface that wanted grouped navigation wrote its own
                rule and they all differed — if yours still carries one, delete it, it is now a
@@ -228,8 +228,10 @@
 <!-- .wrap is the shared column: --content-w wide, --content-pad from the edges (1.25rem on a
      phone). Set padding-BLOCK here for the page's own vertical rhythm — never the `padding`
      shorthand, which resets padding-inline and silently drops the shared margin. It no longer
-     needs room for the footer: the BODY reserves exactly --status-h below the content. -->
-<main class="wrap" style="padding-block: 1.1rem var(--space-section)">
+     needs room for the footer: the BODY reserves exactly --status-h below the content.
+     In the page's stylesheet, never a style attribute (a strict CSP refuses inline style):
+       main.wrap { padding-block: 1.1rem var(--space-section); } -->
+<main class="wrap">
   <!-- OPTIONAL: a toolbar that sticks under the header — the breadcrumb when the bar has no
        centre band (cockpit), a filter bar. First in <main>, above .layout, so its rule spans
        both columns.

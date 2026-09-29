@@ -192,8 +192,9 @@ The markup, the current-page marker (`aria-current="page"` on the `<a>` that car
   toggle elsewhere on the page (danieldeusing.de's home banner) is kept in step by the same
   `initLsNav()`, including one rendered later, and a stale `aria-pressed` is removed.
 - **The listing can print row by row** under the typed `ls -l`, opt-in:
-  `<ul class="ls-panel" data-term-list>` and `style="--i: 0"`, `--i: 1`, … on the rows (the index
-  in the markup: one rule for any number of rows). CSS only, and it fails visible: nothing rests at
+  `<ul class="ls-panel" data-term-list>`, nothing on the rows: each row's step comes from its
+  position, the first twelve 0.11s apart and the rest with the twelfth. No `style` attribute —
+  documented markup has to run under a CSP that refuses inline style. CSS only, and it fails visible: nothing rests at
   `opacity: 0`, so with animation off, reduced motion or no script every row is simply there. The
   title fades in rather than typing (a second typing engine beside `terminal.js` is not wanted).
   Desktop only — the burger would replay it on every open. **It keys on `html.term-anim`: set that
@@ -228,6 +229,14 @@ On a phone:
   running off the screen — a clipped control cannot be reached at all. Three controls (a link, the
   theme menu, the anim toggle) fit a 375px row; a fourth takes a third row, which is NOT cleared.
   A page with that many controls folds them into the burger.
+- **Under a coarse pointer every footer control is a 44px target**, and the footer grows to hold
+  them: `--status-h` is 2.875rem on one row and 4.25rem on a phone's two. The rail's toggle is 44px
+  too, and a rail row's text sits in the middle of its 44px row.
+- **The phone and coarse values of `--status-h` are `!important`, so a page cannot override them.**
+  They have to be: the Tailwind entry imports `tokens.css` unlayered and this file in
+  `@layer components`, and an unlayered declaration beats every layered one, custom properties
+  included (measured: the layered 3.25rem resolved to 2rem). A page that needs a different
+  clearance changes the footer (fewer controls, or a `.mobile-footer`), not the number.
 - Before 0.60.0 the footer hid below 48rem whether or not the burger had anywhere to put it, so a
   page without a `.mobile-footer` lost its theme picker on a phone. `templates/page-chrome.html`
   itself was such a page.

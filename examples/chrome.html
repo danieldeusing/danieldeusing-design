@@ -26,7 +26,7 @@
           if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
         } catch {}
         // ?reveal: the terminal gate PRE-PAINT, as danieldeusing.de sets it, so the rail's listing
-        // prints row by row on load (data-term-list on the list, --i on each row).
+        // prints row by row on load (data-term-list on the list; each row's step is its position).
         if (!animOff && new URLSearchParams(location.search).has("reveal")) document.documentElement.classList.add("term-anim");
       })();
     </script>
@@ -92,9 +92,11 @@
       :where([data-icon="chevron-right"]) { --ico: var(--ico-chevron-right); }
       :where([data-icon="history"]) { --ico: var(--ico-history); }
       @media (forced-colors: active) {
-        :where([data-icon])::before { forced-color-adjust: none; color: CanvasText; --tone: CanvasText; }
         @supports (forced-color-adjust: preserve-parent-color) {
-          :where([data-icon])::before { forced-color-adjust: preserve-parent-color; color: inherit; --tone: currentColor; }
+          :where([data-icon])::before { forced-color-adjust: preserve-parent-color; --tone: currentColor; }
+        }
+        @supports not (forced-color-adjust: preserve-parent-color) {
+          :where([data-icon])::before { forced-color-adjust: none; background: CanvasText; }
         }
       }
 
@@ -134,7 +136,12 @@
     </style>
 
     <style>
-      /* Page layout only — none of this is design-system vocabulary. */
+      /* Page layout only — none of this is design-system vocabulary. No markup below carries a
+         style attribute: documented markup must run under a CSP that refuses inline style. */
+      main#top { padding-block: 1.1rem 2.5rem; }
+      #app-bar { --bar-inset-start: 5rem; }
+      #card-table-card { --tablewrap-fade: var(--card); }
+      #card-table { --tablewrap-max-h: 9rem; }
       .demo-lede { margin: 0 0 0.75rem; color: var(--muted-foreground); max-width: 72ch; }
       .content > section { margin-block: 0 var(--space-section); min-block-size: 18rem; }
       .content h1 { margin: 0 0 0.25rem; font-size: var(--fs-xl); color: var(--primary); }
@@ -190,13 +197,13 @@
           </div>
           <div class="ls-nav" id="nav">
             <ul class="ls-panel" role="list" data-term-list>
-              <li style="--i: 0"><span class="ls-group"># design system</span></li>
-              <li style="--i: 1"><a class="dropdown-item ls-row ls-row--dir" href="#top"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">examples/</span></a></li>
-              <li style="--i: 2"><a class="dropdown-item ls-row ls-row--sub" href="#top" aria-current="page"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">chrome.html</span></a></li>
-              <li style="--i: 3"><a class="dropdown-item ls-row ls-row--sub" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">style-guide.html</span></a></li>
-              <li style="--i: 4"><a class="dropdown-item ls-row ls-row--dir ls-row--sub" href="#top"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">runtime/</span></a></li>
-              <li style="--i: 5"><a class="dropdown-item ls-row ls-row--sub ls-row--sub2" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">lsnav.js</span></a></li>
-              <li style="--i: 6"><a class="dropdown-item ls-row ls-row--sub ls-row--sub2" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">toc.js</span></a></li>
+              <li><span class="ls-group"># design system</span></li>
+              <li><a class="dropdown-item ls-row ls-row--dir" href="#top"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">examples/</span></a></li>
+              <li><a class="dropdown-item ls-row ls-row--sub" href="#top" aria-current="page"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">chrome.html</span></a></li>
+              <li><a class="dropdown-item ls-row ls-row--sub" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">style-guide.html</span></a></li>
+              <li><a class="dropdown-item ls-row ls-row--dir ls-row--sub" href="#top"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">runtime/</span></a></li>
+              <li><a class="dropdown-item ls-row ls-row--sub ls-row--sub2" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">lsnav.js</span></a></li>
+              <li><a class="dropdown-item ls-row ls-row--sub ls-row--sub2" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">toc.js</span></a></li>
             </ul>
           </div>
           <div class="mobile-footer">
@@ -233,7 +240,7 @@
     </header>
     </div>
 
-    <main class="wrap" id="top" style="padding-block: 1.1rem 2.5rem">
+    <main class="wrap" id="top">
       <div class="page-toolbar">
         <nav class="crumbs" aria-label="breadcrumb" id="toolbar-crumbs"><ol><li><a href="#top">design</a></li><li><a href="#top">examples</a></li><li><span aria-current="page">chrome</span></li></ol></nav>
         <button type="button" class="doc-link doc-link--forward">reset view</button>
@@ -265,7 +272,7 @@
             </div>
             <h3>.bar--app — a desktop app's window title strip (static cursor, traffic-light gutter)</h3>
             <div class="demo-frame">
-              <header class="bar bar--app" style="--bar-inset-start: 5rem" id="app-bar">
+              <header class="bar bar--app" id="app-bar">
                 <div class="bar-side"><span class="brand"><span class="glow">configr</span><span class="cursor-block cursor-block--static" aria-hidden="true"></span></span></div>
                 <div class="bar-side"><span class="demo-note">~/projects/estate</span></div>
               </header>
@@ -380,8 +387,8 @@
           <section id="table">
             <h2>a sticky table header in a card</h2>
             <p class="demo-lede">The header row paints the card (<code>--tablewrap-fade</code>), not a band of page colour.</p>
-            <div class="card-terminal" style="--tablewrap-fade: var(--card)">
-              <div class="tablewrap" style="--tablewrap-max-h: 9rem" id="card-table">
+            <div class="card-terminal" id="card-table-card">
+              <div class="tablewrap" id="card-table">
                 <table>
                   <thead><tr><th>agent</th><th>repo</th><th>state</th></tr></thead>
                   <tbody>

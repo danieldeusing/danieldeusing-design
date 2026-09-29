@@ -263,6 +263,13 @@
         }
         if (unmapped.length) {
           css += unmapped.map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
+          // WP4 ships the mapping with a forced-colours default for every [data-icon]::before glyph,
+          // in @layer base so a component's own rule wins (tokens.css, X1): without it a .btn-icon's
+          // glyph paints Canvas on Canvas and the button is an empty box.
+          css += "@layer base { @media (forced-colors: active) {" +
+            " [data-icon]::before { forced-color-adjust: none; color: CanvasText; --tone: CanvasText; }" +
+            " @supports (forced-color-adjust: preserve-parent-color) {" +
+            " [data-icon]::before { forced-color-adjust: preserve-parent-color; color: inherit; --tone: currentColor; } } } }";
           glyphs.push("mapping " + unmapped.join(" "));
         }
         if (!drawn) {

@@ -37,7 +37,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { check, done } = reporter("check-data");
 const server = await serve(root);
 const browser = await launch("data");
-const { evaluate, until, navigate, send } = browser;
+const { evaluate, until, navigate, send, press } = browser;
 
 const THEMES = ["warm", "green", "mono", "paper"];
 const SURFACES = ["--background", "--card", "--muted"];
@@ -104,7 +104,15 @@ const hoverOver = async (sel) => {
 };
 
 await open("theme=warm");
-console.log(`stand-ins in force: ${await evaluate("document.documentElement.dataset.standins")}`);
+const standins = await evaluate("document.documentElement.dataset.standins");
+console.log(`stand-ins in force: ${standins}`);
+// The stand-ins make this page render before the packages they stand in for have landed. Once they
+// have, CI runs with DD_FORBID_STANDINS=1, and a stand-in still in force is a failure — a green run on
+// copies would say nothing about the real tokens and classes. (The full page only: `?bare` drops the
+// stylesheets .tag and the checkbox live in on purpose, so their stand-ins stay on there.)
+if (process.env.DD_FORBID_STANDINS === "1") {
+  await check("DD_FORBID_STANDINS=1: no stand-in is in force on the full page", () => standins === "none", standins);
+}
 
 /* ── D1 · table.dense ─────────────────────────────────────────────────────────────────────────── */
 
@@ -415,6 +423,20 @@ const measure = (body) => evaluate(`(() => { ${PIXELS} return JSON.stringify((()
 const r2 = (n) => (typeof n === "number" ? Math.round(n * 100) / 100 : n);
 const shown = (v) => () => JSON.stringify(v, (k, n) => r2(n));
 
+/* X1's capture rule, last step: before a ratio is trusted, the clip must hold the element's own ink,
+   and none of it with the element taken away — read again, on the same palette. A clip that lands on
+   a neighbour, or on ink the palette painted for something else, fails here instead of passing below. */
+const owns = async (sel, regions) => {
+  const read = () => measure(`return ${regions}.map((r) => ink(r).ratio);`);
+  await shoot(sel);
+  const on = await read();
+  await evaluate(`document.querySelector(${JSON.stringify(sel)}).style.visibility = "hidden"; null`);
+  await shoot(sel);
+  const off = await read();
+  await evaluate(`document.querySelector(${JSON.stringify(sel)}).style.visibility = ""; null`);
+  return { sel, on, off, ok: on.every((r) => r >= 1.5) && off.every((r) => r < 1.2) };
+};
+
 /* ── Q6 · a series is never told apart by colour alone ──────────────────────────────────────────
    The flow chart's three series, and their swatches in the key, are CLASSED from painted pixels and
    blind to hue: the share of ink (2:1 or more off the chart's canvas) inside the mark, and on its edge.
@@ -483,6 +505,17 @@ for (const scheme of ["light", "dark"]) {
   await settle();
   console.log(`forced colours, ${scheme} palette (Canvas / CanvasText / Highlight / HighlightText / GrayText): ${await evaluate(
     `["Canvas", "CanvasText", "Highlight", "HighlightText", "GrayText"].map(M.tok).join(" / ")`)}`);
+  const owned = [
+    await owns("#page-tabs", `[grow(box("#tab-activity"), 2), text("#tab-activity"), text("#tab-queue"), text("#tab-modes")]`),
+    await owns("#tab-syntax", `[text("#tab-syntax")]`),
+    await owns("#dense-table", `[(() => { const r = box("#row-pinned > td:first-child"); return { left: r.left - 1, right: r.left + 6, top: r.top + 2, bottom: r.bottom - 2 }; })(),
+      text("#row-disabled > td:nth-child(3)")]`),
+    await owns("#trend", `(() => { const d = [...document.querySelectorAll("#trend .chart-dot")], a = box(d[2]), b = box(d[3]);
+      const mx = (a.left + a.right + b.left + b.right) / 4, my = (a.top + a.bottom + b.top + b.bottom) / 4;
+      return [box("#trend text"), { left: mx - 2, right: mx + 2, top: my - 3, bottom: my + 3 }, grow(a, 1), grow(box(d.find((x) => x.classList.contains("chart-dot--hollow"))), 1)]; })()`),
+  ];
+  await check(`X1 ${scheme} — every clip below reads its own element: ink with it, none with it taken away`,
+    () => owned.every((o) => o.ok), shown(owned.filter((o) => !o.ok).length ? owned.filter((o) => !o.ok) : owned));
 
   await shoot("#page-tabs");
   const tabs = await measure(`
@@ -527,6 +560,37 @@ for (const scheme of ["light", "dark"]) {
 
   await cues(`X1 ${scheme}`);
 
+  /* Q4 · the focus rings, with REAL keyboard focus: a :focus-visible forced through DevTools painted no
+     ring in one Chromium build (X1). Tab lands on the selected tab; an unselected one takes focus from
+     script after that key, which Chromium counts as keyboard focus — and each must say :focus-visible.
+     The ring is read against the tab's own fill beside it, then read again with the focus gone: the
+     spot must then BE the fill, or the clip was not on the ring. Warm and green, because a ring that
+     fell back to the theme under `none` is dark on one and light on the other. */
+  for (const t of ["warm", "green"]) {
+    await theme(t);
+    const ringAt = (id) => `const r = box("#${id}"), y = (r.top + r.bottom) / 2; return M.ratio(px(r.left + 1, y), px(r.left + 4.5, y));`;
+    const rings = [];
+    for (const id of ["tab-activity", "tab-queue"]) {
+      if (id === "tab-activity") {
+        await evaluate(`document.querySelector("#tabs .lede a").focus(); null`);
+        await press("Tab");
+      } else {
+        await evaluate(`document.getElementById("${id}").focus(); null`);
+      }
+      const focus = await evaluate(`document.activeElement.id === "${id}" && document.activeElement.matches(":focus-visible")`);
+      await settle();
+      await shoot("#page-tabs");
+      const on = await measure(ringAt(id));
+      await evaluate(`document.activeElement.blur(); null`);
+      await settle();
+      await shoot("#page-tabs");
+      const off = await measure(ringAt(id));
+      rings.push({ id, focus, on, off });
+    }
+    await check(`X1 ${scheme} ${t} — a keyboard-focused tab's ring is painted ${rings.map((r) => r2(r.on)).join(":1 (selected), ")}:1 (unselected) off its fill, and gone without the focus`,
+      () => rings.every((r) => r.focus && r.on >= 3 && r.off < 1.1), shown(rings));
+  }
+  await theme("warm");
 }
 await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 900, deviceScaleFactor: 1, mobile: false });
 await sleep(100);

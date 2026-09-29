@@ -93,6 +93,9 @@ function announce(button, message) {
     region = document.createElement("div");
     region.setAttribute("role", "status");
     region.setAttribute("data-copy-status", "");
+    // CSSOM, never setAttribute("style"): under seedr's `style-src 'self'` the attribute is refused
+    // (a style-src-attr violation, measured) while style.cssText applies. Inline, so the region hides
+    // itself whichever stylesheets the page happens to load.
     region.style.cssText = VISUALLY_HIDDEN;
   }
   // A modal <dialog> makes everything outside it inert, and an inert live region is never read —

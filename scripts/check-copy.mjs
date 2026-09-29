@@ -58,8 +58,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /* ── the worktree over loopback ─────────────────────────────────────────────────────────────── */
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+// A page under seedr's style policy, to prove the runtime does not need an inline style attribute:
+// the only style it writes is through the CSSOM, which `style-src 'self'` allows.
+const CSP = "default-src 'self'; style-src 'self'; script-src 'self'";
+const CSP_PAGE = `<!doctype html><html><head><meta charset="utf-8"></head><body>
+<div class="cmd"><code class="cmd-text">npm run build</code><button type="button" data-copy aria-label="copy build command">copy</button></div>
+<script type="module" src="/__csp/boot.js"></script></body></html>`;
+const CSP_BOOT = `window.__violations = [];
+document.addEventListener("securitypolicyviolation", (e) => __violations.push(e.violatedDirective));
+import("/runtime/copy.js").then((m) => { m.initCopyButtons(); window.__ready = true; });`;
 const server = createServer((req, res) => {
-  const file = join(root, decodeURIComponent(new URL(req.url, "http://127.0.0.1").pathname));
+  const path = new URL(req.url, "http://127.0.0.1").pathname;
+  if (path === "/__csp/") { res.writeHead(200, { "content-type": TYPES[".html"], "content-security-policy": CSP }); res.end(CSP_PAGE); return; }
+  if (path === "/__csp/boot.js") { res.writeHead(200, { "content-type": TYPES[".js"], "content-security-policy": CSP }); res.end(CSP_BOOT); return; }
+  const file = join(root, decodeURIComponent(path));
   let body = null;
   if (file.startsWith(root + sep)) { try { body = readFileSync(file); } catch {} }
   if (!body) { res.writeHead(404); res.end(); return; }
@@ -451,6 +463,22 @@ await check("one region, and it follows the button into a modal <dialog> (outsid
 await check("no page error during the whole run", async () => {
   const errors = [...(await evaluate("__copy.errors.slice()")), ...pageErrors];
   return errors.length ? errors : [];
+});
+
+await check("under style-src 'self' the region still hides itself and nothing is refused", async () => {
+  await send("Page.navigate", { url: `${ORIGIN}/__csp/` });
+  for (let i = 0; i < 40 && !(await evaluate("window.__ready === true")); i += 1) await sleep(100);
+  await press("button[data-copy]");
+  await settle();
+  const r = await evaluate(`(() => { const n = document.querySelector("[data-copy-status]"); const b = n && n.getBoundingClientRect();
+    return { region: !!n, text: n?.textContent, pos: n && getComputedStyle(n).position, w: b?.width, h: b?.height,
+             state: document.querySelector("button[data-copy]").getAttribute("data-state"), violations: window.__violations }; })()`);
+  const out = [];
+  if (r.state !== "copied") out.push(`data-state is ${r.state}`);
+  if (!r.region || r.text !== "copied") out.push(`region ${JSON.stringify(r.text)}`);
+  if (!(r.pos === "absolute" && r.w <= 1 && r.h <= 1)) out.push(`the region is not visually hidden: ${JSON.stringify(r)}`);
+  if (r.violations.length) out.push(`CSP refused: ${r.violations.join(", ")}`);
+  return out;
 });
 
 console.log(failures

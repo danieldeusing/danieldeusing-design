@@ -198,8 +198,9 @@ table.dense--form :where(th, td) { vertical-align: middle; }
     color: var(--muted-foreground);
   }
   /* The actions keep one per line when stacked: the label on the first line, the actions down the
-     value edge. As flex items they would spread across the line instead. */
-  table.stackable td.actions[data-label] {
+     value edge. As flex items they would spread across the line instead. `:not(:empty)`, because at
+     (0,3,2) this outranks `td:empty` below and drew an empty "links" line 23px tall. */
+  table.stackable td.actions[data-label]:not(:empty) {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     justify-items: end;

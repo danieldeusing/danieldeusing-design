@@ -204,12 +204,30 @@ await check("...the actions still one per line, down the value edge",
 await check("...the pinned row is one card with the tint and the bar on the card",
   async () => (await css("#row-pinned", "backgroundColor")) === (await tok("color-mix(in srgb, var(--warning) 5%, var(--card))")) &&
     (await css("#row-pinned", "boxShadow")).includes("inset") && (await css("#row-pinned > td:first-child", "boxShadow")) === "none");
-await check("...an empty cell is dropped rather than drawn as a labelled blank line",
-  async () => (await css("#dense-table tbody tr:last-child > td.num", "display")) === "none");
+await check("...a value that wraps lines up on the value edge (text-align: end), under its label's line",
+  async () => (await css(`${row2} > td:nth-child(3)`, "textAlign")) === "end");
+// Every KIND of cell, because each kind has its own rule and a stronger one can outrank `td:empty`:
+// `td.actions[data-label]` (0,3,2) did, and drew an empty "links" line 23px tall.
+const empties = JSON.parse(await evaluate(`(() => {
+  const plain = document.querySelector("${row2} > td:nth-child(3)"), text = plain.textContent;
+  plain.textContent = "";
+  const out = Array.from(document.querySelectorAll("#dense-table tbody td:empty")).map((td) => ({
+    kind: td.classList.contains("num") ? "num" : td.classList.contains("actions") ? "actions" : "plain",
+    display: getComputedStyle(td).display, height: td.getBoundingClientRect().height }));
+  plain.textContent = text;
+  return JSON.stringify(out);
+})()`));
+await check("...an EMPTY cell of every kind is dropped — plain, .num and .actions — never a labelled blank line",
+  () => ["plain", "num", "actions"].every((kind) => empties.some((e) => e.kind === kind)) && empties.every((e) => e.display === "none" && e.height === 0),
+  JSON.stringify(empties));
 await evaluate(`document.querySelector("${row2}").hidden = true; null`);
 await check("...and a row the pager hid stays hidden though every row is now a block — through tokens.css's [hidden], no guard of its own (X3)",
   async () => (await css(row2, "display")) === "none");
-await evaluate(`document.querySelector("${row2}").hidden = false; null`);
+await evaluate(`document.querySelector("${row2}").hidden = false; document.getElementById("row-pinned").hidden = true; null`);
+const gaps = await evaluate(`JSON.stringify([getComputedStyle(document.querySelector("${row2}")).marginTop, getComputedStyle(document.getElementById("row-disabled")).marginTop])`);
+await evaluate(`document.getElementById("row-pinned").hidden = false; null`);
+await check("...a page whose first rows are paged away opens without a gap: the first VISIBLE card has none, the next .8rem",
+  () => gaps === '["0px","12.8px"]', gaps);
 await check("dl.kv is one column on a phone", async () => (await css("#kv-list", "gridTemplateColumns")).split(" ").length === 1);
 await check("a tab is 44px tall on a phone, and the reference half no longer pushes right",
   async () => parseFloat(await css("#tab-queue", "minHeight")) === 44 && (await css("#tab-how", "marginLeft")) === "0px");

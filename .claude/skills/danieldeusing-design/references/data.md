@@ -239,7 +239,8 @@ followed the hash, which one opened an ancestor, which one told a lazy panel it 
   does not describe an element with its own name, so it is not announced twice. Anywhere else, a tip
   that repeats the name is left off.
 - 44px under a coarse pointer and on a phone: tabs are these pages' primary navigation.
-- A filter over a card grid is not a tab. It is a `.filter-set`.
+- A filter over a card grid is not a tab. It is a filter dropdown, `<select data-filter>` (M5), or a
+  set of chips (M8).
 
 ## The ticker strip: push a row, register a refresher (D9)
 
@@ -332,7 +333,9 @@ Opacity is never an axis; cockpit's .55–.75 becomes `--off`.
 - **A state with no class today** (`approved`, `dispatched`, `denied`) takes a tone by the same logic:
   waiting → warning, done well → success, spent or superseded → muted `tag--dashed`, broken →
   destructive.
-- **The containers' status text is not a tag.** It is `.state` with the word unchanged.
+- **The containers' status text is not a tag.** It is `.state` with the word unchanged:
+  `<span class="state" data-state="ok">running</span>` — running → `ok`, starting and stopping →
+  `pending`, stopped → `none`, error and unhealthy → `bad`.
 - In a pinned row, the row's tint is 5% `--warning` because a tag's tone text sits on it (4.59:1 or
   better everywhere); see the dense table in `tables-and-forms.md`.
 

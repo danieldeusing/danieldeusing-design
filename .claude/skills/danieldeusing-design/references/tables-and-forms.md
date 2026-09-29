@@ -155,6 +155,10 @@ is one card carrying the tint and the bar. A row the pager or a filter has hidde
 author `display` beats the browser's `[hidden]`, and `tokens.css` answers that once for every
 element — do not add a guard of your own.
 
+**The header row is not shown on a phone**, and everything in it goes with it. A stackable table with
+a select-all checkbox carries that control OUTSIDE the table — beside its count or its bulk actions —
+so a phone can still select every row.
+
 **On a card or in a dialog**, set `--tablewrap-fade: var(--card)` on the container: the scroll fade
 and the sticky header then paint the card rather than the page.
 

@@ -95,20 +95,6 @@ tbody tr:last-child > * {
 tr > *:first-child { padding-inline-start: 0; }
 tr > *:last-child { padding-inline-end: 0; }
 
-/* A HIDDEN ROW MUST ACTUALLY BE HIDDEN, and `!important` is what makes that true.
-   The UA's own `[hidden] { display: none }` is a one-attribute selector, so ANY rule that
-   sets `display` on a row outruns it — and the estate has those: a narrow-screen media
-   query that restacks a key/value table as `.ask table.kv tr { display: block }` scores
-   higher and would put every hidden row back on screen, on phones only. Worse than a
-   cosmetic slip, because `hidden` that loses to a stylesheet is still exposed to a screen
-   reader: the table would announce rows nobody can see it announcing.
-
-   This is the mechanism `initTablePagination()` turns a page with, and it is declared
-   here rather than beside the pager because it is a correction to the ELEMENT: a row a
-   consumer hides for its own reasons has exactly the same problem. Same `display: none
-   !important` the print stylesheet and the diagram overlay already use. */
-tr[hidden] { display: none !important; }
-
 /* Tailwind v4's reset drops the default button cursor — restore it for all
    interactive controls (buttons, summaries, role=button). */
 button:not(:disabled),
@@ -274,6 +260,12 @@ pre { line-height: var(--lh-base); }
   background: color-mix(in srgb, var(--warning) 30%, transparent);
   color: var(--foreground);
 }
+/* Forced colours (Windows High Contrast) swap an author background for Canvas and keep its alpha,
+   so the tint above fades to about 1.04:1 on the page and a search hit disappears. The mode keeps a
+   system colour, and it has a pair for exactly this: the palette's own Mark under MarkText. */
+@media (forced-colors: active) {
+  :where(mark) { background-color: Mark; color: MarkText; }
+}
 
 :where(hr) {
   border: 0;
@@ -307,26 +299,6 @@ pre { line-height: var(--lh-base); }
   color: var(--muted-foreground);
   font-style: italic;
 }
-
-
-/* ── TEXT COLOUR UTILITIES (0.60.0) ─────────────────────────────────────────────
-   cockpit carried seven local status-colour classes and four opacity steps across five pages,
-   seedr's studio a set of its own, and every one re-declared what a token already says. One
-   declaration per token, and the names are Tailwind's: in a Tailwind app `text-success` is the
-   same word resolving to the same token, so markup moves between the two worlds unchanged.
-
-   There is NO `.text-muted`. Tailwind renders that name as the --muted SURFACE colour, a
-   background shade, so one class would be a readable label here and near-invisible text there.
-   Quieter text is `.text-muted-foreground`. And there is no opacity step: "quieter" is the muted
-   token, whose contrast is measured, not an alpha nobody measured. */
-.text-foreground { color: var(--foreground); }
-.text-muted-foreground { color: var(--muted-foreground); }
-.text-primary { color: var(--primary); }
-.text-success { color: var(--success); }
-.text-warning { color: var(--warning); }
-.text-destructive { color: var(--destructive); }
-.text-info { color: var(--info); }
-.text-pending { color: var(--pending); }
 
 
 /* ── DOTTED GROUND `.bg-dots` (0.60.0) ──────────────────────────────────────────

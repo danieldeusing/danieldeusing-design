@@ -69,7 +69,7 @@ beside it and every surface squared the row up by hand.
 
 ## One display step, for a public page's title (0.60.0)
 
-> **`--fs-display` is 30px, and 36px from 48rem wide. It titles a public-site page and sets an
+> **`--fs-display` is 30px, and 36px from 40rem wide. It titles a public-site page and sets an
 > error page's status code — nothing else. An app's title stays `--fs-2xl`. It is not a text
 > size.**
 
@@ -81,17 +81,18 @@ The type scale, whole, as the skill states it plus the one step this release add
 | `--fs-lg` | 15px | h3, a section head |
 | `--fs-xl` | 18px | h2 |
 | `--fs-2xl` | 24px | h1 — an app page's title |
-| `--fs-display` | **30px, 36px from 48rem** | a public-site page title (`.page-title--display`, content.css) and an error page's status code — only |
+| `--fs-display` | **30px, 36px from 40rem** | a public-site page title (`.page-title--display`, content.css) and an error page's status code — only |
 
 **Why it exists (the lead, 2026-09-28).** danieldeusing.de is a source of truth, and it titles its
-pages at 30px, 36px from 48rem (Tailwind `text-3xl md:text-4xl`). The scale topped out at 24px, so
+pages at 30px, 36px from 40rem (Tailwind `text-3xl sm:text-4xl`, on all twelve page titles). The
+scale topped out at 24px, so
 either the public site shrank to fit the system or the system gained one step. It gained one step,
 and only that: a presented page's title is a different thing from an app's, whose title is read at a
 glance among controls and stays `--fs-2xl`.
 
-- **The token carries the breakpoint.** It is 30px below 48rem and 36px from it — the site's own
-  `md:` width — so a title written with it needs no media query, and `text-3xl md:text-4xl` becomes
-  one class.
+- **The token carries the breakpoint.** It is 30px below 40rem and 36px from it — the site's own
+  `sm:` width, which is also where the system's phone gutter steps (`--content-pad`) — so a title
+  written with it needs no media query, and `text-3xl sm:text-4xl` becomes one class.
 - **Write the class, never the token on an element of your own.** A public page title is
   `.page-title--display`; an error page's code is the error-page template's. A bare `<h1>` stays
   `--fs-2xl` — the element default does not change, so no app title grows by accident.
@@ -99,7 +100,7 @@ glance among controls and stays `--fs-2xl`.
   that must stand out is a stat tile's value at `--fs-xl`, not a display number.
 - **Tailwind:** `text-fs-display`. It sets the SIZE only: the line height stays the heading's
   (`--lh-tight`, 1.3), where `text-3xl` brought its own 1.2. Measured by
-  `scripts/check-foundations.mjs` at 375, 767, 768 and 1440px wide.
+  `scripts/check-foundations.mjs` at 375, 639, 640 and 1440px wide.
 
 ## Categorical colours: twelve names, one lightness per theme (0.60.0)
 
@@ -157,8 +158,8 @@ Every hue lies inside sRGB at these L/C, so no browser gamut-maps one into a dif
   on the light ones it is another design language. The glow is the one the dropdown already wore.
 - **Why every popup and dialog carries `--control-edge`**: the scrim only DIMS. On green and mono a
   near-black card over a scrimmed near-black page is 1.04–1.08:1 whatever the alpha — nothing
-  separates it but its edge, which measures 4.75:1 (green) and 5.39:1 (mono) against the scrimmed
-  page. On warm and paper the dialog's own fill does the separating (3.58 and 3.64:1).
+  separates it but its edge, which measures 4.89:1 (green) and 5.55:1 (mono) against the scrimmed
+  page. On warm and paper the dialog's own fill does the separating (3.62 and 3.64:1).
 - The names avoid `--shadow-*` on purpose: that namespace is Tailwind's, and a token there would
   reskin every existing `shadow-*` utility. Tailwind's own `shadow-sm…2xl` are left alone.
 
@@ -192,24 +193,35 @@ did not change):
 | your own unlayered CSS (Astro-scoped styles, rules outside `@layer`) | specificity decided | yours wins |
 | the tokens, `html.anim-off`, `data-tone`; print | — | unchanged: unlayered |
 
-What that means per consumer, and what to delete:
+What a consumer sees move, measured by the WP1 review (2026-09-29): pagr's own Tailwind 4.3.0
+rebuilt its CSS against 0.59.0 and against this entry, and 14 pages were compared at 1280 and 375px
+(warm theme, a Tab walk, state probes). It includes the element defaults below. What each site does
+about each row is the 0.60.0 migration map's (`MIGRATION.md`); this is only what moves.
 
-- **seedr web.** Its border-colour utilities render as written — the active filter trigger, the
-  filter chips, badge edges, detail labels and card hovers stop rendering `--border`. The shadcn
-  button shows its own ring and no longer the system outline beside it. Four local workarounds
-  become redundant: the radius steps in `web/styles/index.css` (now in the entry), its
-  `html.anim-off` transition rule (now in tokens.css), and the two unlayered patches that exist
-  only because a utility could not win (`input[type="text"][data-search]` padding, the
-  `[data-term-out] table` edge padding).
-- **danieldeusing.de.** Every `p-2`, `p-5`, `p-6` and `sm:p-8` on a `.card-terminal` now applies
-  (nine card sites on About, ArticlePost, Configr, Contact, Home and Seedr) — delete them so the
-  cards take `--card-pad`, as the card reference says. The non-live app card's
-  `hover:border-destructive hover:shadow-none` starts to show. A heading's `mt-6` now beats the
-  section rhythm's 2.5rem. The article search's `outline-none` wins, and its label's
-  `focus-within:border-primary` — dead until now — becomes the indicator. The header's scoped
-  history-trigger styles beat `chrome.css`.
-- **configr, seedr studio.** They import `tokens.css` only, which stays unlayered: no cascade
-  change. They gain the new tokens, the kill switch and the tone map.
+| # | danieldeusing.de (pagr) | where | kind |
+|---|---|---|---|
+| 1 | the open history dropdown's trigger turns from `--primary` to muted: the Astro-scoped `.nav-ctrl` colour now beats `.dropdown[open] > summary` | header, every page | regression, fix in pagr |
+| 2 | the SYNOPSIS `<h1>` goes from 12px/400 to 24px/700, its line from 18 to 31.2px | `/` | decide: give it a class |
+| 3 | article table text goes from 12 to 10.5px, headers turn `--primary`/700, cell padding 13.6 to 6px: the typography plugin now wins | the table article, EN and DE | regression, must fix |
+| 4 | `h2.comment` becomes bold | /cv/, /imprint/, /privacy/ | decide |
+| 5 | the CV's `h3` goes from 12 to 15px | /cv/ | decide |
+| 6 | figcaptions become italic | /apps/configr/, /apps/seedr/ | decide |
+| 7 | photos gain a 1px `--border` frame inside their card | /about/ | decide |
+| 8 | inline `code` in the install table gains a 1px border and `overflow-wrap: anywhere` | /apps/configr/ | decide |
+| 9 | the gap after a heading follows its `mt-*` utility (4 to 20px; 0 in the article), where it was 9.6px | /cv/, /apps/, /articles/tags/ai/, the article | intended by pagr's markup |
+| 10 | card padding utilities apply (`p-6` 24px, `sm:p-8` 32px, `p-2`, `p-5`) | 9 cards | intended by pagr's markup |
+| 11 | `h2.mt-6` margin goes from 40 to 24px | /apps/configr/ | intended |
+| 12 | the search input's outline is gone, and its label's border turns `--primary` on focus: focus stays visible | /articles/ | acceptable |
+| 13 | the blockquote rule and the active tag chip's edge turn `--primary`: dead pagr intent, now live | the article, /articles/ | improvement |
+
+seedr web, read from source (it is on `^0.56.0` and not in this rollout):
+
+- Home's `h1.text-md` becomes bold.
+- The 17 `h2.comment` headings on Privacy and Impressum become bold.
+- 9 `h3.prompt` lose their 18px line height (15.6px).
+
+configr and seedr's studio import `tokens.css` alone, which stays unlayered: no cascade change. They
+gain the new tokens, the kill switch, the tone map and the `hidden` rule.
 
 Rules for a Tailwind author:
 
@@ -232,7 +244,7 @@ Rules for a Tailwind author:
 | `code`, `kbd`, `samp`, `pre` | the page's font at `--fs-base`, even inside a heading |
 | inline `code`, `kbd` | a `--muted` box, 1px `--border` hairline, `.05rem .35rem`, wraps anywhere; square |
 | `pre` | a `--muted` block, 1px `--border`, `.75rem 1rem`, `--lh-base`, scrolls sideways, `tab-size: 2`; its `code` draws no second box |
-| `mark` | `--warning` at 30% under `--foreground` text |
+| `mark` | `--warning` at 30% under `--foreground` text; in forced colours the palette's `Mark` under `MarkText` |
 | `hr` | one 1px `--border` rule, 1.5rem above and below |
 | `blockquote` | a 2px `--border` start rule, `.75rem` in, muted colour; a `cite` sits on its own line, upright |
 | `figure` | no margin; an `img`, `video` or `svg` inside is a block with a 1px `--border` edge; `figcaption` muted italic, `.5rem` below |
@@ -245,10 +257,15 @@ Rules for a Tailwind author:
   worst (green, over `--muted`). A mark that inherited its colour inside muted text (a caption, a
   table header, a nav label) would put `--muted-foreground` on the tint at 2.79–4.38:1.
 - **Zero specificity, with one exception you must not "tidy".** The rules are wrapped in
-  `:where()`, so any class beats them — except the heading size and weight and the code font,
-  which are plain type selectors. In a Tailwind app base.css shares `@layer base` with Preflight,
-  and Preflight resets exactly those properties with type selectors; the `:where()` form lost to it
-  (a bare h1, h2 and h3 rendered at 12px, weight 400). A class still beats a type selector.
+  `:where()`, so any class beats them — except the heading size and weight, the code font and
+  `pre`'s line height, which are plain type selectors. In a Tailwind app base.css shares
+  `@layer base` with Preflight, and Preflight resets exactly those properties with type selectors;
+  the `:where()` form lost to it (a bare h1, h2 and h3 rendered at 12px, weight 400). `pre`'s line
+  height has its own reason: the code font's `font` shorthand resets line height at type
+  specificity, so the block's own has to match it. A class still beats a type selector.
+- **In forced colours a mark is the palette's `Mark` under `MarkText`.** The mode swaps an author
+  background for Canvas and keeps its alpha, so the 30% tint faded to about 1.04:1 on the page and
+  a search hit vanished; the system pair is the reader's own highlight.
 - **Pages that relied on unstyled elements change.** A bare h3 goes from the browser's 14.04px to
   15px; code switches font. Style an element with a class if it must look different; do not reset
   the default locally.
@@ -273,6 +290,18 @@ Rules for a Tailwind author:
   neither ever fires.
 - In a Tailwind app, do not put `!` on a motion utility. The switch is unlayered `!important`, the
   weakest kind of important, so `!animate-spin` would outrank it.
+
+## `hidden` always hides (0.60.0)
+
+> **An element with the `hidden` attribute is not displayed, whatever `display` a class, a media
+> query or an inline style gives it. One rule in `tokens.css` does it; no component guards it.**
+
+- The browser's own `[hidden] { display: none }` loses to any author rule that sets `display`, so
+  a `.row { display: flex }` or a restacked table row stayed on screen, and in the accessibility
+  tree, where a screen reader announced it. `[hidden]:not([hidden="until-found" i]) { display: none
+  !important }` answers it once, for every element, on every surface that loads `tokens.css`.
+- `hidden="until-found"` is left alone: find-in-page must be able to reveal it.
+- To show an element, remove the attribute. Never add a `[hidden]` guard of your own.
 
 ## `data-tone`: one attribute colours every state (0.60.0)
 
@@ -304,6 +333,11 @@ configr's tone prop, seedr's per-component switch).
 `.text-destructive` `.text-info` `.text-pending` — one declaration each, `color: var(--token)`.
 
 - The names are Tailwind's own, so the same markup works in a build-free page and a Tailwind app.
+- **They ship in `utilities.css`, which the bundle imports after every component file** (only
+  `print.css` follows). A utility is written on a component — `.doc-link.text-primary`,
+  `.btn-terminal--ghost.text-destructive` — and at equal specificity the later rule wins, so the
+  bundle now resolves it the way a Tailwind app does. The Tailwind entry does not import the file:
+  Tailwind generates its own `text-*`.
 - **There is no `.text-muted`.** Tailwind renders that name as the `--muted` SURFACE colour, a
   background shade: the same class would be a readable label in one world and near-invisible text
   in the other. Quieter text is `.text-muted-foreground`.
@@ -346,11 +380,22 @@ choice.
 > **A glyph is a CSS mask of an `--ico-*` token, painted in `currentColor` and sized by an
 > `--icon-*` token. Never an `<img>`, never a pasted `<svg>` per page.**
 
+Draw one with `.ico` (icons.css) or `[data-icon]`. A glyph drawn in a rule of your own takes the
+whole recipe, its forced-colours half included:
+
 ```css
-inline-size: var(--icon-size);
-block-size: var(--icon-size);
-background: currentColor;
-mask: var(--ico-check) center / contain no-repeat;
+.glyph {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  background: currentColor;
+  mask: var(--ico-check) center / contain no-repeat;
+}
+@media (forced-colors: active) {
+  .glyph { forced-color-adjust: preserve-parent-color; color: inherit; }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .glyph { forced-color-adjust: none; background: CanvasText; }
+  }
+}
 ```
 
 A mask keeps only the shape and paints it in the current text colour, so one token is right on all
@@ -376,6 +421,13 @@ pencil were masks before any of this existed. The class and `data-icon` layer th
 - Source: lucide 0.575.0 (what seedr's lucide-react resolves), stroke 2 on a 24-unit box — the same
   drawing seedr and configr ship through lucide-react. Lucide's ISC notice and Feather's MIT notice
   travel with the tokens in `tokens.css`.
+- **The forced-colours half is not optional.** Windows High Contrast swaps every author
+  background for Canvas, and a mask glyph IS a background: without it all 21 glyphs paint nothing.
+  `preserve-parent-color` paints the glyph in the colour its parent was forced to (CanvasText in
+  text, LinkText in a link, ButtonText in a button), so the glyph declares no colour of its own
+  there. Not `forced-color-adjust: none` alone: the glyph keeps its author colour, measured at
+  1.11–1.78:1 against the forced palette, or nothing at all. CanvasText is the fallback for an
+  engine without the value.
 - **The glyph is decoration.** An icon-only control is named by its `aria-label`, which names the
   target ("remove shot-1.png"), not the glyph.
 - **Adding one:** one declaration in the icon block of `tokens.css`, generated from lucide rather

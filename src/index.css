@@ -3,9 +3,9 @@
  *
  * The no-Tailwind entry point. Import this one file and you get the full
  * terminal theme: a minimal reset, the four-theme token set, the document base,
- * every component primitive, and the print layer. Works in plain HTML, React,
- * Angular, Vue, a Tauri webview — anywhere CSS @import is understood, with no
- * build step.
+ * every component primitive, the text colour utilities and the print layer.
+ * Works in plain HTML, React, Angular, Vue, a Tauri webview — anywhere CSS
+ * @import is understood, with no build step.
  *
  *   import "@danieldeusing/design";          // package "." export
  *   <link rel="stylesheet" href=".../dist/danieldeusing-design.css">  // CDN
@@ -20,4 +20,7 @@
 @import "./components.css";
 @import "./chrome.css";
 @import "./tooltip.css";
+/* After every component file, so a text utility written on a component wins at equal
+   specificity, as it does in a Tailwind app. print.css stays last: on paper, print wins. */
+@import "./utilities.css";
 @import "./print.css";

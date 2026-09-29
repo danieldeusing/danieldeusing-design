@@ -69,7 +69,20 @@ const TEXT = ["foreground", "muted-foreground", "primary", "success", "warning",
 /* ── serve this checkout ─────────────────────────────────────────────────── */
 
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript" };
+// One page on the REAL build-free bundle, for the question the demo cannot answer: does a text
+// utility beat a component class that sets colour (F8)? The demo loads no component file.
+const BUNDLE_F8 = `<!doctype html><html data-theme="warm"><head><meta charset="utf-8">
+<link rel="stylesheet" href="/src/index.css"></head><body>
+<a id="f8-doclink" class="doc-link text-primary" href="#">doc-link text-primary</a>
+<p id="f8-prompt" class="prompt text-destructive">prompt text-destructive</p>
+<button id="f8-ghost" class="btn-terminal btn-terminal--ghost text-destructive">ghost text-destructive</button>
+<span id="probe"></span></body></html>`;
 const server = createServer((req, res) => {
+  if (req.url === "/__bundle-f8.html") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(BUNDLE_F8);
+    return;
+  }
   const path = normalize(join(root, decodeURIComponent(new URL(req.url, "http://x").pathname)));
   if (!path.startsWith(root) || !existsSync(path) || statSync(path).isDirectory()) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "content-type": `${TYPES[extname(path)] || "application/octet-stream"}; charset=utf-8` });
@@ -184,9 +197,10 @@ await sleep(150);
 
 /* ── the display step (the lead's ruling, 0.60.0) ───────────────────────── */
 
-// 30px below 48rem and 36px from it, the step danieldeusing.de's titles already take. 767 and 768
-// pin the breakpoint itself, so a media query written against another width cannot pass.
-for (const [width, px] of [[375, 30], [767, 30], [768, 36], [1440, 36]]) {
+// 30px below 40rem and 36px from it: danieldeusing.de's own `sm:` step, which is also the system's
+// phone breakpoint (F1). 639 and 640 pin the breakpoint itself, so a media query written against
+// another width cannot pass.
+for (const [width, px] of [[375, 30], [639, 30], [640, 36], [1440, 36]]) {
   await send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: false });
   await sleep(150);
   const [size, title, code, app] = await evaluate(`[M.len("--fs-display"),
@@ -299,8 +313,32 @@ check("<figure> has no margin; its svg a 1px edge; the caption muted italic",
   (await cs("el-figure", "marginLeft")) === "0px" && (await cs("el-figure-svg", "borderTopWidth")) === "1px"
     && (await cs("el-figcaption", "fontStyle")) === "italic"
     && (await cs("el-figcaption", "color")) === (await evaluate('M.tok("--muted-foreground")')));
-check("a class still beats an element default (.text-muted-foreground on a <p>)",
-  (await cs("el-muted-line", "color")) === (await evaluate('M.tok("--muted-foreground")')));
+check("in normal colours the mark is the 30% --warning tint (a forced-colours rule must not leak here)",
+  (await cs("el-mark", "backgroundColor")) === (await evaluate('M.tok("color-mix(in srgb, var(--warning) 30%, transparent)")')),
+  await cs("el-mark", "backgroundColor"));
+
+// A page's own rule must still beat an element default. The page loads these rules BEFORE the
+// system (examples/foundations.html, style#page-own), so specificity wins them, not order.
+check("a page's `.demo-scope h2` beats the heading default (20px, weight 400)",
+  (await cs("contest-scoped", "fontSize")) === "20px" && (await cs("contest-scoped", "fontWeight")) === "400",
+  `${await cs("contest-scoped", "fontSize")} ${await cs("contest-scoped", "fontWeight")}`);
+check("a page's `h2.demo-cls` beats the heading default (20px)",
+  (await cs("contest-cls", "fontSize")) === "20px", await cs("contest-cls", "fontSize"));
+check("a page's `.demo-scope code { border: 0 }` beats the inline-code box",
+  (await cs("contest-code", "borderTopWidth")) === "0px", await cs("contest-code", "borderTopWidth"));
+check("a page's `mark.demo-cls` beats the mark tint",
+  (await cs("contest-mark", "backgroundColor")) === "rgba(0, 0, 0, 0)", await cs("contest-mark", "backgroundColor"));
+
+/* ── X3 · `hidden` hides, whatever display an author set ─────────────────── */
+
+check("`hidden` beats a class that sets display: flex",
+  (await cs("hid-class", "display")) === "none", await cs("hid-class", "display"));
+check("`hidden` beats an inline style that sets display",
+  (await cs("hid-inline", "display")) === "none", await cs("hid-inline", "display"));
+check("`hidden` beats a table row a narrow-screen rule restacks as display: block",
+  (await cs("hid-row", "display")) === "none", await cs("hid-row", "display"));
+check('`hidden="until-found"` is NOT forced to display: none — find-in-page must be able to reveal it',
+  (await cs("hid-until", "display")) !== "none", await cs("hid-until", "display"));
 
 /* ── F6 · motion ──────────────────────────────────────────────────────────── */
 
@@ -372,6 +410,70 @@ const [plain, filled] = await evaluate(`Promise.all(["star", "star-filled"].map(
   x.drawImage(img, 0, 0, 24, 24); let n2 = 0; const d = x.getImageData(0, 0, 24, 24).data;
   for (let i = 3; i < d.length; i += 4) if (d[i] > 128) n2 += 1; return n2; }))`);
 check(`--ico-star-filled is the star with its fill closed (${filled} solid pixels vs ${plain})`, filled > plain * 1.5);
+
+/* ── X1 · forced colours: what WP1 draws by tint or mask still shows ─────── */
+
+// Forced colours (Windows High Contrast) swap every author background for Canvas, keeping its
+// alpha, and force text to the palette. So the mark's tint fades to about 1.04:1 on the page, and a
+// mask glyph — which IS a background — paints Canvas on Canvas. Measured as X1 says: in every theme
+// × palette cell, from the PAINTED colours, a glyph reaches 3:1 on what it sits on and text 4.5:1
+// on its ground. "Not Canvas" is not the test: a glyph under `forced-color-adjust: none` keeps its
+// author colour, which is never Canvas and can still be 1.1:1 against the palette.
+// The mark must also BE the palette's Mark. Its text stays readable on the faded tint (the forced
+// text colour on near-white), so contrast alone cannot see that the highlight itself vanished, and
+// in this mode the only colour that is the reader's highlight is the one their palette names.
+const FORCED_GLYPHS = [["the --icon-size glyph", "#ico-md"], ["an icon-list glyph", "#icon-list .demo-ico"], ["the spinner", "#spin"]];
+for (const theme of ["warm", "green", "mono", "paper"]) for (const palette of ["light", "dark"]) {
+  await send("Emulation.setEmulatedMedia", { media: "", features: [
+    { name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: palette }] });
+  await sleep(50);
+  const cell = await evaluate(`(() => { M.theme(${JSON.stringify(theme)});
+    const sys = (name) => { const p = M.probe(); p.style.cssText = "forced-color-adjust: none; background-color: " + name;
+      const v = getComputedStyle(p).backgroundColor; p.remove(); return v; };
+    const clear = (c) => c === "transparent" || /^rgba\\(.*, 0\\)$/.test(c);
+    // What an element sits on: the nearest ancestor that paints a background, as rgb.
+    const ground = (el) => { let b = el.parentElement; while (b && clear(getComputedStyle(b).backgroundColor)) b = b.parentElement;
+      return M.px(b ? getComputedStyle(b).backgroundColor : "#fff"); };
+    // A colour as it paints over a ground, and its contrast with that ground.
+    const on = (colour, under) => M.ratio(M.px(colour, "rgb(" + under + ")"), under);
+    const mark = document.getElementById("el-mark"), ms = getComputedStyle(mark);
+    return { forced: matchMedia("(forced-colors: active)").matches, mark: ms.backgroundColor, markSys: sys("Mark"),
+      markText: on(ms.color, M.px(ms.backgroundColor, "rgb(" + ground(mark) + ")")),
+      glyphs: ${JSON.stringify(FORCED_GLYPHS)}.map(([name, sel]) => { const el = document.querySelector(sel);
+        return [name, on(getComputedStyle(el).backgroundColor, ground(el))]; }),
+      edges: [["inline <code>", "el-code"], ["<pre>", "el-pre"]].map(([name, id]) => { const el = document.getElementById(id);
+        return [name, getComputedStyle(el).borderTopWidth, on(getComputedStyle(el).borderTopColor, ground(el))]; }) }; })()`);
+  const where = `forced colours, ${theme}, ${palette} palette`;
+  check(`${where}: precondition — the mode is on`, cell.forced);
+  check(`${where}: <mark> is the palette's own Mark, opaque, its text ${r2(cell.markText)}:1 on it`,
+    cell.mark === cell.markSys && cell.markText >= 4.5, `${cell.mark} vs Mark ${cell.markSys}, text ${r2(cell.markText)}:1`);
+  const faint = cell.glyphs.filter(([, ratio]) => !(ratio >= 3));
+  check(`${where}: every glyph the recipe draws reaches 3:1 on what it sits on (${cell.glyphs.map(([, ratio]) => r2(ratio)).join(", ")})`,
+    faint.length === 0, faint.map(([name, ratio]) => `${name} ${r2(ratio)}:1`).join("; "));
+  const lost = cell.edges.filter(([, width, ratio]) => width !== "1px" || !(ratio >= 3));
+  check(`${where}: inline code and the code block keep a 3:1 edge where their fill is gone`,
+    lost.length === 0, lost.map(([name, width, ratio]) => `${name} ${width} ${r2(ratio)}:1`).join("; "));
+}
+await send("Emulation.setEmulatedMedia", { media: "", features: [] });
+await evaluate('M.theme("warm"); null');
+
+/* ── F8 in the build-free bundle: a utility beats a component colour ─────── */
+
+// utilities.css comes after every component file: a later component rule that sets colour would
+// otherwise outrank the utility at equal specificity (.doc-link.text-primary and friends). Only
+// print.css follows it, as a Tailwind app's unlayered print.css follows its utilities.
+const bundleImports = [...readFileSync(join(root, "src/index.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "")
+  .matchAll(/@import\s+(?:url\(\s*)?["']\.\/([^"']+)["']/g)].map((m) => m[1]);
+check("src/index.css imports utilities.css after every component file, and only print.css after it",
+  bundleImports.at(-2) === "utilities.css" && bundleImports.at(-1) === "print.css", bundleImports.join(", "));
+await send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/__bundle-f8.html` });
+await sleep(700);
+for (const [id, token, pair] of [["f8-doclink", "--primary", ".doc-link.text-primary"],
+  ["f8-prompt", "--destructive", ".prompt.text-destructive"], ["f8-ghost", "--destructive", ".btn-terminal--ghost.text-destructive"]]) {
+  const [got, want] = await evaluate(`[getComputedStyle(document.getElementById(${JSON.stringify(id)})).color, (() => {
+    const p = document.getElementById("probe"); p.style.color = "var(${token})"; return getComputedStyle(p).color; })()]`);
+  check(`in the build-free bundle, ${pair} takes the utility's colour`, got === want, `${got} vs ${token} ${want}`);
+}
 
 console.log(failures ? `\ncheck-foundations: ${failures} FAILED` : "\ncheck-foundations: all checks passed");
 process.exit(failures ? 1 : 0);

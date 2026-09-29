@@ -79,7 +79,7 @@
   /* The per-theme inputs of the derived colours below (DERIVED COLOURS). */
   --cat-l: 0.45;           /* categorical text, worst over the whole hue circle: 5.57:1 */
   --cat-c: 0.075;
-  --backdrop: rgb(0 0 0 / 0.5);
+  --backdrop: rgb(0 0 0 / 0.5);   /* a --card dialog on the dimmed page: 3.62:1 by its fill */
 
   --radius: 0rem;
 
@@ -115,7 +115,7 @@ html[data-theme="green"] {
   --scanline-opacity: 0.5;
   --cat-l: 0.74;           /* 7.65:1 worst */
   --cat-c: 0.12;
-  --backdrop: rgb(0 0 0 / 0.6);
+  --backdrop: rgb(0 0 0 / 0.6);   /* dims only: a dialog's fill 1.08:1 on it, its --control-edge 4.89:1 */
 }
 
 /* white-phosphor terminal */
@@ -147,7 +147,7 @@ html[data-theme="mono"] {
   --scanline-opacity: 0.45;
   --cat-l: 0.74;           /* 7.71:1 worst */
   --cat-c: 0.12;
-  --backdrop: rgb(0 0 0 / 0.6);
+  --backdrop: rgb(0 0 0 / 0.6);   /* dims only: a dialog's fill 1.07:1 on it, its --control-edge 5.55:1 */
 }
 
 /* black-on-white terminal (e-ink / printout) */
@@ -179,7 +179,7 @@ html[data-theme="paper"] {
   --scanline-opacity: 0.12;
   --cat-l: 0.45;           /* 6.18:1 worst */
   --cat-c: 0.075;
-  --backdrop: rgb(0 0 0 / 0.5);
+  --backdrop: rgb(0 0 0 / 0.5);   /* a --card dialog on the dimmed page: 3.64:1 by its fill */
 }
 
 /*
@@ -295,11 +295,12 @@ html[data-theme="paper"] {
 
      What survives is the part that is genuinely a hierarchy: three heading steps, each a clear
      jump rather than a nudge. If something needs to be quieter than body text, that is what
-     `--muted-foreground` and `opacity` are for — colour and weight separate a label from its value
-     far better than one pixel ever did, and they keep working at any zoom. */
+     `--muted-foreground` is for — never an opacity step, which is an alpha nobody measured
+     (utilities.css). Colour and weight separate a label from its value far better than one pixel
+     ever did, and they keep working at any zoom. */
   --fs-base: 0.75rem;   /* 12px — ALL normal text: body, tables, labels, badges, notes, controls */
   --fs-lg: 0.9375rem;   /* 15px — h3 / section heads */
-  --fs-xl: 1.125rem;    /* 18px — h2 / page title */
+  --fs-xl: 1.125rem;    /* 18px — h2, a dialog title, a stat value */
 
   /* ── VERTICAL RHYTHM BETWEEN SECTIONS ──────────────────────────────────────
      The reset zeroes every margin (`* { margin: 0 }`) and nothing here ever put
@@ -313,7 +314,7 @@ html[data-theme="paper"] {
      2.5rem is cockpit's existing value, promoted rather than invented, so the
      surface that already had a considered answer does not move. */
   --space-section: 2.5rem;
-  --fs-2xl: 1.5rem;     /* 24px — h1 / hero, display only */
+  --fs-2xl: 1.5rem;     /* 24px — h1 and .page-title: an app page's title */
 
   --lh-tight: 1.3;      /* headings and single-line chrome */
   --lh-base: 1.5;       /* body copy; matches base.css */
@@ -329,20 +330,21 @@ html[data-theme="paper"] {
 /*
  * ── ONE DISPLAY STEP, for a public page's title (0.60.0) ────────────────────────
  *
- * danieldeusing.de titles its pages at 30px, and at 36px from 48rem wide (Tailwind `text-3xl
- * md:text-4xl`), while the scale above tops out at --fs-2xl, 24px. The public site is a source of
- * truth, so the ruling (the lead, 2026-09-28) was to give the system ONE display step rather than
- * shrink the site's titles to fit the scale. The step carries the site's own breakpoint, so a
- * title that uses it needs no media query of its own.
+ * danieldeusing.de titles its pages at 30px, and at 36px from 40rem wide (Tailwind `text-3xl
+ * sm:text-4xl`, on all twelve of its page titles), while the scale above tops out at --fs-2xl,
+ * 24px. The public site is a source of truth, so the ruling (the lead, 2026-09-28) was to give the
+ * system ONE display step rather than shrink the site's titles to fit the scale. The step carries
+ * the site's own breakpoint — 40rem, its `sm:`, which is also where the system's phone gutter
+ * steps (--content-pad, below) — so a title that uses it needs no media query of its own.
  *
  * WHO MAY USE IT: a public-site page title (`.page-title--display`, in content.css) and an error
  * page's status code. Nothing else. An app surface's title stays --fs-2xl, and this is not a text
  * size: nothing a person reads as body copy, a label or a heading inside a page takes it.
  */
 :root {
-  --fs-display: 1.875rem;   /* 30px, below 48rem */
+  --fs-display: 1.875rem;   /* 30px, below 40rem */
 }
-@media (min-width: 48rem) {
+@media (min-width: 40rem) {
   :root { --fs-display: 2.25rem; }   /* 36px */
 }
 
@@ -532,14 +534,52 @@ html.anim-off .cursor-block {
 }
 
 /*
+ * ── `hidden` HIDES — one rule, in the one file every surface loads (0.60.0) ─────
+ *
+ * The UA's `[hidden] { display: none }` is a one-attribute selector, so ANY author rule that sets
+ * `display` outruns it: a class with `display: flex`, an inline `style="display: block"`, or a
+ * narrow-screen query that restacks a key/value table as `.ask table.kv tr { display: block }`.
+ * The element stays on screen, and that is worse than a cosmetic slip: an element `hidden` failed
+ * to hide is still in the accessibility tree, so a screen reader announces rows nobody can see.
+ * initTablePagination() pages a table this way, and every component that toggles `hidden` relies
+ * on it.
+ *
+ * So the system answers it ONCE, here and not beside a component: tokens.css is the one file every
+ * surface loads (netmon, configr and seedr's studio load it without base.css), and one rule covers
+ * every element, so no component carries a `[hidden]` guard of its own. `!important` because it
+ * must beat every rule that sets `display` whatever its specificity, an inline style included.
+ * `hidden="until-found"` is left to the UA: find-in-page reveals such an element, and the UA hides
+ * it with `content-visibility`, not `display`. The `i` is the UA's own: the attribute's keywords
+ * are case-insensitive.
+ */
+[hidden]:not([hidden="until-found" i]) { display: none !important; }
+
+/*
  * ── ICON MASKS — the token half of the icon system (0.60.0) ─────────────────────
  *
  * One lucide icon per token, as an SVG data url for a CSS MASK — never for an <img> or a
- * background image:
+ * background image. `.ico` (icons.css) and `[data-icon]` draw them; a glyph drawn in a rule of its
+ * own takes the whole recipe, its forced-colours half included:
  *
- *     inline-size: var(--icon-size); block-size: var(--icon-size);
- *     background: currentColor;
- *     mask: var(--ico-check) center / contain no-repeat;
+ *     .glyph {
+ *       inline-size: var(--icon-size); block-size: var(--icon-size);
+ *       background: currentColor;
+ *       mask: var(--ico-check) center / contain no-repeat;
+ *     }
+ *     @media (forced-colors: active) {
+ *       .glyph { forced-color-adjust: preserve-parent-color; color: inherit; }
+ *       @supports not (forced-color-adjust: preserve-parent-color) {
+ *         .glyph { forced-color-adjust: none; background: CanvasText; }
+ *       }
+ *     }
+ *
+ * The second half is not optional. Forced colours (Windows High Contrast) swap every author
+ * background for Canvas, and a mask glyph IS a background: without it all 21 glyphs paint nothing.
+ * `preserve-parent-color` paints the glyph in the colour its parent was forced to — CanvasText in
+ * text, LinkText in a link, ButtonText in a button — which is why the glyph must not keep a colour
+ * of its own there (`color: inherit`). NOT `forced-color-adjust: none` alone: the glyph then keeps
+ * its AUTHOR colour, measured at 1.11-1.78:1 against the forced palette, or nothing at all.
+ * CanvasText is the fallback for an engine without the value.
  *
  * A mask keeps only the shape and paints it in currentColor, so one token is right on all four
  * themes and in every state colour with no fill declared per theme — the reason the bin and the

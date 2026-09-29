@@ -220,9 +220,9 @@ filters and sorts `rows`, the full array, and still writes every matching row in
   in-place patching (`dom-patch.js`), which exists so a refresh cannot destroy half-typed input —
   a pager that re-rendered the table would hand all of that back. `dom-patch.js` exempts `hidden`
   on a `<tr>` for the same reason it exempts `open` on a `<details>`: the renderer does not own it.
-- **`tr[hidden] { display: none !important }`** ships in `base.css`, because the UA's
-  one-attribute rule loses to any rule setting `display` on a row — and a `hidden` that loses to a
-  stylesheet is still announced by a screen reader.
+- **A `hidden` row stays hidden**: tokens.css's `[hidden]` rule (`display: none !important`, on
+  every element) beats any rule setting `display` on a row, which the UA's one-attribute rule loses
+  to — and a `hidden` that loses to a stylesheet is still announced by a screen reader.
 - An engine that renders a "nothing matched" message as a `<tr>` must mark it
   `data-table-placeholder`, or the pager counts a message as data.
 - **`.table-pager` is not for a surface that loads only tokens+chrome.** It is built from

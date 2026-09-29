@@ -32,8 +32,9 @@
  * written on. That is the precedence a Tailwind author already expects.
  *
  * Two files stay unlayered on purpose:
- *   · tokens.css is variables, the kill switch and the tone map. configr and seedr's studio import
- *     it directly and unlayered; the same file must not cascade differently through this entry.
+ *   · tokens.css is variables, the kill switch, the tone map and the `hidden` rule. configr and
+ *     seedr's studio import it directly and unlayered; the same file must not cascade differently
+ *     through this entry.
  *   · print.css must beat everything on paper, a utility included (a `flex` on the chrome must not
  *     keep it on the page), and only unlayered normal declarations beat every layer.
  *
@@ -41,8 +42,11 @@
  * is unlayered again, and reinstates for that file the exact failure described above.
  * scripts/check-tailwind-layers.mjs compiles this entry with Tailwind and fails if it does.
  *
- * The build-free bundle (index.css) is untouched and stays unlayered: with no Tailwind there are
- * no utilities to yield to, and a surface's own unlayered stylesheet still wins on source order.
+ * The build-free bundle (index.css) stays unlayered: with no Tailwind there are no utilities to
+ * yield to, and a surface's own unlayered stylesheet still wins on source order. Its text colour
+ * utilities (utilities.css) come after its component files, for the precedence this entry gets from
+ * layers. This entry does NOT import them: Tailwind generates its own `text-*` from the colours
+ * below, in its utilities layer.
  */
 
 @import "./tokens.css";
@@ -100,8 +104,12 @@
   --font-mono: var(--font-mono);
 
   /* Every radius step is 0, including the four Tailwind has that this file used to leave at their
-     defaults — `rounded-2xl` was 1rem until 0.60.0. `rounded-full` is not a theme step and stays
-     round: it is for a true circle (a dot, a radio), the one shape the no-radius rule allows. */
+     defaults — `rounded-2xl` was 1rem until 0.60.0 — and bare `rounded`, which reads Tailwind's
+     own `--radius` key (0.25rem by default). That one is a literal, because `var(--radius)` under
+     its own name would be a self-reference in the theme layer Tailwind emits. `rounded-full` is not
+     a theme step and stays round: it is for a true circle (a dot, a radio), the one shape the
+     no-radius rule allows. */
+  --radius: 0rem;
   --radius-xs: var(--radius);
   --radius-sm: var(--radius);
   --radius-md: var(--radius);
@@ -128,8 +136,8 @@
   --text-fs-lg: var(--fs-lg);
   --text-fs-xl: var(--fs-xl);
   --text-fs-2xl: var(--fs-2xl);
-  /* The one display step (0.60.0): `text-fs-display`, 30px and 36px from 48rem — the token carries
-     the breakpoint, so it replaces `text-3xl md:text-4xl` with one class. For a public-site page
+  /* The one display step (0.60.0): `text-fs-display`, 30px and 36px from 40rem — the token carries
+     the breakpoint, so it replaces `text-3xl sm:text-4xl` with one class. For a public-site page
      title and an error page's status code ONLY; an app's title stays `text-fs-2xl`, and nothing a
      person reads as text takes it. It sets the size alone: the line height stays the heading's
      (--lh-tight), where `text-3xl` brought its own 1.2. */

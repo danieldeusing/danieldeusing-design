@@ -16,12 +16,16 @@
  *     `:focus-visible`, `leading-9` against the body's line height);
  *   · the element defaults still beat Tailwind's Preflight, which lives in the same `base` layer
  *     (a bare <h2> is --fs-xl, a <code> is the page's font) — and a utility still beats them;
- *   · tokens.css and print.css stayed unlayered (the tokens resolve, the kill switch stops a
- *     utility's transition, and on paper print.css beats a utility);
- *   · the theme keys this entry adds resolve (`rounded-2xl` is square, `text-cat-teal`,
- *     `border-control-edge`, `shadow-float`).
+ *   · tokens.css stayed unlayered: a consumer's own `@layer utilities` override of a token does
+ *     not win, which it would if tokens.css sat in any layer below utilities; and its kill switch
+ *     stops a utility's transition;
+ *   · print.css stayed unlayered: on paper it beats a utility;
+ *   · the theme keys this entry adds resolve (`rounded-2xl` and bare `rounded` are square,
+ *     `text-cat-teal`, `border-control-edge`, `shadow-float`);
+ *   · a text utility beats a component's colour (`.doc-link.text-primary`), as in the bundle.
  * And, with no compiler needed, that every import in src/tailwind.css carries the layer its file
- * belongs in.
+ * belongs in — reading every @import, in either quote style or url(), and failing on one it cannot
+ * read rather than skipping it.
  *
  * NO DEPENDENCY. The design system installs nothing, so the compiler is borrowed from a consumer
  * on this machine (`@tailwindcss/node`, which configr has) and the browser is the headless chromium
@@ -63,8 +67,18 @@ const finish = () => {
 
 /* ── the static half: every import carries its layer ─────────────────────── */
 
-const imports = [...readFileSync(ENTRY, "utf8").matchAll(/@import\s+"\.\/([^"]+)"\s*([^;]*);/g)]
-  .map(([, file, rest]) => ({ file, layer: (rest.match(/layer\(([^)]*)\)/) || [])[1] ?? null }));
+// Comments stripped first: the header's usage example is an @import too and must not count.
+const entryCss = readFileSync(ENTRY, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const statements = entryCss.match(/@import\b[^;]*;/g) || [];
+const IMPORT = /^@import\s+(?:url\(\s*)?(["'])\.\/([^"']+)\1\s*\)?\s*([^;]*);$/;
+const imports = statements.flatMap((statement) => {
+  const m = statement.match(IMPORT);
+  return m ? [{ file: m[2], layer: (m[3].match(/layer\(([^)]*)\)/) || [])[1] ?? null }] : [];
+});
+// A statement this check cannot read is a FAIL, not a skip: an import it silently ignored is
+// exactly the one that could be unlayered.
+check(`every @import in the entry is one this check can read (${imports.length} of ${statements.length})`,
+  imports.length === statements.length, statements.filter((s) => !IMPORT.test(s)).join(" "));
 const expected = (file) => (file === "tokens.css" || file === "print.css" ? null : file === "base.css" ? "base" : "components");
 check("the entry imports tokens, base, the component files and print",
   ["tokens.css", "base.css", "components.css", "print.css"].every((f) => imports.some((i) => i.file === f)),
@@ -111,8 +125,11 @@ const CANDIDATES = [
   "p-6", "px-3", "border", "border-primary", "outline-none", "leading-9", "text-2xl", "flex",
   "rounded-xs", "rounded-2xl", "rounded-full", "text-cat-teal", "border-control-edge",
   "shadow-float", "shadow-modal", "transition-colors", "hidden", "text-fs-display",
+  "rounded", "text-primary", "text-destructive",
 ];
-const compiler = await compile(`@import "tailwindcss";\n@import "${ENTRY}";\n`, {
+// The last line is a consumer overriding a token from its own utilities layer. It must NOT win:
+// tokens.css is unlayered, and only a layered tokens.css would lose to it.
+const compiler = await compile(`@import "tailwindcss";\n@import "${ENTRY}";\n@layer utilities { :root { --control-h: 99px; } }\n`, {
   base: dirname(dirname(TW_NODE)), onDependency() {},
 });
 const COMPILED = compiler.build(CANDIDATES);
@@ -140,6 +157,10 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8">
 <div id="r-xs" class="border rounded-xs">xs</div>
 <div id="r-2xl" class="border rounded-2xl">2xl</div>
 <div id="r-full" class="border rounded-full">full</div>
+<div id="r-bare" class="border rounded">bare</div>
+<a id="tw-doclink" class="doc-link text-primary" href="#">doc-link text-primary</a>
+<p id="tw-prompt" class="prompt text-destructive">prompt text-destructive</p>
+<button id="tw-ghost" class="btn-terminal btn-terminal--ghost text-destructive">ghost text-destructive</button>
 <span id="cat" class="text-cat-teal">teal</span>
 <div id="ctl-edge" class="border border-control-edge">control edge</div>
 <div id="float" class="shadow-float">float</div>
@@ -262,6 +283,13 @@ check("<pre> is the page's font too",
 
 check("`rounded-2xl` is square", (await style("r-2xl", "borderTopLeftRadius")) === "0px", await style("r-2xl", "borderTopLeftRadius"));
 check("`rounded-xs` is square", (await style("r-xs", "borderTopLeftRadius")) === "0px", await style("r-xs", "borderTopLeftRadius"));
+check("bare `rounded` is square too — it reads Tailwind's own `--radius` key, 0.25rem by default",
+  (await style("r-bare", "borderTopLeftRadius")) === "0px", await style("r-bare", "borderTopLeftRadius"));
+for (const [id, name, pair] of [["tw-doclink", "--primary", ".doc-link.text-primary"],
+  ["tw-prompt", "--destructive", ".prompt.text-destructive"], ["tw-ghost", "--destructive", ".btn-terminal--ghost.text-destructive"]]) {
+  check(`in a Tailwind app, ${pair} takes the utility's colour (the same markup as the bundle)`,
+    (await style(id, "color")) === (await token(name)), `${await style(id, "color")} vs ${await token(name)}`);
+}
 check("`rounded-full` stays a circle — it is not a theme step and a dot needs it",
   (await style("r-full", "borderTopLeftRadius")) !== "0px", await style("r-full", "borderTopLeftRadius"));
 // Not only "equal": an undefined token and an ungenerated utility both fall back to the inherited
@@ -276,7 +304,7 @@ check("`border-control-edge` resolves to --control-edge",
 const displaySize = await evaluate(`(() => { const p = document.getElementById("probe");
   p.style.cssText = "position:absolute;inline-size:var(--fs-display)"; const w = p.getBoundingClientRect().width;
   p.style.cssText = ""; return w; })()`);
-check("`text-fs-display` is --fs-display (30px, 36px from 48rem) and beats the h1 default",
+check("`text-fs-display` is --fs-display (30px, 36px from 40rem) and beats the h1 default",
   (await style("display", "fontSize")) === `${displaySize}px` && (displaySize === 30 || displaySize === 36),
   `${await style("display", "fontSize")} vs --fs-display ${displaySize}px`);
 check("`shadow-float` is the 20px glow", String(await style("float", "boxShadow")).includes("20px"), await style("float", "boxShadow"));
@@ -284,8 +312,9 @@ check("`shadow-modal` is the 40px glow", String(await style("modal", "boxShadow"
 
 /* ── tokens.css stayed unlayered ────────────────────────────────────────── */
 
-check("the tokens resolve on :root (--control-h)",
-  (await evaluate('getComputedStyle(document.documentElement).getPropertyValue("--control-h").trim()')) === "1.75rem");
+check("tokens.css is unlayered: a consumer's `@layer utilities` override of --control-h does not win",
+  (await evaluate('getComputedStyle(document.documentElement).getPropertyValue("--control-h").trim()')) === "1.75rem",
+  await evaluate('getComputedStyle(document.documentElement).getPropertyValue("--control-h").trim()'));
 check("precondition: `transition-colors` animates while motion is on",
   (await style("fade", "transitionDuration")) !== "0s", await style("fade", "transitionDuration"));
 await evaluate('document.documentElement.classList.add("anim-off"); null');

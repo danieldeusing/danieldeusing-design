@@ -1,0 +1,33 @@
+/*
+ * danieldeusing-design — text colour utilities (0.60.0).
+ *
+ * cockpit carried seven local status-colour classes and four opacity steps across five pages,
+ * seedr's studio a set of its own, and every one re-declared what a token already says. One
+ * declaration per token, and the names are Tailwind's: in a Tailwind app `text-success` is the
+ * same word resolving to the same token, so markup moves between the two worlds unchanged.
+ *
+ * There is NO `.text-muted`. Tailwind renders that name as the --muted SURFACE colour, a
+ * background shade, so one class would be a readable label here and near-invisible text there.
+ * Quieter text is `.text-muted-foreground`. And there is no opacity step: "quieter" is the muted
+ * token, whose contrast is measured, not an alpha nobody measured.
+ *
+ * ⚠️ index.css IMPORTS THIS FILE AFTER EVERY COMPONENT FILE, and the order is the point. A utility
+ * is written ON a component — `.doc-link.text-primary`, `.prompt.text-destructive`,
+ * `.btn-terminal--ghost.text-destructive` — and at equal specificity the later rule wins. While
+ * these lived in base.css, which the bundle loads before components.css, the component's own
+ * colour won and the utility did nothing, and the same markup in a Tailwind app took the utility,
+ * whose layer comes after components. After the components, the markup means the same in both
+ * worlds. Only print.css comes later, as it does in a Tailwind app: on paper, print wins.
+ *
+ * The Tailwind entry does NOT import this file: Tailwind generates its own `text-*` for these
+ * names from the @theme colours, in its utilities layer. scripts/check-foundations.mjs asserts the
+ * three pairs above in the bundle, and where index.css imports this file.
+ */
+.text-foreground { color: var(--foreground); }
+.text-muted-foreground { color: var(--muted-foreground); }
+.text-primary { color: var(--primary); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-destructive { color: var(--destructive); }
+.text-info { color: var(--info); }
+.text-pending { color: var(--pending); }

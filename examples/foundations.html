@@ -21,11 +21,21 @@
       })();
     </script>
 
+    <!-- A page's OWN rules, deliberately loaded BEFORE the system: an element default must lose to them
+         by specificity, not by stylesheet order. check-foundations reads the contest elements in F5. -->
+    <style id="page-own">
+      .demo-scope h2 { font-size: 20px; font-weight: 400; }
+      h2.demo-cls { font-size: 20px; }
+      .demo-scope code { border: 0; }
+      mark.demo-cls { background: transparent; }
+    </style>
+
     <!-- What a build-free page gets from the bundle, minus the component files: WP1 is the token
-         layer and the element defaults, and must stand on these three alone. -->
+         layer, the element defaults and the text utilities, and must stand on these alone. -->
     <link rel="stylesheet" href="../src/reset.css" />
     <link rel="stylesheet" href="../src/tokens.css" />
     <link rel="stylesheet" href="../src/base.css" />
+    <link rel="stylesheet" href="../src/utilities.css" />
 
     <style>
       /* Page-only layout. Every colour and size below is a token; nothing here is part of the
@@ -93,6 +103,13 @@
       .demo-popup p { padding: 0.3rem 0.75rem; }
       .demo-popup p:first-child { background: var(--muted); }
       .demo-spin { background: currentColor; mask: var(--ico-loader-circle) center / contain no-repeat; inline-size: var(--icon-lg); block-size: var(--icon-lg); animation: dd-spin 1s linear infinite; color: var(--primary); }
+      /* The recipe's forced-colours half (tokens.css, ICON MASKS): without it every glyph paints Canvas. */
+      @media (forced-colors: active) {
+        .demo-ico, .demo-spin { forced-color-adjust: preserve-parent-color; color: inherit; }
+        @supports not (forced-color-adjust: preserve-parent-color) {
+          .demo-ico, .demo-spin { forced-color-adjust: none; background: CanvasText; }
+        }
+      }
       .demo-pulse { animation: dd-pulse 2s ease-in-out infinite; }
       .demo-fade { padding: 0.3rem 0.6rem; border: 1px solid var(--control-edge); transition: background-color 0.15s ease, color 0.15s ease; }
       .demo-fade:hover { background: var(--primary); color: var(--primary-foreground); }
@@ -104,11 +121,13 @@
       .demo-values { color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
       .demo-display { font-size: var(--fs-display); font-weight: 700; line-height: var(--lh-tight); color: var(--primary); }
       section { scroll-margin-top: 4rem; }
+      .demo-flex { display: flex; gap: 0.5rem; }
+      .demo-restack { display: block; }
     </style>
   </head>
   <body>
     <div class="demo-bar">
-      <span><strong>foundations</strong> <span class="demo-label">· WP1 · tokens.css + base.css</span></span>
+      <span><strong>foundations</strong> <span class="demo-label">· WP1 · tokens.css + base.css + utilities.css</span></span>
       <span class="demo-controls" role="group" aria-label="theme">
         <button type="button" class="demo-btn" data-set-theme="warm">warm</button>
         <button type="button" class="demo-btn" data-set-theme="green">green</button>
@@ -163,7 +182,7 @@
       <section id="display">
         <h2>The display step · --fs-display</h2>
         <p class="demo-lede">One size above the heading scale, for a public-site page title and an error page's status code only:
-          30px, 36px from 48rem. An app's title stays --fs-2xl. Resize the window across 48rem to see it step.</p>
+          30px, 36px from 40rem. An app's title stays --fs-2xl. Resize the window across 40rem to see it step.</p>
         <p class="demo-label">a public page title (what .page-title--display will wear)</p>
         <h1 class="demo-display" id="display-title">Articles<span class="cursor-block demo-cursor" aria-hidden="true"></span></h1>
         <p class="demo-label" style="margin-top: 0.75rem">an error page's status code</p>
@@ -238,6 +257,27 @@
           <div class="demo-surface" data-surface="card"><p>On --card: <code>inline</code> and <mark>mark</mark>.</p></div>
           <div class="demo-surface" data-surface="muted"><p>On --muted: <code>inline</code> and <mark>mark</mark>.</p></div>
         </div>
+      </section>
+
+      <!-- ── contests: a page's own rule beats an element default ─────────── -->
+      <section id="contests">
+        <h2>A page's own rule beats an element default</h2>
+        <p class="demo-lede">These rules load BEFORE the system (the page-own style block), so each wins by specificity alone.</p>
+        <div class="demo-scope"><h2 id="contest-scoped">.demo-scope h2 · 20px, weight 400</h2>
+          <p><code id="contest-code">.demo-scope code · no box</code></p></div>
+        <h2 class="demo-cls" id="contest-cls">h2.demo-cls · 20px</h2>
+        <p><mark class="demo-cls" id="contest-mark">mark.demo-cls · no tint</mark></p>
+      </section>
+
+      <!-- ── X3 ─────────────────────────────────────────────────────────── -->
+      <section id="x3">
+        <h2>X3 · hidden hides, whatever display an author set</h2>
+        <p class="demo-lede">Nothing below is visible. The last line is hidden="until-found": searching the page for
+          "reveal this" shows it, which is why the rule must not force it to display: none.</p>
+        <div class="demo-flex" id="hid-class" hidden>a class that sets display: flex, plus hidden</div>
+        <span id="hid-inline" style="display: inline-block" hidden>an inline display, plus hidden</span>
+        <table><tbody><tr class="demo-restack" id="hid-row" hidden><td>a row a narrow-screen rule restacks, plus hidden</td></tr></tbody></table>
+        <div class="demo-flex" id="hid-until" hidden="until-found">hidden="until-found": find-in-page can reveal this</div>
       </section>
 
       <!-- ── F6 ─────────────────────────────────────────────────────────── -->

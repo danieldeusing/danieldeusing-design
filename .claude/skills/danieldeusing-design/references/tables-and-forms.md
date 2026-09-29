@@ -121,9 +121,10 @@ every `required` select.
   1.37 / 2.00 / 1.61 / 1.42 against `--background` — invisible as a control edge, where WCAG 1.4.11
   wants 3:1 — and 60% clears it on all four themes against all three surfaces a control can land
   on (warm binds, at 3.26 on `--muted`). Focus adds the `--primary` edge to the `--ring` outline;
-  `aria-invalid="true"` on the `<select>` gives the trigger the `--destructive` edge. It is the
-  height of the text field and the compact button beside it ("One control height" in
-  `components.md`). A disabled select keeps its edge under the pointer: it does not answer it at all.
+  `aria-invalid="true"` on the `<select>` gives the trigger the `--destructive` edge, and, as on
+  every field, the select names a `.field-error` through `aria-describedby` that says what is wrong
+  — the edge alone is colour. It is the height of the text field and the compact button beside it
+  ("One control height" in `components.md`). A disabled select keeps its edge under the pointer: it does not answer it at all.
 - **Under forced colours the caret is text.** The mode drops the gradient that draws it, so the
   trigger draws its ▾ as a glyph instead; a bare `<select>` that no runtime enhanced has no caret
   there — one more reason every page calls `initSelects()`.
@@ -343,6 +344,8 @@ spellings.
   whole line under the control inside `.field-val`, muted and `--destructive`. Point the control at
   both with `aria-describedby`, set `aria-invalid="true"` on it while the error stands (the field
   takes the `--destructive` edge), and give an error that appears after an action `role="alert"`.
+  **`aria-invalid` never stands without its `.field-error`**: the edge is colour alone (WCAG 1.4.1)
+  and says nothing about the fix (3.3.1).
 - **`.field-row--top`** heads a tall value with its label — a textarea, a stack of radios — where a
   centred label reads as belonging to neither line.
 - **`.field-row--stacked`** puts the label over the value at every width, for a value that needs

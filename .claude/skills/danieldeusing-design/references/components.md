@@ -1,9 +1,10 @@
-# Components: buttons, fields, menus, folds, cards, row actions, the rail, hovers, `.eli5`
+# Components: buttons, fields, menus, folds, cards, row actions, the rail, `.eli5`
 
 Reference for the `danieldeusing-design` skill. Read it before you write a button, a text field, a
 dropdown menu, a theme switcher or a fold, lay out a card, write a row action, mark the rail's
-current page, touch `.ls-perm`, add a hover explanation or an `.eli5` box. The component
-vocabulary, and the rule that a consumer never redeclares any of it, are in `SKILL.md`.
+current page, touch `.ls-perm` or add an `.eli5` box. The component vocabulary, and the rule that
+a consumer never redeclares any of it, are in `SKILL.md`. A hover explanation (`data-tip`, never
+`title`) is in `overlays.md`.
 
 Contents:
 
@@ -21,10 +22,10 @@ Contents:
 - `.card-terminal` (0.60.0)
 - The minimap: a TOC or a minimap, never both (0.60.0)
 - The diagram zoom opens a `<dialog>` (0.60.0)
+- `.anim-toggle` (0.60.0)
 - Forced colours: a contrast theme keeps every glyph and every state (0.60.0)
 - The rail marks the current page on `aria-current="page"` (0.19.0)
 - `.ls-perm` is deliberately dimmer than muted (0.20.0)
-- A hover is `data-tip`, never the native `title` (0.26.0)
 
 ## `.eli5` is opt-in per item, never a field every item fills (0.45.0)
 
@@ -118,7 +119,7 @@ system whose `--radius` has been `0` since its first release.
 ## `.btn-terminal`: an icon slot, a busy state, two verdict words (0.60.0)
 
 ```html
-<button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact"><span class="ico" data-icon="refresh-cw"></span>refresh</button>
+<button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact"><span class="ico" data-icon="refresh-cw" aria-hidden="true"></span>refresh</button>
 <button type="button" class="btn-terminal btn-terminal--compact" aria-busy="true" aria-disabled="true">saving</button>
 <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success">approve</button>
 <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger">deny</button>
@@ -126,7 +127,7 @@ system whose `--radius` has been `0` since its first release.
 
 - **An icon goes inside, before the word.** The button is an `inline-flex` row with a `.4rem` gap,
   and a child `.ico` or `svg` is `--icon-size` square whatever its own `width` says. Never align a
-  glyph by hand.
+  glyph by hand. The glyph is `aria-hidden="true"`: the word is the name.
 - **It is right without a reset.** The class declares `box-sizing`, `font: inherit` and, on the
   filled button, a transparent 1px border, so a `<button>` on a Tailwind page or a tokens-only page
   is the same box as the `<a>` beside it. Before 0.60.0 a filled compact `<button>` wore the
@@ -145,9 +146,11 @@ system whose `--radius` has been `0` since its first release.
   icon-only removal stays the bin, and a word never borrows it. **Resetting a view** (filters,
   sort) is not destructive and never red: that is `button.doc-link--forward` (`chrome.md`).
 - **Under a coarse pointer every variant is 44px tall**, and the bin and pencil 44px square.
-- **Disabled is `.45` and does not answer the pointer** — no lift, no tint, no edge. Every hover
-  rule in the family carries `:where(:not(:disabled))`, which adds no weight, so an override
-  written against 0.59.0's selectors still wins.
+- **Disabled is `.45` and does not answer the pointer** — no lift, no tint, no edge — **and neither
+  does a busy button**: it ignores a press, so lifting under the pointer would invite the second
+  press it exists to stop. Every hover rule in the family carries
+  `:where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"]))`, which adds no weight, so an
+  override written against 0.59.0's selectors still wins.
 - **Tailwind:** the classes sit in the `components` layer, so a utility on the same element wins —
   a `px-3` on a `.btn-terminal` is a local fork. Leave the padding to the class.
 
@@ -190,6 +193,21 @@ height on every surface, as seedr's and configr's `h-7` rows already were.
   `--border` is a container hairline at 1.37. `:focus-visible` keeps the 2px `--ring` outline and
   also turns the edge `--primary`; `aria-invalid="true"` turns it `--destructive`, under the pointer
   and in focus too.
+- **An invalid field says what is wrong in words; the edge only repeats it.** A red edge is colour
+  alone (WCAG 1.4.1), and it tells nobody how to fix the value (3.3.1). So `aria-invalid="true"`
+  never stands by itself: the field names a `.field-error` through `aria-describedby`, and that
+  line says what is wrong and what to write instead. No dashed or second edge is needed — the words
+  are the signal that is not a colour.
+
+  ```html
+  <label for="repo">repository</label>
+  <input id="repo" type="text" aria-invalid="true" aria-describedby="repo-err" value="not a repo" />
+  <p class="field-error" id="repo-err">not an owner/repo — write it as poi/vu3</p>
+  ```
+
+  In a settings row the error sits in `.field-val` under the control (`tables-and-forms.md`).
+  `scripts/check-components.mjs` resolves every `aria-invalid="true"` on the demo page and in the
+  examples of this file and `tables-and-forms.md` to a `.field-error` with text.
 - **The placeholder** is `--muted-foreground` at full opacity, and it is never the label: a
   `<label>` or an `aria-label`, always.
 - **Disabled** is `opacity: .45`, as on every control, and a disabled field does not change under
@@ -210,19 +228,28 @@ glow, `--fs-base` at `--lh-tight`. Their rows are **one row**: `.select-option` 
 share the padding, the `--muted` highlight (on hover, `data-active="true"`, or Radix's
 `data-highlighted`) and the disabled ink.
 
-- **A choice is a ✓, not a colour.** Every row of a `.select-panel`, and every row of a menu that
-  holds a choice (`aria-checked`, `aria-pressed`, `menuitemradio`, `menuitemcheckbox`), reserves a
-  check column, so a "reset" under the choices lines up with them; the chosen row shows
-  `--ico-check` there in `--primary`. The label keeps its weight and its ink: `--primary` against
-  `--popover-foreground` measures 1.27:1 on paper, two inks nobody can tell apart. 0.59.0's left
-  edge and bold are gone.
+- **A choice is a ✓, not a colour.** Every row of a `.select-panel`, and every choice row
+  (`aria-selected`, `aria-checked`, `aria-pressed`, `menuitemradio`, `menuitemcheckbox`) with the
+  rows of any menu that holds one, reserves a check column, so a "reset" under the choices lines up
+  with them; the chosen row shows `--ico-check` there in `--primary`. **Every chosen shape draws it**:
+  `aria-selected="true"` or `aria-checked="true"` on a `.select-option` (a Radix radio or checkbox
+  item wearing the class), and those or `aria-pressed="true"` on a `.dropdown-item`. The label keeps
+  its weight and its ink: `--primary` against `--popover-foreground` measures 1.27:1 on paper, two
+  inks nobody can tell apart. 0.59.0's left edge and bold are gone.
 - **`[aria-current="true"]` is not a choice** — it is a navigation list's "you are here" (history,
   language), in `--primary` with the glow.
 - **`[aria-disabled="true"]` or `:disabled`**: `--popover-foreground` mixed 65% into `--popover`
   (3.62:1 at worst, and inactive text is exempt from 1.4.3), no highlight, `cursor: default`.
-- `.dropdown-item--danger` is `--destructive`; `.dropdown-sep` is a 1px `--border` rule;
-  `.dropdown-label` and `.select-group` are the muted uppercase heading of a group. A `.ico` in a
-  row sits after the check column.
+- `.dropdown-item--danger` is `--destructive`; `.dropdown-sep` is a 1px `--border` rule, drawn as a
+  border so a contrast theme keeps it; `.dropdown-label` and `.select-group` are the muted uppercase
+  heading of a group. A `.ico` in a row sits after the check column, `aria-hidden="true"`.
+- **A menu's `.dropdown-label` is for the eye.** Inside `role="menu"` its words would be loose text
+  between the items, so it is `aria-hidden="true"` — `initDropdowns()` sets that in a
+  `details.dropdown`, and a page-built menu writes it — and the menu keeps its name from its summary
+  or its own `aria-label`. A menu whose sections a reader must hear by name is two menus, or items
+  that say it themselves.
+- **44px under a coarse pointer**: every row, and a summary that is only text or a glyph (centred, with
+  no weight, so a `.btn-icon` summary keeps its own box).
 - **Placement is not the look.** `.select-panel` sets no `position` — `initSelects()` writes
   `position: fixed` inline — so a framework app can put the class on its own listbox and place it
   itself. `.dropdown-panel` is `position: absolute` and opens upward, for a status-bar menu;
@@ -253,9 +280,9 @@ dropdown `initTableTools()` builds in a table header had no click-away and no Es
 
 - **A panel of rows is an ARIA menu.** A panel holding only `.dropdown-item`, `.dropdown-sep` and
   `.dropdown-label` rows becomes `role="menu"` (named by its summary), its `li`s `role="none"`, its
-  items `role="menuitem"` — one written as `menuitemradio` or `menuitemcheckbox` keeps that — and
-  its separators `role="separator"`; the summary gets `aria-haspopup="menu"` and a synced
-  `aria-expanded`. **A panel holding anything else stays a disclosure** — the table filter's text
+  items `role="menuitem"` — one written as `menuitemradio` or `menuitemcheckbox` keeps that — its
+  separators `role="separator"` and its labels `aria-hidden="true"`; the summary gets
+  `aria-haspopup="menu"` and a synced `aria-expanded`. **A panel holding anything else stays a disclosure** — the table filter's text
   box is the case: no menu roles, and Tab moves through it.
 - **Keys.** On the summary, Enter, Space and ArrowDown open the menu on its first item, ArrowUp on
   its last. Inside, ArrowDown and ArrowUp move and wrap, Home and End jump, a printable character
@@ -264,15 +291,18 @@ dropdown `initTableTools()` builds in a table header had no click-away and no Es
   active-descendant.
 - **One open at a time.** A click outside, Escape or an activated item closes it, and activation
   hands focus back to the summary unless the item moved focus somewhere itself. An `aria-disabled`
-  item stays focusable and pressing it keeps the menu open — it is still a button, so the page's
-  own handler ignores it. In a `<dialog>`, Escape closes the menu and stops there — the dialog
-  stays open.
+  item stays focusable, and pressing it — Enter, Space or a click — does nothing and keeps the menu
+  open: a `<button>`'s own handler ignores it, and an `<a>` item does not follow its link (the
+  runtime cancels it). In a `<dialog>`, Escape closes the menu and stops there — the dialog stays
+  open.
 - **A summary may be an icon button**: `<summary class="btn-icon btn-icon--bare" data-icon="history"
   aria-label="history"></summary>` (`.btn-icon` is in `controls.md`).
 - **A menu the page builds and places itself** — a context menu, a menu under a button — gets the
   same keys from `attachMenuKeys(panel, { onClose, returnFocusTo })`: roving focus, wrap, Home/End,
-  typeahead, and `onClose` on Escape, Tab or activation with focus handed to `returnFocusTo`. It
-  returns a function that takes the keys off again.
+  typeahead, and `onClose` on Escape, Tab or activation with focus handed to `returnFocusTo`. Its
+  items leave the tab order, and so does an item the page adds while it is attached. It returns a
+  function that takes the keys off again. Its `.dropdown-label` rows are the page's to mark
+  `role="none" aria-hidden="true"`.
 - `scripts/check-dropdown.mjs` drives every line above with real keys and a real mouse.
 
 ## The theme switcher (0.60.0)
@@ -324,6 +354,11 @@ dropdown `initTableTools()` builds in a table header had no click-away and no Es
   while a search narrows the group. There is no count pill.
 - **`data-tone`** on the fold colours its summary and icon, so an error group reads as one before
   it is opened, and it keeps that colour under the pointer.
+- **The icon is its summary's colour** — muted, or the fold's tone — because it is coloured through
+  its parent. Never put a `color` on the `.ico`: under forced colours a glyph that declares a colour
+  keeps that author colour instead of its label's (a muted icon measured 2.89:1 there). One icon
+  that needs a tone of its own takes `data-tone` on the `.ico` (`icons.md`). An untoned fold resets
+  `--tone` (F7), so a fold inside a toned card or notice stays neutral, icon included.
 - **`details.fold--compact`** is a log's folds ("▸ ran 3 commands"): no rule between them, a tight
   summary, a 1rem indent.
 - **`details.fold--boxed`** is a case in a frame: a `--border` box, .75rem inside, .5rem apart.
@@ -407,33 +442,75 @@ files cannot stop agreeing on the state without a failure.
 
 `initDiagramZoom()` still makes every `.diagram` an opener (`.dgm-zoomable`). Its corner hint is
 lucide's `maximize-2`, a mask at `--icon-sm` in place of the `⤢` character sized by `font-size`, and
-its focus ring is the 2px `--ring`. The view it opens is a `<dialog class="dgm-overlay">`, specified
+its focus ring is the 2px `--ring`. **The hint is at full strength when idle** — `--muted-foreground`,
+4.67–6.71:1, turning `--primary` under the pointer and in focus. It rested at .45 and measured
+1.82–2.15:1, and it is the only graphic that says the figure opens (WCAG 1.4.11 wants 3:1): do not
+dim it again. The view it opens is a `<dialog class="dgm-overlay">`, specified
 with the other dialogs in `overlays.css`; `html.dgm-locked`, `.dgm-btn` and `.dgm-close` are gone —
 its bar is `.btn-terminal` buttons and the dialog's own close button.
+
+## `.anim-toggle` (0.60.0)
+
+```html
+<button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
+  <span data-anim-box aria-hidden="true">[x]</span><span>anim</span></button>
+```
+
+The footer's animations switch (`runtime/anim.js`). It has a box of its own: `padding: 0` (it wore
+the browser's button padding, a different size per engine, beside summaries that have none), the
+2px `--ring` focus ring, and a 44px target under a coarse pointer. Its `[x]` box is `aria-hidden`,
+so the name is the `aria-label` — without it the button is announced as "button" (35 cockpit pages
+shipped that way until 0.26.0).
 
 ## Forced colours: a contrast theme keeps every glyph and every state (0.60.0)
 
 A contrast theme — forced colours — repaints every background as `Canvas` and replaces every author
 colour; only a system colour is kept as written. Everything drawn by a background vanishes: the
-mask glyphs (the ✓, the bin, the pencil, the spinner, the zoom hint, the theme dot), the states that
-are only a fill (the highlighted row, the minimap's current bar) and the select's caret, a gradient
-the mode drops outright. `components.css` redraws all of it in one `@media (forced-colors: active)`
-block, and a surface adds nothing.
+mask glyphs (the ✓, the bin, the pencil, the spinner, the zoom hint, the theme dot), the two cursors
+(`.cursor-block`, `.term-caret`), the states that are only a fill (the highlighted row, the
+minimap's current bar), a 1px rule drawn as a fill, and the select's caret, a gradient the mode
+drops outright. `components.css` redraws all of it in one `@media (forced-colors: active)` block,
+and a surface adds nothing.
 
-- The row under the pointer or the keys is `Highlight` under `HighlightText`, a row that is off is
-  `GrayText`, where you are in a navigation list is `Highlight` text, the minimap's bars are
-  `CanvasText` with the current one `Highlight`, and the trigger's caret is a ▾ drawn as text.
-- **Writing a glyph of your own: give its control a system colour first.** A pseudo-element that
-  opts out (`forced-color-adjust: none`) and paints `currentColor` paints the colour its element was
-  *given*, not the one the mode shows. Measured here, with only the opt-out: the spinner on the
-  filled button came out `--primary-foreground` at 1.11:1 on the white Canvas, and the ✓ at 1.78:1
-  on the black one. So the controls that carry a glyph are `ButtonText`, `CanvasText`,
-  `HighlightText` or `GrayText` inside the block, and the glyph inherits that. An `.ico` is such a
-  glyph: in a button or a row it inherits the row's system colour, and in a fold's or a dropdown's
-  summary, which keeps its author colour (muted, or the fold's tone — 2.89:1 on black), it is given
-  `CanvasText`.
-- `scripts/check-components.mjs` emulates the mode, light and dark, and asserts that every glyph
-  stands 3:1 off what it sits on and that every state still differs from its neighbour.
+- **A glyph takes `preserve-parent-color` and paints `currentColor`.** Its colour then becomes the
+  one its host was FORCED to — `ButtonText` in a button, `CanvasText` in text, `HighlightText` on the
+  row under the pointer, `GrayText` on a disabled control — so it is always its label's colour,
+  whatever colour the page gave the host. **Never `forced-color-adjust: none` on a glyph**: forcing
+  happens when the colour is used and inheritance carries the computed value, so under `none` the
+  glyph keeps its host's AUTHOR colour. Cockpit's `.btn-terminal.btn-approve { color:
+  var(--success) }` painted its spinner, bin and pencil at 1.74:1 that way. The glyph declares no
+  `color` of its own, and neither may a page (a declared colour turns `preserve-parent-color` back
+  into `none`). An engine without the value gets the fallback — always visible, if not always the
+  label's colour:
+
+  ```css
+  @media (forced-colors: active) {
+    .my-glyph::before { forced-color-adjust: preserve-parent-color; background: currentColor; }
+    @supports not (forced-color-adjust: preserve-parent-color) {
+      .my-glyph::before { forced-color-adjust: none; background: CanvasText; }
+    }
+  }
+  ```
+
+  An `.ico` does this itself (`icons.css`): colour it through its parent, never on the `.ico`.
+- **A state drawn by fill is redrawn in system colours.** The row under the pointer or the keys is
+  `Highlight` under `HighlightText`, and it opts out (`none`) because the mode would otherwise paint
+  a `Canvas` backplate behind its words and lose them on the fill. `none` is inherited, so
+  **everything inside a highlighted row takes `HighlightText`** — a description with its own colour
+  (filters' `.option-desc`) measured 1.31–3.59:1 on the fill before — and nothing keeps an author
+  glow. The opted-out row owns its ring, `HighlightText` inset on its own fill. **A row that is off
+  is `GrayText` on `Canvas` with a `CanvasText` ring** — APG keeps it in the arrow-key walk, and the
+  `HighlightText` ring it would otherwise wear measured 1.00:1 on `Canvas`. Where you are in a
+  navigation list is `Highlight` text, the minimap's bars are `CanvasText` with the current one
+  `Highlight`, and the trigger's caret is a ▾ drawn as text.
+- **A rule is a border.** `.dropdown-sep` draws its line with `border-top`, which the mode keeps in a
+  system colour; a 1px fill became `Canvas`.
+- `scripts/check-components.mjs` measures every one of these in PAINTED pixels, on the light and the
+  dark forced palette and all four themes: each glyph 3:1 against what it sits on (a page's own
+  button colour included), each word on a state 4.5:1 with the state's fill under it, each state
+  told apart from its neighbour, and a menu row's ring after real key presses. Each capture is taken
+  in the viewport with the scrollbars hidden, and a marker pass proves the clip holds its element
+  before the ratio counts (RULES-CROSSCUT X1).
 
 ## The rail marks the current page on `aria-current="page"` (0.19.0) — an attribute, not a class
 
@@ -480,95 +557,3 @@ dimmest mix that still clears **3:1 against the panel** on every theme (warm bin
 the string carries meaning (a trailing slash plus `drwxr-xr-x` says the thing has contents), so it
 must stay legible, only not compete. Going dimmer drops warm below 3:1. Going back to a flat token
 restores the bug.
-
-## A hover is `data-tip` — never the native `title` (0.26.0, Daniel)
-
-```html
-<span data-tip="Explanation shown instantly on hover">metric</span>
-```
-
-### There is no marker — discovery is by hover (0.45.0, Daniel)
-
-**Write the tip and nothing else. A `data-tip` host renders no glyph, no underline, no dotted
-border.** Daniel: *"Remove the info icons everywhere. People will just hover and see if there is
-a tooltip coming or not."*
-
-```html
-<span data-tip="…">budget</span>          <!-- renders: budget -->
-<span data-tip="…">budget ⓘ</span>        <!-- WRONG — a glyph nobody draws for you -->
-```
-
-**Do not re-add one, and do not write it in markup.** The estate has now tried both alternatives
-and rejected both, so this is settled rather than merely current:
-
-- Until 0.26.0 it was a dotted `border-bottom` — the web's mark for a link, so it read as a link
-  that was broken or disabled, and it disappeared in a table header or against a busy row.
-- From 0.26.0 to 0.45.0 it was an `::after` ⓘ. The reasoning was sound — a tooltip nobody can see
-  is a tooltip nobody finds — but `span[data-tip]`, `th` and `button` meant **154 call sites**:
-  beside sort arrows, inside buttons that already say what they do, after labels that were never
-  ambiguous. A ten-column table carried ten pieces of furniture explaining controls that explain
-  themselves. Discovery by hover costs the reader nothing; the marker cost every surface.
-
-`initTableTools` also stopped putting `data-tip` on the ↕ sort button and the ⌕ filter summary — a
-bubble reading "sort by repo" anchored under the word *repo* is a tooltip repeating its own
-control. **`aria-label` stays on both.** The glyph was decoration; the accessible name is not, and
-a screen reader still has to be told what an unlabelled ↕ does.
-
-`[data-tip-bare]` and `.minimap-bar` are kept as opt-outs though they now suppress nothing. They
-cost nothing, and a future marker would otherwise have to re-derive which elements are already
-their own affordance:
-
-```html
-<span data-tip="…" data-tip-bare>2026-08-11</span>
-```
-
-**An action always shows its action cursor (0.46.2, Daniel).** `cursor: help` belongs only to
-non-interactive tip hosts — spans, labels, badges, table cells, headings. On anything clickable
-the cursor states what a click does, tooltip or not: `tooltip.css` gives `button`, `a[href]`,
-`summary`, `[role="button"]`, `[role="menuitem"]` and `[role="tab"]` carrying a `data-tip`
-`cursor: pointer` (and `not-allowed` while disabled). A question-mark cursor on a button is bad
-UX; you get the right one for free — do not re-declare it per page.
-
-**A tip never covers an open select (0.41.0, Daniel).** The tip panel is `position: fixed;
-z-index: 9999` so it can never be clipped by an overflow container; `.select-panel` is 60. With a
-listbox open and the pointer near a `[data-tip]` — very often inside the trigger's own label —
-the tip painted straight over the options. `initTooltips()` now refuses to show while a
-`.select-panel` exists, and a `pointerdown` anywhere hides one already up.
-
-**You get this for free; do not re-solve it per page.** In particular do not raise a select's
-z-index above the tip to "win" — the two are not competing for the same moment. While a listbox is
-open the choices are the content, and an aside about the control you already opened is not worth one
-covered option. Repositioning was rejected for the same reason: a panel can be full-width and
-viewport-tall, so "flip it to the other side" is not a promise that can be kept.
-
-`initTooltips()` handles every `[data-tip]`, including nodes rendered later. **Never use `title` for
-explanatory text on any danieldeusing surface.** The browser's tooltip waits about a second, is
-unstyled, is unreachable by keyboard on most engines, and **does not exist on a touch screen** —
-cockpit is read from a phone over the tailnet, so there the explanation is simply gone.
-
-**`title` does two unrelated jobs and only one of them is a tooltip.** This is the part that makes
-a bulk conversion dangerous, because getting it wrong is an accessibility regression that reads as
-a tidy-up in the diff:
-
-| the element | what `title` was doing | write |
-| --- | --- | --- |
-| has visible text | a description | `data-tip` |
-| an icon button with no text | the accessible **name** | `aria-label` |
-| an icon button that also wants a hover | both | `aria-label` **and** `data-tip` |
-| `<iframe>` / `<svg>` | the accessible name | leave `title` — no hover to replace |
-
-Converted estate-wide on 2026-08-10: **108 in cockpit and 3 in netmon**. Two traps found doing it,
-both of which would have shipped silently:
-
-- **`.anim-toggle` had a `title` and no `aria-label` on 35 pages** — its content is an aria-hidden
-  glyph, so `title` was the name. A blind rename leaves 35 buttons announced as "button". It now
-  carries both, and so does `templates/page-chrome.html`, which is where all 35 came from.
-- **`role="tooltip"` on the panel described nothing.** Nothing pointed the anchor at it, so
-  `data-tip` was announced to no one while the `title` it replaces is announced — the swap would
-  have traded a slow tooltip for a silent one. `show()` now sets `aria-describedby` and `hide()`
-  removes it, including when moving between anchors.
-
-**netmon carries its own inline copy** of this component (it loads tokens+chrome, never
-components.css). When `runtime/tooltip.js` changes, `deploy/netmon/index.html` changes with it —
-that duplication is deliberate but it is not automatic. `bin/cockpit-render-check` fails a native
-`title` on any cockpit page or on netmon, and fails an icon toggle that lost its name.

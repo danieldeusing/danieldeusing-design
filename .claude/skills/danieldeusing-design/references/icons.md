@@ -117,9 +117,11 @@ text glyph (below).
 ## Forced colours: a glyph is its context's forced colour (0.60.0)
 
 > **Under `@media (forced-colors: active)` a mask glyph takes `forced-color-adjust:
-> preserve-parent-color`. Not `none`. `tokens.css` gives every `[data-icon]::before` glyph that
-> default and `icons.css` gives `.ico` the same; a glyph drawn any other way is its own file's to
-> cover.**
+> preserve-parent-color`, and, `@supports not` that value, `none` with a `CanvasText` background.
+> Never `none` alone, and never a `color` on the glyph. `icons.css` gives `.ico` both branches, and
+> `tokens.css` gives every `[data-icon]::before` glyph both; but a component's own rule paints over
+> the default's `CanvasText`, so a component that paints such a glyph writes its own `@supports not`
+> background. A glyph drawn any other way is its own file's to cover.**
 
 Forced colours (Windows High Contrast) replace every author background with the system `Canvas`,
 and a mask glyph IS a background. Measured in Chromium on the real `controls.css` and
@@ -140,31 +142,49 @@ glyph, 13.99:1 or better in a link, 13.98:1 disabled, 8.73:1 on a selection. The
 
 ```css
 @media (forced-colors: active) {
-  [data-icon]::before { forced-color-adjust: none; color: CanvasText; --tone: CanvasText; }
   @supports (forced-color-adjust: preserve-parent-color) {
-    [data-icon]::before { forced-color-adjust: preserve-parent-color; color: inherit; --tone: currentColor; }
+    [data-icon]::before { forced-color-adjust: preserve-parent-color; --tone: currentColor; }
+  }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    [data-icon]::before { forced-color-adjust: none; background: CanvasText; }
   }
 }
 ```
 
+`.ico` takes the same two branches in `icons.css`, painting `background: currentColor` in the first.
+
 - `--tone: currentColor` brings along the glyphs that paint `var(--tone, …)` rather than
   `currentColor`; the tone itself goes, as every colour does in this mode — which is why a tone is
   never the only thing that says what a glyph means.
-- The first rule is the fallback for an engine without `preserve-parent-color`: `CanvasText`,
-  visible on `Canvas` but not always its context's colour. Its measured limit: a `CanvasText` glyph
-  on a `Highlight` selection is 1.86:1 (light palette) and 2.41:1 (dark).
-- The defaults sit in `@layer base`, like the mapping, so a component's own forced-colours rule wins.
+- The second branch is the fallback for an engine without `preserve-parent-color`, and it sets **no
+  `color`**. Its `none` lets a component's own `@supports not` branch paint `currentColor` (under
+  `auto` the mode forces that background to `Canvas`), and the missing `color` keeps that
+  `currentColor` its host's forced colour: `controls.css`'s pressed icon button is `HighlightText`
+  on `Highlight` that way, 11.31:1 (light palette) and 8.73:1 (dark). When the default set a
+  `CanvasText` `color`, the same button measured 1.86:1 and 2.41:1.
+- The fallback's `CanvasText` background is a floor, not an override. A component paints its glyph
+  in a rule that outranks `base`, so it writes its own `@supports not` branch; `controls.css`,
+  `feedback.css` and `tags.css` do. On a `.ico` the fallback does paint `CanvasText`, and its
+  measured limit is a selection a component redrew in `Highlight`: 1.86:1 and 2.41:1 again, so that
+  component gives its `.ico` `HighlightText` in its own `@supports not` branch.
+- The defaults sit in `@layer base`, like the mapping, so a component's own forced-colours rule
+  wins; and since neither branch sets `color`, `currentColor` in that rule is still its host's.
 
-**What the default reaches, and what it cannot.** It reaches a glyph on `::before` of an element
-carrying `data-icon`, painted `currentColor` or `var(--tone, …)` — the icon button, the segmented
-option, the choice card, the empty state, the callout, the tag. It cannot reach a glyph drawn from
-a named token (`mask: var(--ico-check)`), one on `::after`, an element glyph (`.spinner`), or one
-painted from a private variable resolved on its element (`var(--tone-c)`). Those carry the same
-three lines in their own file, on their own selector:
+**What the default reaches, and what it cannot.** Where `preserve-parent-color` exists it reaches
+a glyph on `::before` of an element carrying `data-icon`, painted `currentColor` or
+`var(--tone, …)` — the icon button, the segmented option, the choice card, the empty state, the
+callout, the tag. It cannot reach a glyph drawn from a named token (`mask: var(--ico-check)`), one
+on `::after`, an element glyph (`.spinner`), or one painted from a private variable resolved on its
+element (`var(--tone-c)`). Those carry both branches in their own file, on their own selector:
 
 ```css
 @media (forced-colors: active) {
-  .search-field::before { forced-color-adjust: preserve-parent-color; background: currentColor; }
+  @supports (forced-color-adjust: preserve-parent-color) {
+    .search-field::before { forced-color-adjust: preserve-parent-color; background: currentColor; }
+  }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .search-field::before { forced-color-adjust: none; background: CanvasText; }
+  }
 }
 ```
 

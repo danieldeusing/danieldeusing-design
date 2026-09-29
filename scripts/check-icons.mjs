@@ -16,7 +16,8 @@
  *     the loud square for an unknown word, no radius, print, forced colours, the naming contract —
  *     on the demo page and again with only tokens.css + icons.css loaded (house rule 4);
  *   · the mapping's cascade — a component in a later layer, and a utility, can swap the glyph;
- *   · glyph colours clear 3:1 (WCAG 1.4.11) on every theme and surface.
+ *   · glyph colours clear 3:1 (WCAG 1.4.11) on every theme and surface;
+ *   · the skill reference — its forced-colours examples carry the fallback.
  *
  * THE SCAN REPORTS ITS YIELD. "No unknown word" is only worth something next to how much was read,
  * so each root prints its file, reference and word counts, and a root that yields no files at all
@@ -155,6 +156,22 @@ for (const scanRoot of roots) {
     files.length === 0 ? `no files under ${SCAN_DIRS.join(", ")} of ${scanRoot}` : unknown.map(([w, at]) => `${w} (${at})`).join("; "));
 }
 
+/* ── the static half: what icons.css and the skill reference teach ───────── */
+
+const ICONS_CSS = readFileSync(join(root, "src/icons.css"), "utf8");
+const ICONS_MD = readFileSync(join(root, ".claude/skills/danieldeusing-design/references/icons.md"), "utf8");
+// An example is copied as written. So one that opts a glyph into preserve-parent-color also carries
+// the fallback for an engine without it (none and a CanvasText background), and gives the glyph no
+// `color`: that would redefine currentColor for every component rule that paints with it.
+const NOT_PRESERVE = "@supports not (forced-color-adjust: preserve-parent-color)";
+const examples = [...ICONS_MD.matchAll(/```css\n([\s\S]*?)```/g)].map((m) => m[1]).filter((css) => css.includes("preserve-parent-color"));
+const offForm = examples.filter((css) => {
+  const fallback = css.includes(NOT_PRESERVE) ? css.slice(css.indexOf(NOT_PRESERVE)) : "";
+  return !/forced-color-adjust:\s*none/.test(fallback) || !/background:\s*CanvasText/.test(fallback) || /(^|[^-\w])color\s*:/.test(css);
+});
+check(`every forced-colours example in the skill reference (${examples.length}) carries the @supports not fallback — none, a CanvasText background — and sets no color`,
+  examples.length >= 2 && offForm.length === 0, offForm.map((css) => css.trim().split("\n").slice(0, 2).join(" ")).join(" | "));
+
 /* ── the browser half ─────────────────────────────────────────────────────── */
 
 const CHROME = process.env.DD_CHROME
@@ -181,24 +198,35 @@ if (!CHROME) {
 }
 
 // The harness pages exist only in memory; everything else is this checkout, read off the disk.
-const ICONS_CSS = readFileSync(join(root, "src/icons.css"), "utf8");
-// Both files with every `@supports (forced-color-adjust: preserve-parent-color)` block cut out —
-// what an engine without that value sees, so the fallback rule is asserted, not assumed.
+// What an engine without preserve-parent-color sees: every `@supports (…preserve…)` block cut out
+// and every `@supports not (…)` block unwrapped — applied to both shipped files and to the harness
+// component's own CSS, so the fallback is asserted, not assumed.
 const PRESERVE = "@supports (forced-color-adjust: preserve-parent-color)";
-const withoutPreserve = (css) => {
+const blockAt = (css, at) => {
+  let depth = 0;
+  let i = css.indexOf("{", at);
+  for (; i < css.length; i += 1) {
+    if (css[i] === "{") depth += 1;
+    if (css[i] === "}" && --depth === 0) break;
+  }
+  return [css.indexOf("{", at), i];
+};
+const asFallbackEngine = (css) => {
   let out = css;
-  for (let at = out.indexOf(PRESERVE); at >= 0; at = out.indexOf(PRESERVE)) {
-    let depth = 0;
-    let i = out.indexOf("{", at);
-    for (; i < out.length; i += 1) {
-      if (out[i] === "{") depth += 1;
-      if (out[i] === "}" && --depth === 0) break;
-    }
-    out = out.slice(0, at) + out.slice(i + 1);
+  for (let at = out.indexOf(PRESERVE); at >= 0; at = out.indexOf(PRESERVE)) out = out.slice(0, at) + out.slice(blockAt(out, at)[1] + 1);
+  for (let at = out.indexOf(NOT_PRESERVE); at >= 0; at = out.indexOf(NOT_PRESERVE)) {
+    const [open, end] = blockAt(out, at);
+    out = out.slice(0, at) + out.slice(open + 1, end) + out.slice(end + 1);
   }
   return out;
 };
 const X3_IN_TOKENS = /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important;?\s*\}/.test(TOKENS_CSS);
+// The probe buttons are a component written as X1 asks: its glyph paints currentColor; under
+// forced colours a pressed one is HighlightText on Highlight (as controls.css draws the pressed
+// icon button) and a disabled one GrayText; and its own @supports not branch paints CanvasText, or
+// currentColor — its host's colour — for those two states. That branch leaves
+// forced-color-adjust to tokens.css's default, as feedback.css's does: without the default's
+// `none` the mode forces a currentColor background to Canvas.
 const forcedPage = (tokensHref, iconsHref) => `<!doctype html><html data-theme="warm"><head>
 <link rel="stylesheet" href="${tokensHref}"><link rel="stylesheet" href="${iconsHref}">
 <style>
@@ -211,7 +239,15 @@ const forcedPage = (tokensHref, iconsHref) => `<!doctype html><html data-theme="
     -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
   .probe--toned[data-icon]::before { background: var(--tone, var(--primary)); }
   .probe-selected { display: inline-block; padding: 4px; }
-  @media (forced-colors: active) { .probe-selected { forced-color-adjust: none; background: Highlight; color: HighlightText; } }
+  @media (forced-colors: active) {
+    .probe-selected { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+    .probe[aria-pressed="true"] { color: HighlightText; background-color: Highlight; }
+    .probe:disabled { color: GrayText; }
+    ${NOT_PRESERVE} {
+      .probe[data-icon]::before { background: CanvasText; }
+      .probe:is([aria-pressed="true"], :disabled)::before { background: currentColor; }
+    }
+  }
 </style></head><body>
 <p id="ctx-text"><span class="ico ico--xl" id="g-text" data-icon="refresh-cw" aria-hidden="true"></span> text</p>
 <p><a href="#x" id="ctx-link"><span class="ico ico--xl" id="g-link" data-icon="external-link" aria-hidden="true"></span> link</a></p>
@@ -222,7 +258,8 @@ const forcedPage = (tokensHref, iconsHref) => `<!doctype html><html data-theme="
 <p><button type="button" class="probe" id="g-pseudo" data-icon="refresh-cw" aria-label="refresh the list"></button>
   <button type="button" class="probe probe--toned" id="g-pseudo-toned" data-tone="warning" data-icon="triangle-alert" aria-label="retry the deploy"></button>
   <button type="button" class="probe probe--toned" id="g-pseudo-untoned" data-icon="home" aria-label="install for this user"></button>
-  <button type="button" class="probe" id="g-pseudo-disabled" data-icon="trash-2" aria-label="remove poi/vu3" disabled></button></p>
+  <button type="button" class="probe" id="g-pseudo-disabled" data-icon="trash-2" aria-label="remove poi/vu3" disabled></button>
+  <button type="button" class="probe" id="g-pseudo-pressed" data-icon="star" aria-pressed="true" aria-label="favourite seedr"></button></p>
 </body></html>`;
 // A component's state glyph, the way controls.css writes one: set --ico on the element that
 // carries the word. `wrap` puts it in a layer, or leaves it unlayered.
@@ -252,12 +289,11 @@ const HARNESS = {
   // X1: a glyph in every context it lives in — text, a link, a button, a disabled button, a
   // selection a component redrew with system colours, a toned .ico — and a component's
   // [data-icon]::before glyph drawn the way controls.css and feedback.css draw theirs, painting
-  // currentColor or var(--tone, var(--primary)). The probe buttons carry no border or fill of
-  // their own, so a screenshot of one is the glyph and nothing else.
+  // currentColor or var(--tone, var(--primary)), at rest, disabled and pressed.
   "/__harness/forced.html": forcedPage("/src/tokens.css", "/src/icons.css"),
-  "/__harness/forced-fallback.html": forcedPage("/__harness/tokens-fallback.css", "/__harness/icons-fallback.css"),
-  "/__harness/tokens-fallback.css": withoutPreserve(TOKENS_CSS),
-  "/__harness/icons-fallback.css": withoutPreserve(ICONS_CSS),
+  "/__harness/forced-fallback.html": asFallbackEngine(forcedPage("/__harness/tokens-fallback.css", "/__harness/icons-fallback.css")),
+  "/__harness/tokens-fallback.css": asFallbackEngine(TOKENS_CSS),
+  "/__harness/icons-fallback.css": asFallbackEngine(ICONS_CSS),
   // X3: `hidden` hides a .ico although .ico sets its own display.
   "/__harness/hidden.html": `<!doctype html><html data-theme="warm"><head>
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/icons.css">
@@ -339,9 +375,12 @@ await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, dev
 /*
  * The instrument, installed in each page. `tok` resolves a colour token through a probe's
  * `color`, so the browser does the var() substitution; `px` rasterises a colour on a canvas;
- * `ratio` is WCAG 2.x. `ink` reads back a SCREENSHOT of a box (the PNG decoded by the page itself,
- * so no image library is needed): how many pixels stand out from the box's corner by 1.5:1 or
- * more, and the strongest contrast among them.
+ * `ratio` is WCAG 2.x. `ink` compares two SCREENSHOTS of one box (PNGs decoded by the page itself,
+ * so no image library is needed), taken with the element shown and with it hidden. The pixels
+ * that change are that element's ink and nothing else — a clip that missed it reads as no ink,
+ * never as a neighbour's — and each one's contrast is against what was behind it. They are
+ * counted inside the box and in the pad ring around it, where a clip that landed off the box
+ * would put them (X1: capture what you think you capture).
  */
 const INSTRUMENT = `window.M = {
   tok(expr) { const p = document.createElement("span"); document.body.append(p); p.style.color = "var(" + expr + ")";
@@ -359,23 +398,31 @@ const INSTRUMENT = `window.M = {
   // read while the scroll is still animating clips a patch of empty page.
   shot(sel) { const e = document.querySelector(sel); e.scrollIntoView({ block: "center", behavior: "instant" }); const r = e.getBoundingClientRect();
     return { x: r.x + scrollX, y: r.y + scrollY, w: r.width, h: r.height }; },
-  async ink(png, pad) { const img = new Image(); img.src = "data:image/png;base64," + png; await img.decode();
-    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const x = c.getContext("2d");
-    x.drawImage(img, 0, 0); const d = x.getImageData(0, 0, c.width, c.height).data; const bg = [d[0], d[1], d[2]];
-    let ink = 0, inside = 0, strongest = 1;
-    for (let y = 0; y < c.height; y += 1) for (let i = 0; i < c.width; i += 1) {
-      const o = (y * c.width + i) * 4; const r = M.ratio([d[o], d[o + 1], d[o + 2]], bg);
-      if (r >= 1.5) { ink += 1; if (i >= pad && y >= pad && i < c.width - pad && y < c.height - pad) inside += 1; }
-      if (r > strongest) strongest = r;
+  async ink(shown, hidden, pad) {
+    const read = async (png) => { const img = new Image(); img.src = "data:image/png;base64," + png; await img.decode();
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const x = c.getContext("2d");
+      x.drawImage(img, 0, 0); return { d: x.getImageData(0, 0, c.width, c.height).data, w: c.width, h: c.height }; };
+    const [a, b] = [await read(shown), await read(hidden)];
+    let inside = 0, ring = 0, strongest = 1;
+    for (let y = 0; y < a.h; y += 1) for (let i = 0; i < a.w; i += 1) {
+      const o = (y * a.w + i) * 4; const p = [a.d[o], a.d[o + 1], a.d[o + 2]], q = [b.d[o], b.d[o + 1], b.d[o + 2]];
+      if (Math.max(...p.map((v, k) => Math.abs(v - q[k]))) <= 8) continue;
+      if (i >= pad && y >= pad && i < a.w - pad && y < a.h - pad) inside += 1; else ring += 1;
+      strongest = Math.max(strongest, M.ratio(p, q));
     }
-    return { ink, inside, area: (c.width - 2 * pad) * (c.height - 2 * pad), strongest }; },
+    return { inside, ring, area: (a.w - 2 * pad) * (a.h - 2 * pad), strongest }; },
 }; null`;
-// A screenshot of one element's box plus `pad` pixels of whatever is around it.
-const inkOf = async (selector, pad = 2) => {
+// One element's ink: its box plus `pad` pixels around it, shot shown and then hidden (`pseudo`
+// hides only that pseudo-element).
+const inkOf = async (selector, pseudo = null, pad = 2) => {
   const b = await evaluate(`M.shot(${JSON.stringify(selector)})`);
-  const { data } = await send("Page.captureScreenshot", {
-    format: "png", clip: { x: b.x - pad, y: b.y - pad, width: b.w + 2 * pad, height: b.h + 2 * pad, scale: 1 } });
-  return evaluate(`M.ink(${JSON.stringify(data)}, ${pad})`);
+  const clip = { x: b.x - pad, y: b.y - pad, width: b.w + 2 * pad, height: b.h + 2 * pad, scale: 1 };
+  const shown = (await send("Page.captureScreenshot", { format: "png", clip })).data;
+  await evaluate(`(() => { const s = document.createElement("style"); s.id = "dd-hide";
+    s.textContent = ${JSON.stringify(`${selector}${pseudo || ""} { visibility: hidden !important; }`)}; document.head.append(s); })()`);
+  const hidden = (await send("Page.captureScreenshot", { format: "png", clip })).data;
+  await evaluate(`document.getElementById("dd-hide").remove()`);
+  return evaluate(`M.ink(${JSON.stringify(shown)}, ${JSON.stringify(hidden)}, ${pad})`);
 };
 const style = (selector, prop, pseudo = null) =>
   evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(selector)}), ${JSON.stringify(pseudo)}).getPropertyValue(${JSON.stringify(prop)}).trim()`);
@@ -422,8 +469,8 @@ const icoChecks = async (where) => {
   check(`${where}: .ico masks itself with the token its data-icon names`,
     mask === await token("--ico-refresh-cw") && mask.startsWith('url("data:image/svg+xml'), mask.slice(0, 60));
   const xl = await inkOf("#size-xl");
-  check(`${where}: the mask paints (refresh-cw at 24px: ${xl.inside} glyph pixels, ${xl.strongest.toFixed(2)}:1 at its core)`,
-    xl.inside > 40 && xl.inside < xl.area * 0.6 && xl.strongest >= 3, JSON.stringify(xl));
+  check(`${where}: the mask paints (refresh-cw at 24px: ${xl.inside} glyph pixels in its box, ${xl.ring} outside it, ${xl.strongest.toFixed(2)}:1 at its core)`,
+    xl.inside > 40 && xl.inside < xl.area * 0.6 && xl.ring === 0 && xl.strongest >= 3, JSON.stringify(xl));
   for (const [id, tok] of [["cc-fg", "--foreground"], ["cc-muted", "--muted-foreground"], ["cc-primary", "--primary"]]) {
     const [bg, want] = [await style(`#${id}`, "background-color"), await evaluate(`M.tok("${tok}")`)];
     check(`${where}: with no tone the glyph is its text's colour (${tok})`, bg === want, `${bg} vs ${want}`);
@@ -503,6 +550,7 @@ const GLYPHS = [
   ["disabled", "#g-disabled", null, "#ctx-disabled"], ["selected", "#g-selected", null, "#ctx-selected"], ["toned .ico", "#g-toned", null, "#ctx-toned"],
   ["[data-icon]::before", "#g-pseudo", "::before", "#g-pseudo"], ["toned ::before", "#g-pseudo-toned", "::before", "#g-pseudo-toned"],
   ["var(--tone, --primary) ::before", "#g-pseudo-untoned", "::before", "#g-pseudo-untoned"], ["disabled ::before", "#g-pseudo-disabled", "::before", "#g-pseudo-disabled"],
+  ["pressed ::before", "#g-pseudo-pressed", "::before", "#g-pseudo-pressed"],
 ];
 const readGlyphs = () => evaluate(`(() => {
   const sys = (name) => { const p = document.createElement("span"); p.style.cssText = "forced-color-adjust: none; color: " + name;
@@ -535,25 +583,34 @@ const forcedPass = async ({ path, label, themes, expect, rule, skip = [] }) => {
     const wrong = got.glyphs.filter((g) => !expect(g, got));
     check(`${where}: every glyph is ${rule}`, wrong.length === 0,
       wrong.map((g) => `${g.name}: ${g.paint} (context ${g.context}, CanvasText ${got.canvasText})`).join("; "));
+    // Pixels: the glyph's own (it is shot shown and hidden), all inside its box, then the ratio.
     const faint = [];
-    for (const [name, sel] of GLYPHS) {
-      const ink = await inkOf(sel);
-      const reading = `${name} ${ink.inside}px ${ink.strongest.toFixed(2)}:1`;
+    for (const [name, sel, pseudo] of GLYPHS) {
+      const ink = await inkOf(sel, pseudo);
+      const reading = `${name} ${ink.inside}px in the box, ${ink.ring} outside, ${ink.strongest.toFixed(2)}:1`;
       if (skip.includes(name)) { console.log(`      known limit, not asserted — ${where}: ${reading}`); continue; }
-      if (!(ink.inside > 20 && ink.strongest >= 3)) faint.push(reading);
+      if (!(ink.inside > 20 && ink.ring === 0 && ink.strongest >= 3)) faint.push(reading);
     }
-    check(`${where}: every glyph renders at 3:1 or better against what is behind it`, faint.length === 0, faint.join("; "));
+    check(`${where}: every glyph's ink is in its clip, and renders at 3:1 or better against what is behind it`, faint.length === 0, faint.join("; "));
   }
 };
 await forcedPass({ path: "/__harness/forced.html", label: "preserve-parent-color", themes: ["warm", "green", "mono", "paper"],
   rule: "its context's forced text colour", expect: (g) => g.paint === g.context });
-// The fallback, as an engine without preserve-parent-color sees it: the @supports blocks cut out.
+// The fallback, as an engine without preserve-parent-color sees it: the @supports blocks cut out
+// and the @supports not blocks unwrapped, in both files and in the harness component's own CSS.
 const declares = (css) => /forced-color-adjust:\s*preserve-parent-color/.test(css.replace(/\/\*[\s\S]*?\*\//g, ""));
-check("precondition: the fallback harness declares no preserve-parent-color, and both shipped files do",
-  !declares(HARNESS["/__harness/tokens-fallback.css"]) && !declares(HARNESS["/__harness/icons-fallback.css"]) && declares(TOKENS_CSS) && declares(ICONS_CSS));
-// A CanvasText glyph on a selection a component redrew in Highlight is the fallback's known limit.
+const FALLBACK = ["/__harness/tokens-fallback.css", "/__harness/icons-fallback.css", "/__harness/forced-fallback.html"].map((path) => HARNESS[path]);
+check("precondition: the fallback harness declares no preserve-parent-color and has no @supports left for it, and both shipped files declare it",
+  FALLBACK.every((css) => !declares(css) && !css.includes(PRESERVE) && !css.includes(NOT_PRESERVE)) && declares(TOKENS_CSS) && declares(ICONS_CSS));
+// A .ico takes icons.css's CanvasText. A component glyph takes its own @supports not branch — CanvasText,
+// or currentColor for a state whose host has a system colour — and neither file's fallback may
+// change what that currentColor is: a CanvasText `color` there made the pressed glyph CanvasText
+// on Highlight, 1.86:1 and 2.41:1. A CanvasText .ico on a selection a component redrew in Highlight
+// is the known limit.
+const HOST_COLOURED = ["disabled ::before", "pressed ::before"];
 await forcedPass({ path: "/__harness/forced-fallback.html", label: "the fallback", themes: ["warm", "green"],
-  rule: "CanvasText", expect: (g, got) => g.paint === got.canvasText, skip: ["selected"] });
+  rule: "CanvasText, or its host's forced colour where its component's own fallback paints currentColor",
+  expect: (g, got) => g.paint === (HOST_COLOURED.includes(g.name) ? g.context : got.canvasText), skip: ["selected"] });
 // Outside forced colours none of it applies: the defaults sit inside the media query.
 await send("Emulation.setEmulatedMedia", { features: [] });
 await load("/__harness/forced.html");

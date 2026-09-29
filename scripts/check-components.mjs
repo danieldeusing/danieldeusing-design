@@ -286,8 +286,11 @@ const reveal = (selector) => evaluate(`(() => { const el = document.querySelecto
 
 // In VIEWPORT coordinates, taken inside the viewport: captureBeyondViewport re-lays the page and a
 // clip measured before it lands up to ~7.5px off (X1).
+// Two animation frames first: a capture straight after a scroll, a style switch or a DOM change
+// can read a frame painted before it (measured: a highlighted row read as a Canvas backplate about
+// one run in eight, while the fill beside it read Highlight).
 const capture = async (clip) => {
-  const [sx, sy] = await evaluate("[scrollX, scrollY]");
+  const [sx, sy] = await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok([scrollX, scrollY]))))");
   const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false,
     clip: { x: clip.x + sx, y: clip.y + sy, width: clip.width, height: clip.height, scale: 1 } });
   return decodePng(data);

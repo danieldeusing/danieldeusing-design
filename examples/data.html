@@ -36,27 +36,6 @@
     <link rel="stylesheet" href="../src/filters.css" data-full />
     <link rel="stylesheet" href="../src/data.css" />
 
-    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
-         STAND-IN — NOT PART OF THIS PACKAGE, AND NOT IN src/.
-         WP3 (chrome.css) has not landed on the release branch yet, and this page draws two of the
-         lines this package handed it. The block is DISABLED (media="not all") and the script at the
-         top of <body> switches it on only while the real rule is missing; the header says so. The
-         packages that HAVE landed (WP1, WP4, WP5, WP6, WP7) are loaded above, never copied.
-         ══════════════════════════════════════════════════════════════════════════════════════════ -->
-    <!-- WP3 · chrome.css edits this package hands over (D1's sticky-header line, D9's tickstrip).
-         The exact CSS is in the WP11 report, "for WP3". -->
-    <style id="standin-wp3" media="not all">
-      .tablewrap thead th { background: var(--tablewrap-fade, var(--background)); }
-      .ticktable thead th { padding: 0; border: 0; }
-      .tick-dot { font-size: inherit; }
-      .tick--ok .tick-dot::before,
-      .tick--running .tick-dot::before { content: "\25CF"; content: "\25CF" / ""; }
-      .tick--stale .tick-dot::before { content: "\2715"; content: "\2715" / ""; }
-      .tick--never .tick-dot::before { content: "\25CB"; content: "\25CB" / ""; }
-      .tick--running .tick-dot { color: var(--info); border-left-color: color-mix(in srgb, var(--info) 45%, transparent); }
-      .tick-next { opacity: 1; }
-      .tick-sep { color: var(--border); opacity: 1; }
-    </style>
     <style>
       /* Page-only layout; nothing here is under test. It sets the body font and colours because in
          ?bare mode base.css is not loaded — which is what a tokens-only surface does for itself. */
@@ -109,32 +88,13 @@
   </head>
   <body>
     <script>
-      /* Switch on the stand-in only where the real thing is missing, and say whether it is in force.
-         `?bare` first drops the data-full stylesheets. */
+      /* `?bare` drops the data-full stylesheets. */
       (() => {
         const root = document.documentElement;
         if (new URLSearchParams(location.search).has("bare")) {
           document.querySelectorAll("link[data-full]").forEach((link) => link.remove());
           root.dataset.bare = "";
         }
-        const probe = (html, test, pseudo) => {
-          const host = document.createElement("div");
-          host.innerHTML = html;
-          document.body.append(host);
-          const el = host.querySelector("[data-probe]") || host.firstElementChild;
-          const ok = test(getComputedStyle(el, pseudo || null));
-          host.remove();
-          return ok;
-        };
-        const inForce = [];
-        const use = (id, missing) => {
-          if (!missing) return;
-          document.getElementById(id).media = "all";
-          inForce.push(id.replace("standin-", ""));
-        };
-        use("standin-wp3", !probe('<table class="ticktable"><tbody><tr class="tick tick--stale"><td class="tick-dot" data-probe></td></tr></tbody></table>',
-          (s) => s.content !== "none" && s.content !== "normal", "::before"));
-        root.dataset.standins = inForce.join(" ") || "none";
       })();
     </script>
 
@@ -149,7 +109,6 @@
       </span>
       <button type="button" class="demo-btn" id="anim-btn" aria-pressed="true">anim</button>
       <a class="demo-btn" id="bare-link" href="?bare">tokens + chrome only</a>
-      <span class="demo-note">stand-ins in force: <span id="standins"></span></span>
     </header>
 
     <main class="wrap">
@@ -480,7 +439,6 @@
 
       const root = document.documentElement;
       const bare = root.hasAttribute("data-bare");
-      document.getElementById("standins").textContent = root.dataset.standins;
       if (bare) document.getElementById("bare-link").href = "?";
 
       /* ── page chrome: theme and anim ── */

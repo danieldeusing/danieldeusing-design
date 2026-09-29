@@ -14,25 +14,22 @@
  *      as a table; text under 4.5:1, or a glyph or ring under 3:1, FAILS. An `info` row is a
  *      divider or a decorative edge, reported and not gated.
  *   3. Does the file stand alone? The demo page is rendered twice — with reset, base, components and
- *      chrome, and with `?bare` (tokens.css + cards.css) — and 58 listed properties of every fixture
+ *      chrome, and with `?bare` (tokens.css + the component files, cards.css among them) — and 58 listed properties of every fixture
  *      this file styles must agree between the two, font-family and font-size among them (X2); an
  *      element's size is its rendered box, since computed width and height follow the page's
  *      box-sizing reset. The focus rings are asserted ONLY in ?bare, where no global
  *      :focus-visible rule exists to supply a ring the component forgot (X2).
  *   4. Does `hidden` hide every component? With tokens.css loaded, whatever display the class sets
- *      (X3). Until this branch carries WP1's rule the demo supplies it as a marked stand-in.
+ *      (X3): tokens.css's one rule.
  *   5. Do the states survive forced colours (X1)? Read from PIXELS, on four themes × both palettes and
  *      again as an engine without preserve-parent-color sees the file: every glyph and line this file
  *      draws reaches 3:1 on what it sits on, a chosen row sits on Highlight where its neighbour does
  *      not, the words on both reach 4.5:1, and a focused row's ring 3:1 on its own fill. Every clip
  *      is proved to hold its element's ink: hidden, the mark takes its ink with it.
  *
- * WHAT IT READS. examples/cards.html is the environment: its stylesheets, and stand-ins for the
- * tokens and classes other packages of 0.60.0 own. Those switch themselves off once the real ones
- * exist, and this prints which were in force — a green run says what it measured. With
- * DD_NO_STANDINS=1 any stand-in still in force is a FAILURE: the integrated tree must not be
- * measuring copies. The fixtures are injected here, so the assertions do not depend on the demo's
- * prose.
+ * WHAT IT READS. examples/cards.html is the environment: the real stylesheets, and nothing standing
+ * in for them (scripts/check-integration.mjs fails a demo that carries a stand-in). The fixtures are
+ * injected here, so the assertions do not depend on the demo's prose.
  *
  * A real browser and no dependency, like check-tabletools.mjs: the headless chromium Playwright
  * caches on these machines, over the DevTools protocol with Node's own fetch and WebSocket. No
@@ -291,9 +288,9 @@ window.__wp8 = (() => {
     near: (a, b, label, tol = 0.6) => (Math.abs(a - b) <= tol ? null : label + ": " + a.toFixed(2) + " vs " + b.toFixed(2)),
     // Every listed computed property of every fixture this file styles, for the full-vs-bare
     // comparison. Another package's class (.btn-icon, .ico, .tag, .count, .dot, .value-filter,
-    // .disclosure-btn) is skipped: once those land, the full stack draws the real class and ?bare the
-    // page's stand-in. A .card-terminal is K1's box (components.css); on one, only the properties
-    // this file sets on a card are compared.
+    // .disclosure-btn) is skipped: it is that file's to prove. A .card-terminal is K1's box
+    // (components.css, which ?bare drops); on one, only the properties this file sets on a card are
+    // compared.
     snapshot(ids, props, cardProps, mine) {
       const out = {};
       for (const id of ids) {
@@ -327,7 +324,7 @@ const load = async (query = "") => {
   for (let i = 0; ; i += 1) {
     await sleep(100);
     try {
-      if (await evaluate("document.readyState === 'complete' && document.getElementById('standins').textContent !== ''")) break;
+      if (await evaluate("document.readyState === 'complete'")) break;
     } catch {}
     if (i > 100) throw new Error("the demo page never finished loading " + query);
   }
@@ -828,12 +825,6 @@ const snapshot = () => evaluate(`window.__wp8.snapshot([...document.querySelecto
 const THEMES = ["warm", "green", "mono", "paper"];
 
 await load();
-const standins = await evaluate("document.documentElement.dataset.standins");
-console.log(`stand-ins in force (tokens and classes other 0.60.0 packages own): ${standins}`);
-if (process.env.DD_NO_STANDINS === "1") {
-  await check("DD_NO_STANDINS=1: no stand-in is in force (the integrated tree measures the real tokens and classes)", () =>
-    (standins === "none" ? [] : [`still standing in: ${standins}`]));
-}
 
 /* The YIELD, as numbers. Everything below compares this file's output with a token resolved on a
    probe, and an unresolved token resolves to nothing on BOTH sides: a missing --ico-chevron-right
@@ -906,16 +897,6 @@ await check("no text sits straight in a .panel-head on the demo (it would take t
 await check("aria-selected on the demo sits only on roles that support it (option, row, gridcell, tab, treeitem)", () => evaluate(`
   [...document.querySelectorAll("[aria-selected]")].filter((el) => !["option", "row", "gridcell", "tab", "treeitem", "columnheader", "rowheader"].includes(el.getAttribute("role")))
     .map((el) => el.tagName.toLowerCase() + "." + el.className + ' carries aria-selected with role "' + el.getAttribute("role") + '"')`));
-await check("the demo's icon stand-in is WP4's corrected forced form: preserve-parent-color, @supports not → none + CanvasText, no color", () => evaluate(`(() => {
-  const src = [...document.scripts].map((sc) => sc.textContent).join("\\n");
-  const forced = src.split("forced-colors: active").slice(1).map((part) => part.split(";\\n")[0]);
-  const out = [];
-  if (forced.length < 2) out.push("the stand-in carries " + forced.length + " forced-colours blocks, want 2 (.ico and [data-icon]::before)");
-  for (const f of forced) {
-    if (!f.includes("@supports not (forced-color-adjust: preserve-parent-color)")) out.push("a forced block without its @supports-not branch");
-    if (/[\\s;{]color\\s*:/.test(f)) out.push("a forced block sets a color: " + f.match(/[\\s;{]color\\s*:[^;}]*/)[0].trim());
-  }
-  return out; })()`));
 await check("no glyph in this file's components carries a colour of its own — it takes its parent's (icons.md)", () => evaluate(`
   [...document.querySelectorAll(":is(.panel-head, .tree-row, .stat-tile, .pane-collapsed, .card-head, .card-foot, .list-row, .console) .ico")]
     .filter((el) => getComputedStyle(el).color !== getComputedStyle(el.parentElement).color || el.style.color)
@@ -1066,6 +1047,19 @@ await load("?bare");
 await check("?bare really dropped reset, base, components and chrome", () => evaluate(`
   [...document.styleSheets].map((s) => (s.href || "").split("/").pop()).filter((f) => /^(reset|base|components|chrome)\\.css$/.test(f))
     .map((f) => f + " is still loaded")`));
+// K2 decorates K1's box, and K1 is components.css's (cards.css says so in its header): a surface that
+// shows a K2 card loads that block with it. So ?bare gets THAT block and nothing else of
+// components.css — read out of the file on every run, from its header comment to the flush modifier,
+// so it cannot drift the way a copy in the demo did.
+const K1 = (() => {
+  const css = readFileSync(join(root, "src/components.css"), "utf8");
+  const from = css.indexOf("   Card — a bordered surface.");
+  const to = css.indexOf(".card-terminal--flush { padding: 0; }");
+  return from > 0 && to > from ? "/*" + css.slice(from, to) + ".card-terminal--flush { padding: 0; }" : "";
+})();
+await check("?bare: K1's card box is read from components.css (the one block a K2 card needs beside cards.css)", () =>
+  (/\.card-terminal \{[^}]*padding: var\(--card-pad\)/.test(K1) ? [] : ["the K1 block was not found in components.css"]));
+await evaluate(`(() => { const s = document.createElement("style"); s.id = "k1-from-components"; s.textContent = ${JSON.stringify(K1)}; document.head.append(s); })(); null`);
 await inject();
 for (const theme of THEMES) {
   await setTheme(theme);
@@ -1253,7 +1247,7 @@ for (const palette of ["light", "dark"]) {
   for (const theme of THEMES) await forcedCell("", theme, palette);
 }
 // The fallback, as an engine without preserve-parent-color sees it: every @supports block that
-// declares it cut out of cards.css (and out of the icon stand-in, when it is in force). The chevron
+// declares it cut out of cards.css. The chevron
 // is then CanvasText, and HighlightText on a chosen row, where CanvasText would sit on Highlight.
 const toFallback = String.raw`(async () => {
   const cut = (css) => css.replace(/@supports \(forced-color-adjust: preserve-parent-color\) \{[^{}]*\{[^{}]*\}\s*\}/g, "")
@@ -1264,11 +1258,9 @@ const toFallback = String.raw`(async () => {
   const style = document.createElement("style");
   style.textContent = cut(before);
   link.replaceWith(style);
-  const i1 = document.getElementById("standin-i1");
-  i1.textContent = cut(i1.textContent);
   const out = [];
   if (!/preserve-parent-color/.test(code(before))) out.push("cards.css declares no preserve-parent-color to cut");
-  if (/preserve-parent-color/.test(code(style.textContent) + code(i1.textContent))) out.push("preserve-parent-color survived the cut");
+  if (/preserve-parent-color/.test(code(style.textContent))) out.push("preserve-parent-color survived the cut");
   return out;
 })()`;
 for (const palette of ["light", "dark"]) {

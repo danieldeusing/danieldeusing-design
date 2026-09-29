@@ -27,9 +27,9 @@
  *   · the dialog footer against controls.css loaded AFTER overlays.css;
  *   · contrast for every new pairing, four themes x three surfaces.
  *
- * STAND-INS. The demo carries copies of what sibling packages of 0.60.0 own, each switched on only
- * when the real thing is missing. Every run prints which are in force; DD_NO_STANDINS=1 makes an
- * in-force stand-in a FAILURE, for the integrated tree, where none may be left.
+ * The demo loads the real files and imports the sibling runtimes it borrows (attachMenuKeys,
+ * positionPopup); nothing stands in for them (check-integration.mjs fails a demo that carries a
+ * stand-in).
  *
  * If no browser is on the machine it SKIPS loudly (DD_REQUIRE_BROWSER=1 makes that a failure). Both
  * ports are chosen by the OS and read back, so it runs beside the other suites without colliding.
@@ -419,14 +419,6 @@ await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, dev
 
 try {
   await load();
-
-  /* ── stand-ins ─────────────────────────────────────────────────────────────────────────────── */
-  section("stand-ins");
-  const standins = await evaluate("({ css: document.documentElement.dataset.standins, js: document.documentElement.dataset.standinsJs })");
-  console.log(`NOTE  stand-ins in force — css: ${standins.css} · js: ${standins.js}`);
-  if (process.env.DD_NO_STANDINS === "1") {
-    await check("DD_NO_STANDINS=1: no stand-in is in force", standins.css === "none" && standins.js === "none", standins);
-  }
 
   /* ── the dialog's box ──────────────────────────────────────────────────────────────────────── */
   section("dialog.dialog — the box");

@@ -40,7 +40,7 @@
  *     colours are perfect
  *   · `hidden` hides every control (X3), measured on a page of tokens.css and controls.css alone; the
  *     [hidden] rule is stood in there only while tokens.css lacks it, and DD_FORBID_STANDINS=1 fails
- *     the run instead (as it does while the demo's stand-in block covers anything)
+ *     the run instead
  *   · CONTRAST: every new text and edge pairing, on warm / green / mono / paper, over --background,
  *     --card and --muted. Text >= 4.5:1, control edges and glyphs >= 3:1. The table it prints is the
  *     one in the release notes. Pressed is told from hovered on every theme.
@@ -294,43 +294,6 @@ await load();
 await evaluate("document.documentElement.classList.add('anim-off'); null");
 
 const T = (id) => `[data-t="${id}"]`;
-
-/*
- * THE STAND-IN BLOCK CAN HIDE A MISSING DECLARATION. examples/controls.html carries copies of tokens
- * and classes other packages own, so this branch renders before they land. Once they have landed, a
- * stand-in still in the page would keep this suite green over a declaration nobody made, and real
- * pages would paint a solid square where a glyph should be. So every run reports what the block is
- * still COVERING FOR: each item is measured with the block on and off, and listed if it changes.
- * Delete the block at integration; anything missing then fails below, loudly. DD_FORBID_STANDINS=1,
- * for the integration build, fails the run while the block covers anything (and while the X3 page
- * below needs its stand-in).
- */
-const covering = await evaluate(`(() => {
-  const block = document.getElementById('stand-ins');
-  if (!block) return null;
-  const read = () => {
-    const root = getComputedStyle(document.documentElement), c = __c;
-    return {
-      '--control-h / --control-edge / --icon-*': ['--control-h', '--control-edge', '--icon-size'].map((p) => root.getPropertyValue(p)).join('|'),
-      '[data-tone] -> --tone': getComputedStyle(c.el('${T("destructive")}')).getPropertyValue('--tone'),
-      '[data-icon] -> --ico': getComputedStyle(c.el('${T("rest")}')).getPropertyValue('--ico'),
-      'dd-spin + html.anim-off transitions': [...document.styleSheets].some((s) => { try { return [...s.cssRules].some((r) => r.name === 'dd-spin'); } catch { return false; } }) + '|' + (document.documentElement.classList.add('anim-off'), c.cs('${T("rest")}').transitionDuration),
-      '.btn-terminal--danger': c.cs('${T("confirm-armed")} .btn-terminal--danger').color,
-      '.filter-bar': c.cs('${T("filter-bar")}').display,
-    };
-  };
-  const on = read();
-  block.disabled = true;
-  const off = read();
-  block.disabled = false;
-  return Object.keys(on).filter((k) => on[k] !== off[k]);
-})()`);
-console.log(covering === null
-  ? "NOTE  no stand-in block: every token and class is the real one"
-  : `NOTE  the demo's stand-in block is still covering for: ${covering.length ? covering.join(", ") : "nothing (delete it)"}`);
-if (process.env.DD_FORBID_STANDINS === "1") {
-  check("DD_FORBID_STANDINS=1: the demo's stand-in block covers nothing", covering === null || covering.length === 0, covering);
-}
 
 /* ── .btn-icon ────────────────────────────────────────────────────────────────── */
 

@@ -39,8 +39,8 @@
  *   REMOVED the classes 0.60.0 removed (§1.1) are not declared again, and the forced glyph rule and
  *           its `@supports not` fallback name the same selectors.
  *
- * The demo carries stand-ins for rules other packages of 0.60.0 own. Each switches itself off when
- * the real rule is present; DD_FORBID_STANDINS=1 FAILS while any is still in force.
+ * The demo loads the real files and nothing standing in for them (check-integration.mjs fails a
+ * demo that carries a stand-in).
  *
  * A real browser (layout, cascade and the forced-colours mode are the subject), served off the
  * working tree over loopback, debugging port 0 read back from DevToolsActivePort. No browser: it
@@ -199,7 +199,6 @@ const section = async (name, body) => {
 };
 
 /* ── SETUP ────────────────────────────────────────────────────────────────── */
-let selectStandIn = null;
 await section("SETUP — the page loads, and the runtime has enhanced it", async () => {
   await send("Page.enable");
   await send("DOM.enable");
@@ -227,14 +226,15 @@ await section("SETUP — the page loads, and the runtime has enhanced it", async
       const v = getComputedStyle(p)[prop]; p.remove(); return v; };
     window.cs = (sel, pseudo) => getComputedStyle(document.querySelector(sel), pseudo || null);
   })()`);
-  // WP6's select.js writes position: fixed on the panel it appends; this branch's does not yet, and
-  // the demo's stand-in carries it. Open one list to see which.
-  selectStandIn = await evaluate(`(() => {
+  // select.js places the panel it appends itself (position: fixed, inline): components.css gives
+  // `.select-panel` no position, so a framework app can place its own listbox.
+  const placed = await evaluate(`(() => {
     const trigger = document.getElementById("trigger-model"); trigger.click();
     const panel = [...document.body.children].find((n) => n.matches(".select-panel"));
     const inline = panel ? panel.style.position : "(no panel opened)"; trigger.click();
-    return inline === "fixed" ? null : "wp6 (select.js does not place its own panel)";
+    return inline;
   })()`);
+  check("select.js places the panel it appends (position: fixed, inline)", placed === "fixed", placed);
 });
 if (failures) {
   console.log(`\ncheck-components: ${failures} FAILED — the page did not come up, so nothing after the setup was run`);
@@ -880,15 +880,6 @@ await section("REMOVED — the classes 0.60.0 removed are not declared (§1.1), 
     glyphs.length >= 10 && JSON.stringify(glyphs) === JSON.stringify(fallback), { glyphs, fallback });
 });
 
-/* ── STAND-INS ────────────────────────────────────────────────────────────── */
-await section("STAND-INS — what the demo still borrows from other packages", async () => {
-  const standins = await evaluate(`document.documentElement.dataset.standins ?? "(the page does not say)"`);
-  const inForce = [standins, selectStandIn].filter((s) => s && s !== "none");
-  console.log(`      in force: ${inForce.length ? inForce.join(" · ") : "none"}`);
-  if (process.env.DD_FORBID_STANDINS === "1") {
-    check("DD_FORBID_STANDINS=1: no demo stand-in is in force", inForce.length === 0, inForce);
-  }
-});
 
 console.log(failures ? `\ncheck-components: ${failures} FAILED` : "\ncheck-components: all checks passed");
 shutdown();

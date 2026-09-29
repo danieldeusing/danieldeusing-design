@@ -27,141 +27,14 @@
     <link rel="stylesheet" href="../src/components.css" data-full />
     <link rel="stylesheet" href="../src/chrome.css" data-full />
 
-    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
-         STAND-INS — NOT PART OF THIS PACKAGE, AND NOT IN src/.
-         Other work packages of 0.60.0 own these and land in parallel. The token block is wrapped in
-         :where(), so the real tokens outrank it the day they exist. Every CLASS block is DISABLED
-         (media="not all") and the script at the top of <body> switches it on only when the real
-         class is missing, so once WP1 / WP2 / I1 / WP5 / WP6 / WP7 / WP12 are integrated this page
-         renders and measures the real thing, not these copies. The header says which are in force.
-         They sit BEFORE cards.css, where components.css will be once integrated, so a tie between
-         K1 and K2 resolves here the way it will in the bundle.
-         ══════════════════════════════════════════════════════════════════════════════════════════ -->
-    <style id="standin-tokens" media="not all">
-      /* WP1 · F1 control, size and layout tokens (values from SPEC.md F1) */
-      :where(:root) {
-        --control-h: 1.75rem;
-        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
-        --card-pad: 0.75rem;
-        --icon-sm: 0.75rem; --icon-size: 0.875rem; --icon-lg: 1rem; --icon-xl: 1.5rem;
-        --dot-size: 0.5rem;
-        --cat-l: 0.45; --cat-c: 0.075;
-        --cat-teal: oklch(var(--cat-l) var(--cat-c) 185);
-        --cat-violet: oklch(var(--cat-l) var(--cat-c) 295);
-        --cat-amber: oklch(var(--cat-l) var(--cat-c) 80);
-      }
-      :where(html[data-theme="green"], html[data-theme="mono"]) { --cat-l: 0.74; --cat-c: 0.12; }
-      /* WP1 · F7 tone mapping */
-      :where([data-tone="primary"]) { --tone: var(--primary); }
-      :where([data-tone="success"]) { --tone: var(--success); }
-      :where([data-tone="warning"]) { --tone: var(--warning); }
-      :where([data-tone="destructive"]) { --tone: var(--destructive); }
-      :where([data-tone="info"]) { --tone: var(--info); }
-      :where([data-tone="pending"]) { --tone: var(--pending); }
-      :where([data-tone="muted"]) { --tone: var(--muted-foreground); }
-      /* WP1 · F6 motion */
-      @keyframes dd-pulse { 50% { opacity: 0.25; } }
-      html.anim-off *, html.anim-off *::before, html.anim-off *::after {
-        animation: none !important; transition: none !important;
-      }
-    </style>
-    <!-- WP1 · X3: `hidden` hides every element, whatever display its class sets — answered once, in
-         tokens.css. Until this branch carries it, this is the only [hidden] rule on the page. -->
-    <style id="standin-hidden" media="not all">
-      [hidden]:not([hidden="until-found"]) { display: none !important; }
-    </style>
-    <!-- I1 · glyphs: the --ico-<word> masks, the [data-icon] → --ico mapping, .ico / .ico--xl.
-         Filled in piece by piece by the script, only for what is missing. -->
-    <style id="standin-i1" media="not all"></style>
-    <!-- WP2 · K1 .card-terminal as SPEC.md revises it: --card-pad, a hover only on a card that is a
-         link (primary edge + --secondary fill, no glow), --flush. 0.59.0 glows every card. -->
-    <style id="standin-k1" media="not all">
-      .card-terminal {
-        --tablewrap-fade: var(--card);
-        background: var(--card); border: 1px solid var(--border); padding: var(--card-pad);
-        transition: border-color 0.15s ease, background-color 0.15s ease;
-      }
-      .card-terminal:hover { border-color: var(--border); box-shadow: none; }
-      a.card-terminal:hover, button.card-terminal:hover, .card-terminal--link:hover {
-        border-color: var(--primary); background: var(--secondary);
-      }
-      a.card-terminal { color: inherit; text-decoration: none; }
-      .card-terminal--flush { padding: 0; }
-    </style>
-    <!-- WP2 · C17 .disclosure-btn -->
-    <style id="standin-wp2" media="not all">
-      .disclosure-btn {
-        box-sizing: border-box; display: inline-grid; place-items: center; padding: 0 0.15rem;
-        font: inherit; color: inherit; background: none; border: 0; opacity: 0.6; cursor: pointer;
-      }
-      .disclosure-btn::before { content: "\25B8"; content: "\25B8" / ""; }
-      .disclosure-btn[aria-expanded="true"]::before { content: "\25BE"; content: "\25BE" / ""; }
-      .disclosure-btn:hover, .disclosure-btn:focus-visible { opacity: 1; }
-    </style>
-    <!-- WP5 · C2 .btn-icon -->
-    <style id="standin-wp5" media="not all">
-      .btn-icon {
-        position: relative; display: inline-grid; place-items: center; box-sizing: border-box;
-        inline-size: var(--control-h); block-size: var(--control-h); padding: 0; font: inherit;
-        color: var(--btn-icon-color, var(--primary)); background: transparent;
-        border: 1px solid var(--control-edge); cursor: pointer;
-      }
-      .btn-icon[data-icon]::before {
-        content: ""; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor;
-        -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
-      }
-      .btn-icon:hover { border-color: currentColor; background: color-mix(in srgb, currentColor 12%, transparent); }
-      .btn-icon:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-      .btn-icon--sm { inline-size: 1.5rem; block-size: 1.5rem; }
-      .btn-icon--sm[data-icon]::before { inline-size: var(--icon-sm); block-size: var(--icon-sm); }
-      .btn-icon--bare { border-color: transparent; --btn-icon-color: var(--muted-foreground); }
-      .btn-icon--bare:hover { --btn-icon-color: var(--primary); background: var(--muted); border-color: transparent; }
-    </style>
-    <!-- WP6 · M10 .value-filter, M7 .filter-bar-spacer -->
-    <style id="standin-wp6" media="not all">
-      .value-filter {
-        position: relative; z-index: 1; margin: 0; padding: 0; font: inherit; color: inherit;
-        text-align: inherit; background: none; border: 0; cursor: pointer;
-      }
-      .value-filter:hover .tag { border-color: currentColor; }
-      .value-filter:not(:has(.tag)):hover { text-decoration: underline; text-underline-offset: 4px; }
-      .value-filter:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-      .filter-bar-spacer { flex: 1; }
-    </style>
-    <!-- WP7 · T1 .tag, T2 .count, S8 .dot -->
-    <style id="standin-wp7" media="not all">
-      :is(.tag, .count):not([data-tone]) { --tone: initial; }
-      .tag {
-        --tag-c: var(--tag-color, var(--tone, var(--muted-foreground)));
-        display: inline-flex; align-items: center; gap: 0.25rem; vertical-align: middle; box-sizing: border-box;
-        min-block-size: 1.25rem; padding: 0 0.375rem; font: inherit; font-weight: 600; line-height: 1;
-        white-space: nowrap; color: var(--tag-c); background: transparent;
-        border: 1px solid color-mix(in srgb, var(--tag-c) 50%, transparent);
-      }
-      .count {
-        display: inline-grid; place-items: center; box-sizing: border-box; min-inline-size: 1.25rem;
-        block-size: 1.25rem; padding: 0 0.25rem; font-weight: 600; font-variant-numeric: tabular-nums;
-        line-height: 1; color: var(--tone, var(--muted-foreground));
-        border: 1px solid color-mix(in srgb, var(--tone, var(--muted-foreground)) 50%, transparent);
-      }
-      .dot {
-        display: inline-block; flex: none; inline-size: var(--dot-size); block-size: var(--dot-size);
-        border-radius: 50%; background: var(--tone, currentColor);
-      }
-      .dot--pulse { animation: dd-pulse 2s ease-in-out infinite; }
-    </style>
-    <!-- WP12 · P3 .section-head, P8 .meta / .meta-stat -->
-    <style id="standin-wp12" media="not all">
-      .section-head {
-        display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-        gap: 0.25rem 1rem; margin-block-end: 1rem;
-      }
-      .section-head > * { margin: 0; }
-      .section-head:has(> :last-child:is(button, .btn-icon)) { align-items: center; }
-      .meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; margin: 0; color: var(--muted-foreground); }
-      .meta-stat { display: inline-flex; align-items: center; gap: 0.25rem; font-variant-numeric: tabular-nums; }
-      .meta-stat > .ico { inline-size: var(--icon-sm); block-size: var(--icon-sm); }
-    </style>
+    <!-- The component files cards' markup also uses. Each needs tokens.css and nothing else, so they
+         stay in ?bare too: that mode is a tokens-only surface, which loads what it renders. -->
+    <link rel="stylesheet" href="../src/icons.css" />
+    <link rel="stylesheet" href="../src/controls.css" />
+    <link rel="stylesheet" href="../src/tags.css" />
+    <link rel="stylesheet" href="../src/feedback.css" />
+    <link rel="stylesheet" href="../src/filters.css" />
+    <link rel="stylesheet" href="../src/content.css" />
 
     <link rel="stylesheet" href="../src/cards.css" />
 
@@ -206,103 +79,13 @@
   </head>
   <body>
     <script>
-      /* Switch on each stand-in only where the real thing is missing, and say which are in force.
-         `?bare` first drops the data-full stylesheets. */
+      /* `?bare` drops the data-full stylesheets: the tokens-only rendering. */
       (() => {
         const root = document.documentElement;
         if (new URLSearchParams(location.search).has("bare")) {
           document.querySelectorAll("link[data-full]").forEach((link) => link.remove());
           root.dataset.bare = "";
         }
-        const token = (name) => getComputedStyle(root).getPropertyValue(name).trim() !== "";
-        const probe = (html, test) => {
-          const host = document.createElement("div");
-          host.innerHTML = html;
-          document.body.append(host);
-          const ok = test(getComputedStyle(host.firstElementChild), host.firstElementChild);
-          host.remove();
-          return ok;
-        };
-        // lucide 0.559.0 (configr's lucide-react), stroke 2 on a 24-unit box
-        const ICONS = {
-          "package": "<path d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/><path d='M12 22V12'/><polyline points='3.29 7 12 12 20.71 7'/><path d='m7.5 4.27 9 5.15'/>",
-          "star": "<path d='M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z'/>",
-          "chevron-right": "<path d='m9 18 6-6-6-6'/>",
-          "chevron-down": "<path d='m6 9 6 6 6-6'/>",
-          "chevrons-up-down": "<path d='m7 15 5 5 5-5'/><path d='m7 9 5-5 5 5'/>",
-          "chevrons-down-up": "<path d='m7 20 5-5 5 5'/><path d='m7 4 5 5 5-5'/>",
-          "folder-tree": "<path d='M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z'/><path d='M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z'/><path d='M3 5a2 2 0 0 0 2 2h3'/><path d='M3 3v13a2 2 0 0 0 2 2h3'/>",
-          "folder-open": "<path d='m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2'/>",
-          "folder": "<path d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/>",
-          "file": "<path d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/><path d='M14 2v5a1 1 0 0 0 1 1h5'/>",
-          "file-code": "<path d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/><path d='M14 2v5a1 1 0 0 0 1 1h5'/><path d='M10 12.5 8 15l2 2.5'/><path d='m14 12.5 2 2.5-2 2.5'/>",
-          "panel-left-open": "<rect width='18' height='18' x='3' y='3' rx='2'/><path d='M9 3v18'/><path d='m14 9 3 3-3 3'/>",
-          "panel-left-close": "<rect width='18' height='18' x='3' y='3' rx='2'/><path d='M9 3v18'/><path d='m16 15-3-3 3-3'/>",
-          "refresh-cw": "<path d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/><path d='M21 3v5h-5'/><path d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/><path d='M8 16H3v5'/>",
-        };
-        const svg = (body) => "url(\"data:image/svg+xml," + encodeURIComponent(
-          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' " +
-          "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" + body + "</svg>") + "\")";
-        const inForce = [];
-        const use = (id, missing) => {
-          if (!missing) return;
-          document.getElementById(id).media = "all";
-          inForce.push(id.replace("standin-", ""));
-        };
-        use("standin-tokens", !token("--card-pad"));
-        use("standin-hidden", !probe('<div class="panel" hidden></div>', (s) => s.display === "none"));
-
-        const absent = Object.keys(ICONS).filter((n) => !token("--ico-" + n));
-        const unmapped = Object.keys(ICONS).filter((n) =>
-          !probe('<span data-icon="' + n + '"></span>', (s) => s.getPropertyValue("--ico").trim() !== ""));
-        const drawn = probe('<span class="ico"></span>', (s) => s.display !== "inline");
-        const glyphs = [];
-        let css = "";
-        if (absent.length) {
-          css += ":root {" + absent.map((n) => "--ico-" + n + ": " + svg(ICONS[n]) + ";").join("") + "}";
-          glyphs.push("tokens " + absent.join(" "));
-        }
-        if (unmapped.length) {
-          css += unmapped.map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
-          // WP4 ships the mapping with a forced-colours default for every [data-icon]::before glyph,
-          // in @layer base so a component's own rule wins (tokens.css, X1): without it a .btn-icon's
-          // glyph paints Canvas on Canvas and the button is an empty box.
-          css += "@layer base { @media (forced-colors: active) {" +
-            " @supports (forced-color-adjust: preserve-parent-color) {" +
-            " [data-icon]::before { forced-color-adjust: preserve-parent-color; --tone: currentColor; } }" +
-            " @supports not (forced-color-adjust: preserve-parent-color) {" +
-            " [data-icon]::before { forced-color-adjust: none; background: CanvasText; } } } }";
-          glyphs.push("mapping " + unmapped.join(" "));
-        }
-        if (!drawn) {
-          css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
-            " vertical-align: -0.125em; background: currentColor;" +
-            " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
-            ".ico[data-tone] { background: var(--tone, currentColor); }" +
-            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }" +
-            // WP4's forced-colours glyph (icons.css @ c35f091, X1): the parent's forced colour, and
-            // CanvasText where preserve-parent-color is unknown. Neither branch sets a color.
-            "@media (forced-colors: active) { @supports (forced-color-adjust: preserve-parent-color) {" +
-            " .ico, .ico[data-tone] { forced-color-adjust: preserve-parent-color; background: currentColor; } }" +
-            " @supports not (forced-color-adjust: preserve-parent-color) {" +
-            " .ico, .ico[data-tone] { forced-color-adjust: none; background: CanvasText; } } }";
-          glyphs.push(".ico");
-        }
-        if (css) {
-          const block = document.getElementById("standin-i1");
-          block.textContent = css;
-          block.media = "all";
-          inForce.push("i1 (" + glyphs.join("; ") + ")");
-        }
-        // K1's card pads by --card-pad (12px); 0.59.0's padded .85rem, and with no components.css at all
-        // (?bare) the class pads nothing — both mean the revised card is missing.
-        use("standin-k1", !probe('<div class="card-terminal"></div>', (s) => s.paddingTop === "12px"));
-        use("standin-wp2", !probe('<button class="disclosure-btn"></button>', (s) => s.opacity === "0.6"));
-        use("standin-wp5", !probe('<button class="btn-icon"></button>', (s) => s.display === "inline-grid"));
-        use("standin-wp6", !probe('<button class="value-filter"></button>', (s) => s.zIndex === "1"));
-        use("standin-wp7", !probe('<span class="tag"></span>', (s) => s.display === "inline-flex"));
-        use("standin-wp12", !probe('<div class="section-head"></div>', (s) => s.display === "flex"));
-        root.dataset.standins = inForce.join(" · ") || "none";
       })();
     </script>
 
@@ -317,7 +100,6 @@
       </span>
       <button type="button" class="demo-btn" id="anim-btn" aria-pressed="true">anim</button>
       <a class="demo-btn" id="bare-link" href="?bare">tokens only</a>
-      <span class="demo-note">stand-ins in force: <span id="standins"></span></span>
     </header>
 
     <main class="demo-wrap">
@@ -706,7 +488,6 @@
 
     <script type="module">
       /* Demo chrome only — cards.css has no runtime. */
-      document.getElementById("standins").textContent = document.documentElement.dataset.standins;
       const params = new URLSearchParams(location.search);
       const bare = document.getElementById("bare-link");
       if (params.has("bare")) { bare.href = "?"; bare.textContent = "full stack"; }

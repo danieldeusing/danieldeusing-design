@@ -21,54 +21,14 @@
 
     <!-- The package's own order, deliberately WITHOUT reset.css: every interactive class on this
          page has to render right without one (house rule 4), and a missing `font: inherit` shows
-         up here as a 13px system font. chrome.css is here for header.bar and .visually-hidden.
-         icons.css is WP4's new file (`.ico`): until it lands the link answers 404, and the I1
-         stand-in below covers for it. -->
+         up here as a 13px system font. chrome.css is here for header.bar and .visually-hidden,
+         icons.css for `.ico`. -->
     <link rel="stylesheet" href="../src/tokens.css" />
     <link rel="stylesheet" href="../src/base.css" />
     <link rel="stylesheet" href="../src/components.css" />
     <link rel="stylesheet" href="../src/chrome.css" />
     <link rel="stylesheet" href="../src/icons.css" />
 
-    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
-         STAND-INS — NOT PART OF THE PACKAGE, AND NOT A PATTERN TO COPY.
-         Each block below belongs to ANOTHER work package of 0.60.0 that is not on this branch yet,
-         so this page can show the revised components as they will render once those land. Each is
-         DISABLED (media="not all"): the script at the top of <body> switches one on only when the
-         real rule is missing, and the page names the ones in force (html[data-standins]).
-         check-components.mjs with DD_FORBID_STANDINS=1 FAILS while any of them is.
-         ══════════════════════════════════════════════════════════════════════════════════════════ -->
-    <!-- WP1 (tokens.css): F1 sizes, F3 elevation, F6 motion, F7 tones. Probed by --control-h. -->
-    <style id="standin-wp1" media="not all">
-      :root {
-        --control-h: 1.75rem;
-        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
-        --card-pad: 0.75rem;
-        --icon-sm: 0.75rem;
-        --icon-size: 0.875rem;
-        --icon-lg: 1rem;
-        --icon-xl: 1.5rem;
-        --elev-float: 0 0 20px var(--glow-soft);
-      }
-      [data-tone="destructive"] { --tone: var(--destructive); }
-      @keyframes dd-spin { to { transform: rotate(1turn); } }
-      html.anim-off *, html.anim-off *::before, html.anim-off *::after { animation: none !important; transition: none !important; }
-      html.anim-off .cursor-block { display: none; }
-    </style>
-    <!-- X3 (WP1, tokens.css): `hidden` beats every author `display`, once, for the whole system.
-         Probed by a hidden .dd-dot that still draws. -->
-    <style id="standin-x3" media="not all">
-      [hidden]:not([hidden="until-found"]) { display: none !important; }
-    </style>
-    <!-- I1 (WP1 + WP4): the --ico-* masks, the [data-icon] mapping and the .ico class with WP4's
-         forced-colours rule. The script fills in ONLY the pieces that are missing. -->
-    <style id="standin-i1" media="not all"></style>
-    <!-- WP6 (runtime/select.js) writes `position: fixed` inline on the panel it appends; this
-         branch's select.js does not yet. The selector stands down by itself on a panel that carries
-         it, and check-components.mjs opens a list to see which one placed it. -->
-    <style id="standin-wp6">
-      body > .select-panel:not([style*="position"]) { position: fixed; }
-    </style>
 
     <style>
       /* Page layout only — nothing here styles a component. */
@@ -104,76 +64,6 @@
   </head>
 
   <body>
-    <script>
-      /* Switch on each stand-in only where the real rule is missing, and say which are in force.
-         WP1 is probed by --control-h, X3 by a hidden .dd-dot that still draws, and I1 piece by
-         piece: each absent --ico-* token, each name the [data-icon] mapping does not resolve, and
-         the .ico class. */
-      (() => {
-        const root = document.documentElement;
-        const token = (name) => getComputedStyle(root).getPropertyValue(name).trim() !== "";
-        const probe = (html, test) => {
-          const host = document.createElement("div");
-          host.innerHTML = html;
-          document.body.append(host);
-          const ok = test(getComputedStyle(host.firstElementChild));
-          host.remove();
-          return ok;
-        };
-        const inForce = [];
-        const use = (id, missing) => {
-          if (!missing) return;
-          document.getElementById(id).media = "all";
-          inForce.push(id.replace("standin-", ""));
-        };
-        use("standin-wp1", !token("--control-h"));
-        use("standin-x3", probe('<span class="dd-dot" hidden></span>', (s) => s.display !== "none"));
-
-        const ICONS = {
-          check: "<path d='M20 6 9 17l-5-5'/>",
-          "trash-2": "<path d='M10 11v6'/><path d='M14 11v6'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/><path d='M3 6h18'/><path d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/>",
-          pencil: "<path d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/><path d='m15 5 4 4'/>",
-          "loader-circle": "<path d='M21 12a9 9 0 1 1-6.219-8.56'/>",
-          "refresh-cw": "<path d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/><path d='M21 3v5h-5'/><path d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/><path d='M8 16H3v5'/>",
-          package: "<path d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/><path d='M12 22V12'/><polyline points='3.29 7 12 12 20.71 7'/><path d='m7.5 4.27 9 5.15'/>",
-          "triangle-alert": "<path d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/><path d='M12 9v4'/><path d='M12 17h.01'/>",
-          "maximize-2": "<path d='M15 3h6v6'/><path d='m21 3-7 7'/><path d='m3 21 7-7'/><path d='M9 21H3v-6'/>",
-          history: "<path d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/><path d='M3 3v5h5'/><path d='M12 7v5l4 2'/>",
-        };
-        const svg = (body) => "url(\"data:image/svg+xml," + encodeURIComponent(
-          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' " +
-          "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" + body + "</svg>") + "\")";
-        const absent = Object.keys(ICONS).filter((n) => !token("--ico-" + n));
-        const unmapped = Object.keys(ICONS).filter((n) =>
-          !probe('<span data-icon="' + n + '"></span>', (s) => s.getPropertyValue("--ico").trim() !== ""));
-        const drawn = probe('<span class="ico"></span>', (s) => s.display !== "inline");
-        const pieces = [];
-        let css = "";
-        if (absent.length) {
-          css += ":root {" + absent.map((n) => "--ico-" + n + ": " + svg(ICONS[n]) + ";").join("") + "}";
-          pieces.push("tokens " + absent.join(" "));
-        }
-        if (unmapped.length) {
-          css += unmapped.map((n) => '[data-icon="' + n + '"] { --ico: var(--ico-' + n + "); }").join("");
-          pieces.push("mapping " + unmapped.join(" "));
-        }
-        if (!drawn) {
-          // WP4's .ico, forced-colours rule included: the glyph takes the colour its parent was FORCED to.
-          css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
-            " background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
-            "@media (forced-colors: active) { .ico { forced-color-adjust: none; background: CanvasText; }" +
-            " @supports (forced-color-adjust: preserve-parent-color) { .ico { forced-color-adjust: preserve-parent-color; background: currentColor; } } }";
-          pieces.push(".ico");
-        }
-        if (css) {
-          const block = document.getElementById("standin-i1");
-          block.textContent = css;
-          block.media = "all";
-          inForce.push("i1 (" + pieces.join("; ") + ")");
-        }
-        root.dataset.standins = inForce.join(" ") || "none";
-      })();
-    </script>
     <header class="bar">
       <span class="brand glow">components.css — 0.60.0 revisions<span class="cursor-block" aria-hidden="true"></span></span>
       <nav aria-label="page settings">
@@ -202,7 +92,6 @@
         Every element WP2 revised, in every state. Switch the theme top right — the switcher is itself a
         revised menu (arrow keys, Home/End, typeahead, Escape back to the summary).
       </p>
-      <p class="demo-note">Stand-ins for other packages in force: <span id="standins"></span></p>
 
       <!-- ── C1 ─────────────────────────────────────────────────────────── -->
       <section id="buttons">
@@ -519,7 +408,6 @@
       import { initFolds } from "../runtime/fold.js";
       import { initMinimap } from "../runtime/minimap.js";
 
-      document.getElementById("standins").textContent = document.documentElement.dataset.standins;
 
       initThemeSwitcher();
       initDropdowns();

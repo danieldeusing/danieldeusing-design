@@ -212,20 +212,6 @@ const HELPERS = `(() => {
 })(); null`;
 const page = async (expr) => { await evaluate(HELPERS); return evaluate(expr); };
 
-/* ═══ 0. what the demo's stand-in block is still covering for ══════════════════════════════════ */
-await load();
-const covering = await page(`(() => {
-  const block = document.getElementById("stand-ins");
-  if (!block) return null;
-  const sheet = [...document.styleSheets].find((s) => (s.href || "").endsWith("/src/tokens.css"));
-  const text = sheet ? [...sheet.cssRules].map((r) => r.cssText).join("\\n") : "";
-  return ["--control-h", "--status-h", "--dot-size", "--icon-sm", "--icon-size", "--ico-check", "--ico-history", "[hidden]"]
-    .filter((name) => !text.includes(name === "[hidden]" ? "[hidden]" : name + ":"));
-})()`);
-console.log(covering === null
-  ? "NOTE  no stand-in block: every token and class is the real one"
-  : `NOTE  the demo's stand-in block is still covering for: ${covering.length ? covering.join(", ") : "nothing (delete it)"}`);
-
 /* ═══ 1. the header's slots ═════════════════════════════════════════════════════════════════════ */
 await load("nobanner");
 const slots = await page(`(() => { const c = T.rect(".bar-center"), m = T.rect("main");
@@ -691,8 +677,8 @@ const GLYPHS = [
   ["tick ● ok", ".tick--ok .tick-dot", null, "before"], ["tick ● running", ".tick--running .tick-dot", null, "before"],
   ["tick ✕ stale", ".tick--stale .tick-dot", null, "before"], ["tick ○ never", ".tick--never .tick-dot", null, "before"],
   ["rail toggle »", ".ls-nav-toggle", null, "after"], ["crumbs /", "#bar-crumbs li + li", "before-child", "before"],
-  ["history ‹ (WP4 mask, stand-in)", '.bar-history [data-icon="chevron-left"]', null, "before"],
-  ["history ⟲ (WP4 mask, stand-in)", '.bar-history [data-icon="history"]', null, "before"],
+  ["history ‹ (WP4 mask)", '.bar-history [data-icon="chevron-left"]', null, "before"],
+  ["history ⟲ (WP4 mask)", '.bar-history [data-icon="history"]', null, "before"],
 ];
 const PHONE_GLYPHS = [["burger (inline svg)", ".nav-burger svg", null, "self"], ["accordion ▾", ".mobile-footer .mf-chev", null, "self"],
   ["burger menu current row: name", '.site-nav .ls-row[aria-current="page"] .ls-name', null, "self"]];
@@ -708,8 +694,8 @@ const FOLLOWS = [
   ["tick ✕ stale", ".tick--stale .tick-dot", "::before", "color"], ["tick ○ never", ".tick--never .tick-dot", "::before", "color"],
   ["rail toggle »", ".ls-nav-toggle", "::after", "color"], ["crumbs /", "#bar-crumbs li + li", "::before", "color"],
   ["rail current ←", '.ls-nav .ls-row[aria-current="page"]', "::after", "color"],
-  ["history ‹ (stand-in)", '.bar-history [data-icon="chevron-left"]', "::before", "backgroundColor"],
-  ["history ⟲ (stand-in)", '.bar-history [data-icon="history"]', "::before", "backgroundColor"],
+  ["history ‹ (WP4 mask)", '.bar-history [data-icon="chevron-left"]', "::before", "backgroundColor"],
+  ["history ⟲ (WP4 mask)", '.bar-history [data-icon="history"]', "::before", "backgroundColor"],
 ];
 const PHONE_FOLLOWS = [["burger (inline svg)", ".nav-burger svg path", null, "stroke", "button"], ["accordion ▾", ".mobile-footer .mf-chev", null, "color", "summary"]];
 const follows = (items) => page(`(${JSON.stringify(items)}).map(([name, selector, pseudo, prop, context]) => {

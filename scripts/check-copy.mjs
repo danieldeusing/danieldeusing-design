@@ -17,7 +17,7 @@
  *
  * It drives examples/content.html, whose module calls initCopyButtons() once, served from this
  * checkout by a loopback server. With no browser it SKIPS loudly; DD_REQUIRE_BROWSER=1 makes that
- * skip a failure, and DD_FORBID_STANDINS=1 makes a stand-in in force one too.
+ * skip a failure.
  *
  *   node scripts/check-copy.mjs
  */
@@ -169,12 +169,7 @@ await send("Emulation.setFocusEmulationEnabled", { enabled: true });
 await send("Page.navigate", { url: `${ORIGIN}/examples/content.html?theme=warm` });
 for (let i = 0; i < 60; i += 1) {
   await sleep(100);
-  try { if (await evaluate(`document.readyState === "complete" && document.getElementById("standins").textContent !== ""`)) break; } catch {}
-}
-const standinList = await evaluate("document.documentElement.dataset.standins");
-console.log(`stand-ins in force: ${standinList}`);
-if (process.env.DD_FORBID_STANDINS === "1") {
-  await check("DD_FORBID_STANDINS=1: nothing stands in for the real files", () => (standinList === "none" ? [] : [`in force: ${standinList}`]));
+  try { if (await evaluate(`document.readyState === "complete"`)) break; } catch {}
 }
 
 // Every write is recorded and then passed to the REAL clipboard. `mode` makes the next writes

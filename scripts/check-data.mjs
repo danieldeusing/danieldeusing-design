@@ -22,9 +22,8 @@
  *   · CONTRAST. Every new text/background and edge pairing, from the colours the browser actually
  *     resolves for the tokens — four themes, three surfaces — and printed as the table the report quotes.
  *
- * It drives examples/data.html from this checkout. The page carries marked stand-ins for what other
- * 0.60.0 packages own (WP1's tokens and X3 rule, WP4's glyphs, WP5's checkbox, WP7's .tag, WP3's
- * chrome lines), each switched on only while the real thing is missing; the run prints which.
+ * It drives examples/data.html from this checkout: the real files, and nothing standing in for them
+ * (check-integration.mjs fails a demo that carries a stand-in).
  *
  *   node scripts/check-data.mjs
  */
@@ -104,15 +103,6 @@ const hoverOver = async (sel) => {
 };
 
 await open("theme=warm");
-const standins = await evaluate("document.documentElement.dataset.standins");
-console.log(`stand-ins in force: ${standins}`);
-// The stand-ins make this page render before the packages they stand in for have landed. Once they
-// have, CI runs with DD_FORBID_STANDINS=1, and a stand-in still in force is a failure — a green run on
-// copies would say nothing about the real tokens and classes. (The full page only: `?bare` drops the
-// stylesheets .tag and the checkbox live in on purpose, so their stand-ins stay on there.)
-if (process.env.DD_FORBID_STANDINS === "1") {
-  await check("DD_FORBID_STANDINS=1: no stand-in is in force on the full page", () => standins === "none", standins);
-}
 
 /* ── D1 · table.dense ─────────────────────────────────────────────────────────────────────────── */
 
@@ -160,7 +150,7 @@ await check("no cell sets its own font: every dense cell is the system's mono, n
 await check("no radius anywhere in these components", () => evaluate(`Array.from(document.querySelectorAll(
   "#dense *, #kv *, #when *, #tabs *, #charts figure, #charts .chart-plot, #charts .chart-key li")).every((el) =>
   ["borderTopLeftRadius", "borderTopRightRadius", "borderBottomLeftRadius", "borderBottomRightRadius"].every((p) => getComputedStyle(el)[p] === "0px"))`));
-await check("the sticky header in a --card card paints the card, not the page (WP3's line — stand-in until WP3 lands)",
+await check("the sticky header in a --card card paints the card, not the page (WP3's line, chrome.css)",
   async () => (await css("#card-wrap thead th", "backgroundColor")) === (await tok("var(--card)")));
 
 /* ── D1 · the pick cell under a coarse pointer ────────────────────────────────────────────────── */

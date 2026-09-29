@@ -1,0 +1,169 @@
+#!/usr/bin/env node
+/*
+ * check-integration.mjs — every file a package added is reachable through the entry points, and
+ * nothing the packages borrowed while they were built apart is still in the tree.
+ *
+ * WHY. 0.60.0 was built as eleven packages side by side, and each one left the wiring to the
+ * integration: a stylesheet no entry imports, a runtime module no barrel exports, and a demo that
+ * stood in for a sibling's rules. Each of those is invisible in its own package's suite — the demo
+ * links the file directly, and the suite imports the module by path — and each fails a consumer who
+ * loads the package the documented way. So this reads the entry points themselves:
+ *
+ *   · src/index.css imports every stylesheet in src/ (fonts.css and the two entries aside), reset
+ *     first, then tokens, base and the components, then utilities.css, then print.css LAST — a
+ *     utility beats a component colour, and on paper print beats both (the WP1 ruling);
+ *   · src/tailwind.css imports every component stylesheet index.css does (utilities.css and reset.css
+ *     are not its — check-tailwind-layers.mjs proves the layer of each);
+ *   · package.json exports every stylesheet in src/, and the runtime barrel;
+ *   · runtime/index.js re-exports EVERY export of every runtime module, and imports in plain Node
+ *     with no DOM — an `export *` silently drops a name two modules both export, and a module that
+ *     touches the DOM at load throws in every server-side render that imports the barrel;
+ *   · tokens/tokens.json holds the unconditional `:root` values (not a phone breakpoint's, not a
+ *     wide screen's) and no icon drawings — those are CSS masks, lucide's licensed path data, and of
+ *     no use to a native or Figma consumer, which takes lucide itself;
+ *   · the minified bundle keeps lucide's `/*!` licence comment, which travels with the path data;
+ *   · no demo and no suite carries a STAND-IN for a sibling package's rules: the siblings have
+ *     merged, so a stand-in left in place can only hide a real rule going missing.
+ *
+ * No browser, no dependency. Build first (`node scripts/build.mjs`): it reads what dist/ and
+ * tokens.json hold, which is what a release publishes.
+ *
+ *   node scripts/check-integration.mjs
+ */
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const read = (path) => readFileSync(join(root, path), "utf8");
+
+let failures = 0;
+let lastPassed = "(before the first check)";
+const check = (label, run) => {
+  let problems;
+  try {
+    problems = run();
+  } catch (error) {
+    problems = [`threw: ${String(error?.message || error).split("\n")[0]}`];
+  }
+  if (!problems.length) { console.log(`PASS  ${label}`); lastPassed = label; return; }
+  failures += 1;
+  console.log(`FAIL  ${label}\n        ${problems.join("\n        ")}`);
+};
+process.on("uncaughtException", (error) => {
+  console.log(`FAIL  the suite threw after: ${lastPassed}\n        ${String(error?.message || error).split("\n")[0]}`);
+  console.log("\ncheck-integration: ABORTED");
+  process.exit(1);
+});
+
+const importsOf = (path) => [...read(path).replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/@import\s+(?:url\(\s*)?["']\.\/([^"']+)["']/g)]
+  .map((m) => m[1]);
+const stylesheets = readdirSync(join(root, "src")).filter((f) => f.endsWith(".css")).sort();
+const ENTRIES = ["index.css", "tailwind.css"];
+const LOADED_APART = ["fonts.css"]; // a separate <link>: the bundle must not block on a font request
+
+/* ── the build-free bundle ─────────────────────────────────────────────────── */
+
+const bundle = importsOf("src/index.css");
+check(`index.css imports every stylesheet in src/ (${bundle.length} of ${stylesheets.length - ENTRIES.length - LOADED_APART.length})`, () =>
+  stylesheets.filter((f) => !ENTRIES.includes(f) && !LOADED_APART.includes(f) && !bundle.includes(f)).map((f) => `${f} is not imported`));
+check("index.css imports each file once, and nothing that is not in src/", () => [
+  ...bundle.filter((f, i) => bundle.indexOf(f) !== i).map((f) => `${f} is imported twice`),
+  ...bundle.filter((f) => !stylesheets.includes(f)).map((f) => `${f} does not exist`),
+]);
+check("index.css order: reset, tokens, base first; utilities after every component file; print last", () => {
+  const out = [];
+  if (bundle.slice(0, 3).join(" ") !== "reset.css tokens.css base.css") out.push(`starts ${bundle.slice(0, 3).join(" ")}`);
+  if (bundle.at(-1) !== "print.css") out.push(`the last import is ${bundle.at(-1)}, not print.css`);
+  if (bundle.at(-2) !== "utilities.css") out.push(`the import before print.css is ${bundle.at(-2)}, not utilities.css`);
+  return out;
+});
+
+/* ── the Tailwind entry ────────────────────────────────────────────────────── */
+
+const tailwind = importsOf("src/tailwind.css");
+const components = bundle.filter((f) => !["reset.css", "tokens.css", "base.css", "utilities.css", "print.css"].includes(f));
+check(`tailwind.css imports every component file index.css does (${components.length})`, () =>
+  components.filter((f) => !tailwind.includes(f)).map((f) => `${f} is not imported`));
+check("tailwind.css leaves out reset.css (Preflight) and utilities.css (Tailwind writes its own)", () =>
+  ["reset.css", "utilities.css"].filter((f) => tailwind.includes(f)).map((f) => `${f} is imported`));
+
+/* ── package.json ──────────────────────────────────────────────────────────── */
+
+const pkg = JSON.parse(read("package.json"));
+check(`package.json exports every stylesheet in src/ (${stylesheets.length})`, () =>
+  stylesheets.filter((f) => pkg.exports[`./${f}`] !== `./src/${f}`).map((f) => `"./${f}": "./src/${f}" is missing`));
+check("package.json exports the runtime barrel and each runtime module", () => [
+  ...(pkg.exports["./runtime"] === "./runtime/index.js" ? [] : ['"./runtime" is not ./runtime/index.js']),
+  ...(pkg.exports["./runtime/*"] === "./runtime/*.js" ? [] : ['"./runtime/*" is not ./runtime/*.js']),
+]);
+
+/* ── the runtime barrel ────────────────────────────────────────────────────── */
+
+const modules = readdirSync(join(root, "runtime")).filter((f) => f.endsWith(".js") && f !== "index.js").sort();
+const barrel = await import(pathToFileURL(join(root, "runtime/index.js")).href).catch((error) => error);
+check("runtime/index.js imports in plain Node, with no DOM (a server-side render imports it)", () =>
+  barrel instanceof Error ? [`threw: ${barrel.message.split("\n")[0]}`] : []);
+if (!(barrel instanceof Error)) {
+  const owners = new Map();
+  const problems = [];
+  for (const file of modules) {
+    const mod = await import(pathToFileURL(join(root, "runtime", file)).href).catch((error) => error);
+    if (mod instanceof Error) { problems.push(`${file} threw on import: ${mod.message.split("\n")[0]}`); continue; }
+    for (const name of Object.keys(mod)) {
+      if (owners.has(name)) problems.push(`${name} is exported by both ${owners.get(name)} and ${file}, so export * drops it`);
+      owners.set(name, file);
+      if (!(name in barrel)) problems.push(`${file}: ${name} is not re-exported by runtime/index.js`);
+    }
+  }
+  check(`runtime/index.js re-exports every export of every module (${owners.size} names from ${modules.length} modules)`, () =>
+    owners.size ? problems : ["read no exports at all"]);
+}
+
+/* ── tokens.json ───────────────────────────────────────────────────────────── */
+
+const tokens = JSON.parse(read("tokens/tokens.json")).themes;
+const warm = tokens.warm || {};
+check("tokens.json: a token a media query redefines keeps its unconditional value (content-pad 1.5rem, fs-display 1.875rem)", () => [
+  ...(warm["content-pad"] === "1.5rem" ? [] : [`content-pad is ${warm["content-pad"]}`]),
+  ...(warm["fs-display"] === "1.875rem" ? [] : [`fs-display is ${warm["fs-display"]}`]),
+]);
+check("tokens.json: a token declared after a comment in its block is read (space-section, fs-2xl, lh-tight, lh-base, lh-display, field-label-w)", () =>
+  ["space-section", "fs-2xl", "lh-tight", "lh-base", "lh-display", "field-label-w"].filter((k) => !(k in warm)).map((k) => `${k} is missing`));
+check("tokens.json: four themes, and no icon drawing in any of them", () => [
+  ...(Object.keys(tokens).sort().join(" ") === "green mono paper warm" ? [] : [`themes: ${Object.keys(tokens).join(" ")}`]),
+  ...Object.entries(tokens).flatMap(([t, v]) => Object.keys(v).filter((k) => k.startsWith("ico-")).map((k) => `${t}.${k}`)).slice(0, 3),
+]);
+
+/* ── the licence travels with the drawings ─────────────────────────────────── */
+
+for (const file of ["dist/danieldeusing-design.css", "dist/danieldeusing-design.min.css"]) {
+  const css = read(file);
+  check(`${file} carries lucide's licence with its path data`, () => {
+    const drawings = (css.match(/--ico-[\w-]+:\s*url\(/g) || []).length;
+    const notices = [...css.matchAll(/\/\*![\s\S]*?\*\//g)].filter((m) => /Lucide[\s\S]*ISC License[\s\S]*Cole Bemis/.test(m[0])).length;
+    return [...(drawings ? [] : ["no icon drawings found — this check is reading the wrong file"]),
+      ...(notices === 1 ? [] : [`${notices} lucide licence comments, want 1`])];
+  });
+}
+
+/* ── no stand-ins ──────────────────────────────────────────────────────────── */
+
+// A stand-in was a demo's copy of a sibling package's rule (or a harness's), switched on while the
+// sibling was missing. Recognised by what every package named its own: a STAND-IN banner, an element
+// id, or a JS fallback. The count of files read is printed, so a wrong directory cannot pass.
+const MARKS = [/\bSTAND-INS?\b/, /id=["'](?:standin[\w-]*|stand-ins|pending-wp\d+[\w-]*|preview-wp\d+[\w-]*)["']/, /\bstandIn[A-Z]\w*/];
+const scanned = [];
+const found = [];
+for (const dir of ["examples", "templates"]) {
+  for (const file of readdirSync(join(root, dir)).filter((f) => f.endsWith(".html"))) {
+    const text = read(`${dir}/${file}`);
+    scanned.push(file);
+    text.split("\n").forEach((line, i) => { if (MARKS.some((re) => re.test(line))) found.push(`${dir}/${file}:${i + 1}  ${line.trim().slice(0, 100)}`); });
+  }
+}
+check(`no demo or template carries a stand-in for a sibling package (${scanned.length} files read)`, () =>
+  scanned.length ? found : ["read no files"]);
+
+console.log(failures ? `\ncheck-integration: ${failures} FAILED` : "\ncheck-integration: all checks passed");
+process.exit(failures ? 1 : 0);

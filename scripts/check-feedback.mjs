@@ -19,13 +19,11 @@
  *
  * And the modes a reader can switch on: forced colours on a light and a dark palette (every glyph
  * drawn in the forced colour of its words, every state pair still two looks — X1), `hidden` (every
- * component gone — X3), print, reduced motion, a coarse pointer. DD_FORBID_STANDINS=1 fails the run while any demo stand-in is still in force, for the
- * integration build, where every one of them must have been replaced by the real thing.
+ * component gone — X3), print, reduced motion, a coarse pointer.
  *
- * WHAT IT READS. examples/feedback.html is the environment: its stylesheets, and stand-ins for the
- * tokens and classes other packages of 0.60.0 own. Those switch themselves off once the real ones
- * exist, and this prints which were in force — a green run says what it measured. The fixtures are
- * injected here, so the assertions do not depend on the demo's prose.
+ * WHAT IT READS. examples/feedback.html is the environment: the real stylesheets, and nothing standing
+ * in for them (check-integration.mjs fails a demo that carries a stand-in). The fixtures are injected
+ * here, so the assertions do not depend on the demo's prose.
  *
  * A real browser and no dependency, like check-tabletools.mjs: the headless chromium Playwright
  * caches on these machines, over the DevTools protocol with Node's own fetch and WebSocket. No
@@ -208,9 +206,8 @@ window.__wp7 = (() => {
         (typeof want === "object" ? "" : " (" + want + ")");
     },
     // Every computed property a stylesheet here decides, for the full-vs-bare comparison. A
-    // .btn-icon host and an .ico glyph belong to other packages: once those land, the full stack
-    // draws the real class and ?bare the page's stand-in, and comparing the two would report a
-    // difference that is not these files'. Their placement and size are asserted in both modes above.
+    // .btn-icon host and an .ico glyph belong to other packages, whose suites prove them. Their
+    // placement and size are asserted in both modes above.
     snapshot(ids, props, ROOTS) {
       const out = {};
       for (const id of ids) {
@@ -238,7 +235,7 @@ const load = async (query = "") => {
   for (let i = 0; ; i += 1) {
     await sleep(100);
     try {
-      if (await evaluate("document.readyState === 'complete' && document.getElementById('standins').textContent !== ''")) break;
+      if (await evaluate("document.readyState === 'complete'")) break;
     } catch {}
     if (i > 100) throw new Error("the demo page never finished loading " + query);
   }
@@ -552,13 +549,6 @@ const snapshot = () => evaluate(`window.__wp7.snapshot([...document.querySelecto
 const THEMES = ["warm", "green", "mono", "paper"];
 
 await load();
-const standins = await evaluate("document.documentElement.dataset.standins");
-console.log(`stand-ins in force (tokens and classes other 0.60.0 packages own): ${standins}`);
-// The integration build sets this: there, a stand-in still in force means a package the demo relies
-// on did not land, and the run below would be measuring the demo's copy instead of the real thing.
-if (process.env.DD_FORBID_STANDINS === "1") {
-  await check("DD_FORBID_STANDINS=1: no demo stand-in is in force", () => (standins === "none" ? [] : [`in force: ${standins}`]));
-}
 
 /* The YIELD, as numbers. Everything below compares this file's output with a token resolved on a
    probe, and an unresolved token resolves to nothing on BOTH sides: a missing --ico-mail makes
@@ -566,8 +556,8 @@ if (process.env.DD_FORBID_STANDINS === "1") {
    muted fallback's contrast under the teal row's name. So what the run depends on is counted first,
    and a short count fails — a check that measured the wrong thing must not read as a pass. */
 const ICONS = ["loader-circle", "triangle-alert", "x", "folder-open", "circle-check", "info", "package", "download", "mail", "eye-off"];
-/* X6: I1's set (SPEC-part3 §2.10 I1, "The set"). A name outside it has no mask once the demo's
-   stand-in is gone, and whoever copies the markup gets an empty box. */
+/* X6: I1's set (SPEC-part3 §2.10 I1, "The set"). A name outside it has no mask, and whoever copies the
+   markup gets an empty box. */
 const I1 = ["check", "search", "filter", "arrow-up", "arrow-down", "trash-2", "pencil", "minus", "loader-circle", "star-filled", "x",
   "chevron-down", "chevron-left", "download", "history", "home", "image-plus", "package", "refresh-cw", "star", "triangle-alert",
   "circle-check", "circle-alert", "circle-x", "info", "copy", "clock", "arrow-up-down", "external-link", "github", "mail",
@@ -724,7 +714,7 @@ const opaque = () => check("every .tag and .count computes opacity 1 (button.tag
   [...document.querySelectorAll(".tag, .count")].filter((el) => !el.matches("button.tag:disabled") && el.getClientRects().length)
     .filter((el) => getComputedStyle(el).opacity !== "1").map((el) => (el.id || el.className) + " opacity " + getComputedStyle(el).opacity)`));
 await opaque();
-// X3: tokens.css hides [hidden] for every surface (WP1; the demo's stand-in until then). An author
+// X3: tokens.css hides [hidden] for every surface (WP1). An author
 // `display` beats the UA's rule, so every class here that sets one would otherwise show.
 const hides = (mode) => check(`X3: hidden hides every component (${mode})`, () => evaluate(`
   ${JSON.stringify(HIDDEN.map(([id]) => id))}.map((id) => document.getElementById("fx-h-" + id))

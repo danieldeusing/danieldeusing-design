@@ -20,14 +20,12 @@
  *   · the error-page template: its structure, and its title rendering at the display step
  *
  * It drives examples/content.html, the package's demo page, served from this checkout by a loopback
- * server. Where another 0.60.0 package has not landed yet the demo switches on a stand-in for it, and
- * this prints which, every run: a stand-in is a copy of someone else's work and the reader must know
- * when a green result leans on one.
+ * server: the real files, and nothing standing in for them (check-integration.mjs fails a demo that
+ * carries a stand-in).
  *
  * A REAL BROWSER, and no dependency — the headless chromium Playwright caches, over the DevTools
  * protocol with Node's own fetch and WebSocket. With no browser it SKIPS loudly; DD_REQUIRE_BROWSER=1
- * makes that skip a failure. DD_FORBID_STANDINS=1 makes every stand-in in force a failure too — for
- * the run after integration, when a green result must stand on the real files alone.
+ * makes that skip a failure.
  *
  *   node scripts/check-content.mjs
  */
@@ -70,27 +68,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
-// The template pins a published release, which predates content.css. Served here, its stylesheet is
-// this checkout's bundle source and its runtime is this checkout's — so what is measured is the
-// template's markup under the code that will ship with it. Two pieces of that code may not be in the
-// bundle yet, and each is injected ONLY while it is missing, and NAMED as a stand-in when it is: the
-// content.css import (WP13 adds it to index.css) and --fs-display (WP1 adds it to tokens.css). Once
-// both land, the template is measured on src/index.css alone.
-const tokensHaveDisplay = /--fs-display\s*:/.test(readFileSync(join(root, "src/tokens.css"), "utf8"));
-const indexImportsContent = /@import\s+(url\()?["']\.\/content\.css["']/.test(readFileSync(join(root, "src/index.css"), "utf8"));
-const DISPLAY_STANDIN = "<style data-standin>:root{--fs-display:1.875rem}@media (min-width:40rem){:root{--fs-display:2.25rem}}</style>";
-const TEMPLATE_STANDINS = [
-  ...(indexImportsContent ? [] : ["content.css beside index.css (index.css does not import it yet)"]),
-  ...(tokensHaveDisplay ? [] : ["--fs-display (tokens.css does not declare it yet)"]),
-];
+// The template pins the CDN. Served here, its stylesheet is this checkout's bundle source
+// (src/index.css, nothing beside it) and its runtime is this checkout's — so what is measured is the
+// template's markup under the code that will ship with it.
 const templateHtml = () => {
   const cdn = `https://cdn.jsdelivr.net/npm/@danieldeusing/design@${pkg.version}`;
   let html = readFileSync(join(root, "templates/error-page.html"), "utf8");
   html = html.replace(/<link\s+rel="stylesheet"\s+href="[^"]*fonts\.css"[^>]*>/, "");
   html = html.replace(/<link\s+rel="stylesheet"\s+href="[^"]*danieldeusing-design\.min\.css"[^>]*>/,
-    '<link rel="stylesheet" href="/src/index.css">' +
-    (indexImportsContent ? "" : '<link rel="stylesheet" href="/src/content.css" data-standin>') +
-    (tokensHaveDisplay ? "" : DISPLAY_STANDIN));
+    '<link rel="stylesheet" href="/src/index.css">');
   return html.split(`${cdn}/runtime/index.js`).join("/runtime/index.js");
 };
 const server = createServer((req, res) => {
@@ -191,13 +177,6 @@ process.on("uncaughtException", (error) => {
   console.log("\ncheck-content: ABORTED");
   process.exit(1);
 });
-// Every stand-in in force is printed; under DD_FORBID_STANDINS=1 each one is also a failure.
-const standins = async (where, list) => {
-  console.log(`stand-ins in force (${where}): ${list}`);
-  if (process.env.DD_FORBID_STANDINS === "1") {
-    await check(`DD_FORBID_STANDINS=1: nothing stands in for the real files (${where})`, () => (list === "none" ? [] : [`in force: ${list}`]));
-  }
-};
 
 /* ── in the page: computed-style assertions and colour maths ────────────────────────────────── */
 
@@ -278,7 +257,7 @@ const load = async (query, { width = 1280, height = 900 } = {}) => {
   await send("Page.navigate", { url: `${ORIGIN}/examples/content.html${query}` });
   for (let i = 0; i < 60; i += 1) {
     await sleep(100);
-    try { if (await evaluate(`document.readyState === "complete" && document.getElementById("standins").textContent !== ""`)) break; } catch {}
+    try { if (await evaluate(`document.readyState === "complete"`)) break; } catch {}
   }
   await evaluate(HELPERS);
 };
@@ -320,8 +299,6 @@ const axName = async (sel) => {
 /* ═════════════════════════════════════════════════════════════════════════════════════════════ */
 
 await load("?theme=warm");
-await standins("full page", await evaluate("document.documentElement.dataset.standins"));
-await standins("template", TEMPLATE_STANDINS.join(" · ") || "none");
 
 /* ── P1 page title and lede ─────────────────────────────────────────────────────────────────── */
 
@@ -751,8 +728,7 @@ await send("Emulation.setEmulatedMedia", { media: "" });
 /* ── `hidden` hides every component (X3: tokens.css answers it once) ─────────────────────────── */
 
 // Every class here that sets `display` outranks the user agent's [hidden] rule, so this fails unless
-// tokens.css carries [hidden]:not([hidden="until-found"]) { display: none !important } (WP1) — or the
-// demo's marked stand-in for it, which the header line above names while WP1 has not landed.
+// tokens.css carries [hidden]:not([hidden="until-found"]) { display: none !important } (WP1).
 const HIDDEN = ["#p1-app .page-title", "#p1-app .lede", "#p1-glyph .page-title > .ico", "#eyebrow-plain", "#head-link",
   "#subheads .subhead", "#md-article", "#list-steps", "#list-plain", "#list-dash", "#code-plain", "#code-div",
   "#code-view .line", "#cmd-one", "#cmd-one .cmd-text", "#cmd-one > button", "#states-text [data-state=copied]",
@@ -988,8 +964,7 @@ console.log(`painted under forced colours: ${paintedYield.captures} of ${PAINTED
 
 // THE FALLBACK BRANCH. Chromium supports preserve-parent-color, so every run above measured only
 // that branch, and the `@supports not` one — `none` and a CanvasText fill — would ship unmeasured.
-// So every `@supports` rule that asks about it, in every sheet the page loads (the real files and the
-// stand-ins alike), is swapped for one asking about a value no engine knows: the supporting branch
+// So every `@supports` rule that asks about it, in every sheet the page loads, is swapped for one asking about a value no engine knows: the supporting branch
 // turns off, the other on. The count is reported, and zero fails — then this measured nothing.
 const FORCE_FALLBACK = `(() => {
   let swapped = 0;
@@ -1100,7 +1075,6 @@ const snapshot = () => evaluate(`${JSON.stringify(IDENTITY)}.map(([sel, pseudo, 
 }))`);
 const full = await snapshot();
 await load("?theme=warm&bare");
-await standins("?bare", await evaluate("document.documentElement.dataset.standins"));
 await check("?bare: reset, base, components, chrome and utilities dropped — the page really lost them", async () => {
   const n = await evaluate(`[...document.styleSheets].map((s) => (s.href || "").split("/").pop()).filter((f) => /^(reset|base|components|chrome|utilities)\\.css$/.test(f)).length`);
   return n === 0 ? [] : [`${n} of those stylesheets are still loaded`];

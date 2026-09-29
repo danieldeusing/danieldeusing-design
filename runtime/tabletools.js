@@ -808,6 +808,42 @@ function ensureChrome(inst) {
   setText(inst.count, inst.countText);
 }
 
+/*
+ * WHICH TABLE THIS NODE IS. A patcher matching by position can hand one table's NODE another table's
+ * markup — two engine tables in one mount, and the first <table> in the new markup lands on whichever
+ * <table> is first. The instance that node carried would go on governing it with the OTHER table's
+ * view: measured, B showed 0 of 4 under A's search. So a node whose `data-table-id` (or `aria-label`,
+ * without one) is no longer the one it was enhanced as is dropped and enhanced again, as itself.
+ */
+const identityOf = (table) => table.getAttribute("data-table-id") || table.getAttribute("aria-label") || "";
+
+function retire(inst) {
+  inst.retired = true;
+  inst.observer?.disconnect();
+  inst.chrome.disconnect();
+  clearTimeout(inst.countTimer);
+  instances.delete(inst.table);
+  if (inst.count) countOwners.delete(inst.count);
+  // What is still unmistakably its own goes with it; a node a patch already rewrote is the page's now.
+  if (inst.searchField && inst.searchField.contains(inst.searchBox)) inst.searchField.remove();
+  if (inst.ownBar && !inst.ownBar.childElementCount) inst.ownBar.remove();
+  if (inst.placeholder && inst.placeholder.hasAttribute(PLACEHOLDER)) inst.placeholder.remove();
+  for (const col of inst.columns) {
+    if (col.tools && col.tools.classList.contains("tbl-tools")) col.tools.remove();
+    if (col.badge && col.badge.classList.contains("tbl-badge")) col.badge.remove();
+    col.th.classList.remove("is-filtered");
+  }
+}
+
+/* true when the node is no longer this instance's table — it has been handed to a fresh one. */
+function renewed(inst) {
+  if (inst.retired) return true;
+  if (identityOf(inst.table) === inst.identity) return false;
+  retire(inst);
+  enhance(inst.table);
+  return true;
+}
+
 function enhance(table) {
   if (instances.has(table)) return;
   const columns = columnsOf(table);
@@ -817,6 +853,7 @@ function enhance(table) {
 
   const inst = {
     table, columns,
+    identity: identityOf(table),
     id: table.getAttribute("data-table-id") || "",
     allRows: [],
     childrenOf: new Map(),
@@ -852,7 +889,7 @@ function enhance(table) {
   const bar = pageBarOf(anchor);
   if (bar && inst.label && !bar.hasAttribute("aria-label")) bar.setAttribute("aria-label", "search " + inst.label);
   inst.countText = "";
-  inst.chrome = new MutationObserver(() => ensureChrome(inst));
+  inst.chrome = new MutationObserver(() => { if (!renewed(inst)) ensureChrome(inst); });
   if (anchor.parentElement) inst.chrome.observe(anchor.parentElement, { childList: true });
   ensureChrome(inst);
 
@@ -878,6 +915,7 @@ function enhance(table) {
    * the first version hung the page.
    */
   inst.observer = new MutationObserver((records) => {
+    if (renewed(inst)) return;
     const body = table.tBodies[0];
     if (!body) return;
     const now = body.rows;
@@ -1007,9 +1045,17 @@ export function initTableTools(root = document) {
   watching = true;
   // Capture, because the summary usually sits in a `.tablewrap` that scrolls on its own and a scroll
   // there does not bubble. A panel scrolling its own list moves nothing and is skipped.
+  // A summary scrolled out of its wrapper leaves the panel floating beside nothing: the reader scrolled
+  // away, so it closes — and focus stays where it is, since nothing was asked of it.
   const follow = (event) => {
     for (const wrap of document.querySelectorAll("details.tbl-filter[open]")) {
       if (event.type === "scroll" && event.target instanceof Node && wrap.querySelector(":scope > .dropdown-panel")?.contains(event.target)) continue;
+      const clip = wrap.closest(".tablewrap");
+      const summary = wrap.querySelector(":scope > summary");
+      if (clip && summary) {
+        const s = summary.getBoundingClientRect(), c = clip.getBoundingClientRect();
+        if (s.right <= c.left || s.left >= c.right || s.bottom <= c.top || s.top >= c.bottom) { wrap.open = false; continue; }
+      }
       placePanel(wrap);
     }
   };

@@ -402,6 +402,45 @@ await check("...and a real press on the lowest one filters by it", async () =>
   evaluate(`document.querySelector("#clip-wrap .tbl-badge")?.textContent === "running" && !document.querySelector("#clip-wrap th[data-col=state] .tbl-filter").open`));
 await evaluate(`(() => { const wrap = document.querySelector("#clip-wrap"); wrap.previousElementSibling.remove(); wrap.nextElementSibling?.matches("p.result-count") && wrap.nextElementSibling.remove(); wrap.remove();
   localStorage.removeItem("table-view:demo-engine"); })(); null`);
+/* ── fix round 2 · N-A: an open panel stays on its summary through every scroll; N-B: it closes when the
+   reader scrolls its column out of the wrapper ──────────────────────────────────────────────────────
+   A table wider and taller than its wrapper, with the pick column in the middle of what shows at the
+   far right. Each scroll must MOVE what it names (the page, the wrapper down, the wrapper sideways), and
+   the panel must keep its offset from the summary. Then a real wheel takes the column out of the
+   wrapper: a panel beside nothing is closed, and focus stays where it was. */
+await evaluate(`(() => { const wrap = document.createElement("div"); wrap.className = "tablewrap"; wrap.id = "scroll-wrap";
+  wrap.style.setProperty("--tablewrap-max-h", "160px");
+  const cols = ["repo", "a", "b", "c", "d", "state", "e", "f"];
+  wrap.innerHTML = '<table class="dense" data-table-tools aria-label="wide runs"><thead><tr>' +
+    cols.map((c) => '<th data-col="' + c + '"' + (c === "state" ? ' data-filter="pick"' : "") + ">" + c + "</th>").join("") + "</tr></thead><tbody>" +
+    Array.from({ length: 12 }, (_, i) => "<tr>" + cols.map((c) => "<td>" + (c === "state" ? ["ok", "failed", "asked"][i % 3] : c + i) + "</td>").join("") + "</tr>").join("") +
+    "</tbody></table>";
+  wrap.firstElementChild.style.minWidth = "2400px";
+  document.getElementById("engine").append(wrap); })(); null`);
+await sleep(150);
+await evaluate(`(() => { const w = document.querySelector("#scroll-wrap"); w.scrollIntoView({ block: "center", behavior: "instant" }); w.scrollLeft = w.scrollWidth; })(); null`);
+await sleep(200);
+await evaluate(`document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter > summary").click(); window.focusedBefore = document.activeElement; null`);
+await sleep(200);
+const attach = async () => JSON.parse(await evaluate(`JSON.stringify((() => { const w = document.querySelector("#scroll-wrap"), d = w.querySelector("th[data-col=state] .tbl-filter");
+  const s = d.firstElementChild.getBoundingClientRect(), p = d.querySelector(".dropdown-panel").getBoundingClientRect(), r = w.getBoundingClientRect();
+  return { open: d.open, dx: Math.round(p.left - s.left), dy: Math.round(p.top - s.bottom), inWrap: s.left >= r.left && s.right <= r.right,
+    y: Math.round(scrollY), top: Math.round(w.scrollTop), left: Math.round(w.scrollLeft) }; })())`));
+const opened = await attach();
+const moves = {};
+await evaluate("scrollBy(0, 60); null"); await sleep(200); moves.page = await attach();
+await evaluate(`document.querySelector("#scroll-wrap").scrollTop += 40; null`); await sleep(200); moves.down = await attach();
+await evaluate(`document.querySelector("#scroll-wrap").scrollLeft -= 100; null`); await sleep(200); moves.sideways = await attach();
+await check("fix round 2 — an open pick panel stays on its summary while the page scrolls, the wrapper scrolls down, and the wrapper scrolls sideways", () =>
+  opened.open && opened.inWrap && moves.page.y > opened.y && moves.down.top > moves.page.top && moves.sideways.left < moves.down.left &&
+    Object.values(moves).every((m) => m.open && Math.abs(m.dx - opened.dx) <= 1 && Math.abs(m.dy - opened.dy) <= 1), JSON.stringify({ opened, moves }));
+const wheelAt = await evaluate(`(() => { const r = document.querySelector("#scroll-wrap").getBoundingClientRect(); return [r.left + 20, r.top + r.height / 2]; })()`);
+await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: wheelAt[0], y: wheelAt[1], deltaX: -4000, deltaY: 0 });
+await sleep(500);
+const away = await attach();
+await check("fix round 2 — wheeled back until its column is out of the wrapper, the panel is closed, and focus has not moved", async () =>
+  away.left === 0 && !away.inWrap && !away.open && (await evaluate("document.activeElement === window.focusedBefore")), JSON.stringify(away));
+await evaluate(`(() => { const wrap = document.querySelector("#scroll-wrap"); wrap.previousElementSibling.remove(); wrap.nextElementSibling?.matches("p.result-count") && wrap.nextElementSibling.remove(); wrap.remove(); })(); null`);
 await open("bare&theme=warm");
 const bare = JSON.parse(await snapshot());
 const drift = [];

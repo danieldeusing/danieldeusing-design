@@ -458,6 +458,11 @@ the pager slices exactly the matching set and needs to know nothing about filter
   ```
 
   A count another table already speaks through is never adopted.
+- **Give every engine table a stable `data-table-id`.** It keys the remembered view, and it is how the
+  engine knows which table a node IS: a positional patcher can hand one `<table>` node another table's
+  markup (two engine tables in one mount), and a node whose `data-table-id` — or `aria-label`, without
+  one — has changed is dropped and enhanced again as the table it now is. Without an id, renaming a
+  table's `aria-label` counts as a different table.
 - **The count is silent at rest.** A `p.result-count[role=status]` sits after the wrapper, after the
   pager when there is one, from the start and empty. While rows are withheld it says
   "7 of 55 runs — 48 hidden by the filters" (`data-table-unit`, default "rows"), written 400 ms after
@@ -477,7 +482,8 @@ the pager slices exactly the matching set and needs to know nothing about filter
   values counted as a reader counts (gpt-5.9 before gpt-5.10). M1 gives it the keys and M0 draws the ✓.
   A filter's panel is placed `fixed` against its summary (WP6's `popup.js`, as `select.js` does), so the
   scrolling `.tablewrap` never clips it — a table filtered down to its placeholder is shorter than its
-  own menu.
+  own menu. It follows its summary through every scroll, and closes (moving no focus) once the reader
+  scrolls the column out of the wrapper.
 - **The header glyphs are the icon set's masks**, in the header's colour at `--icon-sm`: the sort
   arrows follow `aria-sort`, the funnel turns `--primary` while it filters, the badge ends in an x. The
   controls carry no text, only their `aria-label`; the badge carries no native `title`. They take the

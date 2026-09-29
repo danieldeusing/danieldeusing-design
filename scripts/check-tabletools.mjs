@@ -498,6 +498,31 @@ const quiet = await evaluate(`new Promise((resolve) => { let n = 0;
   setTimeout(() => { o.disconnect(); resolve(n); }, 300); })`);
 await check("...and it settles: no write answers another once the header is whole", async () => quiet === 0, `${quiet} mutation record(s) in 300 ms`);
 
+/* ── fix round 2 · a table node that becomes another table is enhanced as that table ────────────────
+   A positional patch can hand one table's NODE another table's markup — two engine tables in one mount,
+   and the first <table> in the markup matches whichever <table> sits first. The instance that node
+   carried would then govern the other table with its own view. Its identity is data-table-id, or
+   aria-label without one; when that changes, the old instance is dropped and the node enhanced anew. */
+const twoTables = ["A", "B"].map((t) => `<table data-table-tools data-table-id="swap-${t}" aria-label="${t}"><thead><tr><th data-col="v">v</th></tr></thead><tbody>` +
+  [1, 2, 3, 4].map((i) => `<tr><td>${t.toLowerCase()}${i}</td></tr>`).join("") + "</tbody></table>");
+const tablesNow = () => evaluate(`JSON.stringify([...document.querySelectorAll("#later table")].map((t) => { const bar = t.previousElementSibling;
+  return [t.getAttribute("aria-label"), [...t.tBodies[0].rows].filter((r) => !r.hasAttribute("data-table-placeholder")).map((r) => r.cells[0].textContent).join(" "),
+    bar && bar.matches("search") ? bar.querySelector("input").value : "no bar"]; }))`);
+const searchIn = (label, text) => evaluate(`(() => { const box = document.querySelector('#later search[aria-label="search ${label}"] input');
+  box.value = ${JSON.stringify(text)}; box.dispatchEvent(new Event("input", { bubbles: true })); })(); null`);
+
+await evaluate(`localStorage.clear(); document.getElementById("later").innerHTML = ${JSON.stringify(twoTables[0])}; null`);
+await sleep(100);
+await searchIn("A", "a1");
+await sleep(100);
+await evaluate(`(() => { const t = document.querySelector("#later table"); t.setAttribute("data-table-id", "swap-B"); t.setAttribute("aria-label", "B");
+  t.tBodies[0].innerHTML = ${JSON.stringify([1, 2, 3, 4].map((i) => `<tr><td>b${i}</td></tr>`).join(""))}; })(); null`);
+await sleep(200);
+const renamedByHand = await tablesNow();
+await check("fix round 2 — the page renames a table node and gives it other rows (setAttribute): it is enhanced as the new table, with that table's own view", async () =>
+  renamedByHand === JSON.stringify([["B", "b1 b2 b3 b4", ""]]), renamedByHand);
+await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
 const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
 const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
   .find((path) => path && existsSync(path));
@@ -538,6 +563,19 @@ if (!DOM_PATCH) {
   await evaluate(`window.cockpitPatch(document.getElementById("mount"), window.lastSource); null`);
   await sleep(100);
   const adoptedPatched = await chromeNow();
+  // Two engine tables, no bars and no ids in the markup order a patcher could key on: A's node is
+  // matched against B's markup.
+  await evaluate(`localStorage.clear(); document.getElementById("later").innerHTML = ${JSON.stringify(twoTables.join(""))}; null`);
+  await sleep(100);
+  await searchIn("A", "a1");
+  await sleep(500);
+  await evaluate(`window.cockpitPatch(document.getElementById("later"), ${JSON.stringify(twoTables.join(""))}); null`);
+  await sleep(600);
+  const swapped = await tablesNow();
+  await check("fix round 2 — cockpitPatch hands A's table node B's markup: B shows its own rows under its own empty search, A keeps its view", async () =>
+    swapped === JSON.stringify([["A", "a1", "a1"], ["B", "b1 b2 b3 b4", ""]]), swapped);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
   // The count is not asked to be the same node: the pager this mount carries sits between the table
   // and the page's count, so the patch matches the count's markup against the pager and draws a fresh
   // one — which is the renderer's own, and is adopted.

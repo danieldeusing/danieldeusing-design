@@ -89,6 +89,14 @@ with no token, with its `path:line`, before a square can ship.
   `.ico`; the demo's retry glyph in a destructive container measured `--destructive` that way and
   `--primary`, its label's colour, this way. The icon button and the feedback components stop the
   same inheritance for their own glyphs.)
+- **Colour the label or use `data-tone`; never `color` or a `text-*` class on the `.ico`.** In
+  forced colours the glyph takes its parent's forced colour only while its own colour is
+  inherited, so a `.ico` with a colour of its own keeps that author colour. Measured: `text-primary`
+  on the glyph vanished on mono (light palette) and paper (dark), and read 1.34:1 on green (light)
+  and 2.94:1 on warm (dark); the same colour on the label, or `data-tone` on the glyph, read 21:1
+  on all eight. Nothing enforces this, and no `!important` guard should: a component may hand its
+  glyph a system colour in its own forced-colours block (a fold summary's `.ico` gets
+  `CanvasText`), and a guard would take that away too.
 - **Decoration, by contract: `aria-hidden="true"` on every `.ico`.** The glyph repeats the word
   beside it, or it is a control's only content — and then the CONTROL is named, by an `aria-label`
   that names the target or the destination: `aria-label="remove poi/vu3"`, `aria-label="GitHub
@@ -211,8 +219,10 @@ forced-colours default, costs the minified bundle 19.9 kB (3.0 kB gzipped).
 - **The word is the estate's, not always lucide's current file name.** `filter` is lucide's
   `funnel` and `home` its `house`; lucide renamed both and still ships the old names as aliases.
   `star-filled` is `star` with its fill closed, the pressed state of a favourite.
-- **seedr resolves lucide 0.575.0**, and every drawing in the set is byte-identical there but
-  `clock`, which lists its two strokes in the other order: the same picture.
+- **seedr resolves lucide 0.575.0.** The first 21 words of the set were taken from it and are
+  byte-identical in both versions; of the other 30 only `clock` differs there, listing its two
+  strokes in the other order: the same picture. `node scripts/check-icons.mjs` regenerates every
+  token from configr's `lucide-react` and fails one that is not lucide's drawing of its word.
 - **`github` is a lucide brand glyph**, which lucide deprecates and drops at 1.0. The token is a
   copy, so the drop cannot reach it; a regeneration from lucide 1.x carries it over unchanged.
 

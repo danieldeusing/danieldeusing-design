@@ -46,6 +46,15 @@
  * rule scoped to the element that asks for it, for the reason above. feedback.css and controls.css
  * stop the same inheritance for their own glyphs.)
  *
+ * COLOUR THE LABEL OR USE data-tone; NEVER `color` OR A `text-*` CLASS ON THE `.ico`. In forced
+ * colours the glyph takes its parent's forced colour only while its own colour is inherited, so a
+ * `.ico` with a colour of its own keeps that author colour: `text-primary` on the glyph vanished
+ * on mono (light palette) and paper (dark), and measured 1.34:1 on green (light) and 2.94:1 on
+ * warm (dark). The same colour on the label, or `data-tone` on the glyph, measured 21:1 on all
+ * eight. Nothing here enforces it, and no `!important` guard should: a component may hand its
+ * glyph a SYSTEM colour in its own forced-colours block (a fold summary's `.ico` gets CanvasText),
+ * and a guard would take that away too.
+ *
  * AN UNKNOWN WORD, OR NONE, PAINTS A SOLID SQUARE. With no --ico the mask declaration is invalid
  * at computed-value time, the element has no mask, and its whole box paints in currentColor. That
  * is left loud on purpose: a missing glyph that painted nothing would leave an icon-only control

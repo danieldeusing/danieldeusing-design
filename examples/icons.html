@@ -197,7 +197,9 @@
         <p class="demo-lede">A glyph is its label's colour. <code>data-tone</code> on the <code>.ico</code> itself paints it in that
           tone; a tone on a container does not reach it. Under forced colours (Windows High Contrast) every glyph takes the
           colour its context is forced to — CanvasText, LinkText in a link, ButtonText in a button, GrayText when disabled —
-          and the tone goes, as every colour does in that mode.</p>
+          and the tone goes, as every colour does in that mode. So colour the label, never the glyph: a <code>.ico</code>
+          given a <code>color</code> or a <code>text-*</code> class of its own keeps that colour in that mode, and on some
+          palettes vanishes.</p>
         <div class="demo-cols">
           <div class="demo-surface" data-surface="background">
             <p class="demo-label">currentColor, on --background</p>

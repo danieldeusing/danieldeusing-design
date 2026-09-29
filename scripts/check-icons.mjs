@@ -12,12 +12,16 @@
  *     the command line, has a token AND a mapping line in src/tokens.css;
  *   · the tokens — each is in lucide's house form (24 box, stroke 2, round caps and joins), holds
  *     nothing the build or a data url chokes on, decodes as an SVG in a real browser and paints;
+ *   · the drawings — each token is regenerated from lucide-react's own icon data, at the version
+ *     tokens.css names, and must match byte for byte: a token carrying another word's picture
+ *     passes every other check here;
  *   · `.ico` — its four sizes, its colour (the text's, or its own data-tone, never a container's),
  *     the loud square for an unknown word, no radius, print, forced colours, the naming contract —
  *     on the demo page and again with only tokens.css + icons.css loaded (house rule 4);
  *   · the mapping's cascade — a component in a later layer, and a utility, can swap the glyph;
  *   · glyph colours clear 3:1 (WCAG 1.4.11) on every theme and surface;
- *   · the skill reference — its forced-colours examples carry the fallback.
+ *   · the skill reference — its forced-colours examples carry the fallback, and it states the rule
+ *     a `.ico` author needs (colour the label, never the glyph).
  *
  * THE SCAN REPORTS ITS YIELD. "No unknown word" is only worth something next to how much was read,
  * so each root prints its file, reference and word counts, and a root that yields no files at all
@@ -26,7 +30,9 @@
  * A REAL BROWSER, and no dependency — the headless chromium Playwright caches, over the DevTools
  * protocol with Node's own fetch and WebSocket, on a port the browser picks (other checks may be
  * running beside this one). With no browser the static half still runs and the browser half SKIPS
- * loudly; DD_REQUIRE_BROWSER=1 makes that skip a failure.
+ * loudly; DD_REQUIRE_BROWSER=1 makes that skip a failure. lucide-react is borrowed the same way
+ * check-tailwind-layers.mjs borrows @tailwindcss/node — configr's, or DD_LUCIDE_REACT — and with
+ * none of the named version the drawing comparison SKIPS loudly; DD_REQUIRE_LUCIDE=1 fails it.
  *
  *   node scripts/check-icons.mjs                          this checkout
  *   node scripts/check-icons.mjs ../other-checkout …      and the words other checkouts use
@@ -123,6 +129,42 @@ check("every token is lucide's house form: 24-unit box, black stroke 2, round ca
 check("only star-filled closes its fill", bad.fill.length === 0, bad.fill.join(", "));
 check("no element in any token repeats an attribute", bad.dup.length === 0, bad.dup.join(", "));
 
+/* ── the static half: each token is lucide's drawing of its word ─────────── */
+
+// Named once, because the comparison regenerates from that version, and two names could disagree.
+const VERSIONS = [...TOKENS_CSS.matchAll(/lucide v?(\d+\.\d+\.\d+)/gi)].map((m) => m[1]);
+check(`tokens.css names the lucide version its drawings come from, once (${VERSIONS.join(", ") || "none"})`, VERSIONS.length === 1);
+// Borrowed, never installed. Compared only against the version the drawings were taken from:
+// another version draws some glyphs differently, and that is not a wrong token.
+const LUCIDE = process.env.DD_LUCIDE_REACT
+  ? (existsSync(join(process.env.DD_LUCIDE_REACT, "package.json")) ? process.env.DD_LUCIDE_REACT : null)
+  : [`${process.env.HOME}/Work/danieldeusing/apps/configr/node_modules/lucide-react`, join(root, "node_modules/lucide-react")]
+    .find((path) => existsSync(join(path, "package.json")));
+const lucideVersion = LUCIDE && JSON.parse(readFileSync(join(LUCIDE, "package.json"), "utf8")).version;
+if (!LUCIDE || lucideVersion !== VERSIONS[0]) {
+  const why = LUCIDE ? `${LUCIDE} is lucide-react ${lucideVersion} and tokens.css names ${VERSIONS[0]}`
+    : "no lucide-react on this machine (DD_LUCIDE_REACT points at one)";
+  console.log(`      drawing comparison SKIPPED — ${why}: a token carrying the wrong picture goes unseen.`);
+  if (process.env.DD_REQUIRE_LUCIDE === "1") check("DD_REQUIRE_LUCIDE=1: every token is compared against lucide's drawing", false, why);
+} else {
+  const icons = join(LUCIDE, "dist/esm/icons");
+  const drawn = (word) => {
+    let src = readFileSync(join(icons, `${word === "star-filled" ? "star" : word}.js`), "utf8");
+    const alias = src.match(/export \{ default \} from '\.\/([a-z0-9-]+)\.js'/); // filter -> funnel, home -> house
+    if (alias) src = readFileSync(join(icons, `${alias[1]}.js`), "utf8");
+    const node = JSON.parse(src.match(/const __iconNode = (\[[\s\S]*?\]);\n/)[1].replace(/([{,]\s*)([a-zA-Z]\w*):/g, '$1"$2":'));
+    const body = node.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([k]) => k !== "key")
+      .map(([k, v]) => `${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}='${v}'`).join(" ")}/>`).join("");
+    return `<svg ${ROOT_ATTRS.replace("FILL", word === "star-filled" ? "black" : "none")}>${body}</svg>`.replace(/</g, "%3C").replace(/>/g, "%3E");
+  };
+  const wrong = [];
+  for (const [word, enc] of tokens) {
+    try { if (enc !== drawn(word)) wrong.push(word); } catch (error) { wrong.push(`${word} (${String(error?.message || error).split("\n")[0]})`); }
+  }
+  check(`every one of the ${tokens.size} tokens is lucide ${lucideVersion}'s drawing of its word, byte for byte (${LUCIDE.replace(process.env.HOME, "~")})`,
+    tokens.size > 0 && wrong.length === 0, wrong.join(", "));
+}
+
 /* ── the static half: every word used anywhere resolves ──────────────────── */
 
 const SCAN_DIRS = ["src", "examples", "runtime", "templates", ".claude/skills/danieldeusing-design/references"];
@@ -171,6 +213,11 @@ const offForm = examples.filter((css) => {
 });
 check(`every forced-colours example in the skill reference (${examples.length}) carries the @supports not fallback — none, a CanvasText background — and sets no color`,
   examples.length >= 2 && offForm.length === 0, offForm.map((css) => css.trim().split("\n").slice(0, 2).join(" ")).join(" | "));
+// The rule a .ico author needs, where they meet it: in icons.css above the .ico rule, and in the reference's .ico section.
+const OWN_COLOUR = /never `color` or a `text-\*` class on the `\.ico`/i;
+const icoAt = ICONS_MD.indexOf("## `.ico`");
+check("the own-colour rule — colour the label or use data-tone, never color on the .ico — is stated in icons.css above .ico and in the reference's .ico section",
+  OWN_COLOUR.test(ICONS_CSS.slice(0, ICONS_CSS.indexOf("\n.ico {"))) && icoAt >= 0 && OWN_COLOUR.test(ICONS_MD.slice(icoAt, ICONS_MD.indexOf("\n## ", icoAt))));
 
 /* ── the browser half ─────────────────────────────────────────────────────── */
 

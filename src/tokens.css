@@ -527,9 +527,11 @@ html.anim-off .cursor-block {
  * alpha; the stroke width is lucide's 2 on a 24-unit box, the glyph seedr and configr already ship
  * through lucide-react, so a mask here and a lucide component there are the same drawing.
  *
- * Source: lucide 0.559.0, the version configr's lucide-react resolves. seedr's resolves 0.575.0,
- * and every drawing here is the same there, byte for byte, but one: `clock` lists its two strokes
- * in the other order, which is the same picture. Token names are the estate's `data-icon` words,
+ * Source: lucide 0.559.0, the version configr's lucide-react resolves, and the one
+ * scripts/check-icons.mjs regenerates every token from and compares byte for byte; this is the one
+ * place the version is named. seedr resolves 0.575.0: the first 21 tokens, which were taken from
+ * it, are byte-identical in both, and of the other 30 only `clock` differs there, listing its two
+ * strokes in the other order — the same picture. Token names are the estate's `data-icon` words,
  * which are not always lucide's current file names: `filter` is lucide's `funnel` and `home` is
  * its `house` (lucide renamed both and ships the old names as aliases; markup keeps the word a
  * reader expects). `star-filled` is `star` with its fill closed, the pressed state of a favourite
@@ -548,14 +550,17 @@ html.anim-off .cursor-block {
  * declaration there, and a raw hash, which starts a fragment in a data url (write %23). `<` and
  * `>` are percent-encoded, attributes single-quoted, and no attribute may repeat — a duplicate
  * makes the SVG invalid and the mask paints nothing. scripts/check-icons.mjs fails each of those,
- * a token with no mapping line, and a `data-icon` word used anywhere in the repo with no token.
+ * a token with no mapping line, a token that is not lucide's drawing of its word, and a
+ * `data-icon` word or `var(--ico-…)` reference with no token in the directories it scans: src/,
+ * examples/, runtime/, templates/ and the skill's references/ (and any other checkout named on its
+ * command line).
  *
  * The licence below is a comment that opens with a bang, the form a minifier keeps, because it
  * has to travel with the path data into every copy, the minified bundle included. (Nothing else in
  * this file opens that way; a tool that collects such comments finds exactly one.)
  */
 /*!
- * Lucide 0.559.0 (https://lucide.dev): the path data in the icon tokens below.
+ * Lucide (https://lucide.dev): the path data in the icon tokens below.
  *
  * ISC License
  *
@@ -671,8 +676,10 @@ html.anim-off .cursor-block {
  * every entry: under the unlayered component files of the build-free bundle, under Tailwind's
  * `components` and `utilities`. A Tailwind app imports this file after `tailwindcss` (every
  * consumer does), so the block joins Tailwind's own `base` layer instead of opening a new one.
- * scripts/check-icons.mjs asserts it in both entries' cascades: the mapping resolves, and a
- * component's state glyph and a utility beat it.
+ * scripts/check-icons.mjs rebuilds both entries' layer order in a page of its own (Tailwind's
+ * theme, base, components, utilities with this file unlayered; the bundle's unlayered files) and
+ * asserts the mapping resolves there, and that a component's state glyph and a utility beat it.
+ * It simulates the order; it does not compile Tailwind.
  *
  * `--ico` INHERITS, as `--tone` does, because a pseudo-element only sees it by inheriting. So an
  * element with no word of its own takes the nearest glyph above it: give every `.ico` its own

@@ -148,7 +148,7 @@ const shutdown = () => {
   try { socket?.close(); } catch {}
   chrome.kill("SIGKILL");
   server.close();
-  rmSync(profile, { recursive: true, force: true });
+  rmSync(profile, { recursive: true, force: true, maxRetries: 10 });
 };
 process.on("exit", shutdown);
 
@@ -185,10 +185,14 @@ const evaluate = async (expression) => {
 };
 
 let failures = 0;
-let last = "(before the first check)";
+let last = "(before the first check)"; // the last check to PASS
+// `condition` may be a (synchronous) thunk: a throw inside it is that check's FAIL, and the suite goes on.
 const check = (label, condition, detail) => {
-  last = label;
-  if (condition) { console.log(`PASS  ${label}`); return; }
+  try { condition = typeof condition === "function" ? condition() : condition; } catch (error) {
+    condition = false; detail = `threw: ${String(error?.message || error).split("\n")[0]}`;
+  }
+  if (typeof condition?.then === "function") { condition = false; detail = "handed a promise: await the measurement before the check"; }
+  if (condition) { console.log(`PASS  ${label}`); last = label; return; }
   failures += 1;
   console.log(`FAIL  ${label}${detail === undefined ? "" : `\n        ${typeof detail === "string" ? detail : JSON.stringify(detail)}`}`);
 };
@@ -994,7 +998,7 @@ const REGIONS = `(() => {
   const fillOf = (n) => over(parse(cs(n).backgroundColor), canvas);
   const page = (r) => ({ x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height });
   let own = 0;
-  const tag = (n) => { n.setAttribute('data-dd-own', ++own); return own; };
+  const tag = (n) => { if (!n.hasAttribute('data-dd-own')) n.setAttribute('data-dd-own', ++own); return +n.getAttribute('data-dd-own'); };
   const text = (name, n) => { const range = document.createRange(); range.selectNodeContents(n); const host = n.closest('button'), fill = fillOf(host);
     return { name, kind: 'text', own: tag(n), ...page(range.getBoundingClientRect()), ink: rgb(over(parse(cs(n).color), fill)), under: rgb(fill) }; };
   const glyph = (name, n, box) => { const fill = fillOf(n), r = n.getBoundingClientRect();
@@ -1084,7 +1088,7 @@ const forcedCells = async (engine) => {
       if (!active) { check(`precondition: forced colours are active (${cell})`, false, active); continue; }
       const bad = (await evaluate(FORCED)).filter((row) => !row.ok);
       check(`forced colours (${cell}): every state pair differs and every glyph, mark, knob and word on a state reaches its ratio`, bad.length === 0, bad.map((row) => `${row.name}: ${row.got}`).join("\n        "));
-      const unpainted = (await paint()).filter((row) => !row.ok);
+      const unpainted = (await paint().catch((error) => [{ name: "the pixel read", ok: false, got: `threw: ${error.message}` }])).filter((row) => !row.ok);
       check(`forced colours (${cell}): PIXELS: each word on a redrawn state sits on its fill, not a Canvas backplate, and each glyph is painted`, unpainted.length === 0, unpainted.map((row) => `${row.name}: ${row.got}`).join("\n        "));
       const rings = [];
       for (const sel of [`${T("seg-text")} > [aria-pressed="true"]`, T("choice-on")]) {

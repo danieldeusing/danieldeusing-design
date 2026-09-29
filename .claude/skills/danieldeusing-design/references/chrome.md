@@ -437,8 +437,12 @@ scrollbar APIs must not be declared together.
 - **The ticker strip draws its state glyph from the row's class** — `●` ok and running, `✕` stale,
   `○` never — with empty alt text, at the text size. A renderer must NOT type the glyph into the
   cell any more (it would show twice); the row's visually hidden state word is what is read.
-  `.tick-next` is `--muted-foreground` with no opacity (it measured 2.80–3.76:1 with one), and the
-  `·` between figures is decoration in `--border`. (The strip: `references/data.md`.)
+  A running row's dot is `--info`: never red, and not the idle ok either. `.tick-next` is
+  `--muted-foreground` with no opacity (it measured 2.80–3.76:1 with one), and the `·` between
+  figures is decoration in `--border`. The runtime's visually hidden header row takes no box.
+- **A stale row is tinted at the house 6% step**, and its next-run and figures cells read
+  `--foreground` on the tint: `--muted-foreground` there measured 4.29:1 on warm (8%) and 4.42:1
+  (6%). The row that has stopped is the one that must be readable. (The strip: `references/data.md`.)
 
 ## Forced colours and `hidden`
 
@@ -456,8 +460,13 @@ scrollbar APIs must not be declared together.
   painting `currentColor`, which the user agent already gives `preserve-parent-color`. The history
   buttons' glyphs are `[data-icon]` masks, which `tokens.css` gives `preserve-parent-color`
   (`references/icons.md`); a new mask glyph in the chrome copies that pattern.
+- **An element opted out of the adjustment owns its focus ring**: `none` stops forcing the outline
+  colour too, so the author `--ring` stayed on the Highlight fill at 1.59–2.97:1. The current row,
+  entry and part draw an inset `HighlightText` ring in forced colours (11.31:1 and 8.73:1).
 - Do not redraw a state as a tint alone. The check reads all of this as painted pixels, on a light
-  and a dark forced palette, because the backplate appears in no computed style.
+  and a dark forced palette, because the backplate appears in no computed style; it proves each clip
+  holds the ink it reports (hiding the ink must change the clip), and that every glyph paints its
+  context's forced colour, which is what holds under a palette the reader chose.
 - `hidden` hides every chrome part whatever `display` its class sets; the one rule that guarantees
   it is in `tokens.css`. Do not add per-class `[hidden]` guards.
 

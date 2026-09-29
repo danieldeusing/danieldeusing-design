@@ -196,6 +196,14 @@ element (`var(--tone-c)`). Those carry both branches in their own file, on their
 }
 ```
 
+`scripts/check-icons.mjs` fails a `src/` file that paints a mask with no fallback branch of its own.
+
+**`data-icon` goes only where `::before` IS the glyph.** The fallback paints the background of every
+`[data-icon]::before`, because a selector cannot tell a glyph from text. On an element whose `::before`
+is a word or a mark — `.prompt`'s `$ `, `.comment`'s `# `, `.tag--bracket`'s `[ `, `.btn-terminal`'s
+`> ` — an engine without `preserve-parent-color` would put that text on a CanvasText box. Give such an
+element a `.ico` child instead.
+
 A glyph that shows a STATE on a fill — the ✓ in a checked box, the check column of a chosen option —
 is a drawn state, and X1's state rule applies: `Highlight` fill, `HighlightText` mark.
 

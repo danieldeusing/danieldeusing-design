@@ -134,6 +134,23 @@ check("every token is lucide's house form: 24-unit box, black stroke 2, round ca
 check("only star-filled closes its fill", bad.fill.length === 0, bad.fill.join(", "));
 check("no element in any token repeats an attribute", bad.dup.length === 0, bad.dup.join(", "));
 
+/* ── the static half: every file that paints a mask carries its own fallback ── */
+
+// tokens.css's forced-colours default reaches `[data-icon]::before` only, and a component that paints
+// its glyph in a rule of its own outranks it anyway (the default is in @layer base). So each src file
+// that paints a mask must cover an engine without `preserve-parent-color` itself: an
+// `@supports not (forced-color-adjust: preserve-parent-color)` branch, or the equivalent unconditional
+// `forced-color-adjust: none; background: CanvasText` that an `@supports (…preserve…)` rule overrides.
+// Without one, that engine paints the glyph in Canvas, and it is gone (WP4 re-review). Code only.
+const SRC_CSS = readdirSync(join(root, "src")).filter((f) => f.endsWith(".css"))
+  .map((f) => [f, readFileSync(join(root, "src", f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "")]);
+const painting = SRC_CSS.filter(([, css]) => /(?:^|[\s;{])(?:-webkit-)?mask(?:-image)?\s*:[^;{}]*var\(--/.test(css));
+const unguarded = painting.filter(([, css]) => !(/@media\s*\(\s*forced-colors\s*:\s*active\s*\)/.test(css) && (
+  /@supports\s+not\s*\(\s*forced-color-adjust\s*:\s*preserve-parent-color\s*\)/.test(css) ||
+  (/@supports\s*\(\s*forced-color-adjust\s*:\s*preserve-parent-color\s*\)/.test(css) && /forced-color-adjust\s*:\s*none\s*;\s*background\s*:\s*CanvasText/.test(css)))));
+check(`every src file that paints a mask carries its own fallback for an engine without preserve-parent-color (${painting.length} files: ${painting.map(([f]) => f).join(" ")})`,
+  painting.length >= 5 && unguarded.length === 0, unguarded.map(([f]) => f).join(", ") || `only ${painting.length} files paint a mask — the scan is reading the wrong thing`);
+
 /* ── the static half: each token is lucide's drawing of its word ─────────── */
 
 // Named once, because the comparison regenerates from that version, and two names could disagree.

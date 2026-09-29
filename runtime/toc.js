@@ -13,15 +13,27 @@
  *   </aside>
  * `data-toc-link` names the id of the section (or heading) the entry points at.
  *
- * WHAT IT MARKS: `aria-current="true"` on the entry whose target is the topmost one in the top 30%
- * of the viewport, and on no other entry. The two spies this replaces (cockpit's portal.js and
- * danieldeusing.de's article page) toggled a CLASS, so the highlight was painted and never said;
- * the attribute is what a screen reader announces, and the stylesheet keys on it.
+ * WHAT IT MARKS: `aria-current="true"` on ONE entry — the last one whose target has reached the
+ * reading line, 30% of the way down the viewport — and on no other. The two spies this replaces
+ * (cockpit's portal.js and danieldeusing.de's article page) toggled a CLASS, so the highlight was
+ * painted and never said; the attribute is what a screen reader announces, and the stylesheet keys
+ * on it.
  *
- * The band is `rootMargin: 0 0 -70% 0`, the value both sources had settled on independently: a
- * section becomes current as it reaches the top of the page, not when its last line leaves the
- * bottom. When nothing is in the band — the reader is deep inside one long section — the last
- * entry marked stays marked, because "you are still here" is the true answer.
+ * The line is the bottom of the band `rootMargin: 0 0 -70% 0`, the value both sources had settled
+ * on independently: a section becomes current as it reaches the top of the page, not when its last
+ * line leaves the bottom. The observer fires whenever a target's top crosses that line, in either
+ * direction, and its own entries say which side each target is on — so no rectangle is read.
+ *
+ * THE LAST TARGET PAST THE LINE, NOT THE TOPMOST ONE IN THE BAND. Both sources marked the topmost
+ * target intersecting the band, which is right for small targets (pagr's headings) and wrong for
+ * sections (cockpit's): a TOC link lands its section at the scroll padding, a line under the
+ * toolbar, and the PREVIOUS section's last 40px still sits inside the band above it. Measured on
+ * the specimen page, every one of five TOC clicks marked the section before the one clicked. With
+ * sections or headings alike, the last target whose top is above the line is the one being read.
+ *
+ * Above the first target nothing is marked: the reader is in the page's introduction. A last
+ * section shorter than the lower 70% of the viewport never reaches the line; give the page room
+ * below it (its bottom padding) if its TOC must be able to mark it.
  *
  * Entries and targets rendered after the call are picked up (one MutationObserver, as the other
  * runtime modules do), so a page that builds its sections from data needs no second call. The
@@ -31,7 +43,7 @@
  * @returns {{ destroy(): void }} stops the spy and clears the mark
  */
 export function initToc(root = document) {
-  const visible = new Set();
+  const reached = new Set();
   const observed = new Set();
   let current = null;
 
@@ -48,14 +60,13 @@ export function initToc(root = document) {
   const spy = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
-        if (entry.isIntersecting) visible.add(entry.target.id);
-        else visible.delete(entry.target.id);
+        const line = entry.rootBounds ? entry.rootBounds.bottom : innerHeight * 0.3;
+        if (entry.boundingClientRect.top <= line) reached.add(entry.target.id);
+        else reached.delete(entry.target.id);
       }
-      // Topmost in the ORDER OF THE LIST, which is the order of the page; two targets can share
-      // the band while a short section passes through it.
-      const top = links().find((link) => visible.has(link.getAttribute("data-toc-link")));
-      if (!top) return;
-      current = top.getAttribute("data-toc-link");
+      // The last in the ORDER OF THE LIST, which is the order of the page.
+      const past = links().filter((link) => reached.has(link.getAttribute("data-toc-link")));
+      current = past.length ? past[past.length - 1].getAttribute("data-toc-link") : null;
       mark();
     },
     { rootMargin: "0px 0px -70% 0px" },

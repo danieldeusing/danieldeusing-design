@@ -592,8 +592,11 @@ section.doc.tab-panel { margin-top: 1.35rem; }
    word sat on that backplate in its own colour — white on white in the light palette, black on black
    in the dark one: the fill was right and the label was gone, and a check that compared computed
    colours passed it. `forced-color-adjust: none` stops the forcing and the backplate, so the pair is
-   declared in full. The disabled tab drops its .45 there: GrayText is already the palette's own word
-   for unavailable, and faded to .45 it painted at 2.98:1 (light palette) and 3.25:1 (dark).
+   declared in full. A disabled tab is GrayText and KEEPS its .45, as every disabled control in the
+   estate does under a forced palette (the lead's ruling): one look for "unavailable" everywhere, and
+   WCAG exempts a disabled control from contrast. It paints about 3:1, and its focus ring is forced
+   like any other tab's. A disabled row has no .45 to keep — it is muted text, not opacity — so under
+   a forced palette it is GrayText.
 
    CHARTS ARE THE OTHER WAY ROUND. SVG is `preserve-parent-color` by default, so nothing is forced: a
    chart keeps its THEME colours over whatever Canvas the reader's palette has, and warm's --primary on
@@ -610,10 +613,7 @@ section.doc.tab-panel { margin-top: 1.35rem; }
   }
   .tab[aria-selected="true"]:focus-visible { outline-color: HighlightText; }
   .tab:disabled,
-  .tab[aria-disabled="true"] {
-    color: GrayText;
-    opacity: 1;
-  }
+  .tab[aria-disabled="true"] { color: GrayText; }
   table.dense tr[data-pin] > :first-child { border-inline-start: 3px solid CanvasText; }
   tr[aria-disabled="true"] > :not(:first-child) { color: GrayText; }
   .chart text { fill: CanvasText; }

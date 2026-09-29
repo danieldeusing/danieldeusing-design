@@ -530,8 +530,13 @@ for (const scheme of ["light", "dark"]) {
     () => tabs.fills >= 3 && tabs.offLabel >= 4.5, shown(tabs));
   await shoot("#tab-syntax");
   const syntax = await measure(`return ink(text("#tab-syntax"));`);
-  await check(`X1 ${scheme} — a disabled tab is GrayText at full strength (${r2(tabs.disabled)}:1 disabled, ${r2(syntax.ratio)}:1 aria-disabled), not the enabled tabs' ink`,
-    () => tabs.disabled >= 4.5 && syntax.ratio >= 4.5 && tabs.disabledInk.join() !== tabs.enabledInk.join(), shown([tabs.disabled, syntax.ratio, tabs.disabledInk, tabs.enabledInk]));
+  // Disabled keeps its .45 under a forced palette, estate-wide (the lead's ruling; WCAG exempts it from
+  // contrast): GrayText, faded — still painted, and not the enabled tabs' ink.
+  const faded = await evaluate(`["#tab-modes", "#tab-syntax"].map((s) => { const c = getComputedStyle(document.querySelector(s));
+    return c.opacity === "0.45" && c.color === M.tok("GrayText"); })`);
+  await check(`X1 ${scheme} — a disabled tab is GrayText at .45 (painted ${r2(tabs.disabled)}:1 disabled, ${r2(syntax.ratio)}:1 aria-disabled), not the enabled tabs' ink`,
+    () => faded.every(Boolean) && tabs.disabled >= 2 && syntax.ratio >= 2 && tabs.disabledInk.join() !== tabs.enabledInk.join(),
+    shown([faded, tabs.disabled, syntax.ratio, tabs.disabledInk, tabs.enabledInk]));
 
   await shoot("#dense-table");
   const rows = await measure(`
@@ -570,7 +575,7 @@ for (const scheme of ["light", "dark"]) {
     await theme(t);
     const ringAt = (id) => `const r = box("#${id}"), y = (r.top + r.bottom) / 2; return M.ratio(px(r.left + 1, y), px(r.left + 4.5, y));`;
     const rings = [];
-    for (const id of ["tab-activity", "tab-queue"]) {
+    for (const id of ["tab-activity", "tab-queue", "tab-syntax"]) {
       if (id === "tab-activity") {
         await evaluate(`document.querySelector("#tabs .lede a").focus(); null`);
         await press("Tab");
@@ -580,15 +585,19 @@ for (const scheme of ["light", "dark"]) {
       const focus = await evaluate(`document.activeElement.id === "${id}" && document.activeElement.matches(":focus-visible")`);
       await settle();
       await shoot("#page-tabs");
+      await shoot(id === "tab-syntax" ? "#tab-syntax" : "#page-tabs");
       const on = await measure(ringAt(id));
       await evaluate(`document.activeElement.blur(); null`);
       await settle();
-      await shoot("#page-tabs");
+      await shoot(id === "tab-syntax" ? "#tab-syntax" : "#page-tabs");
       const off = await measure(ringAt(id));
       rings.push({ id, focus, on, off });
     }
-    await check(`X1 ${scheme} ${t} — a keyboard-focused tab's ring is painted ${rings.map((r) => r2(r.on)).join(":1 (selected), ")}:1 (unselected) off its fill, and gone without the focus`,
-      () => rings.every((r) => r.focus && r.on >= 3 && r.off < 1.1), shown(rings));
+    await check(`X1 ${scheme} ${t} — a keyboard-focused tab's ring is painted ${rings.slice(0, 2).map((r) => r2(r.on)).join(":1 (selected), ")}:1 (unselected) off its fill, and gone without the focus`,
+      () => rings.slice(0, 2).every((r) => r.focus && r.on >= 3 && r.off < 1.1), shown(rings));
+    // A disabled tab's ring fades with it (.45), so it is held to "painted", not to 3:1.
+    await check(`X1 ${scheme} ${t} — ...and an aria-disabled tab's ring, faded with it, is still painted at ${r2(rings[2].on)}:1, and gone without the focus`,
+      () => rings[2].focus && rings[2].on >= 1.5 && rings[2].off < 1.1, shown(rings[2]));
   }
   await theme("warm");
 }

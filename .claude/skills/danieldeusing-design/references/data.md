@@ -382,8 +382,10 @@ says what was asked for, not what reached the screen:
   the mistake to avoid anywhere a state carries text: the label is painted on the backplate in its
   own colour — white on white, black on black — so the fill is right and the word is gone (2.8:1 in
   pixels), while every computed style still looks correct.
-- A disabled tab or row is `GrayText` at full strength (about 14:1): the palette's own word for
-  unavailable. Faded to .45 on top of it, it painted at 2.98:1 light and 3.25:1 dark.
+- A disabled tab is `GrayText` and keeps its .45, as every disabled control in the estate does
+  under a forced palette: one look for unavailable everywhere, and WCAG exempts a disabled control
+  from contrast. It paints at about 3:1, and its focus ring is still painted. A disabled row, which is
+  muted text rather than faded, is `GrayText`.
 - A pinned row's bar is a real 3px `CanvasText` border, on the card's edge when stacked.
 - **A chart is repainted.** SVG keeps its theme colours under a forced palette, so on a dark one
   warm's chart text measured 3.52:1, its line 2.94:1 and its first series' bars 2.93:1, and the key's

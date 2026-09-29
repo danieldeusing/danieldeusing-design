@@ -90,11 +90,12 @@ if (layerAt >= 0) {
   }
 }
 const mapRe = new RegExp(`\\[data-icon="(${WORD})"\\]\\s*\\{\\s*--ico:\\s*var\\(--ico-(${WORD})\\);?\\s*\\}`, "g");
-const mappingAll = [...TOKENS_CSS.matchAll(mapRe)];
-const mapping = new Map([...layerBody.matchAll(mapRe)].map(([, word, token]) => [word, token]));
-check(`the mapping is inside @layer base, all ${mappingAll.length} lines of it`,
-  mappingAll.length > 0 && mapping.size === mappingAll.length,
-  `${mappingAll.length} mapping lines in the file, ${mapping.size} inside @layer base`);
+// Where a line sits (the layer) and whether a word resolves (any line) are two questions, and a
+// mapping outside the layer should fail the first alone.
+const mapping = new Map([...TOKENS_CSS.matchAll(mapRe)].map(([, word, token]) => [word, token]));
+const layered = [...layerBody.matchAll(mapRe)].length;
+check(`the mapping is inside @layer base, all ${mapping.size} lines of it`,
+  mapping.size > 0 && layered === mapping.size, `${mapping.size} mapping lines in the file, ${layered} inside @layer base`);
 check("every token has a mapping line, and every mapping line names its own word's token",
   [...tokens.keys()].every((w) => mapping.get(w) === w) && [...mapping].every(([w, t]) => w === t && tokens.has(t)),
   [...[...tokens.keys()].filter((w) => mapping.get(w) !== w).map((w) => `--ico-${w} has no mapping line`),

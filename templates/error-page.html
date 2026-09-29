@@ -131,7 +131,7 @@
               <button type="button" class="dropdown-item" data-theme-value="paper">paper</button>
             </div>
           </details>
-          <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations" data-tip="Toggle animations">
+          <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
             <span data-anim-box aria-hidden="true">[x]</span>
             <span>anim</span>
           </button>
@@ -185,7 +185,9 @@
           </ul>
         </details>
         <span class="sep" aria-hidden="true"></span>
-        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations" data-tip="Toggle animations">
+        <!-- aria-label names it; there is no data-tip, because a tip that repeats the name is announced
+             twice (tooltip.js points aria-describedby at it). -->
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
           <span data-anim-box aria-hidden="true">[x]</span>
           <span>anim</span>
         </button>

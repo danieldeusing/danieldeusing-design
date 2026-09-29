@@ -97,8 +97,14 @@
       :where(figure) { margin: 0; }
       .text-muted-foreground { color: var(--muted-foreground); }
     </style>
+    <!-- WP1 · X3: `hidden` hides everything, answered once in tokens.css. An author `display` (every
+         flex, grid and block class in content.css) outranks the user agent's [hidden] rule. -->
+    <style id="standin-wp1-hidden" media="not all">
+      [hidden]:not([hidden="until-found"]) { display: none !important; }
+    </style>
     <!-- WP4 · I1 glyphs: the --ico-<word> masks this page needs, the [data-icon] → --ico mapping and
-         the .ico class. The script fills in ONLY the pieces that are missing and names them. -->
+         the .ico class as icons.css draws it (forced colours included). The script fills in ONLY the
+         pieces that are missing and names them. -->
     <style id="standin-wp4" media="not all"></style>
     <!-- WP5 · C2 .btn-icon — what the copy buttons and the section-head toggle need -->
     <style id="standin-wp5" media="not all">
@@ -126,6 +132,10 @@
       .btn-icon:is(:disabled, [aria-disabled="true"]) { opacity: 0.45; cursor: default; }
       @media (pointer: coarse) { .btn-icon { min-inline-size: 44px; min-block-size: 44px; } }
       @media print { .btn-icon { display: none !important; } }
+      /* X1: a mask glyph is a background, which forced colours replace with Canvas. Drawn in the
+         system's ButtonText instead — NOT with forced-color-adjust: none, which in Chromium keeps the
+         AUTHOR colour (measured: mono's white --primary on a light palette, 1.00:1). */
+      @media (forced-colors: active) { .btn-icon[data-icon]::before { background: ButtonText; } }
     </style>
 
     <style>
@@ -214,10 +224,13 @@
         }
         if (!probe('<span class="ico"></span>', (el) => getComputedStyle(el).display === "inline-block")) {
           css += ".ico { display: inline-block; flex: none; inline-size: var(--icon-size); block-size: var(--icon-size);" +
-            " vertical-align: -0.125em; background: var(--tone, currentColor);" +
+            " vertical-align: -0.125em; background: currentColor;" +
             " -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }" +
+            ".ico[data-tone] { background: var(--tone, currentColor); }" +
             ".ico--sm { inline-size: var(--icon-sm); block-size: var(--icon-sm); }" +
-            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }";
+            ".ico--lg { inline-size: var(--icon-lg); block-size: var(--icon-lg); }" +
+            ".ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }" +
+            "@media (forced-colors: active) { .ico, .ico[data-tone] { background: CanvasText; } }";
           glyphs.push(".ico");
         }
         document.getElementById("standin-wp4").textContent = css;
@@ -229,6 +242,8 @@
           inForce.push(what);
         };
         use("standin-wp1-tokens", !token("--fs-display"), "WP1 tokens (--fs-display, F1, F2, F6, F7)");
+        use("standin-wp1-hidden", probe('<div class="cmd" hidden></div>', (el) => getComputedStyle(el).display !== "none"),
+          "WP1 [hidden] (X3)");
         use("standin-wp1-base", !bare && probe("<code>x</code>", (el) => getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)"),
           "WP1 base.css (F5, F8)");
         use("standin-wp4", glyphs.length > 0, "WP4 " + glyphs.join(", "));

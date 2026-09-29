@@ -484,10 +484,6 @@ await check("P5 diff lines: add/del/hunk/meta tokens; a context line inherits", 
   ["#code-diff .diff-meta", null, { color: { token: "--muted-foreground" } }],
   ["#code-diff", null, { color: { token: "--foreground" } }],
 ]));
-await check("P5 a scrollable block takes the --ring focus ring from the keyboard", async () => {
-  await focusByKeyboard("#code-plain");
-  return ring("#code-plain");
-});
 
 /* ── P6 command block ───────────────────────────────────────────────────────────────────────── */
 
@@ -591,14 +587,6 @@ await check("P9 a link warms to --primary under the pointer", async () => {
   await sleep(200);
   return expectAll([["#seq li:first-child a", null, { color: { token: "--primary" } }]]);
 });
-await check("P9 a link takes the --ring focus ring from the keyboard", async () => {
-  await focusByKeyboard("#seq li:first-child a");
-  return ring("#seq li:first-child a");
-});
-await check("P4 a markdown link takes the --ring focus ring from the keyboard", async () => {
-  await focusByKeyboard("#md-article a");
-  return ring("#md-article a");
-});
 
 /* ── P10 boot log ───────────────────────────────────────────────────────────────────────────── */
 
@@ -679,14 +667,75 @@ await check("a coarse pointer makes each series link a 44px target", async () =>
 try { await send("Emulation.setEmulatedMedia", { features: [] }); } catch {}
 await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 
+/* ── `hidden` hides every component (X3: tokens.css answers it once) ─────────────────────────── */
+
+// Every class here that sets `display` outranks the user agent's [hidden] rule, so this fails unless
+// tokens.css carries [hidden]:not([hidden="until-found"]) { display: none !important } (WP1) — or the
+// demo's marked stand-in for it, which the header line above names while WP1 has not landed.
+const HIDDEN = ["#p1-app .page-title", "#p1-app .lede", "#p1-glyph .page-title > .ico", "#eyebrow-plain", "#head-link",
+  "#subheads .subhead", "#md-article", "#list-steps", "#list-plain", "#list-dash", "#code-plain", "#code-div",
+  "#code-view .line", "#cmd-one", "#cmd-one .cmd-text", "#cmd-one > button", "#states-text [data-state=copied]",
+  "#meta-article", "#meta-stats .meta-stat", "#seq", "#seq .seq-list", "#seq .seq-list > li", "#boot", "#boot .boot-line"];
+const hiddenHides = () => evaluate(`${JSON.stringify(HIDDEN)}.flatMap((sel) => {
+  const e = __t.el(sel); e.hidden = true; const d = getComputedStyle(e).display; e.hidden = false;
+  return d === "none" ? [] : [sel + " is display:" + d + " with hidden set"];
+})`);
+await check("hidden hides every content.css component (tokens.css + the full page)", hiddenHides);
+
+/* ── forced colours (X1): every glyph still draws, every state still differs ────────────────── */
+
+// Forced colours replace author colours with the user's palette, and a user picks a LIGHT or a DARK
+// one — so every theme is run under both. A mask glyph is a background: painted in Canvas it is
+// gone, and painted in an author colour it can land ON Canvas (mono's white --primary on a light
+// palette measured 1.00:1). So the assertion is contrast against Canvas, not merely "not Canvas".
+// A fresh load per theme: under forced colours Chromium does not restyle a pseudo-element that
+// opted out with forced-color-adjust: none when data-theme changes.
+for (const theme of THEMES) {
+  await load(`?theme=${theme}`);
+  for (const scheme of ["light", "dark"]) {
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
+    await check(`forced colours, ${theme}, ${scheme} palette: glyphs >= 3:1 on Canvas, text glyphs >= 4.5:1, the copy states differ in shape`, async () => {
+      if (!(await evaluate(`matchMedia("(forced-colors: active)").matches`))) return ["could not emulate forced colours — this check proved nothing"];
+      return evaluate(`(() => {
+        const canvas = __t.probe("background-color", "Canvas");
+        const out = [];
+        const ICON = "#states-icon .btn-icon:not(.btn-icon--bare)";
+        const glyphs = [
+          [ICON + ":not([data-state])", "::before"], [ICON + "[data-state=copied]", "::before"], [ICON + "[data-state=failed]", "::before"],
+          ["#states-icon .btn-icon--bare[data-state=copied]", "::before"], ["#cmd-one > button", "::before"],
+          ["#p1-glyph .page-title > .ico", null], ["#meta-stats .meta-stat:first-child > .ico", null],
+        ];
+        for (const [sel, pseudo] of glyphs) {
+          const bg = getComputedStyle(__t.el(sel), pseudo).backgroundColor;
+          const r = bg === "rgba(0, 0, 0, 0)" ? 1 : __t.ratio(bg, canvas);
+          if (r < 3) out.push(sel + (pseudo || "") + " glyph " + bg + " is " + r.toFixed(2) + ":1 on Canvas " + canvas);
+        }
+        for (const [sel, pseudo] of [["#list-dash > li", "::before"], ["#list-steps > li", "::before"], ["#boot .boot-step", "::before"], ["#code-view .line", "::before"], ["#md-article a", null]]) {
+          const r = __t.ratio(getComputedStyle(__t.el(sel), pseudo).color, canvas);
+          if (r < 4.5) out.push(sel + (pseudo || "") + " text is " + r.toFixed(2) + ":1 on Canvas");
+        }
+        const mask = (sel) => { const st = getComputedStyle(__t.el(sel), "::before"); return st.maskImage || st.webkitMaskImage; };
+        const [rest, copied, failed] = [":not([data-state])", "[data-state=copied]", "[data-state=failed]"].map((x) => mask(ICON + x));
+        if (rest === copied || rest === failed || copied === failed) out.push("two of copy / copied / failed draw the same glyph");
+        if (getComputedStyle(__t.el("#seq a[aria-current=page]")).fontWeight === getComputedStyle(__t.el("#seq li:first-child a")).fontWeight)
+          out.push("the current series part is told by colour alone");
+        if (getComputedStyle(__t.el("#md-article a")).textDecorationLine !== "underline") out.push("the markdown link lost its underline");
+        return out;
+      })()`);
+    });
+  }
+  await send("Emulation.setEmulatedMedia", { features: [] });
+}
+await load("?theme=warm");
+
 /* ── the same classes on tokens.css alone ───────────────────────────────────────────────────── */
 
 const IDENTITY = [
-  ["#p1-app .page-title", null, ["font-size", "font-weight", "line-height", "letter-spacing", "color", "margin-top", "margin-bottom", "text-shadow", "overflow-wrap"]],
-  ["#p1-app .lede", null, ["color", "margin-top", "margin-bottom"]],
+  ["#p1-app .page-title", null, ["font-family", "font-size", "font-weight", "line-height", "letter-spacing", "color", "margin-top", "margin-bottom", "text-shadow", "overflow-wrap"]],
+  ["#p1-app .lede", null, ["font-family", "font-size", "color", "margin-top", "margin-bottom"]],
   ["#p1-display .page-title", null, ["font-size"]],
   ["#p1-glyph .page-title > .ico", null, ["width", "height", "margin-right", "vertical-align"]],
-  ["#eyebrow-plain", null, ["font-size", "font-weight", "letter-spacing", "text-transform", "color", "margin-top", "margin-bottom", "line-height"]],
+  ["#eyebrow-plain", null, ["font-family", "font-size", "font-weight", "letter-spacing", "text-transform", "color", "margin-top", "margin-bottom", "line-height"]],
   ["#eyebrow-warning", null, ["color"]],
   ["#head-link", null, ["display", "flex-wrap", "align-items", "justify-content", "row-gap", "column-gap", "margin-bottom"]],
   ["#head-link > h2", null, ["margin-top", "margin-bottom"]],
@@ -696,7 +745,7 @@ const IDENTITY = [
   ["#subheads .subhead:nth-of-type(2)", null, ["margin-top", "margin-bottom", "font-size", "font-weight", "line-height"]],
   ["#md-article", null, ["line-height", "overflow-wrap"]],
   ["#md-article > p", null, ["margin-top", "margin-bottom"]],
-  ["#md-article > h2", null, ["font-size", "font-weight", "color", "margin-top", "line-height"]],
+  ["#md-article > h2", null, ["font-family", "font-size", "font-weight", "color", "margin-top", "line-height"]],
   ["#md-article > h3", null, ["font-size"]],
   ["#md-article > ul", null, ["list-style-type", "padding-left"]],
   ["#md-article > ol", null, ["list-style-type", "padding-left"]],
@@ -710,22 +759,24 @@ const IDENTITY = [
   ["#list-plain", null, ["list-style-type", "padding-left", "margin-top"]],
   ["#list-dash > li", null, ["padding-left", "position"]],
   ["#list-dash > li", "::before", ["content", "color", "position"]],
-  ["#code-plain", null, ["display", "padding-top", "padding-left", "font-size", "line-height", "white-space", "tab-size", "color", "background-color", "border-top-width", "border-top-color", "margin-top"]],
-  ["#code-div", null, ["padding-top", "font-size", "line-height", "white-space", "background-color"]],
+  ["#code-plain", null, ["display", "padding-top", "padding-left", "font-family", "font-size", "line-height", "white-space", "tab-size", "color", "background-color", "border-top-width", "border-top-color", "margin-top"]],
+  ["#code-div", null, ["padding-top", "font-family", "font-size", "line-height", "white-space", "background-color"]],
   ["#code-view .line", null, ["display", "padding-left"]],
   ["#code-view .line", "::before", ["content", "width", "margin-left", "margin-right", "text-align", "color", "user-select"]],
   ["#code-view .tok-string", null, ["color"]],
   ["#code-view .tok-comment", null, ["color", "font-style"]],
   ["#code-diff .diff-add", null, ["color"]],
   ["#cmd-one", null, ["display", "align-items", "column-gap", "padding-top", "padding-left", "background-color", "border-top-width"]],
-  ["#cmd-one .cmd-text", null, ["flex-grow", "min-width", "padding-left", "border-top-width", "background-color", "white-space", "overflow-wrap", "color"]],
+  ["#cmd-one .cmd-text", null, ["font-family", "font-size", "flex-grow", "min-width", "padding-left", "border-top-width", "background-color", "white-space", "overflow-wrap", "color"]],
+  ["#cmd-multi .cmd-text", null, ["font-family", "font-size", "line-height", "margin-top", "white-space"]],
   ["#states-icon .btn-icon--bare[data-state=copied]", null, ["color", "--ico"]],
-  ["#meta-article", null, ["display", "flex-wrap", "row-gap", "column-gap", "color", "margin-top"]],
+  ["#meta-article", null, ["font-family", "font-size", "display", "flex-wrap", "row-gap", "column-gap", "color", "margin-top"]],
   ["#meta-stats .meta-stat:first-child > .ico", null, ["width", "height"]],
   ["#seq .seq-list", null, ["display", "row-gap", "margin-top", "padding-left", "list-style-type"]],
-  ["#seq a[aria-current=page]", null, ["color", "font-weight"]],
+  ["#seq a[aria-current=page]", null, ["font-family", "font-size", "color", "font-weight"]],
   ["#boot", null, ["display", "row-gap", "color"]],
   ["#boot .boot-line", null, ["grid-template-columns", "column-gap", "margin-top"]],
+  ["#boot .boot-step", null, ["font-family", "font-size"]],
   ["#boot .boot-step", "::before", ["content", "font-weight", "color", "margin-right"]],
   ["#boot .boot-val", null, ["color"]],
 ];
@@ -749,6 +800,22 @@ await check("?bare: every content.css class computes exactly what it computes on
     if (full[i][j] !== bare[i][j]) out.push(`${sel}${pseudo || ""} ${p}: full ${JSON.stringify(full[i][j])} vs bare ${JSON.stringify(bare[i][j])}`);
   }));
   return out;
+});
+
+await check("?bare: hidden still hides every component — tokens.css is all that is left", hiddenHides);
+// X2: base.css draws a global :focus-visible ring, so on the full page these would pass with the
+// component's own rule deleted. Here nothing but content.css can draw them.
+await check("?bare: a scrollable .code-block takes the --ring focus ring from the keyboard", async () => {
+  await focusByKeyboard("#code-plain");
+  return ring("#code-plain");
+});
+await check("?bare: a .markdown link takes the --ring focus ring from the keyboard", async () => {
+  await focusByKeyboard("#md-article a");
+  return ring("#md-article a");
+});
+await check("?bare: a .seq-list link takes the --ring focus ring from the keyboard", async () => {
+  await focusByKeyboard("#seq li:first-child a");
+  return ring("#seq li:first-child a");
 });
 
 /* ── a phone ────────────────────────────────────────────────────────────────────────────────── */

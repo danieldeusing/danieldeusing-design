@@ -469,8 +469,18 @@ const decode = (png) => {
   }
   return Array.from({ length: w * h }, (_, i) => [out[i * bpp], out[i * bpp + 1], out[i * bpp + 2]]);
 };
-const shot = async (clip) =>
-  decode(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip: { ...clip, scale: 1 } })).data, "base64"));
+// CAPTURE WHAT YOU THINK YOU CAPTURE. A clip is in document coordinates and is taken from the page as
+// laid out now — never `captureBeyondViewport`, which re-lays the page without its scrollbar and moves
+// every clip computed beforehand (WP12 measured a 1.34:1 glyph read as 21:1). So the page must be
+// unscrolled and the clip inside its layout viewport, or the shot is refused.
+const shot = async (clip) => {
+  const view = await evaluate(`({ x: scrollX, y: scrollY, w: document.documentElement.clientWidth, h: document.documentElement.clientHeight })`);
+  if (view.x || view.y || clip.x < 0 || clip.y < 0 || clip.x + clip.width > view.w || clip.y + clip.height > view.h) {
+    throw new Error(`screenshot clip ${JSON.stringify(clip)} is not inside the unscrolled viewport ${JSON.stringify(view)}`);
+  }
+  const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false, clip: { ...clip, scale: 1 } });
+  return decode(Buffer.from(data, "base64"));
+};
 const pixel = async (x, y) => `rgb(${(await shot({ x, y, width: 1, height: 1 }))[0].join(", ")})`;
 
 /* ═══ popup.js — positionPopup() ═══════════════════════════════════════════ */
@@ -1384,19 +1394,48 @@ await evaluate(`mount(\`
 \`); initSelects(); initSearchFields(); null`);
 const boxOf = (selector) => evaluate(`(() => { const b = $(${JSON.stringify(selector)}).getBoundingClientRect();
   return { x: Math.floor(b.left), y: Math.floor(b.top), width: Math.ceil(b.right) - Math.floor(b.left), height: Math.ceil(b.bottom) - Math.floor(b.top) }; })()`);
-// What a glyph paints against what it covers: its host shot with the glyph and without it.
-const glyphPaint = async (selector, pseudo) => {
-  const clip = await boxOf(selector);
+// What a mark paints against what it covers: the same clip shot with the mark and without it. Only
+// the mark's own pixels differ between the two, so a neighbour's ink can never stand in for it, and
+// a clip that holds NO changed pixel is reported as that — never as a contrast.
+const markPaint = async (clip, show, hide) => {
+  await show();
   const drawn = await shot(clip);
-  await evaluate(`document.head.insertAdjacentHTML("beforeend", ${JSON.stringify(`<style id="unglyph">${selector}${pseudo} { visibility: hidden !important; }</style>`)}); null`);
+  await hide();
   const bare = await shot(clip);
-  await evaluate(`document.getElementById("unglyph").remove(); null`);
-  let best = { ratio: 1, ink: null };
-  drawn.forEach((p, i) => { const q = contrast(p, bare[i]); if (q > best.ratio) best = { ratio: q, ink: p.join(",") }; });
+  let best = { ratio: 1, ink: null, changed: 0 };
+  drawn.forEach((p, i) => {
+    const q = contrast(p, bare[i]);
+    if (q > 1.05) best.changed += 1;
+    if (q > best.ratio) best = { ...best, ratio: q, ink: p.join(",") };
+  });
   return best;
 };
-// The text's contrast as PAINTED: the commonest colour in its line box is what it sits on; the pixel
-// furthest from that is the text's own ink.
+const glyphPaint = async (selector, pseudo) => {
+  const hide = `<style id="unglyph">${selector}${pseudo} { visibility: hidden !important; }</style>`;
+  const paint = await markPaint(await boxOf(selector), async () => {},
+    () => evaluate(`document.head.insertAdjacentHTML("beforeend", ${JSON.stringify(hide)}); null`));
+  await evaluate(`document.getElementById("unglyph").remove(); null`);
+  return paint;
+};
+// A FOCUS RING, on and off: its left band, 2-4px outside the control, halfway down. REAL keyboard
+// focus — Tab from the control before it — because a :focus-visible forced through DevTools computes
+// the outline and paints nothing (measured: 0 changed pixels around the chip).
+const ringPaint = async (selector, before) => {
+  const b = await evaluate(`box(${JSON.stringify(selector)})`);
+  const clip = { x: Math.floor(b.left) - 6, y: Math.floor(b.top + b.height / 2) - 2, width: 6, height: 4 };
+  let focused = false;
+  const paint = await markPaint(clip,
+    async () => {
+      await evaluate(`$(${JSON.stringify(before)}).focus(); null`);
+      await press("Tab");
+      focused = await evaluate(`$(${JSON.stringify(selector)}).matches(":focus-visible")`);
+    },
+    () => evaluate("document.activeElement.blur(); null"));
+  return { ...paint, focused };
+};
+// The text's contrast as PAINTED: the commonest colour in its line box is what it sits on (a backplate
+// included); the pixel furthest from that is the text's own ink. Ink is counted, so a clip that caught
+// no glyph cannot pass.
 const textPaint = async (selector) => {
   const clip = await evaluate(`(() => { const e = $(${JSON.stringify(selector)});
     const text = [...e.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
@@ -1407,7 +1446,8 @@ const textPaint = async (selector) => {
   const counts = new Map();
   for (const p of px) counts.set(p.join(","), (counts.get(p.join(",")) || 0) + 1);
   const ground = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
-  return Math.max(...px.map((p) => contrast(p, ground)));
+  const ratios = px.map((p) => contrast(p, ground));
+  return { ratio: Math.max(...ratios), ink: ratios.filter((q) => q >= 1.5).length };
 };
 // A fill, read 3px inside the left edge, halfway down — padding, never text.
 const fillPaint = async (selector) => {
@@ -1430,18 +1470,28 @@ for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   const canvas = (await evaluate(`probe("Canvas")`)).match(/\d+/g).slice(0, 3).map(Number);
   const faint = [];
+  const rings = [];
   const inks = {};
   for (const theme of ["warm", "green", "mono", "paper"]) {
     await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
     for (const [name, selector, pseudo] of GLYPHS) {
       const paint = await glyphPaint(selector, pseudo);
-      if (!(paint.ratio >= 3)) faint.push(`${theme} ${name} ${paint.ratio.toFixed(2)}:1`);
+      if (paint.changed < 3) faint.push(`${theme} ${name}: its clip holds no ink`);
+      else if (!(paint.ratio >= 3)) faint.push(`${theme} ${name} ${paint.ratio.toFixed(2)}:1`);
       if (theme === "warm") inks[name] = paint.ink;
+    }
+    for (const [name, selector, before] of [["pressed chip", "#chip-on", "#chip"], ["current link chip", "#link-on", "#link"]]) {
+      const paint = await ringPaint(selector, before);
+      if (!paint.focused) rings.push(`${theme} ${name}: Tab did not give it keyboard focus`);
+      else if (paint.changed < 3) rings.push(`${theme} ${name}: its clip holds no ring`);
+      else if (!(paint.ratio >= 3)) rings.push(`${theme} ${name} ${paint.ratio.toFixed(2)}:1`);
     }
   }
   await evaluate(`delete document.documentElement.dataset.theme; null`);
   await check(`forced colours (${scheme}): every glyph PAINTS at >= 3:1 on what it covers — ${GLYPHS.length} glyphs x 4 themes, in pixels`,
     () => faint.length === 0, () => faint.slice(0, 6).join("; "));
+  await check(`forced colours (${scheme}): the focus ring of a chip that opts out (pressed, current) paints at >= 3:1 — 4 themes`,
+    () => rings.length === 0, () => rings.slice(0, 6).join("; "));
   await check(`forced colours (${scheme}): a disabled glyph paints differently from an enabled one (GrayText), at full strength`,
     async () => inks["sort arrow, disabled"] !== inks["sort arrow"] && inks["search clear ×, disabled"] !== inks["search clear ×"] &&
       (await evaluate(`cs("#dir-off", "opacity") === "1" && cs("#dir-off", "color") === probe("GrayText")`)),
@@ -1457,7 +1507,8 @@ for (const scheme of ["light", "dark"]) {
     texts.push([name, await textPaint(selector)]);
   }
   await check(`forced colours (${scheme}): text on a redrawn state reads at >= 4.5:1 in pixels (no Canvas backplate)`,
-    () => texts.every(([, q]) => q >= 4.5), () => texts.map(([name, q]) => `${name} ${q.toFixed(2)}:1`).join("; "));
+    () => texts.every(([, t]) => t.ink >= 3 && t.ratio >= 4.5),
+    () => texts.map(([name, t]) => `${name} ${t.ratio.toFixed(2)}:1 (${t.ink} ink px)`).join("; "));
 }
 await send("Emulation.setEmulatedMedia", { features: [] });
 

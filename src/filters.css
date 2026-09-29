@@ -684,6 +684,9 @@
     background: Highlight;
     border-color: Highlight;
   }
+  /* `none` stops forcing the ring too: a focused pressed chip would keep the author's --ring. The
+     ring is drawn 2px out, on Canvas, so it takes the palette's text colour. */
+  .chip:is([aria-pressed="true"], [aria-current="page"]):focus-visible { outline-color: CanvasText; }
 }
 /* The magnifier of a switched-off box is GrayText too: it takes the field's colour. A rule of its
    own, for :has(). */

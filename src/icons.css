@@ -1,0 +1,153 @@
+/*
+ * danieldeusing-design — icons.
+ *
+ * `.ico` is a glyph as an element: a <span> that paints the mask its `data-icon` word names, in
+ * the colour of the text around it, at one of four sizes.
+ *
+ *     <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">
+ *       <span class="ico" data-icon="refresh-cw" aria-hidden="true"></span>refresh
+ *     </button>
+ *
+ * WHY A MASK AND NOT AN <svg>. configr and seedr draw lucide through lucide-react, pagr pasted
+ * <svg> elements, and the system itself had two hand-made masks (the bin and the pencil), so one
+ * glyph was three drawings and a build-free page had no way to get any of them without pasting
+ * path data. The tokens in tokens.css are lucide's own drawings, stroke 2 on a 24-unit box, so a
+ * mask here and a lucide component in a framework app are the same picture. A framework app may
+ * keep its lucide components (a system control sizes an <svg> child by the same --icon-* token);
+ * this class is for build-free pages and for anything that is not a framework component.
+ *
+ * SELF-SUFFICIENT: tokens.css and this file. `.ico` reads --ico (the `data-icon` mapping in
+ * tokens.css), the --icon-* sizes and --tone, and nothing from base.css or components.css, so a
+ * tokens-only surface (netmon, configr's and seedr's apps) can load it on its own.
+ *
+ * DECORATION, BY CONTRACT: every `.ico` carries aria-hidden="true". The glyph repeats what the
+ * label beside it says, or it is a control's only content, and then the CONTROL is named by its
+ * aria-label ("remove poi/vu3" — the target, never "trash icon"). A data-tip on that control says
+ * what the name does not, or is left off: tooltip.js makes the tip the control's description, so a
+ * tip that repeats the name is read out twice. A glyph that means something on its own, with no
+ * label beside it, is `role="img"` with an aria-label instead. A stylesheet cannot set either
+ * attribute; the markup owes both.
+ *
+ * SIZE comes from a token, never from font-size (one text size): 12px `--sm` beside a label, in a
+ * tag or chip, on a trigger; 14px default inside a control; 16px `--lg` standalone beside body
+ * text; 24px `--xl` heading a block (an empty state, a large notice). configr's 8/10/18/20/32px and
+ * seedr's 20/32px move to the nearest step. `vertical-align: -0.125em` sets a glyph in running
+ * text on the x-height rather than on the baseline; in a flex row it does nothing, and the row's
+ * `align-items` centres it.
+ *
+ * COLOUR IS currentColor, so the glyph is its label's colour on every theme and in every state —
+ * a disabled control's glyph dims with its label, a destructive button's is red with its word.
+ * `data-tone` ON THE `.ico` ITSELF paints it in that tone. A tone set on a CONTAINER does not,
+ * although --tone inherits: a notice or a card that takes `data-tone="destructive"` would
+ * otherwise paint the glyph of every button inside it red while the button's label stays
+ * --primary, and a `.state` word inside it would read "ok" beside a red mark. A component that
+ * wants its glyphs in its tone colours its text with the tone, and the glyph follows the text.
+ * (SPEC-part3 I1 wrote `background: var(--tone, currentColor)` on `.ico` itself; this is that
+ * rule scoped to the element that asks for it, for the reason above. feedback.css and controls.css
+ * stop the same inheritance for their own glyphs.)
+ *
+ * COLOUR THE LABEL OR USE data-tone; NEVER `color` OR A `text-*` CLASS ON THE `.ico`. In forced
+ * colours the glyph takes its parent's forced colour only while its own colour is inherited, so a
+ * `.ico` with a colour of its own keeps that author colour: `text-primary` on the glyph vanished
+ * on mono (light palette) and paper (dark), and measured 1.34:1 on green (light) and 2.94:1 on
+ * warm (dark). The same colour on the label, or `data-tone` on the glyph, measured 21:1 on all
+ * eight. Nothing here enforces it, and no `!important` guard should: a component may hand its
+ * glyph a SYSTEM colour in its own forced-colours block (a fold summary's `.ico` gets CanvasText),
+ * and a guard would take that away too.
+ *
+ * AN UNKNOWN WORD, OR NONE, PAINTS A SOLID SQUARE. With no --ico the mask declaration is invalid
+ * at computed-value time, the element has no mask, and its whole box paints in currentColor. That
+ * is left loud on purpose: a missing glyph that painted nothing would leave an icon-only control
+ * as an empty box nobody notices, while a square in place of an icon is reported the first time
+ * anyone sees it. In this repository scripts/check-icons.mjs fails any `data-icon` word that has
+ * no token, before a square can ship. One exception follows from inheritance: a `.ico` with no
+ * word of its own INSIDE an element that has one draws that element's glyph.
+ *
+ * NO RADIUS, NO MOTION. The box is a square mask; nothing here animates (a spinning busy glyph is
+ * the spinner's and the icon button's, and they stop under html.anim-off).
+ *
+ * The glyphs are lucide's, and the path data lives in tokens.css with lucide's licence as a
+ * preserved comment. The notice again, since this file is the icon system's other half:
+ *
+ *   Lucide — ISC License. Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2023 as
+ *   part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2025.
+ *   Permission to use, copy, modify, and/or distribute this software for any purpose with or
+ *   without fee is hereby granted, provided that the above copyright notice and this permission
+ *   notice appear in all copies. THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ *   WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ *   AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
+ *   CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+ *   WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ *   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ *   Feather (the portions of Lucide derived from it) — The MIT License (MIT). Copyright (c)
+ *   2013-2023 Cole Bemis. Permission is hereby granted, free of charge, to any person obtaining a
+ *   copy of this software and associated documentation files (the "Software"), to deal in the
+ *   Software without restriction, including without limitation the rights to use, copy, modify,
+ *   merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+ *   persons to whom the Software is furnished to do so, subject to the following conditions: The
+ *   above copyright notice and this permission notice shall be included in all copies or
+ *   substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ *   ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ *   COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ *   CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+ *   USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+.ico {
+  display: inline-block;
+  flex: none;
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  vertical-align: -0.125em;
+  background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+.ico[data-tone] { background: var(--tone, currentColor); }
+
+.ico--sm { inline-size: var(--icon-sm); block-size: var(--icon-sm); }
+.ico--lg { inline-size: var(--icon-lg); block-size: var(--icon-lg); }
+.ico--xl { inline-size: var(--icon-xl); block-size: var(--icon-xl); }
+
+/* A mask paints a BACKGROUND, and a browser leaves backgrounds off the page by default, so on
+   paper every glyph would vanish and a row of icon buttons would print as empty boxes. */
+@media print {
+  .ico {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* FORCED COLOURS (Windows High Contrast) replace every author background with the system Canvas,
+   and a mask glyph IS a background: measured in Chromium, every .ico painted nothing at all, which
+   leaves an icon-only link or control as an empty box. `preserve-parent-color` gives the glyph the
+   colour its parent was FORCED to — CanvasText in text, LinkText in a link, ButtonText in a button,
+   GrayText when disabled, HighlightText on a selection a component redrew — and leaves the
+   background it paints with alone, so the glyph is its label's colour in this mode too.
+   Not `forced-color-adjust: none` on its own: forcing happens at used-value time and inheritance
+   carries computed values, so the glyph kept the AUTHOR's colour — warm's brown measured 1.78:1 on
+   a dark palette, and green's and mono's glyphs vanished on a light one. An engine without
+   `preserve-parent-color` gets `none` and CanvasText: visible on Canvas, but not on a selection a
+   component redrew in Highlight (1.86:1 on a light palette, 2.41:1 on a dark one), so a component
+   that puts a `.ico` on Highlight gives it HighlightText in its own `@supports not` branch. The
+   tone goes as every colour does in this mode, which is why a tone is never the only thing that
+   says what a glyph means. tokens.css gives every component's `[data-icon]::before` glyph the
+   same default, in the same two branches. */
+@media (forced-colors: active) {
+  @supports (forced-color-adjust: preserve-parent-color) {
+    .ico,
+    .ico[data-tone] {
+      forced-color-adjust: preserve-parent-color;
+      background: currentColor;
+    }
+  }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .ico,
+    .ico[data-tone] {
+      forced-color-adjust: none;
+      background: CanvasText;
+    }
+  }
+}

@@ -376,6 +376,56 @@ const shownWhenHidden = await evaluate(`${JSON.stringify(HIDE)}.filter((sel) => 
 await check(`X3 — \`hidden\` hides each of ${HIDE.length} components whatever display it sets (tokens.css's rule, WP1)`,
   () => shownWhenHidden.length === 0, JSON.stringify(shownWhenHidden));
 
+/* ── D2 · the table engine's header, count and placeholder ─────────────────────────────────────────
+   On the ?bare page on purpose: data.css carries every .tbl-* rule since 0.60.0, so a tokens-only
+   surface draws the same header. The glyphs were TEXT (↕ ▲ ▼ ⌕ ×) at .55 — 2.22–2.60:1 against the
+   page — and are now the icon set's masks at full strength. */
+const showD2 = (v) => () => JSON.stringify(v);
+const masks = () => evaluate(`(() => {
+  const maskOf = (name) => { const p = document.createElement("i"); p.style.maskImage = "var(--ico-" + name + ")"; document.body.append(p);
+    const v = getComputedStyle(p).maskImage; p.remove(); return v; };
+  const at = (sel, pseudo) => { const el = document.querySelector(sel); if (!el) throw new Error("no " + sel); return getComputedStyle(el, pseudo); };
+  const glyph = (sel, pseudo, name) => { const c = at(sel, pseudo); return c.maskImage === maskOf(name) && c.width === "12px" && c.height === "12px"; };
+  return {
+    rest: glyph('#engine-table th[data-col="repo"] .tbl-sort', "::before", "arrow-up-down"),
+    down: glyph('#engine-table th[data-col="findings"] .tbl-sort', "::before", "arrow-down"),
+    up: glyph('#engine-empty th[data-col="repo"] .tbl-sort', "::before", "arrow-up"),
+    funnel: glyph('#engine-table th[data-col="agent"] .tbl-filter > summary', "::before", "filter"),
+    x: document.querySelector("#engine-table .tbl-badge") ? glyph("#engine-table .tbl-badge", "::after", "x") : "no badge",
+    text: [...document.querySelectorAll("#engine-table .tbl-sort, #engine-table .tbl-filter > summary")].every((c) => c.textContent === ""),
+    restColour: at('#engine-table th[data-col="repo"] .tbl-sort').color === M.tok("var(--muted-foreground)") && at('#engine-table th[data-col="repo"] .tbl-sort').opacity === "1",
+    sortedColour: at('#engine-table th[data-col="findings"] .tbl-sort').color === M.tok("var(--primary)"),
+  };
+})()`);
+const countBox = () => evaluate(`(() => { const c = document.querySelector("#engine-table").closest(".tablewrap").nextElementSibling;
+  return c && c.matches(".result-count[data-table-count]") ? { text: c.textContent, h: c.getBoundingClientRect().height, mt: getComputedStyle(c).marginTop } : null; })()`);
+const rest = await masks();
+const quietCount = await countBox();
+await check("D2 — the header glyphs are the icon set's masks at --icon-sm: ↕ at rest, ↓ on the descending column, ↑ on an ascending one, the funnel — and no glyph text",
+  () => rest.rest && rest.down && rest.up && rest.funnel && rest.text, showD2(rest));
+await check("...at rest in --muted-foreground at FULL strength (the .55 measured 2.22–2.60:1), --primary on the column that is sorting",
+  () => rest.restColour && rest.sortedColour, showD2(rest));
+await check("D2 — the count is silent at rest and takes no room: an empty status region, 0px high",
+  () => quietCount && quietCount.text === "" && quietCount.h === 0 && quietCount.mt === "0px", showD2(quietCount));
+// Tolerant on purpose: on an engine without pick rows this must reach the checks below and FAIL
+// them, not abort the suite.
+await evaluate(`document.querySelector('#engine-table th[data-col="state"] .dropdown-item[data-pick="ok"]')?.click(); null`);
+await sleep(500);
+const filtered = await masks();
+const saidCount = await countBox();
+await check("D2 — a pick filter marks its column: the funnel turns --primary, and the badge naming the value carries the x mask",
+  async () => filtered.x === true && (await css('#engine-table th[data-col="state"] .tbl-filter > summary', "color")) === (await tok("var(--primary)")) &&
+    (await css('#engine-table th[data-col="state"] .tbl-filter > summary', "content", "::after")) !== '"•"',
+  () => evaluate(`JSON.stringify([document.querySelector("#engine-table .tbl-badge")?.outerHTML, getComputedStyle(document.querySelector('#engine-table th[data-col="state"] .tbl-filter > summary')).color])`));
+await check("...and the count, settled, says what is withheld in the table's unit",
+  () => saidCount && saidCount.text === "3 of 5 runs — 2 hidden by the filters" && saidCount.h > 0, showD2(saidCount));
+await check("D2 — a table with no rows says so in a placeholder row across every column, start-aligned in S1's inline look",
+  () => evaluate(`(() => { const p = document.querySelector("#engine-empty tr[data-table-placeholder]"); if (!p) return false;
+    const line = p.querySelector("p"), cell = p.cells[0];
+    return p.cells.length === 1 && cell.colSpan === 2 && line.textContent === "no runs yet" &&
+      Math.abs(line.getBoundingClientRect().left - cell.getBoundingClientRect().left) < 16; })()`),
+  () => evaluate(`JSON.stringify((() => { const p = document.querySelector("#engine-empty tr[data-table-placeholder]"); return p ? [p.outerHTML, p.querySelector("p").getBoundingClientRect().left, p.cells[0].getBoundingClientRect().left] : null; })())`));
+
 /* ── X1 · forced colours: two palettes, PAINTED pixels ───────────────────────────────────────────
    Under a forced palette the browser rewrites colours at PAINT time — it forces them, drops shadows,
    and paints a Canvas backplate behind text — so a computed style says what was asked for, not what
@@ -440,6 +490,8 @@ const shown = (v) => () => JSON.stringify(v, (k, n) => r2(n));
    WHERE: an 8px vertical slide of #dense-table and of #page-tabs passed it. */
 const owns = async (clip, target, kind) => {
   const sel = JSON.stringify(target);
+  // A target that is not on the page fails the proof; it must not abort the suite.
+  if (!(await evaluate(`!!document.querySelector(${sel})`))) return { target, kind, missing: true, ok: false };
   await shoot(clip);
   await evaluate(`window.SHOT_A = window.SHOT; document.querySelector(${sel}).style.visibility = "hidden"; null`);
   await shoot(clip);
@@ -542,9 +594,17 @@ for (const scheme of ["light", "dark"]) {
     ["#tab-syntax", "#tab-syntax", "text"], ["#stale-tabs", "#tab-stale", "fill"],
     ["#dense-table", "#row-pinned > td:first-child", "mark"], ["#dense-table", "#row-disabled > td:nth-child(3)", "text"],
     ["#trend", "#trend text", "mark"], ["#trend", "#trend circle.chart-dot:nth-of-type(3)", "mark"], ["#trend", "#trend .chart-dot--hollow", "mark"],
+    ["#engine-table thead", '#engine-table th[data-col="repo"] .tbl-sort', "mark"],
+    ["#engine-table thead", '#engine-table th[data-col="agent"] .tbl-filter > summary', "mark"],
+    ["#engine-table thead", "#engine-table .tbl-badge", "mark"],
   ]) owned.push(await owns(clip, target, kind));
   await check(`X1 ${scheme} — every clip below reads its own element: hiding ONLY it changes ≥3 pixels by ≥1.5:1, where it is (±1px)`,
     () => owned.every((o) => o.ok), shown(owned.filter((o) => !o.ok).length ? owned.filter((o) => !o.ok) : owned.map((o) => [o.target, o.n, o.carried])));
+  // The table engine's glyphs are masks, which a forced palette would erase: each must be PAINTED, in
+  // its own place, at 3:1 or more against what it sits on — read from the same two-shot diff.
+  const glyphs = owned.filter((o) => o.target.startsWith("#engine-table"));
+  await check(`X1 ${scheme} — the table engine's sort, filter and badge glyphs are painted, each where it is: ${glyphs.map((o) => r2(o.carried)).join(", ")}:1`,
+    () => glyphs.length === 3 && glyphs.every((o) => o.ok && o.carried >= 3), shown(glyphs));
 
   await shoot("#page-tabs");
   const tabs = await measure(`
@@ -678,6 +738,8 @@ const PAIRS = [
   ["chart line, dot, bar: --primary (graphic)", "var(--primary)", [], 3],
   ...["green", "red", "blue"].map((hue) => [`chart series and key swatch: --cat-${hue} (graphic)`, `var(--cat-${hue})`, [], 3]),
   ["chart marker and floor tick: --muted-foreground (graphic)", "var(--muted-foreground)", [], 3],
+  ["table engine glyph at rest (sort, funnel): --muted-foreground at full strength (graphic)", "var(--muted-foreground)", [], 3],
+  ["table engine glyph in force, filtered header and badge: --primary (graphic)", "var(--primary)", [], 3],
   ["chart axis: --border (decoration; the values are also in a table)", "var(--border)", [], 0],
   ["chart grid: --border 55% (decoration)", "color-mix(in srgb, var(--border) 55%, transparent)", [], 0],
   ["tab row rule: --border 80% (decoration)", "color-mix(in srgb, var(--border) 80%, transparent)", [], 0],

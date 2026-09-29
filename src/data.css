@@ -223,6 +223,113 @@ table.dense--form :where(th, td) { vertical-align: middle; }
   }
 }
 
+/* ── THE TABLE ENGINE — search, filter, sort, count, two nothings ─────────────────────────── (D2)
+   Paired with runtime/tabletools.js (initTableTools). The estate grew four generations of table
+   filtering before it existed — cockpit's `tr.act-filters`, cockpit's older `tr.filters`, the family
+   contacts table's bare box row — each spending a whole row of vertical space on a capability idle on
+   most visits. Two controls in the <th> cost nothing when unused and sit on the column they act on.
+   The filter is a `details.dropdown`, the SYSTEM's dropdown, so one-open, click-away and Escape come
+   from initDropdowns(); a pick column's panel is an M1 menu of menuitemradios, and M0 draws its ✓.
+   The search above the table is WP6's `.search-field` in a `<search class="filter-bar">`, and the
+   count is WP6's `.result-count`: nothing of either is redeclared here.
+
+   THE GLYPHS ARE MASKS (0.60.0). The runtime wrote ↕ ▲ ▼ ⌕ × as text, at .55 opacity: 2.22–2.60:1
+   against --background, under the 3:1 a control's only glyph needs, and in the font's own shapes
+   beside an icon set that draws the same ideas. Now each control is an empty button or summary with
+   an aria-label, and the glyph is the icon set's mask in currentColor at --icon-sm: --muted-foreground
+   at full strength at rest, --primary when it is doing something. The arrows follow `aria-sort` on
+   the header, which is already the fact they draw. The active filter's "•" is gone: the funnel turns
+   primary, the header underlines, and the badge names the value — three marks were one too many. */
+.tbl-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-inline-start: 0.4rem;
+  vertical-align: baseline;
+}
+.tbl-sort,
+.tbl-filter > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 0.1rem;
+  font: inherit;
+  line-height: 1;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.tbl-sort::before,
+.tbl-filter > summary::before,
+.tbl-badge::after {
+  content: "";
+  flex: none;
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+  background: currentColor;
+  -webkit-mask: var(--tbl-glyph) center / contain no-repeat;
+  mask: var(--tbl-glyph) center / contain no-repeat;
+}
+.tbl-sort::before { --tbl-glyph: var(--ico-arrow-up-down); }
+th[aria-sort="ascending"] .tbl-sort::before { --tbl-glyph: var(--ico-arrow-up); }
+th[aria-sort="descending"] .tbl-sort::before { --tbl-glyph: var(--ico-arrow-down); }
+.tbl-filter > summary::before { --tbl-glyph: var(--ico-filter); }
+.tbl-badge::after { --tbl-glyph: var(--ico-x); }
+.tbl-sort:hover,
+.tbl-filter > summary:hover,
+th[aria-sort]:not([aria-sort="none"]) .tbl-sort,
+.tbl-filter.is-on > summary { color: var(--primary); }
+.tbl-sort:focus-visible,
+.tbl-filter > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+.tbl-filter-panel { padding: 0.4rem; max-block-size: 60vh; overflow-y: auto; }
+.tbl-filter > ul.dropdown-panel { max-block-size: 60vh; overflow-y: auto; }
+
+/* WHAT IS IN FORCE GOES ON THE COLUMN, not in a bar above the table (Daniel, 2026-08-19). A separate
+   strip is a second place to look, costs a line on every filtered table, and prints "relationship =
+   family" a long way from the relationship column. The badge is a BUTTON that clears the column's
+   filter, so the way back is attached to the thing it undoes. It sits on the label's line: a narrow
+   column would otherwise wrap it under the label and make that one header taller than the rest. */
+th.is-filtered {
+  color: var(--primary);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+th:has(.tbl-tools) { white-space: nowrap; }
+.tbl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  margin-inline-start: 0.4rem;
+  max-inline-size: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+  font-size: var(--fs-base);
+  line-height: 1.2;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--background));
+  border: 1px solid var(--primary);
+  padding: 0 0.35em;
+  cursor: pointer;
+}
+.tbl-badge:hover { background: color-mix(in srgb, var(--primary) 22%, var(--background)); }
+.tbl-badge:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+/* THE TWO NOTHINGS. The placeholder row spans the table and holds S1's inline empty state: "no runs
+   yet" when there are none, "no runs match these filters." and its reset when a filter withheld
+   them. It is not data, so it takes no row hover and no stripe. */
+tr[data-table-placeholder] > td { text-align: start; background: none; }
+/* Silent at rest: the count's region is always there (a region that appears as it speaks is not
+   heard), and empty it takes no room. */
+.result-count[data-table-count]:empty { margin: 0; }
+
+@media (pointer: coarse) {
+  .tbl-sort,
+  .tbl-filter > summary { min-inline-size: 44px; min-block-size: 44px; }
+}
+
 /* ── KEY/VALUE — a table of pairs and a list of pairs look the same ──────────────────────── (D3)
    The label is --primary 700 (cockpit, danieldeusing.de and seedr's studio agree) and the VALUE is
    --foreground, the text a reader came for. danieldeusing.de and studio muted the value, which made
@@ -655,6 +762,24 @@ section.doc.tab-panel { margin-top: 1.35rem; }
   table.stackable.dense tr[data-pin] > :first-child { border-inline-start: 0; }
 }
 
+/* The table engine's glyphs are masks, and a mask is a background, which a forced palette erases:
+   each takes its parent's FORCED colour instead (X1, as icons.css does it), and an engine without
+   `preserve-parent-color` paints CanvasText. The filtered header's underline is a shadow, which a
+   forced palette drops, so it becomes a real border there; the badge still names the value. */
+@media (forced-colors: active) {
+  @supports (forced-color-adjust: preserve-parent-color) {
+    .tbl-sort::before,
+    .tbl-filter > summary::before,
+    .tbl-badge::after { forced-color-adjust: preserve-parent-color; background: currentColor; }
+  }
+  @supports not (forced-color-adjust: preserve-parent-color) {
+    .tbl-sort::before,
+    .tbl-filter > summary::before,
+    .tbl-badge::after { forced-color-adjust: none; background: CanvasText; }
+  }
+  th.is-filtered { box-shadow: none; border-block-end: 2px solid CanvasText; }
+}
+
 /* ── PRINT ─────────────────────────────────────────────────────────────────────────────────────
    A printout is read without the controls, so it carries EVERY tab panel and no tab row — the same
    reason every <details> opens for print. That has to beat tokens.css's `[hidden]` rule, which is
@@ -663,6 +788,9 @@ section.doc.tab-panel { margin-top: 1.35rem; }
    chart and the key's swatches are printed exactly: a chart printed without its colours is a set of
    axes. */
 @media print {
+  .tbl-tools { display: none !important; }
+  .tbl-badge { border-color: currentColor; background: none; }
+  .tbl-badge::after { content: none; }
   .tabs { display: none !important; }
   [role="tabpanel"][hidden]:not([hidden="until-found"]) { display: block !important; }
   table.dense tr[data-pin] > :first-child {

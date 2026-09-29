@@ -472,11 +472,13 @@ PASS  the skill pins the current release</div></div>
     <!-- The context menu. The page clones it per open: it is not in the document until then. -->
     <template id="ctx-menu">
       <ul class="select-panel context-menu" role="menu">
-        <li class="dropdown-label" role="none" aria-hidden="true">file</li>
-        <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="open">open in editor</button></li>
-        <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="reveal" data-tip="opens the folder that holds it · (Finder on macOS)">reveal in finder</button></li>
-        <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="copy">copy path</button></li>
-        <li role="none"><button type="button" class="dropdown-item" role="menuitem" aria-disabled="true" data-action="history">no history — this file is not in a repository yet, so there is nothing to compare it with</button></li>
+        <li role="none"><ul role="group" aria-labelledby="ctx-file">
+          <li role="none"><span class="dropdown-label" id="ctx-file">file</span></li>
+          <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="open">open in editor</button></li>
+          <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="reveal" data-tip="opens the folder that holds it · (Finder on macOS)">reveal in finder</button></li>
+          <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="copy">copy path</button></li>
+          <li role="none"><button type="button" class="dropdown-item" role="menuitem" aria-disabled="true" data-action="history">no history — this file is not in a repository yet, so there is nothing to compare it with</button></li>
+        </ul></li>
         <li class="dropdown-sep" role="separator"></li>
         <li role="none"><button type="button" class="dropdown-item dropdown-item--danger" role="menuitem" data-action="delete">delete</button></li>
       </ul>

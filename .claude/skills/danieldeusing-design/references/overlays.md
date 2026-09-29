@@ -299,9 +299,11 @@ from inside it and appended to `<body>` renders UNDER it — correctly placed, a
 
 ```html
 <ul class="select-panel context-menu" role="menu" aria-label="actions for src/app.ts">
-  <li class="dropdown-label" role="none" aria-hidden="true">file</li>
-  <li role="none"><button type="button" class="dropdown-item" role="menuitem">open in editor</button></li>
-  <li role="none"><button type="button" class="dropdown-item" role="menuitem" aria-disabled="true">no history — this file is not in a repository yet</button></li>
+  <li role="none"><ul role="group" aria-labelledby="ctx-file">
+    <li role="none"><span class="dropdown-label" id="ctx-file">file</span></li>
+    <li role="none"><button type="button" class="dropdown-item" role="menuitem">open in editor</button></li>
+    <li role="none"><button type="button" class="dropdown-item" role="menuitem" aria-disabled="true">no history — this file is not in a repository yet</button></li>
+  </ul></li>
   <li class="dropdown-sep" role="separator"></li>
   <li role="none"><button type="button" class="dropdown-item dropdown-item--danger" role="menuitem">delete</button></li>
 </ul>
@@ -373,8 +375,12 @@ document.addEventListener("pointerdown", (e) => {            // a press outside
   walk so a screen reader hears it, does nothing when activated, and wraps instead of truncating the
   half that explains. It is `--muted-foreground` (4.84:1 at worst), meant to be read, and `GrayText`
   under forced colours.
-- A danger row is `.dropdown-item--danger`; a section heading is `.dropdown-label`; a rule is
-  `.dropdown-sep` with `role="separator"`.
+- A danger row is `.dropdown-item--danger`; a rule is `.dropdown-sep` with `role="separator"`.
+- **A labelled section is a group**: its `.dropdown-label` and the items under it sit in a
+  `role="group"` named by that label (`aria-labelledby`), as a `details.dropdown` menu's do
+  (`components.md`). The label is read, not hidden: a reader hears "file, group" and then its items,
+  and the arrow keys walk from one group into the next. A context menu is the page's markup, so the
+  page writes the group; give the label an id of its own.
 - Shift+F10 and the Menu key make it reachable from the keyboard. An action a reader needs often
   still deserves a visible control as well: nothing on a row says "right-click me".
 

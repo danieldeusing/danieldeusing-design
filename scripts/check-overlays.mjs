@@ -1095,6 +1095,16 @@ try {
       top: r.top, rowBottom: row.b, left: r.left, rowLeft: row.x, w: r.width, position: s.position, z: s.zIndex }; })()`);
   await check("Shift+F10 on a focused row opens the menu on <body>, a named role=menu",
     !!opened && opened.parent && opened.role === "menu" && opened.label === "actions for src/app.ts", opened);
+  // The WP2 group ruling: a labelled section is a role="group" named by its label (aria-labelledby),
+  // not a label hidden from the tree. Asked of the accessibility tree, not of the attributes alone.
+  // (Chromium names it from the rendered text, so the label's uppercase transform reads "FILE".)
+  const ctxGroup = await evaluate(`(() => { const m = __o.menu(), g = m && m.querySelector('[role="group"]'); if (!g) return null;
+    const label = document.getElementById(g.getAttribute("aria-labelledby") || "");
+    return { label: label?.textContent, hidden: label?.closest("[aria-hidden]") !== null, labelIn: !!label && g.contains(label),
+      items: [...g.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent.trim().slice(0, 12)) }; })()`);
+  const ctxGroupAx = ctxGroup ? await axOf(".context-menu [role=\"group\"]") : null;
+  await check("its labelled section is a role=group named \"file\" by its visible label, holding the section's four items",
+    !!ctxGroup && ctxGroup.label === "file" && !ctxGroup.hidden && ctxGroup.labelIn && ctxGroup.items.length === 4 && ctxGroupAx?.name.toLowerCase() === "file", { ctxGroup, ctxGroupAx });
   await check("...under the row, focus on its first item", !!opened && Math.abs(opened.top - opened.rowBottom - 4) < 1.5 && Math.abs(opened.left - opened.rowLeft) < 1.5 && opened.active === "open in editor", opened);
   await check("...fixed, above the page's own popups (z 60), and 12-20rem wide whoever placed it",
     !!opened && opened.position === "fixed" && opened.z === "60" && opened.w >= 192 && opened.w <= 322, opened);

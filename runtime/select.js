@@ -75,6 +75,8 @@ const TYPEAHEAD_MS = 700;
 const SEARCH_THRESHOLD = 20;
 
 const enhanced = new WeakMap();
+// The search boxes this runtime built — their input/change are stopped (installGlobals), no one else's.
+const ownBoxes = new WeakSet();
 let counter = 0;
 let openInstance = null;
 let documentObserver = null;
@@ -434,6 +436,7 @@ function buildPanel(instance) {
     const field = document.createElement("div");
     field.className = "search-field";
     const input = document.createElement("input");
+    ownBoxes.add(input);
     input.type = "search";
     input.setAttribute("role", "combobox");
     input.setAttribute("aria-expanded", "true");
@@ -852,11 +855,14 @@ function installGlobals() {
   // <select> announces the pick; nothing else should. Stopped on the WINDOW, in capture: stopped on
   // the box, they still reached every capturing listener on the document. So the box's own filtering
   // runs here too — once stopped, the event reaches no listener on the box.
-  // ponytail: a page's own window-capture listener registered before initSelects() still hears them.
+  // Only the boxes buildPanel() made, known by identity: a page or framework that renders the same
+  // classes (filters.md's contract) owns its box, and its events are its own.
+  // ponytail: stopImmediatePropagation on the window, in capture, is as early as a script can stand;
+  // a window-capture listener the page registered BEFORE initSelects() still hears them.
   for (const type of ["input", "change"]) {
     addEventListener(type, (event) => {
-      if (!event.target.closest?.(".select-panel .select-search")) return;
-      event.stopPropagation();
+      if (!ownBoxes.has(event.target)) return;
+      event.stopImmediatePropagation();
       if (type === "input" && openInstance && event.target === openInstance.search) filterRows(openInstance);
     }, true);
   }

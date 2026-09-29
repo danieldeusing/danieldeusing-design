@@ -652,9 +652,9 @@
    (WCAG 1.4.11), and dimming is what says "not now" in every palette. A pressed chip
    carries TEXT, so it opts out whole and names both halves of its pair, HighlightText on Highlight:
    left to the browser, text gets a Canvas backplate, and on a plain <button> that turned
-   HighlightText-on-Highlight into HighlightText-on-Canvas, 1.05:1 (measured). In the chip's own box
-   Chromium 151 kept the word readable anyway (9.94:1 without the opt-out); the opt-out does not rely
-   on that. */
+   HighlightText-on-Highlight into HighlightText-on-Canvas, 1.05:1 (measured). The chip does the same
+   without the opt-out: an earlier reading of 9.94:1 there was the check measuring UNDER the
+   backplate, not what the word sits on. */
 @media (forced-colors: active) {
   .search-field::before,
   .search-clear::before,

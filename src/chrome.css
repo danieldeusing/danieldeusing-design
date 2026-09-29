@@ -955,6 +955,11 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
      keeps the band and lets the path truncate into whatever the two ends leave (seedr). */
   header.bar:has(.nav-burger) .bar-center { display: none; }
   .bar-center { flex: 1 1 auto; padding-inline: 0; }
+  /* …and the two ends go back to their own size. Equal shares only exist to centre the band, and
+     on a phone there is either no band or a band that should take the room: squeezed to half the
+     bar, the docs wordmark broke at its hyphen ("danieldeusing-" / "docs", a 68px bar instead of
+     45). danieldeusing.de had the equal shares from 48.0625rem up only, for the same reason. */
+  .bar-side { flex: 0 1 auto; }
   .site-nav.open { display: block; }
   /* The desktop rail is a desktop idea: a fixed 17rem column would eat a phone.
      Below the breakpoint the burger owns navigation — the rail un-fixes and becomes a

@@ -225,6 +225,11 @@ await load("nobanner", { width: 375, height: 812 });
 await check("below 48rem the centre band gives way to the burger", () => page(`T.cs(".bar-center", "display") === "none"`));
 await check("…and the burger's menu takes normal wrapping back from the right slot",
   () => page(`T.cs(".site-nav", "whiteSpace") === "normal"`));
+await page(`document.querySelector(".brand .glow").textContent = "danieldeusing-docs"; null`);
+await frames(2);
+const phoneBar = await page(`({ flex: T.cs(".bar-side", "flex"), brand: T.rect(".brand").height, bar: T.rect("header.bar").height })`);
+await check("…where the two ends take their own size again, so a hyphenated wordmark stays on one line",
+  () => phoneBar.flex === "0 1 auto" && phoneBar.brand < 30, phoneBar);
 await load("nobanner");
 const app = await page(`({ h: T.rect("#app-bar").height, pos: T.cs("#app-bar", "position"), pl: T.cs("#app-bar", "paddingLeft"),
   anim: T.cs(".cursor-block--static", "animationName"), status: T.cs(".bar-status", "color"), muted: T.colour("var(--muted-foreground)") })`);

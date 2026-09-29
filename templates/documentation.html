@@ -124,14 +124,16 @@
          a wide display that column was the difference between content that fills the page and
          content stranded beside a strip of nothing. Its two real jobs — how long is this, and
          where am I — moved to the MINIMAP in the left gutter (src/components.css,
-         initMinimap()), which does them in 2rem and is fixed, so it costs the column nothing. */
-      .content { min-width: 0; }
+         initMinimap()), which does them in 2rem and is fixed, so it costs the column nothing.
+         (`.content` itself is the system's since 0.60.0 — chrome.css — so nothing is declared here.) */
       h1.title { font-size: var(--fs-2xl, 1.7rem); font-weight: 700; margin: 0.4rem 0 0.5rem; }
       .lede { color: var(--muted-foreground); } /* full width — no max-width cap */
 
       /* design-conformance: spacing BETWEEN doc sections on this page template, not a restyle
          of the shared .doc — the system sets its own margin for the standalone case. */
-      section.doc { margin-top: 2.5rem; scroll-margin-top: 4rem; }
+      /* No scroll-margin-top: since 0.60.0 the viewport's scroll padding (chrome.css) lands every
+         anchor a line below the sticky header, and a margin here would ADD to it. */
+      section.doc { margin-top: 2.5rem; }
       .body { margin-top: 0.85rem; }
       .body > * + * { margin-top: 0.75rem; }
 
@@ -172,11 +174,14 @@
   <body>
     <a href="#top" class="skip-link">skip to content</a>
     <header class="bar">
-      <!-- top-left: ALWAYS danieldeusing-docs -->
-      <a href="#top" class="brand">
-        <span class="glow">danieldeusing-docs</span>
-        <span class="cursor-block" aria-hidden="true"></span>
-      </a>
+      <!-- top-left: ALWAYS danieldeusing-docs. The slots are wrappers, never the link. -->
+      <div class="bar-side">
+        <a href="#top" class="brand">
+          <span class="glow">danieldeusing-docs</span>
+          <span class="cursor-block" aria-hidden="true"></span>
+        </a>
+      </div>
+      <div class="bar-side bar-right">
       <!-- top-right: navigation. Desktop = the sticky `ls -l` RAIL; mobile = the burger
            toggling a full-width menu with the rail and the footer folded into it (chrome
            kit: src/chrome.css + runtime initBurgerNav / initLsNav). Never a dropdown: a
@@ -220,13 +225,25 @@
           <li><a class="dropdown-item ls-row ls-row--sub" href="{{NAV_2_HREF}}" aria-current="page"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">{{NAV_2_LABEL}}</span></a></li>
         </ul>
       </div>
-      <!-- The footer is display:none below 48rem, so its controls fold in here — a phone
-           reader must still be able to switch theme. -->
+      <!-- The footer folds away below 48rem on a page that has this block, so its controls fold
+           in here — a phone reader must still be able to switch theme. Keep it in step with the
+           footer: the same links, the same menus as accordions, the same toggle. -->
       <div class="mobile-footer">
         <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+        <!-- OPTIONAL: a language accordion, for a doc published in more than one language. Each
+             row links to this doc in that language; the current one is aria-current="true".
+        <details class="mobile-theme">
+          <summary><span class="visually-hidden">language </span><span class="dd-flag dd-flag-en" aria-hidden="true"></span><span>english</span><span class="mf-chev" aria-hidden="true">▾</span></summary>
+          <div class="mf-panel">
+            <a class="dropdown-item" href="{{DOC_DE_HREF}}" hreflang="de" lang="de" data-lang-value="de"><span class="dd-flag dd-flag-de" aria-hidden="true"></span>deutsch</a>
+            <a class="dropdown-item" href="{{DOC_EN_HREF}}" hreflang="en" lang="en" data-lang-value="en" aria-current="true"><span class="dd-flag dd-flag-en" aria-hidden="true"></span>english</a>
+          </div>
+        </details>
+        -->
         <details class="mobile-theme">
           <summary>
-            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
+            <span class="visually-hidden">theme </span>
+            <span class="dd-dot" aria-hidden="true"></span>
             <span data-theme-label>warm</span>
             <span class="mf-chev" aria-hidden="true">▾</span>
           </summary>
@@ -237,11 +254,12 @@
             <button type="button" class="dropdown-item" data-theme-value="paper">paper</button>
           </div>
         </details>
-        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations" data-tip="Toggle animations">
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
           <span data-anim-box aria-hidden="true">[x]</span>
           <span>anim</span>
         </button>
       </div></nav>
+      </div>
     </header>
 
     <main class="wrap" id="top">
@@ -303,23 +321,37 @@ flowchart TD
       <!-- bottom-left: [folder] + the doc title -->
       <span class="status-left"><span class="glow">[{{FOLDER}}]</span> {{DOC_TITLE}}</span>
       <!-- bottom-right: danieldeusing.de link + theme (page settings) dropdown -->
-      <nav class="status-right">
+      <nav class="status-right" aria-label="page settings">
         <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
         <span class="sep" aria-hidden="true"></span>
+        <!-- OPTIONAL: a language menu, for a doc published in more than one language.
         <details class="dropdown">
-          <summary aria-label="theme">
-            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="currentColor"></circle></svg>
+          <summary><span class="visually-hidden">language </span><span class="dd-flag dd-flag-en" aria-hidden="true"></span><span>en</span><span aria-hidden="true">▾</span></summary>
+          <ul class="dropdown-panel">
+            <li><a class="dropdown-item" href="{{DOC_DE_HREF}}" hreflang="de" lang="de" data-lang-value="de"><span class="dd-flag dd-flag-de" aria-hidden="true"></span>deutsch</a></li>
+            <li><a class="dropdown-item" href="{{DOC_EN_HREF}}" hreflang="en" lang="en" data-lang-value="en" aria-current="true"><span class="dd-flag dd-flag-en" aria-hidden="true"></span>english</a></li>
+          </ul>
+        </details>
+        <span class="sep" aria-hidden="true"></span>
+        -->
+        <!-- The summary reads "theme warm" — the hidden word names the menu, the label says the
+             value; an aria-label here would replace the value with "theme". -->
+        <details class="dropdown">
+          <summary>
+            <span class="visually-hidden">theme </span>
+            <span class="dd-dot" aria-hidden="true"></span>
             <span data-theme-label>warm</span>
             <span aria-hidden="true">▾</span>
           </summary>
-          <ul class="dropdown-panel" role="list">
+          <ul class="dropdown-panel">
             <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
             <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
             <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
             <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
           </ul>
         </details>
-        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations" data-tip="Toggle animations">
+        <!-- No data-tip: a tip that repeats the accessible name is announced twice. -->
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
           <span data-anim-box aria-hidden="true">[x]</span>
           <span>anim</span>
         </button>
@@ -335,8 +367,9 @@ flowchart TD
       initTerminal();
       initAnimToggle();
       initBurgerNav();
-      // The rail's show/hide, and it measures the real header/footer heights into
-      // --ls-nav-top / --ls-nav-bottom so the rail sits BETWEEN the chrome, not under it.
+      // The rail's show/hide, and it measures the real chrome on every page, rail or not:
+      // --ls-nav-top / --ls-nav-bottom put the rail (and the minimap) BETWEEN the header and
+      // the footer, --sticky-top parks anything that sticks under the header.
       initLsNav();
       // Every table gets a .tablewrap parent, so a table wider than its column scrolls
       // itself instead of pushing the whole page sideways. Already-wrapped ones are skipped.

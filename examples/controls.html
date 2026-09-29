@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en" data-theme="warm">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>controls — danieldeusing-design</title>
+
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" />
+    <!-- components.css only for the .btn-terminal buttons that .form-actions and the confirmations
+         compose; nothing in controls.css reads it. -->
+    <link rel="stylesheet" href="../src/components.css" />
+    <link rel="stylesheet" href="../src/controls.css" />
+
+    <!--
+      ═══ STAND-INS — DELETE THIS WHOLE BLOCK AT INTEGRATION (WP13) ═══════════════════════════════
+      This branch was cut from 0.59.0, before the packages that declare these landed. Each rule
+      below is a copy of what SPEC.md gives another package, here ONLY so this page renders:
+        · WP1 (tokens.css): --control-h, --control-edge, --icon-*, [data-tone] -> --tone (F1, F7),
+          @keyframes dd-spin and html.anim-off stopping transitions (F6)
+        · the icon set (WP4, tokens.css): --ico-* masks (lucide), [data-icon] -> --ico (I1)
+        · WP2: .btn-terminal--danger (C1)          · WP6: .filter-bar, .filter-bar-spacer (M7)
+      Tokens and attribute mappings are wrapped in :where(), so the day tokens.css declares the
+      real ones they win on specificity and this block goes inert. The three CLASS stand-ins are
+      ordinary rules and would shadow the real ones: they must go.
+      The [hidden] rule (X3) is not here: the check measures it on a page of its own, from
+      tokens.css and controls.css alone, and stands it in there only while tokens.css lacks it.
+      Nothing here is ever copied into src/.
+    -->
+    <style id="stand-ins">
+      :where(:root) {
+        --control-h: 1.75rem;
+        --control-edge: color-mix(in srgb, var(--foreground) 60%, transparent);
+        --icon-sm: 0.75rem; --icon-size: 0.875rem; --icon-lg: 1rem; --icon-xl: 1.5rem;
+
+        --ico-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+        --ico-minus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+        --ico-x: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E");
+        --ico-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/%3E%3C/svg%3E");
+        --ico-star-filled: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/%3E%3C/svg%3E");
+        --ico-loader-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-6.219-8.56'/%3E%3C/svg%3E");
+        --ico-refresh-cw: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/%3E%3Cpath d='M8 16H3v5'/%3E%3C/svg%3E");
+        --ico-chevron-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E");
+        --ico-chevron-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
+        --ico-chevrons-up-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+        --ico-history: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3Cpath d='M12 7v5l4 2'/%3E%3C/svg%3E");
+        --ico-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8'/%3E%3Cpath d='M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3C/svg%3E");
+        --ico-folder: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
+        --ico-image-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 5h6'/%3E%3Cpath d='M19 2v6'/%3E%3Cpath d='M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3C/svg%3E");
+        --ico-file-code: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5'/%3E%3Cpath d='M10 12.5 8 15l2 2.5'/%3E%3Cpath d='m14 12.5 2 2.5-2 2.5'/%3E%3C/svg%3E");
+        --ico-eye: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+        --ico-file: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5'/%3E%3C/svg%3E");
+        --ico-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 7-7 7 7'/%3E%3Cpath d='M12 19V5'/%3E%3C/svg%3E");
+        --ico-triangle-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+        --ico-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E");
+        --ico-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E");
+      }
+      :where([data-tone="primary"]) { --tone: var(--primary); }
+      :where([data-tone="success"]) { --tone: var(--success); }
+      :where([data-tone="warning"]) { --tone: var(--warning); }
+      :where([data-tone="destructive"]) { --tone: var(--destructive); }
+      :where([data-tone="info"]) { --tone: var(--info); }
+      :where([data-tone="pending"]) { --tone: var(--pending); }
+      :where([data-tone="muted"]) { --tone: var(--muted-foreground); }
+
+      :where([data-icon="check"]) { --ico: var(--ico-check); }
+      :where([data-icon="minus"]) { --ico: var(--ico-minus); }
+      :where([data-icon="x"]) { --ico: var(--ico-x); }
+      :where([data-icon="star"]) { --ico: var(--ico-star); }
+      :where([data-icon="loader-circle"]) { --ico: var(--ico-loader-circle); }
+      :where([data-icon="refresh-cw"]) { --ico: var(--ico-refresh-cw); }
+      :where([data-icon="chevron-left"]) { --ico: var(--ico-chevron-left); }
+      :where([data-icon="chevron-right"]) { --ico: var(--ico-chevron-right); }
+      :where([data-icon="chevrons-up-down"]) { --ico: var(--ico-chevrons-up-down); }
+      :where([data-icon="history"]) { --ico: var(--ico-history); }
+      :where([data-icon="home"]) { --ico: var(--ico-home); }
+      :where([data-icon="folder"]) { --ico: var(--ico-folder); }
+      :where([data-icon="image-plus"]) { --ico: var(--ico-image-plus); }
+      :where([data-icon="file-code"]) { --ico: var(--ico-file-code); }
+      :where([data-icon="eye"]) { --ico: var(--ico-eye); }
+      :where([data-icon="file"]) { --ico: var(--ico-file); }
+      :where([data-icon="arrow-up"]) { --ico: var(--ico-arrow-up); }
+      :where([data-icon="triangle-alert"]) { --ico: var(--ico-triangle-alert); }
+      :where([data-icon="info"]) { --ico: var(--ico-info); }
+      :where([data-icon="clock"]) { --ico: var(--ico-clock); }
+
+      @keyframes dd-spin { to { transform: rotate(1turn); } }
+      html.anim-off *, html.anim-off *::before, html.anim-off *::after { animation: none !important; transition: none !important; }
+
+      /* WP2 (C1) and WP6 (M7) — ordinary class rules: DELETE at integration. */
+      .btn-terminal--danger { color: var(--destructive); border-color: color-mix(in srgb, var(--destructive) 60%, var(--border)); }
+      .btn-terminal--danger:hover { border-color: currentColor; background: color-mix(in srgb, currentColor 10%, transparent); }
+      .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+      .filter-bar-spacer { flex: 1; }
+      .filter-bar > .sep { inline-size: 1px; block-size: 1.5rem; background: var(--border); }
+    </style>
+
+    <style>
+      /* Page layout only — none of this is design-system vocabulary. */
+      body { margin: 0; }
+      .demo { max-width: var(--content-w); margin-inline: auto; padding: 1.5rem var(--content-pad) 4rem; }
+      .demo-head { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+      .demo-head h1 { margin: 0; font-size: var(--fs-xl); color: var(--primary); }
+      .demo-head p { margin: 0; flex-basis: 100%; color: var(--muted-foreground); }
+      .demo section { margin-top: var(--space-section); }
+      .demo h2 { margin: 0 0 0.25rem; font-size: var(--fs-lg); }
+      .demo h3 { margin: 1.25rem 0 0.5rem; font-size: var(--fs-base); color: var(--muted-foreground); font-weight: 400; }
+      .demo-lede { margin: 0 0 0.75rem; color: var(--muted-foreground); max-width: 72ch; }
+      .demo-states { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: flex-end; }
+      .demo-state { display: grid; justify-items: start; gap: 0.35rem; }
+      .demo-state > small { font-size: var(--fs-base); color: var(--muted-foreground); }
+      .demo-box { padding: 1rem; background: var(--card); border: 1px solid var(--border); max-width: 44rem; }
+      .demo-narrow { max-width: 26rem; }
+      .demo-list { list-style: none; margin: 0; padding: 0; max-width: 32rem; }
+      .demo-list > li { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
+      .demo-list > li > :first-child { flex: 1; }
+      .demo-stack { display: grid; gap: 0.5rem; justify-items: start; }
+      .demo-fieldset { margin: 0; padding: 0.5rem 0.75rem 0.75rem; border: 1px solid var(--border); display: grid; gap: 0.25rem; justify-items: start; }
+      .demo-fieldset > legend { padding: 0 0.25rem; color: var(--muted-foreground); }
+      .demo-matrix { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1rem; }
+      .demo-surface { padding: 1rem; border: 1px solid var(--border); }
+      .demo-surface > small { display: block; margin-bottom: 0.75rem; color: var(--muted-foreground); }
+      .demo-probes { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+      .demo-probes > .choice-card, .demo-probes > .dropzone { flex: 1 1 12rem; }
+      .demo-drawer { max-width: 44rem; border: 1px solid var(--border); }
+      .demo-drawer-bar { display: flex; align-items: center; gap: 0.75rem; padding: 0.25rem 0.75rem; background: var(--card); border-bottom: 1px solid var(--border); }
+      .demo-drawer-bar > strong { margin-right: auto; }
+      .demo-drawer pre { margin: 0; padding: 0.5rem 0.75rem; color: var(--muted-foreground); font: inherit; }
+      table.demo-table { max-width: 32rem; }
+    </style>
+  </head>
+
+  <body>
+    <main class="demo">
+      <header class="demo-head">
+        <h1>controls</h1>
+        <div class="segmented" role="group" aria-label="theme" data-demo-theme>
+          <button type="button" aria-pressed="true">warm</button>
+          <button type="button" aria-pressed="false">green</button>
+          <button type="button" aria-pressed="false">mono</button>
+          <button type="button" aria-pressed="false">paper</button>
+        </div>
+        <button type="button" role="switch" aria-checked="true" class="switch" data-demo-anim>animations</button>
+        <p>
+          src/controls.css — every element and every state. Hover and keyboard focus are live: point at
+          a control or Tab through the page. The theme picker above is itself a <code>.segmented</code>, and
+          the animation toggle a <code>.switch</code>.
+        </p>
+      </header>
+
+      <!-- ── C2 ───────────────────────────────────────────────────────────── -->
+      <section id="c2" aria-labelledby="c2-h">
+        <h2 id="c2-h">.btn-icon</h2>
+        <p class="demo-lede">One 28px box at the control height, --sm at 24px, --bare without an edge. The glyph is a mask
+          from <code>data-icon</code>; the name comes from <code>aria-label</code>, and a <code>data-tip</code> only says
+          what the name does not. Pressed is solid; hover is a wash.</p>
+        <div class="demo-states">
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh catalog" data-tip="last refreshed 2 minutes ago" data-t="rest"></button><small>rest</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="star" aria-pressed="false" aria-label="favourite seedr" data-t="star"></button><small>toggle off</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="star" aria-pressed="true" aria-label="favourite configr" data-t="star-on"></button><small>pressed (filled)</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="star" aria-pressed="true" aria-label="favourite built-in/registry" disabled data-t="star-on-disabled"></button><small>pressed, disabled</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="chevrons-up-down" aria-expanded="true" aria-controls="c2" aria-label="collapse all sections" data-t="expanded"></button><small>expanded</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh catalog" disabled data-t="disabled"></button><small>disabled</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh catalog" aria-disabled="true" data-tip="refresh runs every 5 minutes" data-t="aria-disabled"></button><small>aria-disabled</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh catalog" aria-busy="true" aria-disabled="true" data-t="busy"></button><small>busy</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh catalog" data-demo-busy data-t="busy-live"></button><small>press: busy 1.5s</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon btn-icon--sm" data-icon="x" aria-label="dismiss" data-t="sm"></button><small>--sm</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-left" aria-label="back" data-t="bare"></button><small>--bare</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon btn-icon--bare" data-icon="history" aria-pressed="true" aria-label="history" data-t="bare-on"></button><small>--bare pressed</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon btn-icon--bare" data-tone="destructive" data-icon="x" aria-label="discard the draft" data-t="bare-tone"></button><small>--bare + tone</small></div>
+          <div class="demo-state" data-tone="warning"><button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="x" aria-label="dismiss" data-t="in-tone"></button><small>untoned, inside data-tone</small></div>
+          <div class="demo-state"><button type="button" class="btn-icon" aria-label="open file" data-t="svg"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button><small>svg child</small></div>
+        </div>
+        <h3>data-tone, at rest and pressed</h3>
+        <div class="demo-states">
+          <div class="demo-state"><span class="btn-row"><button type="button" class="btn-icon" data-tone="success" data-icon="check" aria-label="mark passed"></button><button type="button" class="btn-icon" data-tone="success" data-icon="check" aria-pressed="true" aria-label="mark passed"></button></span><small>success</small></div>
+          <div class="demo-state"><span class="btn-row"><button type="button" class="btn-icon" data-tone="warning" data-icon="triangle-alert" aria-label="flag"></button><button type="button" class="btn-icon" data-tone="warning" data-icon="triangle-alert" aria-pressed="true" aria-label="flag"></button></span><small>warning</small></div>
+          <div class="demo-state"><span class="btn-row"><button type="button" class="btn-icon" data-tone="destructive" data-icon="x" aria-label="remove shot-1.png" data-t="destructive"></button><button type="button" class="btn-icon" data-tone="destructive" data-icon="x" aria-pressed="true" aria-label="remove shot-1.png"></button></span><small>destructive</small></div>
+          <div class="demo-state"><span class="btn-row"><button type="button" class="btn-icon" data-tone="info" data-icon="info" aria-label="details"></button><button type="button" class="btn-icon" data-tone="info" data-icon="info" aria-pressed="true" aria-label="details"></button></span><small>info</small></div>
+          <div class="demo-state"><span class="btn-row"><button type="button" class="btn-icon" data-tone="pending" data-icon="clock" aria-label="snooze"></button><button type="button" class="btn-icon" data-tone="pending" data-icon="clock" aria-pressed="true" aria-label="snooze"></button></span><small>pending</small></div>
+          <div class="demo-state"><span class="btn-row"><button type="button" class="btn-icon" data-tone="muted" data-icon="minus" aria-label="collapse"></button><button type="button" class="btn-icon" data-tone="muted" data-icon="minus" aria-pressed="true" aria-label="collapse"></button></span><small>muted</small></div>
+        </div>
+      </section>
+
+      <!-- ── C3 ───────────────────────────────────────────────────────────── -->
+      <section id="c3" aria-labelledby="c3-h">
+        <h2 id="c3-h">.btn-group</h2>
+        <p class="demo-lede">Neighbours share one edge; the hovered, pressed or open child is lifted above its siblings and
+          the focused one above that. Each child keeps its own tab stop.</p>
+        <div class="demo-states">
+          <div class="demo-state">
+            <div class="btn-group" role="group" aria-label="sort" data-t="group-sort">
+              <button type="button" class="btn-icon" data-icon="arrow-up" aria-label="sort descending"></button>
+              <select aria-label="sort by"><option>name</option><option>updated</option><option>installs</option></select>
+            </div><small>direction + enhanced select</small>
+          </div>
+          <div class="demo-state">
+            <div class="btn-group" role="group" aria-label="history" data-t="group-icons">
+              <button type="button" class="btn-icon" data-icon="chevron-left" aria-label="back"></button>
+              <button type="button" class="btn-icon" data-icon="chevron-right" aria-label="forward"></button>
+              <button type="button" class="btn-icon" data-icon="star" aria-pressed="true" aria-label="favourite seedr"></button>
+            </div><small>icon buttons, one pressed</small>
+          </div>
+          <div class="demo-state">
+            <div class="btn-group" role="group" aria-label="pager">
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">prev</button>
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">next</button>
+            </div><small>ghost compact buttons</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── C4 ───────────────────────────────────────────────────────────── -->
+      <section id="c4" aria-labelledby="c4-h">
+        <h2 id="c4-h">.form-actions and .btn-row</h2>
+        <p class="demo-lede">Status at the start, then cancel, then the one primary action last. A long status truncates
+          instead of pushing the buttons onto a line of their own.</p>
+        <div class="demo-box">
+          <div class="field-row"><label class="lbl" for="demo-name">display name</label><input id="demo-name" type="text" value="Poirot (POI)" /></div>
+          <div class="form-actions" data-t="actions">
+            <p class="form-status" role="status">saved 12s ago</p>
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">cancel</button>
+            <button type="button" class="btn-terminal btn-terminal--compact">save</button>
+          </div>
+        </div>
+        <h3>--ruled, with a status too long for the row</h3>
+        <div class="demo-box demo-narrow">
+          <div class="form-actions form-actions--ruled" data-t="actions-ruled">
+            <p class="form-status" role="status" data-t="status-long">three fields changed since the last save, and the model list was re-read</p>
+            <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">cancel</button>
+            <button type="button" class="btn-terminal btn-terminal--compact">save</button>
+          </div>
+        </div>
+        <h3>.btn-row — buttons that are not a form's footer</h3>
+        <div class="btn-row" data-t="btn-row">
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">dry run</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">re-read models</button>
+          <button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh agents"></button>
+        </div>
+      </section>
+
+      <!-- ── C5 ───────────────────────────────────────────────────────────── -->
+      <section id="c5" aria-labelledby="c5-h">
+        <h2 id="c5-h">.switch</h2>
+        <p class="demo-lede">Replaces the boolean <code>.filter-ctl</code> toggles. The state is the knob's position as well as
+          the fill; the name is the visible text.</p>
+        <div class="demo-states">
+          <div class="demo-state"><button type="button" role="switch" aria-checked="false" class="switch" data-t="switch-off">follow</button><small>off</small></div>
+          <div class="demo-state"><button type="button" role="switch" aria-checked="true" class="switch" data-t="switch-on">follow</button><small>on</small></div>
+          <div class="demo-state"><button type="button" role="switch" aria-checked="false" class="switch" disabled data-t="switch-disabled">follow</button><small>disabled off</small></div>
+          <div class="demo-state"><button type="button" role="switch" aria-checked="true" class="switch" disabled data-t="switch-disabled-on">follow</button><small>disabled on</small></div>
+        </div>
+
+        <h3>in a filter bar — cockpit's review activity, where <code>hide handled</code> was a <code>[x]</code> toggle</h3>
+        <search class="filter-bar" aria-label="review activity" data-t="filter-bar">
+          <input type="search" aria-label="search review activity" placeholder="search…" autocomplete="off" spellcheck="false" />
+          <span class="filter-bar-spacer"></span>
+          <button type="button" role="switch" aria-checked="true" class="switch" data-t="switch-bar">hide handled</button>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">select all pending</button>
+          <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">clear selection</button>
+          <button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="refresh review activity"></button>
+        </search>
+
+        <h3>in a drawer's bar — the log drawer's <code>follow</code></h3>
+        <div class="demo-drawer">
+          <div class="demo-drawer-bar">
+            <strong>dd-infra-cockpit · logs</strong>
+            <button type="button" role="switch" aria-checked="true" class="switch">follow</button>
+            <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="x" aria-label="close the log drawer"></button>
+          </div>
+          <pre>2026-09-28 19:40:02 GET /api/automation 200 4ms
+2026-09-28 19:40:07 GET /api/agents 200 11ms</pre>
+        </div>
+      </section>
+
+      <!-- ── C6 ───────────────────────────────────────────────────────────── -->
+      <section id="c6" aria-labelledby="c6-h">
+        <h2 id="c6-h">checkbox and radio</h2>
+        <p class="demo-lede">Drawn, not native: square box on <code>--control-edge</code>, a <code>--primary</code> fill with the
+          check cut out. The radio is the one circle.</p>
+        <div class="demo-states">
+          <div class="demo-state"><label class="check"><input type="checkbox" name="agents" value="claude" data-t="cb-off" /> claude</label><small>unchecked</small></div>
+          <div class="demo-state"><label class="check"><input type="checkbox" name="agents" value="codex" checked data-t="cb-on" /> codex <span class="check-meta">· new</span></label><small>checked + .check-meta</small></div>
+          <div class="demo-state"><label class="check"><input type="checkbox" data-demo-indeterminate data-t="cb-mixed" /> all agents</label><small>indeterminate</small></div>
+          <div class="demo-state"><label class="check" data-t="check-disabled"><input type="checkbox" disabled data-t="cb-disabled" /> copilot</label><small>disabled</small></div>
+          <div class="demo-state"><label class="check"><input type="checkbox" checked disabled data-t="cb-disabled-on" /> gemini</label><small>disabled checked</small></div>
+        </div>
+        <h3>a group, and a radio set</h3>
+        <div class="demo-states">
+          <fieldset class="demo-fieldset">
+            <legend>comments</legend>
+            <label class="check"><input type="checkbox" checked /> agent info</label>
+            <label class="check"><input type="checkbox" /> ELI5</label>
+          </fieldset>
+          <fieldset class="demo-fieldset">
+            <legend>review type</legend>
+            <label class="check"><input type="radio" name="rt" value="public" checked data-t="radio-on" /> public <span class="check-meta">— posts on the PR</span></label>
+            <label class="check"><input type="radio" name="rt" value="silent" data-t="radio-off" /> silent</label>
+            <label class="check"><input type="radio" name="rt" value="draft" disabled /> draft <span class="check-meta">— needs a newer forge</span></label>
+          </fieldset>
+          <fieldset class="demo-fieldset">
+            <legend>nothing answered yet</legend>
+            <label class="check"><input type="radio" name="unanswered" data-t="radio-unanswered" /> yes</label>
+            <label class="check"><input type="radio" name="unanswered" /> no</label>
+          </fieldset>
+        </div>
+        <h3>bare, in a table cell</h3>
+        <table class="demo-table">
+          <thead><tr><th><input type="checkbox" aria-label="select every repository" data-demo-indeterminate /></th><th>repository</th><th>agents</th></tr></thead>
+          <tbody>
+            <tr><td><input type="checkbox" checked aria-label="select poi/vu3" /></td><td>poi/vu3</td><td>3</td></tr>
+            <tr><td><input type="checkbox" aria-label="select danieldeusing/pagr" /></td><td>danieldeusing/pagr</td><td>2</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ── C10 ──────────────────────────────────────────────────────────── -->
+      <section id="c10" aria-labelledby="c10-h">
+        <h2 id="c10-h">.segmented</h2>
+        <p class="demo-lede">One value of a few, chosen in place. Exactly one <code>aria-pressed="true"</code>; the group is
+          labelled. An unavailable segment is disabled and keeps its <code>data-tip</code>.</p>
+        <div class="demo-states">
+          <div class="demo-state">
+            <div class="segmented" role="group" aria-label="preview mode" data-t="seg-text">
+              <button type="button" aria-pressed="true">formatted</button>
+              <button type="button" aria-pressed="false">raw</button>
+              <button type="button" aria-pressed="false" disabled data-tip="no diff: this file is new">diff</button>
+            </div><small>text, one unavailable</small>
+          </div>
+          <div class="demo-state">
+            <div class="segmented" role="group" aria-label="preview as" data-t="seg-icons">
+              <button type="button" aria-pressed="false" data-icon="file-code" aria-label="source"></button>
+              <button type="button" aria-pressed="true" data-icon="eye" aria-label="rendered"></button>
+              <button type="button" aria-pressed="false" data-icon="file" aria-label="plain text"></button>
+            </div><small>icon segments (square)</small>
+          </div>
+          <div class="demo-state">
+            <div class="segmented" role="group" aria-label="range">
+              <button type="button" aria-pressed="false">1h</button>
+              <button type="button" aria-pressed="true">24h</button>
+              <button type="button" aria-pressed="false">7d</button>
+              <button type="button" aria-pressed="false">30d</button>
+            </div><small>netmon's range</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── C11 ──────────────────────────────────────────────────────────── -->
+      <section id="c11" aria-labelledby="c11-h">
+        <h2 id="c11-h">.choice-card</h2>
+        <p class="demo-lede">An option that needs a sentence. Pressed is the tone's edge, a 12% fill over
+          <code>--card</code>, and the description in <code>--foreground</code>.</p>
+        <div class="choice-grid" role="group" aria-label="install scope" data-t="choice-grid">
+          <button type="button" class="choice-card" aria-pressed="true" data-icon="home" data-t="choice-on"><span class="choice-title">user</span><span class="choice-desc">~/.claude, every project on this machine</span></button>
+          <button type="button" class="choice-card" aria-pressed="false" data-icon="folder" data-t="choice-off"><span class="choice-title">project</span><span class="choice-desc">.claude/ in this repository, shared with the team</span></button>
+          <button type="button" class="choice-card" aria-pressed="false" data-icon="file" disabled data-tip="this folder is not a git repository" data-t="choice-disabled"><span class="choice-title">local</span><span class="choice-desc">this checkout only, never committed</span></button>
+        </div>
+        <h3>with data-tone, and without a glyph</h3>
+        <div class="choice-grid" role="group" aria-label="on a conflict">
+          <button type="button" class="choice-card" aria-pressed="false"><span class="choice-title">keep mine</span><span class="choice-desc">the local file stays as it is</span></button>
+          <button type="button" class="choice-card" aria-pressed="true" data-tone="warning" data-icon="triangle-alert" data-t="choice-warning"><span class="choice-title">take theirs</span><span class="choice-desc">overwrites 3 local edits</span></button>
+        </div>
+        <h3>inside a toned container, the card keeps its own tone</h3>
+        <div class="choice-grid" role="group" aria-label="publish to" data-tone="destructive" data-t="choice-in-tone">
+          <button type="button" class="choice-card" aria-pressed="true" data-icon="folder" data-t="choice-in-tone-on"><span class="choice-title">this repository</span><span class="choice-desc">only danieldeusing/pagr</span></button>
+        </div>
+      </section>
+
+      <!-- ── C12 ──────────────────────────────────────────────────────────── -->
+      <section id="c12" aria-labelledby="c12-h">
+        <h2 id="c12-h">.dropzone and .thumb-grid</h2>
+        <p class="demo-lede">A label around a real file input: Tab reaches it, Space opens the picker. Hover and drag light
+          the zone; the page sets <code>data-dragging</code>. Choose or drop images to fill the grid below it. The third
+          shot's remove is disabled, and stays dimmed when its thumbnail reveals it.</p>
+        <div class="demo-stack">
+          <label class="dropzone" data-icon="image-plus" style="inline-size: min(44rem, 100%);" data-t="dropzone" data-demo-drop>
+            <input type="file" accept="image/*" multiple data-t="dropzone-input" />
+            drop screenshots or choose files
+            <span class="dropzone-note">max 5 MB each · png, jpg, webp</span>
+          </label>
+          <ul class="thumb-grid" style="inline-size: min(44rem, 100%);" data-demo-thumbs data-t="thumbs">
+            <li class="thumb"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 90'%3E%3Crect width='160' height='90' fill='%23020604'/%3E%3Crect x='10' y='10' width='80' height='5' fill='%2333ff66'/%3E%3Crect x='10' y='22' width='120' height='4' fill='%234fdd7d'/%3E%3Crect x='10' y='31' width='100' height='4' fill='%234fdd7d'/%3E%3Crect x='10' y='40' width='110' height='4' fill='%233da45e'/%3E%3C/svg%3E" /><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove shot-1.png" data-t="thumb-remove"></button></li>
+            <li class="thumb"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 90'%3E%3Crect width='160' height='90' fill='%23f5efe2'/%3E%3Crect x='10' y='10' width='70' height='5' fill='%238a4516'/%3E%3Crect x='10' y='22' width='130' height='4' fill='%2343352a'/%3E%3Crect x='10' y='31' width='90' height='4' fill='%2371614e'/%3E%3C/svg%3E" /><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove shot-2.png"></button></li>
+            <li class="thumb"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 90'%3E%3Crect width='160' height='90' fill='%23fafafa'/%3E%3Crect x='10' y='10' width='60' height='5' fill='%23000'/%3E%3Crect x='10' y='22' width='120' height='4' fill='%231f1f1f'/%3E%3Crect x='10' y='31' width='60' height='4' fill='%23595959'/%3E%3C/svg%3E" /><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove shot-3.png" disabled data-t="thumb-remove-disabled"></button></li>
+          </ul>
+        </div>
+        <h3>data-dragging, and disabled</h3>
+        <div class="demo-states">
+          <label class="dropzone" data-icon="image-plus" style="inline-size: 20rem;" data-dragging data-t="dropzone-dragging">
+            <input type="file" accept="image/*" multiple />
+            drop screenshots or choose files
+          </label>
+          <label class="dropzone" data-icon="image-plus" style="inline-size: 20rem;" data-t="dropzone-disabled">
+            <input type="file" accept="image/*" disabled />
+            5 of 5 screenshots attached
+          </label>
+        </div>
+      </section>
+
+      <!-- ── C13 ──────────────────────────────────────────────────────────── -->
+      <section id="c13" aria-labelledby="c13-h">
+        <h2 id="c13-h">.reveal</h2>
+        <p class="demo-lede">Actions show on hover and on focus, always on a touch screen, and are never taken out of the tab
+          order. Tab into the list to see the first row's actions appear. A pressed toggle is never hidden:
+          pagr's star is on, so it stays.</p>
+        <ul class="demo-list">
+          <li class="reveal-host" data-t="reveal-host"><span>poi/vu3</span><span class="reveal btn-row" data-t="reveal"><button type="button" class="btn-icon btn-icon--sm" data-icon="star" aria-pressed="false" aria-label="favourite poi/vu3" data-t="reveal-btn"></button><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove poi/vu3"></button></span></li>
+          <li class="reveal-host" data-t="reveal-host-pressed"><span>danieldeusing/pagr</span><span class="reveal btn-row"><button type="button" class="btn-icon btn-icon--sm" data-icon="star" aria-pressed="true" aria-label="favourite danieldeusing/pagr" data-t="reveal-pressed"></button><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove danieldeusing/pagr" data-t="reveal-pressed-remove"></button></span></li>
+          <li class="reveal-host"><span>danieldeusing/seedr</span><span class="reveal btn-row"><button type="button" class="btn-icon btn-icon--sm" data-icon="star" aria-pressed="false" aria-label="favourite danieldeusing/seedr"></button><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove danieldeusing/seedr"></button></span></li>
+          <li class="reveal-host" data-t="reveal-host-disabled"><span>built-in/registry <span class="check-meta">· built in, cannot be removed</span></span><button type="button" class="btn-icon btn-icon--sm reveal" data-tone="destructive" data-icon="x" aria-label="remove built-in/registry" disabled data-t="reveal-disabled"></button></li>
+        </ul>
+      </section>
+
+      <!-- ── C14 ──────────────────────────────────────────────────────────── -->
+      <section id="c14" aria-labelledby="c14-h">
+        <h2 id="c14-h">.confirm-inline</h2>
+        <p class="demo-lede">The first press arms, the second decides. Focus moves to the confirming button when armed and
+          back to the bin when disarmed; changing the row disarms it.</p>
+        <ul class="demo-list">
+          <li data-demo-confirm-row><span>poi/vu3 <span class="check-meta">· 3 agents</span></span><span data-demo-confirm-slot><button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove poi/vu3" data-demo-arm="poi/vu3" data-t="confirm-rest"></button></span></li>
+          <li data-demo-confirm-row><span>danieldeusing/pagr <span class="check-meta">· publishes on push</span></span><span data-demo-confirm-slot><button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove danieldeusing/pagr" data-demo-arm="danieldeusing/pagr" data-demo-note="deploys danieldeusing.de"></button></span></li>
+          <li><span>danieldeusing/design <span class="check-meta">· static: armed</span></span>
+            <span class="confirm-inline" role="group" aria-label="confirm publish danieldeusing/design" data-t="confirm-armed"><button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--danger btn-terminal--compact">publish</button><button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">keep</button><span class="confirm-inline-note" data-t="confirm-note">commits on main</span></span></li>
+          <li><span>poi/columbus <span class="check-meta">· static: refused</span></span><span data-tip="it has an execution run in flight"><button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove poi/columbus" disabled></button></span></li>
+        </ul>
+        <p class="form-status" role="status" data-demo-confirm-status></p>
+      </section>
+
+      <!-- ── C15 ──────────────────────────────────────────────────────────── -->
+      <section id="c15" aria-labelledby="c15-h">
+        <h2 id="c15-h">.confirm-code</h2>
+        <p class="demo-lede">Type the code back. The confirming button stays disabled until it matches; the status line is a
+          polite live region whose tone the page sets.</p>
+        <div class="demo-states">
+          <div class="demo-box" style="inline-size: 22rem;">
+            <div class="confirm-code" data-t="confirm-code">
+              <p class="confirm-code-value" role="img" aria-label="code 4 8 1 7" data-t="code-value">4817</p>
+              <label>type the code <input class="confirm-code-input" inputmode="numeric" autocomplete="off" spellcheck="false" data-demo-code="4817" data-t="code-input" /></label>
+              <p class="confirm-code-status" role="status" data-t="code-status"></p>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">cancel</button>
+              <button type="button" class="btn-terminal btn-terminal--compact" disabled data-demo-code-go data-t="code-go">approve</button>
+            </div>
+          </div>
+          <div class="demo-box" style="inline-size: 22rem;">
+            <div class="confirm-code">
+              <p class="confirm-code-value" role="img" aria-label="code 9 0 3 6">9036</p>
+              <label>type the code <input class="confirm-code-input" inputmode="numeric" autocomplete="off" spellcheck="false" value="9063" /></label>
+              <p class="confirm-code-status" role="status" data-tone="warning" data-t="code-status-bad">that is not the code shown above</p>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">cancel</button>
+              <button type="button" class="btn-terminal btn-terminal--compact" disabled>approve</button>
+            </div>
+          </div>
+          <div class="demo-box" style="inline-size: 22rem;">
+            <div class="confirm-code">
+              <p class="confirm-code-value" role="img" aria-label="code 5 5 2 0">5520</p>
+              <label>type the code <input class="confirm-code-input" inputmode="numeric" autocomplete="off" spellcheck="false" disabled data-t="code-input-disabled" /></label>
+              <p class="confirm-code-status" role="status">this code expired: ask for a new one</p>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">close</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── contrast matrix ──────────────────────────────────────────────── -->
+      <section id="matrix" aria-labelledby="matrix-h">
+        <h2 id="matrix-h">on every surface</h2>
+        <p class="demo-lede">The same states on <code>--background</code>, <code>--card</code> and <code>--muted</code>.
+          <code>scripts/check-controls.mjs</code> measures every pairing here, on all four themes.</p>
+        <div class="demo-matrix">
+          <div class="demo-surface" data-surface="background" style="background: var(--background)"><small>--background</small></div>
+          <div class="demo-surface" data-surface="card" style="background: var(--card)"><small>--card</small></div>
+          <div class="demo-surface" data-surface="muted" style="background: var(--muted)"><small>--muted</small></div>
+        </div>
+        <template id="probes">
+          <div class="demo-probes">
+            <div class="segmented" role="group" aria-label="probe"><button type="button" aria-pressed="false" data-probe="seg-rest">raw</button><button type="button" aria-pressed="true" data-probe="seg-pressed">formatted</button></div>
+            <button type="button" role="switch" aria-checked="false" class="switch" data-probe="switch-off">off</button>
+            <button type="button" role="switch" aria-checked="true" class="switch" data-probe="switch-on">on</button>
+            <label class="check" data-probe="check"><input type="checkbox" aria-label="probe" data-probe="cb-off" /> box <span class="check-meta" data-probe="check-meta">· meta</span></label>
+            <input type="checkbox" checked aria-label="probe" data-probe="cb-on" />
+            <input type="radio" checked aria-label="probe" data-probe="radio-on" />
+            <button type="button" class="btn-icon" data-icon="refresh-cw" aria-label="probe" data-probe="icon-rest"></button>
+            <button type="button" class="btn-icon" data-icon="refresh-cw" aria-expanded="true" aria-label="probe" data-probe="icon-expanded"></button>
+            <button type="button" class="btn-icon" data-icon="refresh-cw" aria-pressed="true" aria-label="probe" data-probe="icon-pressed"></button>
+            <button type="button" class="btn-icon btn-icon--bare" data-icon="history" aria-label="probe" data-probe="icon-bare"></button>
+            <button type="button" class="btn-icon btn-icon--bare" data-icon="history" aria-expanded="true" aria-label="probe" data-probe="icon-bare-expanded"></button>
+            <button type="button" class="btn-icon btn-icon--bare" data-icon="history" aria-pressed="true" aria-label="probe" data-probe="icon-bare-pressed"></button>
+            <button type="button" class="btn-icon" data-tone="success" data-icon="check" aria-label="probe" data-probe="tone-success"></button>
+            <button type="button" class="btn-icon" data-tone="success" data-icon="check" aria-pressed="true" aria-label="probe" data-probe="tone-success-pressed"></button>
+            <button type="button" class="btn-icon" data-tone="warning" data-icon="triangle-alert" aria-label="probe" data-probe="tone-warning"></button>
+            <button type="button" class="btn-icon" data-tone="warning" data-icon="triangle-alert" aria-pressed="true" aria-label="probe" data-probe="tone-warning-pressed"></button>
+            <button type="button" class="btn-icon" data-tone="destructive" data-icon="x" aria-label="probe" data-probe="tone-destructive"></button>
+            <button type="button" class="btn-icon" data-tone="destructive" data-icon="x" aria-pressed="true" aria-label="probe" data-probe="tone-destructive-pressed"></button>
+            <button type="button" class="btn-icon" data-tone="info" data-icon="info" aria-label="probe" data-probe="tone-info"></button>
+            <button type="button" class="btn-icon" data-tone="info" data-icon="info" aria-pressed="true" aria-label="probe" data-probe="tone-info-pressed"></button>
+            <button type="button" class="btn-icon" data-tone="pending" data-icon="clock" aria-label="probe" data-probe="tone-pending"></button>
+            <button type="button" class="btn-icon" data-tone="pending" data-icon="clock" aria-pressed="true" aria-label="probe" data-probe="tone-pending-pressed"></button>
+            <button type="button" class="btn-icon" data-tone="muted" data-icon="minus" aria-label="probe" data-probe="tone-muted"></button>
+            <button type="button" class="btn-icon" data-tone="muted" data-icon="minus" aria-pressed="true" aria-label="probe" data-probe="tone-muted-pressed"></button>
+            <span class="confirm-inline-note" data-probe="confirm-note">commits on main</span>
+            <p class="confirm-code-value" data-probe="code-value">4817</p>
+            <p class="confirm-code-status" data-tone="warning" data-probe="code-status">not the code</p>
+            <p class="form-status" style="flex: none" data-probe="form-status">saved 12s ago</p>
+            <button type="button" class="choice-card" aria-pressed="false" data-icon="home" data-probe="choice-rest"><span class="choice-title">user</span><span class="choice-desc">~/.claude</span></button>
+            <button type="button" class="choice-card" aria-pressed="true" data-icon="folder" data-probe="choice-pressed"><span class="choice-title">project</span><span class="choice-desc">.claude/ here</span></button>
+            <button type="button" class="choice-card" aria-pressed="true" data-tone="warning" data-icon="triangle-alert" data-probe="choice-warning"><span class="choice-title">theirs</span><span class="choice-desc">overwrites</span></button>
+            <label class="dropzone" data-icon="image-plus" data-probe="drop-rest"><input type="file" />drop files</label>
+            <label class="dropzone" data-icon="image-plus" data-dragging data-probe="drop-dragging"><input type="file" />drop files</label>
+          </div>
+        </template>
+      </section>
+    </main>
+
+    <script type="module">
+      import { initSelects } from "../runtime/select.js";
+
+      // The probes, once per surface, before anything else reads the page.
+      const probes = document.getElementById("probes");
+      for (const surface of document.querySelectorAll("[data-surface]")) surface.append(probes.content.cloneNode(true));
+
+      initSelects();
+      for (const box of document.querySelectorAll("[data-demo-indeterminate]")) box.indeterminate = true;
+
+      const root = document.documentElement;
+      const pressOne = (button) => {
+        for (const sibling of button.parentElement.children) sibling.setAttribute("aria-pressed", String(sibling === button));
+      };
+
+      // aria-disabled keeps a control focusable, so the page must ignore its presses itself. ONE guard,
+      // in the capture phase, stops the click before any handler on this page sees it: an unavailable
+      // control and a busy one alike, in every listener below and in any added later. A guard written
+      // into each handler instead is one that the next handler forgets.
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("button")?.getAttribute("aria-disabled") === "true") {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
+
+      // Every state below is an attribute the page flips; controls.css draws it. This is the whole
+      // "runtime" a build-free page needs, and a framework app does the same in its own handlers.
+      document.addEventListener("click", (event) => {
+        const target = event.target.closest("button");
+        if (!target || target.closest("[data-surface]")) return;
+
+        if (target.matches("[data-demo-theme] > button")) {
+          pressOne(target);
+          root.dataset.theme = target.textContent.trim();
+        } else if (target.matches(".segmented > button")) {
+          pressOne(target);
+        } else if (target.matches(".choice-card")) {
+          for (const card of target.closest(".choice-grid").querySelectorAll(".choice-card")) {
+            card.setAttribute("aria-pressed", String(card === target));
+          }
+        } else if (target.matches(".switch")) {
+          const on = target.getAttribute("aria-checked") !== "true";
+          target.setAttribute("aria-checked", String(on));
+          if (target.matches("[data-demo-anim]")) root.classList.toggle("anim-off", !on);
+        } else if (target.matches(".btn-icon[data-demo-busy]")) {
+          // Busy is aria-busy + aria-disabled, never `disabled`: focus stays on the button for the
+          // whole press, and a second press lands on the aria-disabled guard above.
+          target.dataset.demoRuns = String(Number(target.dataset.demoRuns || 0) + 1);
+          target.setAttribute("aria-busy", "true");
+          target.setAttribute("aria-disabled", "true");
+          setTimeout(() => { target.removeAttribute("aria-busy"); target.removeAttribute("aria-disabled"); }, 1500);
+        } else if (target.matches(".btn-icon[aria-pressed]")) {
+          target.setAttribute("aria-pressed", String(target.getAttribute("aria-pressed") !== "true"));
+        }
+      });
+
+      // ── .dropzone: the page reads the input and marks the drag. Enter and leave fire for every
+      // child the pointer crosses, and WebKit (configr's WKWebView) sends dragleave with a null
+      // relatedTarget, so "did it leave the zone?" cannot be asked of the event. Count instead: each
+      // enter is matched by a leave, and the drag has left when the count is back to zero.
+      const zone = document.querySelector("[data-demo-drop]");
+      const input = zone.querySelector("input");
+      const thumbs = document.querySelector("[data-demo-thumbs]");
+      const addThumbs = (files) => {
+        for (const file of files) {
+          if (!file.type.startsWith("image/")) continue;
+          const li = document.createElement("li");
+          li.className = "thumb";
+          const img = document.createElement("img");
+          img.alt = "";
+          img.src = URL.createObjectURL(file);
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "btn-icon btn-icon--sm";
+          remove.dataset.tone = "destructive";
+          remove.dataset.icon = "x";
+          remove.setAttribute("aria-label", "remove " + file.name);
+          li.append(img, remove);
+          thumbs.append(li);
+        }
+      };
+      let depth = 0;
+      zone.addEventListener("dragenter", (event) => { event.preventDefault(); depth += 1; zone.dataset.dragging = ""; });
+      zone.addEventListener("dragover", (event) => event.preventDefault());
+      zone.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) delete zone.dataset.dragging; });
+      zone.addEventListener("drop", (event) => { event.preventDefault(); depth = 0; delete zone.dataset.dragging; addThumbs(event.dataTransfer.files); });
+      input.addEventListener("change", () => { addThumbs(input.files); input.value = ""; });
+      thumbs.addEventListener("click", (event) => {
+        const remove = event.target.closest(".thumb > .btn-icon");
+        if (!remove) return;
+        // Focus goes to the next remove button that can take it, or back to the zone's input, never
+        // to <body>.
+        const live = [...thumbs.querySelectorAll(".thumb > .btn-icon:not(:disabled)")];
+        const at = live.indexOf(remove);
+        const next = live[at + 1] ?? live[at - 1] ?? input;
+        remove.closest(".thumb").remove();
+        next.focus();
+      });
+
+      // ── .confirm-inline: arm swaps the bin for the pair and focuses the verb; keep, Escape or a
+      // change to the row disarms and puts focus back on the bin. A press anywhere outside an armed
+      // row stands in here for "the row changed" (a re-render, the selection moving on).
+      const confirmStatus = document.querySelector("[data-demo-confirm-status]");
+      const disarm = (slot, restore = true) => {
+        const bin = slot._bin;
+        if (!bin) return;
+        slot.replaceChildren(bin);
+        slot._bin = null;
+        if (restore) bin.focus();
+      };
+      document.addEventListener("click", (event) => {
+        const row = event.target.closest("[data-demo-confirm-row]");
+        for (const armed of document.querySelectorAll("[data-demo-confirm-slot]")) {
+          if (armed._bin && armed.closest("[data-demo-confirm-row]") !== row) disarm(armed, false);
+        }
+        const slot = event.target.closest("[data-demo-confirm-slot]");
+        if (!slot) return;
+        const arm = event.target.closest("[data-demo-arm]");
+        if (arm) {
+          const target = arm.dataset.demoArm;
+          const pair = document.createElement("span");
+          pair.className = "confirm-inline";
+          pair.setAttribute("role", "group");
+          pair.setAttribute("aria-label", "confirm remove " + target);
+          pair.innerHTML =
+            '<button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--danger btn-terminal--compact" data-demo-confirm>remove</button>' +
+            '<button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-demo-keep>keep</button>' +
+            (arm.dataset.demoNote ? '<span class="confirm-inline-note"></span>' : "");
+          if (arm.dataset.demoNote) pair.querySelector(".confirm-inline-note").textContent = arm.dataset.demoNote;
+          slot._bin = arm;
+          slot.replaceChildren(pair);
+          pair.querySelector("[data-demo-confirm]").focus();
+          return;
+        }
+        if (event.target.closest("[data-demo-keep]")) { disarm(slot); return; }
+        if (event.target.closest("[data-demo-confirm]")) {
+          confirmStatus.textContent = "removed " + slot._bin.dataset.demoArm + " (demo: nothing was removed)";
+          disarm(slot);
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        const slot = event.target.closest?.("[data-demo-confirm-slot]");
+        if (event.key === "Escape" && slot?._bin) disarm(slot);
+      });
+
+      // ── .confirm-code: the button stays disabled until the typed value matches.
+      for (const codeInput of document.querySelectorAll("[data-demo-code]")) {
+        const box = codeInput.closest(".demo-box");
+        const go = box.querySelector("[data-demo-code-go]");
+        const status = box.querySelector(".confirm-code-status");
+        codeInput.addEventListener("input", () => {
+          const typed = codeInput.value.trim();
+          const match = typed === codeInput.dataset.demoCode;
+          go.disabled = !match;
+          if (!typed || match) {
+            status.textContent = match ? "matches" : "";
+            status.removeAttribute("data-tone");
+          } else {
+            status.textContent = "that is not the code shown above";
+            status.dataset.tone = "warning";
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

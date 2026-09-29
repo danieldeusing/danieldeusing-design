@@ -362,9 +362,15 @@ const glyph = async (selector, pseudo) => {
  * A WORD ON A STATE: the text's ink against the colour that is actually under it. The dominant
  * colour of the text's own box is what the letters sit on; it must be the STATE's fill (sampled in
  * the row's padding), or the mode painted a Canvas backplate over the state and the word sits on
- * that instead — which a ratio against the row's fill would miss. The marker pass paints the text
- * magenta, and the clip must hold the WHOLE word: magenta within 3px of both of its ends. Any
- * magenta at all was not enough — a clip slid 8px along the word still held some, and passed.
+ * that instead — which a ratio against the row's fill would miss. The ratio is taken in the DRAWN
+ * shot, over the word's tight text box.
+ *
+ * OWNERSHIP IS A TWO-SHOT DIFF: the same clip again with only the word hidden — its text wrapped
+ * in a `visibility: hidden` span, so `forced-color-adjust` is never touched and the backplate goes
+ * with the word. At least 3 pixels must change, and changed pixels must reach within 3px of BOTH
+ * ends of the box: a clip slid 8px along the word still changed pixels, only not at the far end.
+ * (Hiding a word by switching it to `none` would drop its backplate too, and a word painted in
+ * the row's own colour then passed at 21:1 — measured in WP12.)
  */
 const words = async (textSel, rowSel = textSel, pseudoState = null) => {
   await reveal(rowSel);
@@ -379,15 +385,18 @@ const words = async (textSel, rowSel = textSel, pseudoState = null) => {
     return { x: l, y: t, width: rr - l, height: b - t, rowX: e.left, rowY: e.top };
   })()`);
   const clip = { x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height) };
-  // On black, so an anti-aliased end stroke stays magenta on any fill (on the dark palette's cyan it did not).
-  await setStyle("mark", `${textSel}, ${textSel} * { color: rgb(255 0 255) !important; background: rgb(0 0 0) !important;
-    forced-color-adjust: none !important; text-shadow: none !important; }`);
-  const marked = await capture(clip);
-  await setStyle("mark", "");
-  const inked = (x) => Array.from({ length: marked.height }, (_, y) => isMagenta(marked.at(x, y))).some(Boolean);
-  const ends = [0, 1, 2].map((d) => [d, marked.width - 1 - d]);
-  const aligned = ends.some(([l]) => inked(l)) && ends.some(([, r]) => inked(r));
   const img = await capture(clip);
+  await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(textSel)});
+    for (const n of [...el.childNodes]) if (n.nodeType === 3 && n.textContent.trim()) {
+      const hide = document.createElement("span"); hide.dataset.xHidden = ""; hide.style.visibility = "hidden"; n.replaceWith(hide); hide.append(n); } })()`);
+  const hidden = await capture(clip);
+  await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(textSel)});
+    for (const hide of el.querySelectorAll("[data-x-hidden]")) hide.replaceWith(...hide.childNodes); el.normalize(); })()`);
+  const changedIn = (x) => Array.from({ length: img.height }, (_, y) => !near(img.at(x, y), hidden.at(x, y), 8)).filter(Boolean).length;
+  const perColumn = Array.from({ length: img.width }, (_, x) => changedIn(x));
+  const ends = [0, 1, 2];
+  const aligned = perColumn.reduce((a, b) => a + b, 0) >= 3
+    && ends.some((d) => perColumn[d] > 0) && ends.some((d) => perColumn[img.width - 1 - d] > 0);
   const fill = (await capture({ x: Math.floor(r.rowX) + 4, y: Math.floor(r.rowY) + 4, width: 1, height: 1 })).at(0, 0);
   if (pseudoState) await force(rowSel, []);
   const counts = new Map();
@@ -565,7 +574,7 @@ await section("FORCED — both palettes, four themes, painted pixels (X1)", asyn
       check(`${cell}: a keyboard-focused row's ring reaches 3:1 on its row — enabled (${enabled.ratio}:1) and aria-disabled (${disabled.ratio}:1)`,
         enabled.who[1] && disabled.who[1] && disabled.who[2] === "true" && enabled.ratio >= 3 && disabled.ratio >= 3, { enabled, disabled });
 
-      check(`${cell}: every clip holds its own element (the marker pass painted where it was measured)`, misaligned.length === 0, misaligned);
+      check(`${cell}: every clip holds its own element (a marker pass for glyphs and rings, a two-shot diff for words)`, misaligned.length === 0, misaligned);
     }
   }
   await send("Emulation.setEmulatedMedia", { features: [] });

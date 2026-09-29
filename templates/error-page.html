@@ -26,10 +26,11 @@
 
   ── THE PROMPT IS FILLED FROM THE ADDRESS BAR ──
   A static host serves ONE 404.html for every missing path (Cloudflare Pages does, and so does
-  seedr's dist/404.html), so the path cannot be written in at build time — an Astro 404 rendered
-  once prints "404" there. The script at the end writes `location.pathname` into the prompt with
-  textContent (never innerHTML: the path is whatever the visitor typed). Without script the
-  placeholder you fill in below stays, so make it something true on its own, e.g. "page".
+  seedr's dist/404.html), so the path cannot be written in at build time — danieldeusing.de's built
+  dist/404.html prints "$ 404/" for every missing page. The script at the end writes
+  `location.pathname` into the prompt with textContent (never innerHTML: the path is whatever the
+  visitor typed). Without script the placeholder you fill in below stays, so make it something
+  true on its own, e.g. "page".
 
   ── SERVE IT WITH THE STATUS, AND noindex ANYWAY ──
   A 404 page must be served with status 404, or a crawler indexes every mistyped url as a page.

@@ -162,6 +162,11 @@
       .callout > * { margin: 0; }
     </style>
     <!-- WP8 · K12 .console, the drawer's scrollback -->
+    <!-- WP3 · a sticky table header paints what its wrapper sits on (--tablewrap-fade), so a table in
+         a dialog has a --card header -->
+    <style id="standin-wp3" media="not all">
+      .tablewrap thead th { background: var(--tablewrap-fade, var(--background)); }
+    </style>
     <style id="standin-wp8" media="not all">
       .console { display: flex; flex-direction: column; box-sizing: border-box; min-block-size: 0; background: var(--card); }
       .console-body {
@@ -307,6 +312,14 @@
         use("standin-wp6", !probe('<span class="match-count"></span>', (s) => s.fontVariantNumeric === "tabular-nums"));
         use("standin-wp7", !probe('<div class="callout"></div>', (s) => s.borderInlineStartWidth === "2px"));
         use("standin-wp8", !probe('<div class="console"></div>', (s) => s.display === "flex"));
+        {
+          const host = document.createElement("div");
+          host.innerHTML = '<div class="tablewrap" style="--tablewrap-fade: rgb(1, 2, 3)"><table><thead><tr><th>x</th></tr></thead></table></div>';
+          document.body.append(host);
+          const painted = getComputedStyle(host.querySelector("th")).backgroundColor === "rgb(1, 2, 3)";
+          host.remove();
+          use("standin-wp3", !painted);
+        }
         use("standin-x3", !probe('<div hidden style="display: block"></div>', (s) => s.display === "none"));
         root.dataset.standins = inForce.join(" ") || "none";
       })();
@@ -687,7 +700,7 @@ PASS  the skill pins the current release</div></div>
       <ul class="select-panel context-menu" role="menu">
         <li class="dropdown-label" role="none" aria-hidden="true">file</li>
         <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="open">open in editor</button></li>
-        <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="reveal">reveal in finder</button></li>
+        <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="reveal" data-tip="opens the folder that holds it · (Finder on macOS)">reveal in finder</button></li>
         <li role="none"><button type="button" class="dropdown-item" role="menuitem" data-action="copy">copy path</button></li>
         <li role="none"><button type="button" class="dropdown-item" role="menuitem" aria-disabled="true" data-action="history">no history — this file is not in a repository yet, so there is nothing to compare it with</button></li>
         <li class="dropdown-sep" role="separator"></li>

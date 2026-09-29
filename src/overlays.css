@@ -52,8 +52,8 @@
    table is in scripts/check-overlays.mjs's output.
 
    ONE SURFACE: --card. So a table's sticky header and a scroller's fade, which are painted in
-   --background by default, are told the truth here — the custom properties below and the thead
-   rule further down. Cockpit painted both --background inside a --card dialog (C64), which reads
+   --background by default, are told the truth here — the custom properties below, which
+   chrome.css's `.tablewrap thead th` paints the header with too. Cockpit painted both --background inside a --card dialog (C64), which reads
    as a stripe of page showing through the box.
 
    `display` ONLY ON [open]. The UA hides a closed dialog with `dialog:not([open]) { display: none }`;
@@ -200,11 +200,6 @@ dialog.dialog--fit { inline-size: max-content; max-inline-size: 90vw; }
   margin-block-start: 1.5rem;
 }
 
-/* A sticky table header inside a dialog is painted in the dialog's surface, not the page's. */
-.dialog .tablewrap thead th {
-  background: var(--card);
-}
-
 /* THE SCROLL LOCK IS CSS. The page behind a modal is inert to the pointer, but the wheel still
    scrolled it — the backdrop belongs to the dialog, and the dialog's scroll chain is the viewport.
    configr locked <body> from script, which is one more thing to undo on every exit path. Keyed on
@@ -288,13 +283,16 @@ dialog.dialog.dialog--drawer {
    and components.css inks a highlighted row's inset ring HighlightText — right on a Highlight fill,
    but a disabled row loses the fill, and HighlightText IS the Canvas colour on both forced palettes:
    the ring measured 1:1 in all eight cells, so the reader could not see where the keys were.
-   Highlight is the system's own mark for "here", and it stands 8.7:1 or more off Canvas. */
+   CanvasText, the estate's ring for a focused row that is disabled or states something (the lead's
+   ruling; components.css does the same for its own disabled rows): the ring of a row with no fill
+   is drawn in the colour of text on the Canvas it sits on. Once M0 carries it this rule is
+   redundant; it stays until the two meet. */
 @media (forced-colors: active) {
   .context-menu .dropdown-item[aria-disabled="true"] {
     color: GrayText;
   }
   .context-menu .dropdown-item[aria-disabled="true"]:focus-visible {
-    outline-color: Highlight;
+    outline-color: CanvasText;
   }
 }
 
@@ -346,8 +344,17 @@ dialog.dgm-overlay::backdrop {
   background: var(--card);
   border-block-end: 1px solid var(--border);
 }
+/* A finger's target. The compact buttons are sized by their text, and "−" and "+" are one
+   character wide: under a coarse pointer they measured 32px across, beside a 44px X. */
+@media (pointer: coarse) {
+  .dgm-bar > button {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+  }
+}
 /* The stage clips; the artwork inside it is what moves. Transforming a wrapper rather than the svg
-   keeps mermaid's own geometry untouched. */
+   keeps mermaid's own geometry untouched. `touch-action: none` because the view does its own
+   pinch and pan (diagramzoom.js): the browser's pinch would zoom the page behind a modal view. */
 .dgm-stage {
   display: grid;
   flex: 1;

@@ -9,8 +9,11 @@
  * which replaces its hand-rolled lightbox.
  *
  * THE OPENER SAYS WHAT IT OPENS. Each element becomes a real button (role, tabindex, Enter and
- * Space), named "zoom: <the image's alt>" for an image and "zoom diagram" otherwise. It used to say
- * "open diagram, zoomable" for everything, a photograph included. The view takes the same name.
+ * Space), named "zoom: <name>" from the image's alt or the svg's own name (its aria-label or
+ * <title>), "zoom image" for an image with neither, and "zoom diagram" otherwise. It used to say
+ * "open diagram, zoomable" for everything, a photograph included. An aria-label the author wrote
+ * is kept, and the view takes the opener's name. An opener the author already marked
+ * `.dgm-zoomable` is wired like any other; a second call wires nothing twice.
  *
  * THE VIEW IS A MODAL <dialog> (0.60.0), opened through openDialog(): the page behind is inert, Tab
  * stays in the view, Escape closes it, and focus goes back to the opener. It was a
@@ -18,10 +21,16 @@
  * walked out into the page behind. Its bar is the system's: the compact ghost buttons and the
  * dialog's own X (src/overlays.css draws the view).
  *
- * Wheel zooms about the pointer, drag pans, +/-/0 and the bar do the same, and a click on the empty
- * stage closes — a CLICK, not the end of a drag. Pointer capture delivers the click that ends a pan
- * to the stage, and until 0.60.0 that closed the view under the reader's hand after every pan
- * (measured on 0.59.0: drag the artwork 100px and the view is gone).
+ * Wheel zooms about the pointer, drag pans, a two-finger pinch zooms about the fingers' midpoint,
+ * the arrow keys pan and +/-/0 and the bar zoom. A click on the empty stage closes — a click that
+ * BEGAN there, not the end of a drag and not a press on the artwork. Pointer capture delivers
+ * every click that ends a press on the stage TO the stage, whatever it began on, and until 0.60.0
+ * that closed the view under the reader's hand after every pan (measured on 0.59.0: drag the
+ * artwork 100px and the view is gone) and on a plain click on the picture.
+ *
+ * TOUCH IS HANDLED HERE, NOT BY THE BROWSER. The stage is `touch-action: none` — the browser's own
+ * pinch would zoom the whole page behind a modal view — so the view does its own: one finger pans,
+ * two fingers zoom about their midpoint and pan with it.
  *
  * The artwork is CLONED into the view rather than moved: mermaid holds references to the nodes it
  * rendered and re-runs against them (a folded or tabbed diagram is redrawn when it becomes
@@ -34,14 +43,17 @@ const FIT_MARGIN = 0.92; // leave a little air around a fitted diagram
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 12;
 const DRAG_SLOP = 4; // px a press may wander and still be a click rather than a pan
+const KEY_PAN = 40; // px an arrow key moves the artwork
 
 /* "zoom: network map" for an image with alt text, "zoom image" for one without, "zoom diagram" for
    everything else — the middle case because "diagram" is what the old name called a photograph. */
 function nameOf(el) {
   const node = el.querySelector("svg, img, canvas");
-  if (node?.tagName !== "IMG") return "zoom diagram";
-  const alt = node.getAttribute("alt")?.trim();
-  return alt ? `zoom: ${alt}` : "zoom image";
+  const own = node?.tagName === "IMG" ? node.getAttribute("alt")
+    : node?.tagName.toLowerCase() === "svg" ? node.getAttribute("aria-label") || node.querySelector(":scope > title")?.textContent
+    : null;
+  if (own?.trim()) return `zoom: ${own.trim()}`;
+  return node?.tagName === "IMG" ? "zoom image" : "zoom diagram";
 }
 
 export function initDiagramZoom(selector = ".diagram") {
@@ -49,7 +61,9 @@ export function initDiagramZoom(selector = ".diagram") {
   if (!diagrams.length) return;
 
   let view, stage, art;
-  let scale = 1, tx = 0, ty = 0, dragging = false, moved = false, lastX = 0, lastY = 0;
+  let scale = 1, tx = 0, ty = 0, moved = false, pressedStage = false;
+  const pointers = new Map(); // pointerId -> { x, y }, while a finger or the mouse is down
+  let pinch = null; // { distance, scale, x, y } when two pointers are down
 
   const apply = () => { art.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`; };
   const zoomTo = (next, cx, cy) => {
@@ -101,7 +115,7 @@ export function initDiagramZoom(selector = ".diagram") {
 
     view.addEventListener("click", (e) => {
       const act = e.target.closest("[data-dgm]")?.dataset.dgm;
-      if (act === "close" || (e.target === stage && !moved)) return view.close();
+      if (act === "close" || (e.target === stage && pressedStage && !moved)) return view.close();
       if (act === "in") return zoomTo(scale * 1.3);
       if (act === "out") return zoomTo(scale / 1.3);
       if (act === "reset") return fit();
@@ -111,27 +125,55 @@ export function initDiagramZoom(selector = ".diagram") {
       if (e.key === "+" || e.key === "=") zoomTo(scale * 1.3);
       else if (e.key === "-") zoomTo(scale / 1.3);
       else if (e.key === "0") fit();
+      else if (e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        tx += { ArrowLeft: KEY_PAN, ArrowRight: -KEY_PAN }[e.key] ?? 0;
+        ty += { ArrowUp: KEY_PAN, ArrowDown: -KEY_PAN }[e.key] ?? 0;
+        apply();
+      }
     });
     view.addEventListener("close", () => art.replaceChildren());
     stage.addEventListener("wheel", (e) => {
       e.preventDefault();
       zoomTo(scale * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX, e.clientY);
     }, { passive: false });
+    const twoFingers = () => {
+      const [a, b] = [...pointers.values()];
+      return { distance: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    };
     stage.addEventListener("pointerdown", (e) => {
-      dragging = true; moved = false; lastX = e.clientX; lastY = e.clientY;
+      // Where the press BEGAN decides the click: capture retargets its end to the stage.
+      if (!pointers.size) { moved = false; pressedStage = e.target === stage; }
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       stage.setPointerCapture(e.pointerId); stage.classList.add("is-grabbing");
+      if (pointers.size === 2) { moved = true; pinch = { ...twoFingers(), scale }; }
     });
     stage.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
-      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      const last = pointers.get(e.pointerId);
+      if (!last) return;
+      if (pinch) {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const now = twoFingers();
+        tx += now.x - pinch.x; ty += now.y - pinch.y; // the midpoint pans
+        zoomTo(pinch.scale * (now.distance / pinch.distance), now.x, now.y);
+        pinch.x = now.x; pinch.y = now.y;
+        apply();
+        return;
+      }
+      const dx = e.clientX - last.x, dy = e.clientY - last.y;
       if (!moved && Math.abs(dx) + Math.abs(dy) < DRAG_SLOP) return;
       moved = true;
       tx += dx; ty += dy;
-      lastX = e.clientX; lastY = e.clientY; apply();
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      apply();
     });
-    const endDrag = () => { dragging = false; stage.classList.remove("is-grabbing"); };
-    stage.addEventListener("pointerup", endDrag);
-    stage.addEventListener("pointercancel", endDrag);
+    const release = (e) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (!pointers.size) stage.classList.remove("is-grabbing");
+    };
+    stage.addEventListener("pointerup", release);
+    stage.addEventListener("pointercancel", release);
     // An <img> is draggable by default: a few pixels in, the browser starts its own drag of the
     // image, cancels the pointer, and the pan stops where that began — measured, a 120px drag moved
     // the picture 24px. Only an svg had ever panned properly.
@@ -170,11 +212,14 @@ export function initDiagramZoom(selector = ".diagram") {
   };
 
   for (const d of diagrams) {
-    if (d.classList.contains("dgm-zoomable")) continue; // already an opener: a second call adds nothing
+    // A marker of its own, not the class: an author may write `.dgm-zoomable` in the markup, and
+    // that opener still needs its role, its keys and its click.
+    if ("dgmWired" in d.dataset) continue;
+    d.dataset.dgmWired = "";
     d.classList.add("dgm-zoomable");
     d.setAttribute("role", "button");
     d.setAttribute("tabindex", "0");
-    d.setAttribute("aria-label", nameOf(d));
+    if (!d.hasAttribute("aria-label")) d.setAttribute("aria-label", nameOf(d));
     d.addEventListener("click", () => open(d));
     d.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(d); }

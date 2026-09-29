@@ -166,6 +166,22 @@ await check("the registration array is compacted IN PLACE to one entry per mount
 await evaluate(`window.renderTickStrip(document.getElementById("other"), [{ key: "x", label: "<b>not markup</b>", lastAt: ago(1), intervalMs: 1000 }]); null`);
 await check("renderTickStrip(element, items) renders a strip directly, and a label is text, never markup",
   () => evaluate(`row("x", "other").cells[1].textContent === "<b>not markup</b>" && !row("x", "other").querySelector("b")`));
+// The first tick after the first paint must find nothing to write for a strip whose data did not
+// change: every node is the one painted, with not even the figures rewritten once.
+const stillStrip = await evaluate(`(async () => {
+  const host = document.getElementById("other"), items = [{ key: "q", label: "queue", lastAt: null, stats: [[3, "queued"], [1, "reviewer's"]] }];
+  host.replaceChildren();
+  window.renderTickStrip(host, items);
+  let records = 0;
+  const watch = new MutationObserver((list) => { records += list.length; });
+  watch.observe(host, { subtree: true, childList: true, characterData: true, attributes: true });
+  window.renderTickStrip(host, items);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  watch.disconnect();
+  return records;
+})()`);
+await check("the first tick over an unchanged strip writes nothing — 0 mutations, the figures included",
+  () => stillStrip === 0, `${stillStrip} mutation record(s)`);
 await evaluate(`window.renderTickStrip(document.getElementById("other"), []); null`);
 await check("an empty list empties the mount, so `.tickstrip:not(:empty)` draws no box",
   () => evaluate(`document.getElementById("other").childNodes.length === 0`));

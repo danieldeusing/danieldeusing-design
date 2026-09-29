@@ -129,9 +129,12 @@ export function renderTickStrip(mount, items) {
   const caption = host.getAttribute("data-label") || "pollers";
   let table = host.querySelector("table.ticktable");
   if (!table) {
+    const views = items.map((item) => describe(item, now));
     host.innerHTML = `<table class="ticktable"><caption class="visually-hidden">${esc(caption)}</caption>` +
       `<thead><tr>${COLUMNS.map((c) => `<th scope="col"><span class="visually-hidden">${c}</span></th>`).join("")}</tr></thead>` +
-      `<tbody>${items.map((item) => rowHtml(item, describe(item, now))).join("")}</tbody></table>`;
+      `<tbody>${items.map((item, i) => rowHtml(item, views[i])).join("")}</tbody></table>`;
+    // Seeded here, or the first tick finds nothing written and rewrites every figures cell once.
+    Array.from(host.querySelector("tbody").rows).forEach((row, i) => written.set(row.cells[4], views[i].stats));
     return;
   }
   if (table.caption) setText(table.caption, caption);
@@ -147,6 +150,7 @@ export function renderTickStrip(mount, items) {
     } else {
       body.insertAdjacentHTML("beforeend", rowHtml(item, view));
       row = body.lastElementChild;
+      written.set(row.cells[4], view.stats);
     }
     // Moved only when out of place, so an unchanged order touches no row at all.
     if (row !== cursor) body.insertBefore(row, cursor);

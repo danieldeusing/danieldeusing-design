@@ -31,11 +31,15 @@ const fieldOf = (element) => (element && element.closest ? element.closest(".sea
 const inputOf = (field) => field.querySelector(":scope > input");
 const clearOf = (field) => field.querySelector(":scope > .search-clear");
 
-/* The clear is there exactly when there is something to clear. */
+/* The clear is there exactly when there is something to clear, and usable exactly when the box is.
+   A disabled box can still hold a query — shown, so the reader sees what is in force, but not
+   clearable: that would change the value of a control the page has switched off (as .filter-clear). */
 function sync(field) {
   const input = inputOf(field);
   const clear = clearOf(field);
-  if (input && clear) clear.hidden = !input.value;
+  if (!input || !clear) return;
+  clear.hidden = !input.value;
+  clear.disabled = input.disabled;
 }
 
 function settle(field) {
@@ -46,15 +50,19 @@ function settle(field) {
 
 function clearField(field) {
   const input = inputOf(field);
-  if (!input) return;
+  // `:disabled`, not `.disabled`: a box inside a disabled <fieldset> is off too.
+  if (!input || input.matches(":disabled")) return;
   // A cleared box has nothing pending. Whatever the page was waiting to apply was
   // the query that has just been thrown away.
   settle(field);
   input.value = "";
   sync(field);
+  // Focus goes back BEFORE the events go out, for select.js's reason: a handler may re-render the
+  // field or move focus on purpose, and a focus() after it would undo that — or land on a node that
+  // is no longer in the page.
+  input.focus();
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
-  input.focus();
 }
 
 /**
@@ -72,6 +80,14 @@ export function initSearchFields(root = document) {
     const field = fieldOf(event.target);
     if (field && event.target === inputOf(field)) sync(field);
   });
+  // A box switched on or off after it was drawn takes its clear with it. No event reports that;
+  // the attribute is the only signal.
+  new MutationObserver((records) => {
+    for (const { target } of records) {
+      const field = fieldOf(target);
+      if (field && target === inputOf(field)) sync(field);
+    }
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["disabled"], subtree: true });
 
   // A press on the clear must not take focus from the box. If it did, the box would blur first —
   // and a blur on an edited box fires the browser's own `change` with the OLD query, so the page

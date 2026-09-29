@@ -32,7 +32,8 @@
  * character cycles, as a native select does), Enter selects, Escape closes
  * without changing anything, Tab moves on. Focus never leaves the trigger —
  * the active option is pointed at with `aria-activedescendant` — so there is
- * nowhere for it to get stuck.
+ * nowhere for it to get stuck. (A list with a search row moves it into the box
+ * while it is open, and hands it back to the trigger when it closes.)
  *
  * THERE IS NO OPT-OUT (0.60.0, Daniel: "A dropdown should ALWAYS have the custom
  * layout for the list, not the system one"). `data-select="off"` used to skip a
@@ -46,9 +47,24 @@
  *                and the value once something is, wears --primary while it
  *                filters, and a clear button is joined to it. The empty option
  *                is the "all" row at the top of the list.
- *   data-search  a search box at the top of the list. A list longer than twenty
- *                options gets one without asking — past that a list is searched,
- *                not scanned (configr's FilterDropdown threshold).
+ *   data-search  a search box above the list, on any select. A FILTER longer than
+ *                twenty options gets one without asking — past that a filter is
+ *                searched, not scanned (configr's FilterDropdown threshold). A
+ *                plain select never does, however long: it keeps the listbox keys
+ *                above, where a typed letter jumps and Space picks (C8).
+ *
+ * THE DOM IT BUILDS (the framework contract in references/filters.md names each):
+ *   span.filter-dd.btn-group[role=group]      a filter only: the trigger + its clear
+ *     span.select-field > select + button.select-trigger(.select-trigger--filter)
+ *     button.filter-clear
+ *   ul.select-panel[role=listbox]             the popup of a list with no search row
+ *   div.select-panel                          the popup of a list WITH one:
+ *     div.select-search > div.search-field > input[type=search]
+ *     ul.select-list[role=listbox]
+ *     div.select-empty                        "no matches"
+ *   li.select-option[role=option]             every row, with an .ico for data-icon
+ *   div.select-optgroup[role=group]           an <optgroup>, named by its label,
+ *     div.select-group[aria-hidden]             its visible heading, then its rows
  */
 
 import { positionPopup } from "./popup.js";
@@ -65,6 +81,9 @@ let globalsInstalled = false;
 const optionsOf = (instance) => instance.select.options;
 const label = (element) => (element.textContent || "").trim();
 const indexOf = (item) => Number(item.dataset.index);
+const searchable = (instance) =>
+  instance.select.hasAttribute("data-search") ||
+  (instance.filter && instance.select.options.length > SEARCH_THRESHOLD);
 
 /*
  * THE ROWS A READER CAN REACH, IN THE ORDER THEY SEE THEM. Not `select.options`
@@ -216,8 +235,27 @@ function nameTrigger(instance) {
   if (labelId) trigger.setAttribute("aria-labelledby", `${labelId} ${trigger.id}`);
 }
 
+/*
+ * A select that LEFT the wrapper built for it — page code re-parented it, or a
+ * DOM patcher kept the node and rebuilt everything around it — is still known
+ * here, and skipping it as known is what left it rendering as the OS list. Its
+ * old wrapper goes (it would be a trigger for nothing), every listener the old
+ * instance put on the select goes with it, and enhance() wraps it again.
+ */
+function retire(instance) {
+  if (openInstance === instance) close(instance, false);
+  instance.abort.abort();
+  instance.observer.disconnect();
+  (instance.group || instance.field).remove();
+  enhanced.delete(instance.select);
+}
+
 function enhance(select) {
-  if (enhanced.has(select)) return;
+  const known = enhanced.get(select);
+  if (known) {
+    if (known.field.contains(select)) return;
+    retire(known);
+  }
   // `multiple` and `size > 1` are not popups — the platform renders them inline
   // and there is no OS menu to replace. Nothing else is skipped (see the header).
   if (select.multiple || select.size > 1) return;
@@ -244,7 +282,7 @@ function enhance(select) {
   trigger.setAttribute("role", "combobox");
   trigger.setAttribute("aria-haspopup", "listbox");
   trigger.setAttribute("aria-expanded", "false");
-  trigger.setAttribute("aria-controls", `${id}-panel`);
+  trigger.setAttribute("aria-controls", `${id}-listbox`);
 
   const value = document.createElement("span");
   value.className = "select-value";
@@ -288,9 +326,10 @@ function enhance(select) {
 
   const instance = {
     select, field, trigger, value, id, group, clear, filter: isFilter,
-    icon: null, panel: null, search: null, empty: null, side: undefined,
-    items: [], active: -1, typed: "", typedAt: 0,
+    icon: null, panel: null, list: null, search: null, empty: null, side: undefined,
+    items: [], active: -1, typed: "", typedAt: 0, abort: new AbortController(),
   };
+  const { signal } = instance.abort;
   enhanced.set(select, instance);
   if (!isFilter) nameTrigger(instance);
   syncTrigger(instance);
@@ -310,10 +349,10 @@ function enhance(select) {
   });
   // Focus aimed at the hidden control — a <label> click, or page code calling
   // select.focus() — belongs to the one the reader can see.
-  select.addEventListener("focus", () => trigger.focus());
+  select.addEventListener("focus", () => trigger.focus(), { signal });
   // A page that sets the value itself and announces it the normal way is honoured.
   // Our own dispatch lands here too; re-syncing an already-synced trigger is a no-op.
-  select.addEventListener("change", () => syncTrigger(instance));
+  select.addEventListener("change", () => syncTrigger(instance), { signal });
 
   // Cockpit rewrites a select's options from fetched data — a new model list, a
   // new credential list, a filter column derived from the rows that just arrived.
@@ -347,30 +386,36 @@ function enhance(select) {
 
 function buildPanel(instance) {
   const { select } = instance;
-  const panel = document.createElement("ul");
-  panel.className = "select-panel";
-  panel.id = `${instance.id}-panel`;
-  panel.setAttribute("role", "listbox");
-  panel.tabIndex = -1;
+  const facet = facetOf(select);
+  const list = document.createElement("ul");
+  list.id = `${instance.id}-listbox`;
+  list.setAttribute("role", "listbox");
+  if (facet) list.setAttribute("aria-label", facet);
 
   /*
-   * THE SEARCH ROW (M5). Focus moves INTO it on open — it has to hold focus to be
-   * typed into — so it, not the trigger, carries `aria-activedescendant` while the
-   * list is out; `aria-controls` repairs the fact that the panel is appended to
-   * <body> and is no descendant of either.
+   * THE SEARCH ROW (M5) SITS ABOVE THE LISTBOX, NOT IN IT: a listbox may own only
+   * options and groups (0.60.0, lead ruling), and a text box inside one is read as
+   * part of the list. So a list with a search row is a `div.select-panel` holding
+   * the row, then the listbox, then the "no matches" line.
+   *
+   * Focus moves INTO the box on open — it has to hold focus to be typed into — so
+   * it, not the trigger, carries `aria-activedescendant` while the list is out, and
+   * `aria-controls` names the listbox those ids live in.
    */
+  let panel = list;
   instance.search = null;
   instance.empty = null;
-  if (select.options.length > SEARCH_THRESHOLD || select.hasAttribute("data-search")) {
-    const row = document.createElement("li");
+  if (searchable(instance)) {
+    panel = document.createElement("div");
+    list.className = "select-list";
+    const row = document.createElement("div");
     row.className = "select-search";
-    row.setAttribute("role", "presentation");
     const field = document.createElement("div");
     field.className = "search-field";
     const input = document.createElement("input");
     input.type = "search";
-    input.setAttribute("aria-label", `search ${facetOf(select) || "options"}`);
-    input.setAttribute("aria-controls", panel.id);
+    input.setAttribute("aria-label", `search ${facet || "options"}`);
+    input.setAttribute("aria-controls", list.id);
     input.setAttribute("autocomplete", "off");
     input.setAttribute("spellcheck", "false");
     input.setAttribute("data-1p-ignore", "");
@@ -386,9 +431,17 @@ function buildPanel(instance) {
     input.addEventListener("keydown", (event) => onSearchKeydown(instance, event));
     field.appendChild(input);
     row.appendChild(field);
-    panel.appendChild(row);
+    const empty = document.createElement("div");
+    empty.className = "select-empty";
+    empty.textContent = "no matches";
+    empty.hidden = true;
+    panel.append(row, list, empty);
     instance.search = input;
+    instance.empty = empty;
   }
+  panel.classList.add("select-panel");
+  panel.tabIndex = -1;
+  instance.list = list;
 
   instance.items = [];
   let index = 0;
@@ -424,18 +477,31 @@ function buildPanel(instance) {
   // keeps its heading. The walk order is document order, which is exactly the
   // order `select.options` flattens to — that is what keeps `data-index` a valid
   // index into the real control.
+  //
+  // An <optgroup> is a GROUP that holds its rows (the APG's grouped listbox), not
+  // a heading row between them: a bare heading in the listbox is a row that is not
+  // an option. A `div`, so it adds no list box of its own to lay out; the rows
+  // inherit the list's `list-style: none`. The group is NAMED with the label as
+  // written, and the visible heading is hidden from assistive technology: named
+  // through `aria-labelledby` it came out "ANTHROPIC" — Chromium reads the heading
+  // through its `text-transform` — and it would be read twice besides.
   for (const child of select.children) {
     if (child.tagName === "OPTGROUP") {
-      const heading = document.createElement("li");
+      const group = document.createElement("div");
+      group.className = "select-optgroup";
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", child.label);
+      const heading = document.createElement("div");
       heading.className = "select-group";
-      heading.setAttribute("role", "presentation");
+      heading.setAttribute("aria-hidden", "true");
       heading.textContent = child.label;
-      panel.appendChild(heading);
+      group.appendChild(heading);
       for (const option of child.children) {
-        if (option.tagName === "OPTION") panel.appendChild(addOption(option));
+        if (option.tagName === "OPTION") group.appendChild(addOption(option));
       }
+      list.appendChild(group);
     } else if (child.tagName === "OPTION") {
-      panel.appendChild(addOption(child));
+      list.appendChild(addOption(child));
     }
   }
 
@@ -450,18 +516,8 @@ function buildPanel(instance) {
     const all = instance.items.find((item) => select.options[indexOf(item)].value === "");
     if (all) {
       if (!label(all)) all.append("all");
-      panel.insertBefore(all, panel.querySelector(".select-option, .select-group"));
+      list.prepend(all);
     }
-  }
-
-  if (instance.search) {
-    const empty = document.createElement("li");
-    empty.className = "select-empty";
-    empty.setAttribute("role", "presentation");
-    empty.textContent = "no matches";
-    empty.hidden = true;
-    panel.appendChild(empty);
-    instance.empty = empty;
   }
   return panel;
 }
@@ -491,10 +547,12 @@ function open(instance) {
 
   // Options are never focusable; the panel is pointed at with
   // aria-activedescendant instead. preventDefault on mousedown is what keeps
-  // focus where it is when an option is clicked. The search row is the one
-  // exception — it is typed into, so a press there must be able to place the caret.
+  // focus where it is when an option is clicked. The search BOX is the one
+  // exception — it is typed into, so a press on it must place the caret. Only the
+  // box: a press on the row's padding, once let through as well, focused the panel
+  // itself (it is tabindex=-1) and the next key went nowhere.
   panel.addEventListener("mousedown", (event) => {
-    if (!event.target.closest(".select-search")) event.preventDefault();
+    if (event.target !== instance.search) event.preventDefault();
   });
   panel.addEventListener("click", (event) => {
     const item = event.target.closest(".select-option");
@@ -517,6 +575,7 @@ function close(instance, focusTrigger) {
     instance.panel = null;
   }
   instance.items = [];
+  instance.list = null;
   instance.search = null;
   instance.empty = null;
   instance.active = -1;
@@ -583,20 +642,16 @@ function filterRows(instance) {
     item.hidden = !hit;
     if (hit) shown += 1;
   }
-  for (const heading of panel.querySelectorAll(".select-group")) {
-    let next = heading.nextElementSibling;
-    let any = false;
-    while (next && next.classList.contains("select-option")) {
-      if (!next.hidden) any = true;
-      next = next.nextElementSibling;
-    }
-    heading.hidden = !any;
+  for (const group of instance.list.querySelectorAll(".select-optgroup")) {
+    group.hidden = !group.querySelector(".select-option:not([hidden])");
   }
   instance.empty.hidden = shown > 0;
-  // The value in force stays the highlight while it is on screen; otherwise the
-  // first match is, so "type, Enter" picks what the reader just narrowed to.
+  // ONCE ANYTHING IS TYPED, THE FIRST MATCH IS THE HIGHLIGHT (the APG's list
+  // autocomplete), even when the value in force matches too — so "type, Enter"
+  // picks what the reader narrowed to, never the value they already had. With the
+  // box emptied again the list is as it opened: on the value in force.
   const selected = instance.items[select.selectedIndex];
-  const keep = selected && !selected.hidden && selected.getAttribute("aria-disabled") !== "true";
+  const keep = !query && selected && !selected.hidden && selected.getAttribute("aria-disabled") !== "true";
   setActive(instance, keep ? select.selectedIndex : firstEnabled(instance));
   positionPopup(panel, instance.trigger, { side: instance.side });
 }

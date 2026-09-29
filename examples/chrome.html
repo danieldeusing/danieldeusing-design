@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en" data-theme="warm">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5efe2" />
+    <title>chrome — danieldeusing-design</title>
+
+    <!-- pre-paint, exactly as the templates carry it: theme, animation gate, rail state -->
+    <script>
+      (() => {
+        const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
+        let theme = "warm";
+        try {
+          const stored = localStorage.getItem("theme");
+          if (stored && stored in bg) theme = stored;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg[theme]);
+        let animOff = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        try {
+          if (localStorage.getItem("anim") === "off") animOff = true;
+        } catch {}
+        if (animOff) document.documentElement.classList.add("anim-off");
+        try {
+          if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
+        } catch {}
+      })();
+    </script>
+
+    <link rel="stylesheet" href="../src/tokens.css" />
+    <link rel="stylesheet" href="../src/base.css" />
+    <!-- components.css for what the chrome HOLDS (the dropdown menus, .dd-dot, .anim-toggle, the
+         card, .prompt); nothing in chrome.css reads it. -->
+    <link rel="stylesheet" href="../src/components.css" />
+    <link rel="stylesheet" href="../src/chrome.css" />
+
+    <!--
+      ═══ STAND-INS — DELETE THIS WHOLE BLOCK AT INTEGRATION (WP13) ═══════════════════════════════
+      This branch was cut from 0.59.0, before the packages that declare these landed. Each rule is a
+      copy of what the spec gives another package, here ONLY so this page renders:
+        · WP1 (tokens.css): --control-h, --status-h, --dot-size, --icon-*, the phone --content-pad,
+          [data-tone] -> --tone (F1, F7)
+        · WP4 (icons): the three --ico-* masks the header uses, [data-icon] -> --ico (I1)
+        · WP5 (controls.css): .btn-icon, .btn-icon--bare (C2)       · WP7 (feedback.css): .dot (S8)
+        · WP2 (components.css + theme.js): M0's ✓ column on a chosen theme row, and theme.js
+          marking theme rows menuitemradio/aria-checked in a menu, aria-pressed elsewhere (N5)
+      Everything is wrapped in :where(), so the day the real declarations arrive they win on
+      specificity and this block goes inert — except the phone --content-pad, which has to beat
+      0.59.0's own :root value and is identical to WP1's. Nothing here is ever copied into src/.
+    -->
+    <style id="stand-ins">
+      :where(:root) {
+        --control-h: 1.75rem;
+        --status-h: 2rem;
+        --dot-size: 0.5rem;
+        --icon-sm: 0.75rem;
+        --icon-size: 0.875rem;
+        --ico-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+        --ico-chevron-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E");
+        --ico-chevron-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
+        --ico-history: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3Cpath d='M12 7v5l4 2'/%3E%3C/svg%3E");
+      }
+      @media (max-width: 40rem) {
+        :root { --content-pad: 1.25rem; }
+      }
+      :where([data-tone="success"]) { --tone: var(--success); }
+      :where([data-tone="pending"]) { --tone: var(--pending); }
+      :where([data-tone="destructive"]) { --tone: var(--destructive); }
+      :where([data-icon="chevron-left"]) { --ico: var(--ico-chevron-left); }
+      :where([data-icon="chevron-right"]) { --ico: var(--ico-chevron-right); }
+      :where([data-icon="history"]) { --ico: var(--ico-history); }
+
+      :where(.btn-icon) {
+        display: inline-grid; place-items: center; box-sizing: border-box;
+        inline-size: var(--control-h); block-size: var(--control-h); margin: 0; padding: 0;
+        font: inherit; color: var(--btn-icon-color, var(--primary)); background: transparent;
+        border: 1px solid var(--control-edge, var(--border)); cursor: pointer; list-style: none;
+      }
+      :where(.btn-icon)::-webkit-details-marker { display: none; }
+      :where(.btn-icon[data-icon])::before {
+        content: ""; inline-size: var(--icon-size); block-size: var(--icon-size); background: currentColor;
+        -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
+      }
+      :where(.btn-icon--bare) { --btn-icon-color: var(--muted-foreground); border-color: transparent; }
+      :where(.btn-icon--bare:not(:disabled):hover, .btn-icon--bare[aria-expanded="true"]) { --btn-icon-color: var(--primary); background: var(--muted); }
+      :where(.btn-icon:disabled) { opacity: 0.45; cursor: default; }
+      :where(.dot) {
+        display: inline-block; flex: none; inline-size: var(--dot-size); block-size: var(--dot-size);
+        border-radius: 50%; background: var(--tone, currentColor);
+      }
+      :where(a.dropdown-item) { text-decoration: none; }
+      :where(.dropdown-item:is([aria-checked], [aria-pressed]))::before {
+        content: ""; flex: none; inline-size: var(--icon-sm); block-size: var(--icon-sm);
+      }
+      :where(.dropdown-item:is([aria-checked="true"], [aria-pressed="true"]))::before {
+        background: var(--primary);
+        -webkit-mask: var(--ico-check) center / contain no-repeat; mask: var(--ico-check) center / contain no-repeat;
+      }
+    </style>
+
+    <style>
+      /* Page layout only — none of this is design-system vocabulary. */
+      .demo-lede { margin: 0 0 0.75rem; color: var(--muted-foreground); max-width: 72ch; }
+      .content > section { margin-block: 0 var(--space-section); min-block-size: 18rem; }
+      .content h1 { margin: 0 0 0.25rem; font-size: var(--fs-xl); color: var(--primary); }
+      .content h2 { margin: 0 0 0.35rem; font-size: var(--fs-lg); }
+      .content h3 { margin: 1.1rem 0 0.4rem; font-size: var(--fs-base); color: var(--muted-foreground); font-weight: 400; }
+      .demo-row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; }
+      .demo-frame { border: 1px dashed var(--border); padding: 0.75rem; }
+      /* A footer or an app bar shown as a SPECIMEN inside the page must not be fixed or sticky. */
+      .demo-frame header.bar,
+      .demo-frame footer.status { position: static; margin-inline: 0; }
+      .demo-scroller { block-size: 7rem; inline-size: 16rem; overflow: auto; border: 1px solid var(--border); padding: 0.5rem; }
+      .demo-scroller > div { inline-size: 28rem; }
+      .demo-note { color: var(--muted-foreground); }
+    </style>
+  </head>
+
+  <body>
+    <a href="#top" class="skip-link">skip to content</a>
+
+    <header class="bar">
+      <div class="bar-side">
+        <a href="#top" class="brand"><span class="glow">danieldeusing</span><span class="cursor-block" aria-hidden="true"></span></a>
+      </div>
+      <div class="bar-center">
+        <div class="bar-history" role="group" aria-label="history">
+          <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-left" aria-label="back"></button>
+          <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-right" aria-label="forward" disabled></button>
+          <details class="dropdown">
+            <summary class="btn-icon btn-icon--bare" data-icon="history" aria-label="history"></summary>
+            <ul class="dropdown-panel dropdown-panel--down">
+              <li><a class="dropdown-item" href="#top" aria-current="true">~/design/chrome</a></li>
+              <li><a class="dropdown-item" href="#top">~/design</a></li>
+              <li><a class="dropdown-item" href="#top">~</a></li>
+            </ul>
+          </details>
+        </div>
+        <nav class="crumbs" aria-label="breadcrumb" id="bar-crumbs"><span class="crumbs-host" aria-hidden="true">visitor@danieldeusing:</span><ol><li><a class="crumbs-home" href="#top" aria-label="home">~</a></li><li><a href="#top">design</a></li><li><span aria-current="page">chrome</span></li></ol></nav>
+      </div>
+      <div class="bar-side bar-right">
+        <p class="bar-status" role="status"><span class="dot" data-tone="success" aria-hidden="true"></span>live</p>
+        <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        </button>
+        <nav aria-label="site" id="site-nav" class="site-nav">
+          <div class="ls-nav-head">
+            <span class="ls-nav-title prompt">ls -l</span>
+            <button type="button" class="ls-nav-toggle" data-ls-nav-toggle aria-controls="nav" aria-expanded="true" aria-label="show or hide navigation"></button>
+          </div>
+          <div class="ls-nav" id="nav">
+            <ul class="ls-panel" role="list" data-term-list>
+              <li style="--i: 0"><span class="ls-group"># design system</span></li>
+              <li style="--i: 1"><a class="dropdown-item ls-row ls-row--dir" href="#top"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">examples/</span></a></li>
+              <li style="--i: 2"><a class="dropdown-item ls-row ls-row--sub" href="#top" aria-current="page"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">chrome.html</span></a></li>
+              <li style="--i: 3"><a class="dropdown-item ls-row ls-row--sub" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">style-guide.html</span></a></li>
+              <li style="--i: 4"><a class="dropdown-item ls-row ls-row--dir ls-row--sub" href="#top"><span class="ls-perm" aria-hidden="true">drwxr-xr-x</span><span class="ls-name">runtime/</span></a></li>
+              <li style="--i: 5"><a class="dropdown-item ls-row ls-row--sub ls-row--sub2" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">lsnav.js</span></a></li>
+              <li style="--i: 6"><a class="dropdown-item ls-row ls-row--sub ls-row--sub2" href="#top"><span class="ls-perm" aria-hidden="true">-rw-r--r--</span><span class="ls-name">toc.js</span></a></li>
+            </ul>
+          </div>
+          <div class="mobile-footer">
+            <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+            <details class="mobile-theme">
+              <summary>
+                <span class="visually-hidden">language </span><span class="dd-flag dd-flag-en" aria-hidden="true"></span><span>english</span>
+                <span class="mf-chev" aria-hidden="true">▾</span>
+              </summary>
+              <div class="mf-panel">
+                <a class="dropdown-item" href="?lang=de" hreflang="de" lang="de" data-lang-value="de"><span class="dd-flag dd-flag-de" aria-hidden="true"></span>deutsch</a>
+                <a class="dropdown-item" href="?lang=en" hreflang="en" lang="en" data-lang-value="en" aria-current="true"><span class="dd-flag dd-flag-en" aria-hidden="true"></span>english</a>
+              </div>
+            </details>
+            <details class="mobile-theme">
+              <summary>
+                <span class="visually-hidden">theme </span><span class="dd-dot" aria-hidden="true"></span><span data-theme-label>warm</span>
+                <span class="mf-chev" aria-hidden="true">▾</span>
+              </summary>
+              <div class="mf-panel">
+                <button type="button" class="dropdown-item" data-theme-value="warm">warm</button>
+                <button type="button" class="dropdown-item" data-theme-value="green">green</button>
+                <button type="button" class="dropdown-item" data-theme-value="mono">mono</button>
+                <button type="button" class="dropdown-item" data-theme-value="paper">paper</button>
+              </div>
+            </details>
+            <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
+              <span data-anim-box aria-hidden="true">[x]</span>
+              <span>anim</span>
+            </button>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap" id="top" style="padding-block: 1.1rem 2.5rem">
+      <div class="page-toolbar">
+        <nav class="crumbs" aria-label="breadcrumb" id="toolbar-crumbs"><ol><li><a href="#top">design</a></li><li><a href="#top">examples</a></li><li><span aria-current="page">chrome</span></li></ol></nav>
+        <button type="button" class="doc-link doc-link--forward">reset view</button>
+      </div>
+
+      <div class="layout">
+        <div class="content">
+          <h1>chrome</h1>
+          <p class="demo-lede">
+            WP3 of 0.60.0: the header's slots, the prompt-path breadcrumb, the rail, the footer and its
+            clearance, the page column, the table of contents, the burger, the sticky layers — plus thin
+            scrollbars, text actions on a button, the sticky table header and the ticker strip's glyphs.
+            This page is its own specimen: the bar, toolbar, TOC, rail and footer around this text are
+            the real ones.
+          </p>
+
+          <section id="header">
+            <h2>header.bar — three slots</h2>
+            <p class="demo-lede">
+              The page's own bar: brand in the left slot, history and the path centred over this
+              column, the connection status and <code>ls -l</code> in the right slot. Back is enabled,
+              forward disabled (the end of history), the history menu is open-able.
+            </p>
+            <h3>.bar-status — the three connection states</h3>
+            <div class="demo-row">
+              <p class="bar-status" role="status"><span class="dot" data-tone="pending" aria-hidden="true"></span>connecting…</p>
+              <p class="bar-status" role="status"><span class="dot" data-tone="success" aria-hidden="true"></span>live</p>
+              <p class="bar-status" role="status"><span class="dot" data-tone="destructive" aria-hidden="true"></span>down</p>
+            </div>
+            <h3>.bar--app — a desktop app's window title strip (static cursor, traffic-light gutter)</h3>
+            <div class="demo-frame">
+              <header class="bar bar--app" style="--bar-inset-start: 5rem" id="app-bar">
+                <div class="bar-side"><span class="brand"><span class="glow">configr</span><span class="cursor-block cursor-block--static" aria-hidden="true"></span></span></div>
+                <div class="bar-side"><span class="demo-note">~/projects/estate</span></div>
+              </header>
+            </div>
+          </section>
+
+          <section id="crumbs">
+            <h2>.crumbs — the prompt path</h2>
+            <p class="demo-lede">Muted path, <code>~</code> in the accent, the current segment in the foreground. A segment an SPA renders as a button reads as the link beside it.</p>
+            <div class="demo-frame">
+              <nav class="crumbs" aria-label="breadcrumb" id="demo-crumbs"><span class="crumbs-host" aria-hidden="true">visitor@registry:</span><ol><li><a class="crumbs-home" href="#top" aria-label="home">~</a></li><li><button type="button">capabilities</button></li><li><a href="#top">review</a></li><li><span aria-current="page">SKILL.md</span></li></ol></nav>
+            </div>
+          </section>
+
+          <section id="rail">
+            <h2>the ls -l rail</h2>
+            <p class="demo-lede">
+              The rail on the right is this page's. Its list prints row by row (<code>data-term-list</code>,
+              <code>--i</code> per row) when <code>html.term-anim</code> is set pre-paint. A second toggle
+              anywhere on the page drives the same rail and shows the same <code>aria-expanded</code>:
+            </p>
+            <div class="demo-row">
+              <button type="button" class="doc-link doc-link--forward" data-ls-nav-toggle aria-controls="nav" aria-expanded="true" id="second-rail-toggle">show or hide the rail</button>
+            </div>
+          </section>
+
+          <section id="footer">
+            <h2>footer.status and the anim toggle</h2>
+            <p class="demo-lede">
+              The page's footer is exactly <code>--status-h</code> tall and the body reserves that much
+              below its content. On a phone without a <code>.mobile-footer</code> it wraps to two rows
+              (3.25rem); with one it folds into the burger (0rem). A toggle with a flipping label:
+            </p>
+            <div class="demo-row">
+              <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations" data-label-on="enabled" data-label-off="disabled" id="labelled-anim-toggle">
+                <span data-anim-box aria-hidden="true">[x]</span> <span data-anim-label>enabled</span>
+              </button>
+            </div>
+          </section>
+
+          <section id="language">
+            <h2>language switcher</h2>
+            <p class="demo-lede">
+              In the footer (a menu of links, the current one <code>aria-current="true"</code>, each item
+              <code>lang</code> + <code>hreflang</code>) and in the burger's accordion. Picking a language
+              navigates, so the current one carries the accent, not a ✓.
+            </p>
+          </section>
+
+          <section id="column">
+            <h2>.wrap — the page column</h2>
+            <p class="demo-lede">
+              This page is a <code>.wrap</code>: <code>--content-w</code> wide, <code>--content-pad</code>
+              from the edges (1.25rem below 40rem). <code>.wrap--full</code> drops the cap for a dashboard:
+            </p>
+            <div class="demo-frame"><div class="wrap wrap--full" id="full-wrap"><span class="demo-note">.wrap.wrap--full — no cap, same gutter</span></div></div>
+          </section>
+
+          <section id="toc">
+            <h2>table of contents and the series list</h2>
+            <p class="demo-lede">
+              The column on the right is this page's TOC; the entry for the section at the top of the
+              viewport carries <code>aria-current="true"</code>. The same <code>.navlist</code> as a series:
+            </p>
+            <nav class="navlist card-terminal" aria-labelledby="ser-h" id="series">
+              <p class="navlist-label" id="ser-h">in this series</p>
+              <ol>
+                <li><span class="navlist-lead">part 1</span><a href="#top">a design system for one person</a></li>
+                <li><span class="navlist-lead">part 2</span><a href="#top" aria-current="page">the chrome, measured</a></li>
+                <li><span class="navlist-lead">part 3</span><a href="#top">what a filter is</a></li>
+              </ol>
+            </nav>
+          </section>
+
+          <section id="mobile">
+            <h2>the burger</h2>
+            <p class="demo-lede">
+              Below 48rem the bar's centre band gives way to the burger. Its menu holds the rail's list
+              and the <code>.mobile-footer</code>: two accordions (language, theme) whose chevron turns,
+              and every row a 44px target under a coarse pointer.
+            </p>
+          </section>
+
+          <section id="sticky">
+            <h2>sticky layers</h2>
+            <p class="demo-lede">
+              The toolbar above the columns sticks under the bar; the TOC sticks under the toolbar at
+              <code>--sticky-top</code>, which <code>initLsNav()</code> measures. Every anchor lands below
+              both (<code>scroll-padding-block-start</code>).
+            </p>
+          </section>
+
+          <section id="scrollbars">
+            <h2>.scrollbars-thin</h2>
+            <div class="demo-row">
+              <div class="demo-scroller" id="scroller-default"><div>default scrollbar — the browser's own. This box scrolls both ways. This box scrolls both ways. This box scrolls both ways.<br>1<br>2<br>3<br>4<br>5<br>6<br>7<br>8</div></div>
+              <div class="demo-scroller scrollbars-thin" id="scroller-thin"><div>.scrollbars-thin — the .tablewrap recipe. This box scrolls both ways. This box scrolls both ways.<br>1<br>2<br>3<br>4<br>5<br>6<br>7<br>8</div></div>
+            </div>
+          </section>
+
+          <section id="text-actions">
+            <h2>text actions on a &lt;button&gt;</h2>
+            <p class="demo-lede">A text action that changes the view is a button that reads as a link. Never red: resetting a view destroys nothing.</p>
+            <div class="demo-row">
+              <button type="button" class="doc-link" id="btn-doc">show more</button>
+              <button type="button" class="doc-link doc-link--forward" id="btn-forward">reset filters</button>
+              <button type="button" class="doc-link doc-link--forward" disabled id="btn-disabled">try again</button>
+              <a class="doc-link" href="#top">a doc-link that is a link</a>
+            </div>
+          </section>
+
+          <section id="table">
+            <h2>a sticky table header in a card</h2>
+            <p class="demo-lede">The header row paints the card (<code>--tablewrap-fade</code>), not a band of page colour.</p>
+            <div class="card-terminal" style="--tablewrap-fade: var(--card)">
+              <div class="tablewrap" style="--tablewrap-max-h: 9rem" id="card-table">
+                <table>
+                  <thead><tr><th>agent</th><th>repo</th><th>state</th></tr></thead>
+                  <tbody>
+                    <tr><td>claude</td><td>poi/vu3</td><td>done</td></tr>
+                    <tr><td>codex</td><td>poi/vu3</td><td>done</td></tr>
+                    <tr><td>copilot</td><td>dd/infra</td><td>running</td></tr>
+                    <tr><td>opencode</td><td>dd/design</td><td>queued</td></tr>
+                    <tr><td>gemini</td><td>dd/design</td><td>queued</td></tr>
+                    <tr><td>antigravity</td><td>dd/docs</td><td>done</td></tr>
+                    <tr><td>claude-twiced</td><td>dd/family</td><td>done</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="tickstrip">
+            <h2>the ticker strip — state glyphs</h2>
+            <p class="demo-lede">The glyph is drawn from the row's state class at the text size; the state word is read, the glyph is not.</p>
+            <div class="tickstrip" data-label="pollers">
+              <table class="ticktable">
+                <caption class="visually-hidden">pollers</caption>
+                <tbody>
+                  <tr class="tick tick--ok"><td class="tick-dot"><span class="visually-hidden">ok</span></td><td class="tick-name">review poll</td><td class="tick-last">12s ago</td><td class="tick-next">next 48s</td><td class="tick-stats"><b>3</b> queued<i class="tick-sep" aria-hidden="true">·</i><b>1</b> running</td></tr>
+                  <tr class="tick tick--running"><td class="tick-dot"><span class="visually-hidden">running</span></td><td class="tick-name">execution poll</td><td class="tick-last">4m ago</td><td class="tick-next">running 3m</td><td class="tick-stats"><b>1</b> lap</td></tr>
+                  <tr class="tick tick--stale"><td class="tick-dot"><span class="visually-hidden">stale</span></td><td class="tick-name">learn poll</td><td class="tick-last">41m ago</td><td class="tick-next">due now</td><td class="tick-stats"><b>0</b> comments</td></tr>
+                  <tr class="tick tick--never"><td class="tick-dot"><span class="visually-hidden">never run</span></td><td class="tick-name">docs index</td><td class="tick-last">never run</td><td class="tick-next">—</td><td class="tick-stats"></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <aside class="toc">
+          <nav class="navlist toc-inner" aria-labelledby="toc-h">
+            <p class="navlist-label" id="toc-h">on this page</p>
+            <ol>
+              <li><a href="#header" data-toc-link="header">header.bar</a></li>
+              <li class="navlist-sub"><a href="#crumbs" data-toc-link="crumbs">.crumbs</a></li>
+              <li><a href="#rail" data-toc-link="rail">the rail</a></li>
+              <li><a href="#footer" data-toc-link="footer">footer.status</a></li>
+              <li class="navlist-sub"><a href="#language" data-toc-link="language">language</a></li>
+              <li><a href="#column" data-toc-link="column">.wrap</a></li>
+              <li><a href="#toc" data-toc-link="toc">the TOC</a></li>
+              <li><a href="#mobile" data-toc-link="mobile">the burger</a></li>
+              <li><a href="#sticky" data-toc-link="sticky">sticky layers</a></li>
+              <li><a href="#scrollbars" data-toc-link="scrollbars">.scrollbars-thin</a></li>
+              <li><a href="#text-actions" data-toc-link="text-actions">text actions</a></li>
+              <li><a href="#table" data-toc-link="table">sticky header</a></li>
+              <li><a href="#tickstrip" data-toc-link="tickstrip">ticker strip</a></li>
+            </ol>
+          </nav>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="status">
+      <span class="status-left"><span class="glow">[design]</span> chrome — the WP3 specimen page</span>
+      <nav class="status-right" aria-label="page settings">
+        <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+        <span class="sep" aria-hidden="true" data-demo-lang></span>
+        <details class="dropdown" data-demo-lang>
+          <summary><span class="visually-hidden">language </span><span class="dd-flag dd-flag-en" aria-hidden="true"></span><span>en</span><span aria-hidden="true">▾</span></summary>
+          <ul class="dropdown-panel">
+            <li><a class="dropdown-item" href="?lang=de" hreflang="de" lang="de" data-lang-value="de"><span class="dd-flag dd-flag-de" aria-hidden="true"></span>deutsch</a></li>
+            <li><a class="dropdown-item" href="?lang=en" hreflang="en" lang="en" data-lang-value="en" aria-current="true"><span class="dd-flag dd-flag-en" aria-hidden="true"></span>english</a></li>
+          </ul>
+        </details>
+        <span class="sep" aria-hidden="true"></span>
+        <details class="dropdown">
+          <summary><span class="visually-hidden">theme </span><span class="dd-dot" aria-hidden="true"></span><span data-theme-label>warm</span><span aria-hidden="true">▾</span></summary>
+          <ul class="dropdown-panel">
+            <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+          </ul>
+        </details>
+        <span class="sep" aria-hidden="true"></span>
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
+          <span data-anim-box aria-hidden="true">[x]</span>
+          <span>anim</span>
+        </button>
+      </nav>
+    </footer>
+
+    <script type="module">
+      import { initLsNav } from "../runtime/lsnav.js";
+      import { initAnimToggle } from "../runtime/anim.js";
+      import { initToc } from "../runtime/toc.js";
+      import { initBurgerNav } from "../runtime/nav.js";
+      import { initThemeSwitcher } from "../runtime/theme.js";
+      import { initDropdowns } from "../runtime/dropdown.js";
+      import { initTableScroll } from "../runtime/tablescroll.js";
+
+      // Variants for the check and the screenshots, applied before any init call:
+      //   ?norail     a page with no rail (the measurement must still run)
+      //   ?nomf       no .mobile-footer, so a phone keeps the fixed, wrapped footer (seedr)
+      //   ?nolang     no language menu in the footer (seedr's footer: its controls fit one phone row)
+      //   ?notoolbar  no page toolbar (--sticky-top is the header alone)
+      //   ?burger     the burger open with both accordions open (the phone screenshot)
+      const params = new URLSearchParams(location.search);
+      if (params.has("norail")) document.querySelectorAll(".ls-nav, .ls-nav-head, [data-ls-nav-toggle]").forEach((el) => el.remove());
+      if (params.has("nomf")) document.querySelector(".mobile-footer")?.remove();
+      if (params.has("nolang")) document.querySelectorAll("[data-demo-lang]").forEach((el) => el.remove());
+      if (params.has("notoolbar")) document.querySelector(".page-toolbar")?.remove();
+
+      // STAND-IN for WP2's theme.js (N5): a theme row is a menuitemradio with aria-checked inside a
+      // menu, a toggle button with aria-pressed anywhere else. Delete with the stand-in block.
+      const markThemeRows = () => {
+        const theme = document.documentElement.dataset.theme || "warm";
+        for (const item of document.querySelectorAll("[data-theme-value]")) {
+          const chosen = String(item.dataset.themeValue === theme);
+          if (item.closest(".dropdown-panel")) { item.setAttribute("role", "menuitemradio"); item.setAttribute("aria-checked", chosen); }
+          else item.setAttribute("aria-pressed", chosen);
+        }
+      };
+      new MutationObserver(markThemeRows).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+      markThemeRows();
+
+      initThemeSwitcher();
+      initDropdowns();
+      initAnimToggle();
+      initBurgerNav();
+      initLsNav();
+      initTableScroll();
+      window.ddToc = initToc();
+
+      if (params.has("burger")) {
+        document.querySelector("[data-nav-toggle]")?.click();
+        document.querySelectorAll(".mobile-theme").forEach((d) => (d.open = true));
+      }
+    </script>
+  </body>
+</html>

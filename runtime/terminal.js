@@ -25,8 +25,14 @@
  * (nothing stays hidden); only the truncated prompt text needs JS.
  */
 
+let started = false;
+
 export function initTerminal() {
   if (typeof window === "undefined") return;
+  // Once per page: a second call queued every section again, behind a second print listener and a
+  // second observer.
+  if (started) return;
+  started = true;
 
   // Animation policy: an explicit pick (localStorage "anim", e.g. from a footer
   // toggle) wins over the OS setting. "off" — or no pick while the OS prefers

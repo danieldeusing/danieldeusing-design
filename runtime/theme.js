@@ -104,11 +104,14 @@ function syncThemeControls() {
   }
   for (const item of document.querySelectorAll("[data-theme-value]")) {
     const chosen = String(item.getAttribute("data-theme-value") === theme);
+    // Written only when it changes: this runs on every theme change and every call, and an
+    // unchanged write still wakes every attribute observer on the page.
+    const set = (name, value) => { if (item.getAttribute(name) !== value) item.setAttribute(name, value); };
     if (item.closest("details.dropdown .dropdown-panel")) {
-      item.setAttribute("role", "menuitemradio");
-      item.setAttribute("aria-checked", chosen);
+      set("role", "menuitemradio");
+      set("aria-checked", chosen);
     } else {
-      item.setAttribute("aria-pressed", chosen);
+      set("aria-pressed", chosen);
     }
   }
 }

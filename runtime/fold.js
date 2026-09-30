@@ -6,11 +6,15 @@
  * <details> for the print and closes those same ones again afterwards; a fold the reader had opened
  * stays open, and a `details.dropdown` is a menu, not content, so it is left alone.
  *
- *   initFolds();   // once per page
+ *   initFolds();   // once per page; a second call does nothing
  *
  * It replaces cockpit's `beforeprint` opener, which never closed anything again.
  */
+let wired = false;
+
 export function initFolds() {
+  if (wired) return;
+  wired = true;
   let opened = [];
   window.addEventListener("beforeprint", () => {
     // ponytail: an exclusive accordion (`<details name>`) keeps one member open, so this prints only

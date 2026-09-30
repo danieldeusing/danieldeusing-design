@@ -492,9 +492,13 @@ const INSTRUMENT = `window.M = {
 const inkOf = async (selector, pseudo = null, pad = 2) => {
   const b = await evaluate(`M.shot(${JSON.stringify(selector)})`);
   const clip = { x: b.x - pad, y: b.y - pad, width: b.w + 2 * pad, height: b.h + 2 * pad, scale: 1 };
+  // Two animation frames before every capture (RULES-CROSSCUT X1): a capture taken as soon as a
+  // theme, a palette, a hidden mark or a focus changed can read the frame before that paint landed.
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const shown = (await send("Page.captureScreenshot", { format: "png", clip })).data;
   await evaluate(`(() => { const s = document.createElement("style"); s.id = "dd-hide";
     s.textContent = ${JSON.stringify(`${selector}${pseudo || ""} { visibility: hidden !important; }`)}; document.head.append(s); })()`);
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const hidden = (await send("Page.captureScreenshot", { format: "png", clip })).data;
   await evaluate(`document.getElementById("dd-hide").remove()`);
   return evaluate(`M.ink(${JSON.stringify(shown)}, ${JSON.stringify(hidden)}, ${pad})`);

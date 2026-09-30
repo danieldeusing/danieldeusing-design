@@ -169,11 +169,19 @@ function syncTrigger(instance) {
   // reaches nobody; the trigger is the control now. The error's TEXT goes with it:
   // the `.field-error` the page ties to the select with aria-describedby is the
   // trigger's description too, since colour alone says nothing (WCAG 1.4.1).
-  for (const attribute of ["aria-invalid", "aria-describedby"]) {
-    const text = select.getAttribute(attribute);
-    if (text === null) trigger.removeAttribute(attribute);
-    else trigger.setAttribute(attribute, text);
-  }
+  const invalid = select.getAttribute("aria-invalid");
+  if (invalid === null) trigger.removeAttribute("aria-invalid");
+  else if (trigger.getAttribute("aria-invalid") !== invalid) trigger.setAttribute("aria-invalid", invalid);
+  // By TOKEN, never the whole list (the tooltip's rule): the select's ids replace the ones it gave
+  // last time, and a token somebody else put on the trigger — the tip's `ddtip` while it shows —
+  // stays. Copying the list wholesale dropped the tip's description on any change to the options.
+  const tokens = (text) => (text ?? "").split(/\s+/).filter(Boolean);
+  const own = tokens(select.getAttribute("aria-describedby"));
+  const foreign = tokens(trigger.getAttribute("aria-describedby")).filter((id) => !(instance.describedBy || []).includes(id) && !own.includes(id));
+  instance.describedBy = own;
+  const describedBy = [...own, ...foreign].join(" ");
+  if (!describedBy) trigger.removeAttribute("aria-describedby");
+  else if (trigger.getAttribute("aria-describedby") !== describedBy) trigger.setAttribute("aria-describedby", describedBy);
   // A popup with a search row is a DIALOG (it holds a text box and a list); a
   // plain one is the listbox itself. Decided here, not once at enhance: the row
   // comes and goes with the option count, and the trigger must say which before
@@ -242,6 +250,14 @@ function nameTrigger(instance) {
     const element =
       (select.id && document.querySelector(`label[for="${CSS.escape(select.id)}"]`)) ||
       select.closest("label");
+    if (element && !element.id && "ariaLabelledByElements" in trigger) {
+      // The page's <label> is the page's: an id written onto it is an attribute its renderer never
+      // draws, so a patcher matching by id could never find that label again — it rebuilt the rest
+      // of the mount around a new one, and the trigger's aria-labelledby named a node that was gone.
+      // Element reflection names the trigger by the node itself, and writes nothing on the label.
+      trigger.ariaLabelledByElements = [element, trigger];
+      return;
+    }
     if (element) {
       if (!element.id) element.id = `${instance.id}-label`;
       labelId = element.id;

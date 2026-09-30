@@ -540,6 +540,9 @@ const shot = async (clip) => {
   if (view.x || view.y || clip.x < 0 || clip.y < 0 || clip.x + clip.width > view.w || clip.y + clip.height > view.h) {
     throw new Error(`screenshot clip ${JSON.stringify(clip)} is not inside the unscrolled viewport ${JSON.stringify(view)}`);
   }
+  // Two animation frames before every capture (RULES-CROSSCUT X1): a capture taken as soon as a
+  // theme, a palette, a hidden mark or a focus changed can read the frame before that paint landed.
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false, clip: { ...clip, scale: 1 } });
   return decode(Buffer.from(data, "base64"));
 };
@@ -1817,6 +1820,32 @@ await check("demo: ArrowDown moves the highlight — the next row takes data-act
     return rows[1].getAttribute("data-active") === "true" && !rows[0].hasAttribute("data-active")
       && $("#cmd").getAttribute("aria-activedescendant") === rows[1].id; })()`));
 await press("Escape");
+
+// S4: the trigger's aria-describedby is merged BY TOKEN. A change to the options re-syncs the trigger,
+// and that sync copied the select's list over the trigger's wholesale: with a tip showing, "s4-err
+// ddtip" became "s4-err" while the tip was still on screen.
+await open("/main");
+await evaluate(`(async () => { (await import("/runtime/tooltip.js")).initTooltips();
+  const mount = document.getElementById("mount");
+  mount.innerHTML = '<label for="s4">kind</label> <select id="s4" aria-invalid="true" aria-describedby="s4-err" data-tip="the kind of agent to run">' +
+    '<option>agent</option><option>skill</option></select><p class="field-error" id="s4-err">pick one</p>';
+  initSelects(mount); })()`);
+await sleep(100);
+await hover(`triggerOf("s4")`);
+await sleep(150);
+const s4 = { showing: await evaluate(`triggerOf("s4").getAttribute("aria-describedby")`) };
+await evaluate(`document.getElementById("s4").append(new Option("tool")); null`);
+await sleep(100);
+s4.optionsChanged = await evaluate(`triggerOf("s4").getAttribute("aria-describedby")`);
+s4.options = await evaluate(`document.getElementById("s4").options.length`);
+await evaluate(`document.getElementById("s4").setAttribute("aria-describedby", "s4-err s4-hint"); null`);
+await sleep(100);
+s4.selectChanged = await evaluate(`triggerOf("s4").getAttribute("aria-describedby")`);
+await check("S4 — with the tip showing, a change to the options keeps the tip's token on the trigger: \"s4-err ddtip\" stays \"s4-err ddtip\"",
+  () => s4.showing === "s4-err ddtip" && s4.options === 3 && s4.optionsChanged === "s4-err ddtip", JSON.stringify(s4));
+await check("...and a change to the select's own list replaces the select's tokens and keeps the tip's: \"s4-err s4-hint ddtip\"",
+  () => s4.selectChanged === "s4-err s4-hint ddtip", JSON.stringify(s4));
+await move(2, 2);
 
 console.log(failures
   ? `\ncheck-filters: ${failures} FAILED, ${passes} passed`

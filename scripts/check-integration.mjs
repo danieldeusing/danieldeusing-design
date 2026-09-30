@@ -25,14 +25,19 @@
  *   · no demo and no suite carries a STAND-IN for a sibling package's rules: the siblings have
  *     merged, so a stand-in left in place can only hide a real rule going missing.
  *
- * No browser, no dependency. Build first (`node scripts/build.mjs`): it reads what dist/ and
- * tokens.json hold, which is what a release publishes.
+ *   · every init* the barrel exports can be called TWICE: the second call adds no listener, no
+ *     observer and no node, and writes nothing (the one section that needs a browser).
+ *
+ * No dependency. Build first (`node scripts/build.mjs`): it reads what dist/ and tokens.json hold,
+ * which is what a release publishes. The init-twice section drives headless Chromium; with none on
+ * the machine it skips loudly, and DD_REQUIRE_BROWSER=1 makes that a failure.
  *
  *   node scripts/check-integration.mjs
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { CHROME, launch, serve } from "./lib/chromium.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -221,6 +226,154 @@ if (sibling) {
   console.log(vendored === readFileSync(sibling, "utf8")
     ? `      (the vendored patcher matches ${sibling})`
     : `NOTE  the vendored patcher differs from ${sibling} — refresh scripts/fixtures/cockpit-dom-patch.js`);
+}
+
+/* ── every init, twice ──────────────────────────────────────────────────────────────────────────── */
+
+// Pages call init* from more than one place — a layout and a view, a first render and a re-render —
+// and every module but a few already said "call once; a second call does nothing". toc.js's second
+// spy hung the tab outright; fold, theme, search, sort, burger, zoom, terminal and the rail each added
+// listeners, observers or overlays, or rewrote attributes that had not changed, on every extra call.
+// So one page carries markup for every init, calls each once, settles, and calls each again: the
+// second pass must add 0 listeners, 0 observers (constructed or observing) and 0 nodes, and make 0
+// mutation records. The tickstrip's own 1 s clock and [data-ago]'s re-render are left out of the
+// record count; they write on a timer, not because of a call.
+const INITS = ["initThemeSwitcher", "initResolutionZoom", "initBurgerNav", "initDropdowns", "initSelects", "initAnimToggle", "initTerminal",
+  "initLsNav", "initDiagramZoom", "initTableScroll", "initTablePagination", "initMinimap", "initTooltips", "initTableTools", "initFolds",
+  "initSearchFields", "initSortControls", "initNotices", "initDialogs", "initRelativeTimes", "initTabs", "initTickStrips", "initPickCells",
+  "initToc", "initCopyButtons"];
+const TWICE_BODY = `<header class="bar"><button type="button" data-ls-nav-toggle aria-label="toggle the rail">nav</button>
+  <details class="dropdown"><summary>theme <span data-theme-label></span></summary><ul class="dropdown-panel">
+    ${["warm", "green", "mono", "paper"].map((t) => `<li><button type="button" class="dropdown-item" data-theme-value="${t}">${t}</button></li>`).join("")}</ul></details>
+  <button type="button" data-anim-toggle><span data-anim-box></span> <span data-anim-label>anim</span></button>
+  <button type="button" data-nav-toggle aria-expanded="false" aria-controls="site-nav" id="burger">menu</button></header>
+<nav id="site-nav"><a href="#s1">one</a><details class="dropdown" id="nav-menu"><summary id="nav-menu-sum">more</summary><ul class="dropdown-panel">
+  <li><button type="button" class="dropdown-item">a</button></li></ul></details></nav>
+<main><aside class="toc"><nav class="navlist toc-inner" aria-label="on this page"><ol>
+  <li><a href="#s1" data-toc-link="s1">one</a></li><li><a href="#s2" data-toc-link="s2">two</a></li></ol></nav></aside>
+<section class="doc" id="s1"><h2>one</h2>
+  <div class="tabs" role="tablist" aria-label="views"><button type="button" class="tab" role="tab" id="tw-a" aria-controls="tw-pa" aria-selected="true">a</button><button type="button" class="tab" role="tab" id="tw-b" aria-controls="tw-pb" aria-selected="false" tabindex="-1">b</button></div>
+  <div class="tab-panel" id="tw-pa" role="tabpanel" aria-labelledby="tw-a">a</div><div class="tab-panel" id="tw-pb" role="tabpanel" aria-labelledby="tw-b" hidden>b</div>
+  <label for="tw-sel">lines</label> <select id="tw-sel"><option>50</option><option selected>200</option></select>
+  <label>source <select data-filter><option value="">all</option><option>seedr</option></select></label>
+  <div class="search-field"><input type="search" aria-label="search" value="q"><button type="button" class="search-clear" aria-label="clear search"></button></div>
+  <div class="sort-ctl"><button type="button" class="sort-dir" data-dir="asc"></button><select data-sort aria-label="sort by"><option>name</option></select></div>
+  <table data-table-tools data-table-id="twice" aria-label="runs"><thead><tr><th data-col="n">n</th><th data-col="k" data-filter="pick">k</th></tr></thead>
+    <tbody>${Array.from({ length: 30 }, (_, i) => `<tr><td>${i}</td><td>${["a", "b"][i % 2]}</td></tr>`).join("")}</tbody></table>
+  <button type="button" data-tip="a tip">tipped</button>
+  <div class="cmd"><code class="cmd-text">npm i x</code><button type="button" data-copy aria-label="copy"></button></div>
+  <div class="notice" role="status"><p>hello</p><button type="button" class="notice-dismiss" aria-label="dismiss"></button></div></section>
+<section class="doc" id="s2"><h2>two</h2>
+  <button type="button" data-dialog-open="tw-dlg">open</button><dialog class="dialog" id="tw-dlg"><h2 class="dialog-title">d</h2><button type="button" data-dialog-close>x</button></dialog>
+  <figure class="diagram" id="dgm"><svg viewBox="0 0 10 10" aria-label="flow"><rect width="5" height="5"/></svg></figure>
+  <div id="ticks" data-label="pollers"></div><p>updated <span data-ago="2026-09-29T08:00:00Z">then</span></p>
+  <table><tbody><tr><td class="pick"><input type="checkbox" aria-label="pick"></td><td>x</td></tr></tbody></table>
+  <details class="fold"><summary>fold</summary><p>folded</p></details>
+  <section data-term><p class="prompt">ls</p><pre data-term-out>out</pre></section></section></main>`;
+const TWICE_PAGE = `<!doctype html><html lang="en" data-theme="warm"><head><meta charset="utf-8">
+<link rel="stylesheet" href="/dist/danieldeusing-design.css"></head><body>${TWICE_BODY}
+<script type="module">
+import * as dd from "/runtime/index.js";
+window.dd = dd;
+const args = { initDiagramZoom: [".diagram"], initMinimap: [{ sections: "main > section" }] };
+window.initAll = () => { for (const name of ${JSON.stringify(INITS)}) dd[name](...(args[name] || [])); };
+window.__ddTicks = [{ mount: "ticks", key: "a", label: "poller a", lastAt: new Date(Date.now() - 5000).toISOString(), intervalMs: 60000 }];
+window.ready = true;
+</script></body></html>`;
+// Before any page script: count what the runtime adds, and every record the page makes.
+const TWICE_PROBE = `(() => {
+  const W = window.__twice = { live: [], observers: 0, observes: 0, records: 0, where: [] };
+  const origin = () => (new Error().stack.split("\\n").slice(2).map((l) => l.match(/\\/(runtime\\/[a-z]+\\.js):(\\d+)/)).find(Boolean) || ["", "page"])[1];
+  const add = EventTarget.prototype.addEventListener, remove = EventTarget.prototype.removeEventListener;
+  EventTarget.prototype.addEventListener = function (type, fn, options) {
+    W.live.push({ target: this, type, fn, capture: options === true || !!options?.capture, from: origin() });
+    return add.call(this, type, fn, options);
+  };
+  EventTarget.prototype.removeEventListener = function (type, fn, options) {
+    const capture = options === true || !!options?.capture;
+    const i = W.live.findIndex((l) => l.target === this && l.type === type && l.fn === fn && l.capture === capture);
+    if (i !== -1) W.live.splice(i, 1);
+    return remove.call(this, type, fn, options);
+  };
+  const Recorder = MutationObserver;
+  for (const name of ["MutationObserver", "ResizeObserver", "IntersectionObserver"]) {
+    const Real = window[name];
+    window[name] = class extends Real {
+      constructor(...a) { super(...a); W.observers += 1; W.where.push(name + " " + origin()); }
+      observe(...a) { W.observes += 1; W.where.push(name + ".observe " + origin()); return super.observe(...a); }
+    };
+  }
+  const quiet = (node) => !!(node.nodeType === 1 ? node : node.parentElement)?.closest?.("#ticks, [data-ago]");
+  new Recorder((records) => { for (const r of records) if (!quiet(r.target)) { W.records += 1; W.recordLog.push(r.type + ":" + (r.attributeName || "") + ":" + (r.target.nodeName || "")); } })
+    .observe(document, { childList: true, subtree: true, attributes: true, characterData: true });
+  W.recordLog = [];
+  W.snap = () => ({ listeners: W.live.length, observers: W.observers, observes: W.observes, nodes: document.getElementsByTagName("*").length });
+  W.settle = async (quietMs = 600, maxMs = 8000) => {
+    const start = performance.now(); let last = W.records, since = performance.now();
+    while (performance.now() - start < maxMs) {
+      await new Promise((ok) => setTimeout(ok, 50));
+      if (W.records !== last) { last = W.records; since = performance.now(); } else if (performance.now() - since >= quietMs) return true;
+    }
+    return false;
+  };
+})();`;
+if (!CHROME) {
+  console.log("      the init-twice section SKIPPED — no headless chromium on this machine.");
+  if (process.env.DD_REQUIRE_BROWSER === "1") check("DD_REQUIRE_BROWSER=1: every init is called twice in a browser", () => ["no headless chromium on this machine"]);
+} else {
+  const server = await serve(root, { "/__twice.html": TWICE_PAGE });
+  const browser = await launch("integration");
+  // Bounded in node: toc.js's second spy hung the renderer, and a hung renderer never answers.
+  const within = (promise, ms = 15000) => Promise.race([promise, new Promise((ok) => setTimeout(() => ok("no answer in " + ms + " ms — the tab hung"), ms))]);
+  try {
+    await browser.send("Page.addScriptToEvaluateOnNewDocument", { source: TWICE_PROBE });
+    await browser.navigate(`${server.origin}/__twice.html`);
+    await browser.until("window.ready === true");
+    const first = await within(browser.evaluate(`(async () => { initAll(); await __twice.settle(); return { ...__twice.snap(), at: __twice.where.length }; })()`));
+    const second = typeof first === "string" ? first : await within(browser.evaluate(`(async () => { __twice.records = 0; __twice.recordLog = [];
+      const live = __twice.live.length; initAll(); await __twice.settle(800);
+      return { ...__twice.snap(), records: __twice.records, recordLog: __twice.recordLog.slice(0, 12),
+        added: __twice.live.slice(live).map((l) => l.type + " " + l.from), observed: __twice.where.slice(${typeof first === "string" ? 0 : "FIRST_AT"}) }; })()`.replace("FIRST_AT", String(first.at ?? 0))));
+    check(`every one of the ${INITS.length} init* called a second time adds 0 listeners, 0 observers and 0 nodes, and writes nothing`, () => {
+      if (typeof first === "string" || typeof second === "string") return [String(typeof first === "string" ? first : second)];
+      const out = [];
+      for (const k of ["listeners", "observers", "observes", "nodes"]) if (second[k] !== first[k]) out.push(`${k}: ${first[k]} -> ${second[k]}`);
+      if (second.records) out.push(`${second.records} mutation record(s): ${second.recordLog.join(" ")}`);
+      if (second.added.length) out.push(`added: ${second.added.join(", ")}`);
+      if (second.observed.length) out.push(`observers: ${second.observed.join(", ")}`);
+      return out;
+    });
+    // What each extra call used to break, driven: the burger still opens, one Escape in a menu inside the
+    // open nav closes only that menu, and a figure wired by a later call opens in the one view.
+    const behaviour = typeof second === "string" ? second : await within(browser.evaluate(`(async () => {
+      const frame = () => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      document.getElementById("burger").click();
+      const opens = document.getElementById("burger").getAttribute("aria-expanded");
+      document.getElementById("nav-menu-sum").click(); await frame();
+      document.getElementById("nav-menu-sum").focus();
+      return { opens, menu: document.getElementById("nav-menu").open };
+    })()`));
+    let escape = behaviour;
+    if (typeof behaviour === "object") {
+      for (const type of ["rawKeyDown", "keyUp"]) await browser.send("Input.dispatchKeyEvent", { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+      escape = await within(browser.evaluate(`({ menu: document.getElementById("nav-menu").open, nav: document.getElementById("site-nav").classList.contains("open") })`));
+    }
+    check("...the burger, initialised twice, still opens on one press", () =>
+      typeof behaviour === "object" && behaviour.opens === "true" ? [] : [JSON.stringify(behaviour)]);
+    check("...and one Escape in a menu open inside the open burger closes the menu and leaves the nav open", () =>
+      typeof escape === "object" && behaviour.menu === true && escape.menu === false && escape.nav === true ? [] : [JSON.stringify({ behaviour, escape })]);
+    const zoom = typeof second === "string" ? second : await within(browser.evaluate(`(async () => {
+      const frame = () => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      document.getElementById("s2").insertAdjacentHTML("beforeend", '<figure class="diagram" id="dgm2"><svg viewBox="0 0 10 10" aria-label="later"><rect width="5" height="5"/></svg></figure>');
+      dd.initDiagramZoom(".diagram");
+      for (const id of ["dgm", "dgm2"]) { document.getElementById(id).click(); await frame(); document.querySelector("dialog.dgm-overlay[open]")?.close(); await frame(); }
+      return document.querySelectorAll("dialog.dgm-overlay").length; })()`));
+    check("...and a figure a later initDiagramZoom() wires opens in the page's one view: 1 overlay <dialog> after both have opened", () =>
+      zoom === 1 ? [] : [`${zoom} overlay dialogs`]);
+  } finally {
+    browser.close();
+    server.close();
+  }
 }
 
 console.log(failures ? `\ncheck-integration: ${failures} FAILED` : "\ncheck-integration: all checks passed");

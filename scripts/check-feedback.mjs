@@ -668,7 +668,8 @@ await check("feedback.md's examples follow the same rule, show a failed result b
   const docs = blocks.map((html) => new DOMParser().parseFromString(html, "text/html"));
   const problems = docs.flatMap((doc) => ${ROLES}(doc));
   for (const b of docs.flatMap((doc) => [...doc.querySelectorAll(".banner")]))
-    if (/frozen/.test(b.textContent) && b.getAttribute("role") !== "status") problems.push("the frozen banner has role=" + b.getAttribute("role") + ", wants status");
+    // In a role=status region, its own or one that was already there (the ruling puts it inside one).
+    if (/frozen/.test(b.textContent) && !b.closest("[role='status']")) problems.push("the frozen banner has role=" + b.getAttribute("role") + " and sits in no role=status region");
   const failedResult = docs.some((doc) => [...doc.querySelectorAll(".notice--lg[role='alert']")]
     .some((n) => !n.parentElement.closest("[role='status'], [role='alert']")));
   if (!failedResult) problems.push("no failed result (a --lg notice with role=alert) is shown beside its status slot");
@@ -966,8 +967,12 @@ const paintOf = async (sel, kind, pseudo = "") => {
   if (kind === "glyph" && pseudo) t = await pseudoBox(sel, pseudo);
   // a ring is read along its top band only (2px), but it is the whole outline box its ink must sit in
   const clip = { x: t.x - PAD, y: t.y - PAD, width: t.w + 2 * PAD, height: (kind === "ring" ? 2 : t.h) + 2 * PAD, scale: 1 };
+  // Two animation frames before every capture (RULES-CROSSCUT X1): a capture taken as soon as a
+  // theme, a palette, a hidden mark or a focus changed can read the frame before that paint landed.
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const drawn = decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip })).data, "base64"));
   await evaluate(HIDE[kind](sel, pseudo));
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const bare = decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip })).data, "base64"));
   await evaluate(UNHIDE);
   // the target's box in the capture's pixels (device pixels: k per CSS px), where the code believes the clip was placed

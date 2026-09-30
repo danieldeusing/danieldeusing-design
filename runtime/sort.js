@@ -25,8 +25,10 @@ let installed = false;
  * both): an ascending list's button says "sort descending". The arrow already shows the state;
  * a name repeating it would leave a screen-reader user guessing what the press does.
  */
-const syncLabel = (button) =>
-  button.setAttribute("aria-label", button.dataset.dir === "desc" ? "sort ascending" : "sort descending");
+const syncLabel = (button) => {
+  const label = button.dataset.dir === "desc" ? "sort ascending" : "sort descending";
+  if (button.getAttribute("aria-label") !== label) button.setAttribute("aria-label", label);
+};
 
 function announce(control) {
   const button = control.querySelector(".sort-dir");

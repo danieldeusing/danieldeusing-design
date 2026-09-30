@@ -306,8 +306,12 @@ export function initTooltips() {
     return [...node.childNodes].map(rendered).join(" ");
   }
   function accessibleName(el) {
+    // The reflected list where there is one: it holds a reference set as nodes (select.js names its
+    // trigger that way), which the attribute does not show.
     const ids = el.getAttribute("aria-labelledby");
-    const byIds = ids ? ids.split(/\s+/).map((id) => { const n = document.getElementById(id); return n ? rendered(n) : ""; }).join(" ") : "";
+    const refs = "ariaLabelledByElements" in el ? el.ariaLabelledByElements || []
+      : ids ? ids.split(/\s+/).map((id) => document.getElementById(id)) : [];
+    const byIds = refs.map((n) => (n ? rendered(n) : "")).join(" ");
     if (byIds.trim()) return byIds;
     const label = el.getAttribute("aria-label");
     if (label?.trim()) return label;

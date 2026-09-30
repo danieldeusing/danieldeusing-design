@@ -40,17 +40,22 @@
  *
  * Entries and targets rendered after the call are picked up, and a target that goes is let go (one
  * MutationObserver, as the other runtime modules do), so a page that builds its sections from data
- * needs no second call. The mark is re-asserted when a renderer rewrites it: a list re-rendered
+ * needs no second call. The mark is recomputed when a renderer rewrites it: a list re-rendered
  * from markup that never carries `aria-current` (cockpit's dom-patch writes attributes in place)
  * would otherwise lose the mark until the next scroll crossed a line.
+ *
+ * ONE SPY PER ROOT: a second call returns the first call's handle. And a rewritten mark is answered by
+ * recomputing it from where the targets are, never by re-asserting what this instance last stored.
+ * Re-asserting hung the tab: two spies over the same entries (a second call, or `initToc()` and then
+ * `initToc(aside)`) each wrote back their own `current` over the other's, in microtasks, for ever.
  *
  * @param {ParentNode} [root=document] where the entries live
  * @returns {{ destroy(): void }} stops the spy and clears the mark
  */
 export function initToc(root = document) {
+  if (spies.has(root)) return spies.get(root);
   const observed = new Set();
   let current = null;
-  let line = innerHeight * 0.3;
 
   const links = () => [...root.querySelectorAll("[data-toc-link]")];
   // Writes only what changed: this runs on every re-render the page does, not only on a scroll.
@@ -63,8 +68,11 @@ export function initToc(root = document) {
   };
   // The last entry, in the ORDER OF THE LIST (the order of the page), whose target's top has
   // reached the line — read from where the targets are now, never from which ones crossed.
+  // The line is the band's bottom, computed the same way by every spy on the page: two spies over
+  // one entry must never disagree about which side of it a target is on.
   const update = () => {
     current = null;
+    const line = document.documentElement.clientHeight * 0.3;
     for (const link of links()) {
       const target = document.getElementById(link.getAttribute("data-toc-link"));
       if (target && target.getBoundingClientRect().top <= line) current = link.getAttribute("data-toc-link");
@@ -72,14 +80,7 @@ export function initToc(root = document) {
     mark();
   };
 
-  const spy = new IntersectionObserver(
-    (entries) => {
-      const bounds = entries[0]?.rootBounds;
-      if (bounds) line = bounds.bottom;
-      update();
-    },
-    { rootMargin: "0px 0px -70% 0px" },
-  );
+  const spy = new IntersectionObserver(update, { rootMargin: "0px 0px -70% 0px" });
 
   const observeTargets = () => {
     // A target that left the page is let go, or a page that redraws its sections every poll would
@@ -113,18 +114,24 @@ export function initToc(root = document) {
       observeTargets();
       update();
     } else if (rewritten) {
-      mark();
+      update();
     }
   });
   // The whole document, not `root`: the entries live in root, their targets anywhere on the page.
   watcher.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-current", "data-toc-link"] });
 
-  return {
+  const handle = {
     destroy() {
+      spies.delete(root);
       spy.disconnect();
       watcher.disconnect();
       current = null;
       mark();
     },
   };
+  spies.set(root, handle);
+  return handle;
 }
+
+// root -> its spy's handle (see ONE SPY PER ROOT above).
+const spies = new WeakMap();

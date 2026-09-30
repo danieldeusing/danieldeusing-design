@@ -595,6 +595,46 @@ await check("fix round 3 — two engine tables sharing data-table-id \"twin\" dr
   JSON.parse(twinWarnings).length === 1 && JSON.parse(twinWarnings)[0].includes("data-table-id"), twinWarnings);
 await evaluate(`document.getElementById("later").replaceChildren(); null`);
 
+/* ── S1 · a mount repainted with innerHTML retires the table it replaced ───────────────────────────
+   The pattern of every page that does not patch. The observer the engine puts on the table's parent
+   outlived the table, so each repaint kept the old instance, its header controls and its rows alive:
+   measured, +13,800 nodes, +1,100 listeners and +200 MutationObservers over 50 repaints. A repaint is
+   also not a patcher rebuilding the table, so it draws no contract warning. Counted after a garbage
+   collection, once the count's timer has run. */
+await send("HeapProfiler.enable");
+const liveObservers = async () => {
+  const { result: proto } = await send("Runtime.evaluate", { expression: "MutationObserver.prototype" });
+  const { objects } = await send("Runtime.queryObjects", { prototypeObjectId: proto.objectId });
+  const { result } = await send("Runtime.callFunctionOn", { objectId: objects.objectId, functionDeclaration: "function () { return this.length; }", returnByValue: true });
+  await send("Runtime.releaseObject", { objectId: objects.objectId });
+  await send("Runtime.releaseObject", { objectId: proto.objectId });
+  return result.value;
+};
+const heap = async () => {
+  await sleep(700);
+  await send("HeapProfiler.collectGarbage");
+  await sleep(50);
+  await send("HeapProfiler.collectGarbage");
+  const { nodes, jsEventListeners } = await send("Memory.getDOMCounters");
+  return { nodes, listeners: jsEventListeners, observers: await liveObservers() };
+};
+const REPAINT = `<table data-table-tools data-table-id="s1-leak" aria-label="leak"><thead><tr><th data-col="a">a</th><th data-col="b" data-filter="pick">b</th></tr></thead><tbody>${
+  Array.from({ length: 30 }, (_, i) => `<tr><td>r${i}</td><td>${i % 3}</td></tr>`).join("")}</tbody></table>`;
+const repaint = (times) => evaluate(`(async () => { const later = document.getElementById("later");
+  for (let i = 0; i < ${times}; i += 1) { later.innerHTML = ${JSON.stringify(REPAINT)}; await new Promise((r) => setTimeout(r, 0)); await new Promise((r) => setTimeout(r, 0)); } })()`);
+await evaluate(`window.warned = []; if (!window.warnWrapped) { window.warnWrapped = true; const warn = console.warn; console.warn = (...args) => { window.warned.push(args.join(" ")); warn.apply(console, args); }; } null`);
+await repaint(5);
+const leakBefore = await heap();
+await repaint(50);
+const leakAfter = await heap();
+const leakGrowth = Object.fromEntries(Object.keys(leakBefore).map((k) => [k, leakAfter[k] - leakBefore[k]]));
+await check("S1 — 50 innerHTML repaints of an engine table's mount leave nothing behind: 0 more nodes, listeners and MutationObservers",
+  async () => leakGrowth.nodes <= 0 && leakGrowth.listeners <= 0 && leakGrowth.observers <= 0, JSON.stringify({ before: leakBefore, growth: leakGrowth }));
+await check("...and a repaint is not a patcher rebuilding the table: no contract warning",
+  async () => (await evaluate(`window.warned.filter((w) => w.includes("data-table-bar")).length`)) === 0,
+  () => evaluate(`JSON.stringify(window.warned)`));
+await evaluate(`document.getElementById("later").replaceChildren(); window.warned = []; null`);
+
 const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
 const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
   .find((path) => path && existsSync(path));
@@ -710,6 +750,35 @@ if (!DOM_PATCH) {
   await sleep(100);
   const clearWarned = await barWarnings();
   await check("...and a page that fills its mount with a different table, then clears it, is not warned", async () => JSON.parse(clearWarned).length === 0, clearWarned);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
+  // S3: a select named by a <label for> the renderer draws WITHOUT an id. An id written onto that label
+  // is an attribute no markup carries, so the patcher, matching by id, never found the label again: it
+  // built a new one and rebuilt the rest of the mount after it (the table among it), and the trigger's
+  // aria-labelledby named a node that was gone. The name is read from the accessibility tree.
+  await send("Accessibility.enable");
+  await send("DOM.enable");
+  const triggerName = async () => {
+    const { root: doc } = await send("DOM.getDocument", { depth: 0 });
+    const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector: "#later .select-trigger" });
+    const { nodes } = await send("Accessibility.getPartialAXTree", { nodeId, fetchRelatives: false });
+    return nodes[0]?.name?.value ?? null;
+  };
+  const S3 = (n) => '<label for="s3-lines">lines</label> <select id="s3-lines"><option>50</option><option selected>200</option></select>' + H1_BAR +
+    '<table data-table-tools data-table-id="s3-runs" aria-label="s3 runs"><thead><tr><th data-col="v">v</th></tr></thead><tbody>' + rowsOf(n) + '</tbody></table>';
+  await evaluate(`(async () => { localStorage.clear(); const later = document.getElementById("later"); later.innerHTML = ${JSON.stringify(S3(4))};
+    (await import("/runtime/select.js")).initSelects(later); })()`);
+  await sleep(150);
+  await evaluate(`window.keepTable = document.querySelector("#later table"); window.keepLabel = document.querySelector("#later label"); null`);
+  const s3 = [];
+  for (let i = 0; i < 7; i += 1) {
+    await evaluate(`window.cockpitPatch(document.getElementById("later"), ${JSON.stringify("SOURCE")}); null`.replace('"SOURCE"', JSON.stringify(S3(4 + (i % 2)))));
+    await sleep(150);
+    s3.push({ name: await triggerName(), ...(await evaluate(`({ table: document.querySelector("#later table") === window.keepTable,
+      label: document.querySelector("#later label") === window.keepLabel && !window.keepLabel.id })`)) });
+  }
+  await check("S3 — 7 cockpitPatch polls over a select whose <label> has no id: the label is never given one, the same table node survives every poll, and the trigger keeps its name",
+    async () => s3.every((p) => p.table && p.label && /^lines\b/.test(p.name || "")), JSON.stringify(s3));
   await evaluate(`document.getElementById("later").replaceChildren(); null`);
 }
 

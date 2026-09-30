@@ -86,12 +86,35 @@ ${realControls ? '<link rel="stylesheet" href="/src/controls.css">' : `<style>${
 <dialog class="dialog" open><footer class="dialog-foot form-actions form-actions--ruled" id="foot"><button type="button">ok</button></footer></dialog>
 </body></html>`;
 
+// A dialog opened from a dropdown menu's item: once by `data-dialog-open` on the item, once by a page
+// handler calling openDialog(dialog, item). `?dialogs-first` runs initDialogs() before initDropdowns().
+const HARNESS_MENU_DIALOG = (dialogsFirst) => `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/base.css"><link rel="stylesheet" href="/src/components.css">
+<link rel="stylesheet" href="/src/overlays.css"></head><body>
+<details class="dropdown" id="md"><summary id="md-sum">actions</summary><ul class="dropdown-panel">
+  <li><button type="button" class="dropdown-item" id="md-attr" data-dialog-open="md-dlg">edit…</button></li>
+  <li><button type="button" class="dropdown-item" id="md-page">delete…</button></li></ul></details>
+<dialog class="dialog" id="md-dlg" aria-label="menu dialog"><button type="button" data-dialog-close>close</button></dialog>
+<script type="module">
+import { initDropdowns } from "/runtime/dropdown.js";
+import { initDialogs, openDialog } from "/runtime/dialog.js";
+${dialogsFirst ? "initDialogs(); initDropdowns();" : "initDropdowns(); initDialogs();"}
+const item = document.getElementById("md-page");
+item.addEventListener("click", () => openDialog("md-dlg", item));
+window.menuReady = true;
+</script></body></html>`;
+
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
   const url = new URL(req.url, "http://x").pathname;
   if (url === "/harness/foot-order") {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(HARNESS_FOOT);
+    return;
+  }
+  if (url === "/harness/menu-dialog") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(HARNESS_MENU_DIALOG(new URL(req.url, "http://x").searchParams.has("dialogs-first")));
     return;
   }
   const path = normalize(join(root, decodeURIComponent(url)));
@@ -329,7 +352,12 @@ const diffIn = (shown, hidden, box) => {
   }
   return { changed, ratio: Math.round(ratio * 100) / 100, ownInk: ink };
 };
-const screenshot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
+// Two animation frames before every capture (RULES-CROSSCUT X1): a capture taken as soon as a theme,
+// a palette, a hidden mark or a focus changed can read the frame before that paint landed.
+const screenshot = async () => {
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
+  return decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
+};
 
 const axOf = async (selector) => {
   const { root: doc } = await send("DOM.getDocument", { depth: 0 });
@@ -1382,6 +1410,27 @@ try {
   for (const [name, { kind, themes }] of table) {
     const cell = (t) => { const v = Object.values(themes[t]); return new Set(v).size === 1 ? v[0].toFixed(2) : v.map((x) => x.toFixed(2)).join(" / "); };
     console.log(`| ${name} | ${kind === "text" ? "4.5" : kind === "edge" ? "3.0" : "—"} | ${THEMES.map(cell).join(" | ")} |`);
+  }
+
+  /* ── a dialog opened from a menu item hands focus back to the menu's summary ─────────────────── */
+  section("dialog.js — opened from a dropdown menu item, focus comes back to the menu");
+  // The menu closed when its item was chosen, and a control inside a closed <details> cannot take
+  // focus: every candidate was that item, and focus fell to <body>.
+  for (const order of ["dropdowns-first", "dialogs-first"]) {
+    for (const [how, item, keyTo] of [["data-dialog-open on the item", "md-attr", "Home"], ["a page handler calling openDialog(dialog, item)", "md-page", "End"]]) {
+      await send("Page.navigate", { url: `${BASE}/harness/menu-dialog?${order}` });
+      for (let i = 0; i < 100 && !(await evaluate("window.menuReady === true").catch(() => false)); i += 1) await sleep(50);
+      await evaluate(`document.getElementById("md-sum").focus(); null`);
+      await key("Enter");
+      await key(keyTo);
+      const onItem = await evaluate(`document.activeElement?.id`);
+      await key("Enter");
+      const opened = await evaluate(`document.getElementById("md-dlg").open`);
+      await key("Escape");
+      const back = await evaluate(`document.activeElement?.id || document.activeElement?.tagName`);
+      await check(`${order.replace("-", " ")}, ${how}: Enter opens the dialog, Escape hands focus to the menu's summary, not <body>`,
+        () => onItem === item && opened && back === "md-sum", { onItem, opened, back });
+    }
   }
 } catch (error) {
   failures += 1;

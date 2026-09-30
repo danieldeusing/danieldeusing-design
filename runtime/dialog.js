@@ -156,11 +156,24 @@ function onClose(event) {
   const again = dialog.id
     ? document.querySelector(`[data-dialog-open="${CSS.escape(dialog.id)}"]:not([aria-disabled="true"])`)
     : null;
-  for (const el of [state.returnTo, state.opener, again]) {
-    if (!el || el === document.body || !el.isConnected) continue;
+  for (const candidate of [state.returnTo, state.opener, again]) {
+    if (!candidate || candidate === document.body || !candidate.isConnected) continue;
+    const el = shownFor(candidate);
     el.focus();
     if (document.activeElement === el) return;
   }
+}
+
+/* A menu item that opened the dialog sits in a <details> the menu closed when it was chosen, and a
+   control in a closed <details> cannot take focus: every candidate was that item, and focus fell to
+   <body>. The summary of the outermost closed <details> stands in for it: that is the one on screen. */
+function shownFor(el) {
+  let shown = el;
+  for (let shut = el.closest("details:not([open])"); shut; shut = shut.parentElement?.closest("details:not([open])")) {
+    const summary = shut.querySelector(":scope > summary");
+    if (summary && !summary.contains(el)) shown = summary;
+  }
+  return shown;
 }
 
 /* The closers a committing footer switches off, marked so, and unmarked when the write returns.

@@ -164,8 +164,8 @@ function dataRows(table) {
 }
 
 /*
- * Built ONCE per table and then only updated — the status text and the two disabled
- * flags. Rebuilding it per page change would destroy and re-create the <select>, which
+ * Built ONCE per table and then only updated — the status text and the two
+ * aria-disabled flags. Rebuilding it per page change would destroy and re-create the <select>, which
  * initSelects() has enhanced: the reader would lose the open list mid-click and the
  * focus with it.
  *
@@ -220,10 +220,12 @@ function buildBar(instance) {
   bar.append(status, label, nav);
 
   previous.addEventListener("click", () => {
+    if (off(previous)) return;
     instance.page -= 1;
     render(instance);
   });
   next.addEventListener("click", () => {
+    if (off(next)) return;
     instance.page += 1;
     render(instance);
   });
@@ -261,8 +263,20 @@ function render(instance) {
   if (!useful) return;
 
   instance.status.textContent = total ? `${window_.from + 1}–${window_.to} of ${total}` : "no rows";
-  instance.previous.disabled = window_.page <= 1;
-  instance.next.disabled = window_.page >= window_.pageCount;
+  turnOff(instance.previous, window_.page <= 1);
+  turnOff(instance.next, window_.page >= window_.pageCount);
+}
+
+/*
+ * OFF IS `aria-disabled`, NEVER `disabled` (the X5 rule). Enter on "next" that reaches the last page
+ * disables the very button that holds focus, and a `disabled` button throws focus to <body>: the
+ * next Tab started from the top of the page. `aria-disabled` keeps it focusable, says it is off, and
+ * the click handlers above ignore it.
+ */
+const off = (button) => button.getAttribute("aria-disabled") === "true";
+function turnOff(button, on) {
+  if (on && !off(button)) button.setAttribute("aria-disabled", "true");
+  else if (!on && button.hasAttribute("aria-disabled")) button.removeAttribute("aria-disabled");
 }
 
 function enhance(table) {

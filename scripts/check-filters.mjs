@@ -1264,22 +1264,29 @@ await check("search: an OPEN autocomplete keeps its Escape — it reaches the pa
   async () => (await evaluate("escapes")) === 2 && (await evaluate("lastPrevented")) === false);
 await evaluate(`$("#q3").removeAttribute("aria-expanded"); null`);
 
-// The pending line: markPending at t=0 and t=250 with ms=400 → still pending at t≈500 (the first
-// call alone would have expired at 400), gone by t≈800 (400 after the second).
-await evaluate(`window.t0 = performance.now(); markPending($("#sf"), 400); null`);
+// The pending line: markPending at t=0 and t≈250 with ms=400 → still pending past t=400 (the first
+// call alone would have expired there), gone 400 after the second. The sequence runs IN THE PAGE and is
+// timed from each call as it happened: the timers under test are the page's, and a protocol round trip
+// between a wait and its read is no part of them. On a loaded Linux host the old fixed t=800 read came
+// before the second call's own deadline and saw the line still pending.
+const pend = await evaluate(`(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, Math.max(0, ms))), on = () => $("#sf").hasAttribute("data-pending");
+  const t0 = performance.now(); markPending($("#sf"), 400);
+  const marked = [on(), $("#sf").style.getPropertyValue("--pending-ms"), cs("#sf", "animation-name", "::after"), cs("#sf", "animation-duration", "::after")];
+  await sleep(t0 + 250 - performance.now());
+  const t1 = performance.now(); markPending($("#q"), 400); // anything inside the field will do
+  await sleep(t0 + 500 - performance.now());
+  const read = performance.now() - t0, restarted = on();
+  await sleep(t1 + 550 - performance.now());
+  return { marked, second: Math.round(t1 - t0), read: Math.round(read), restarted, settled: !on() }; })()`);
 await check("pending: markPending marks the field and gives the line its duration",
-  async () => (await evaluate(`$("#sf").hasAttribute("data-pending")`)) &&
-    (await evaluate(`$("#sf").style.getPropertyValue("--pending-ms")`)) === "400ms");
+  () => pend.marked[0] === true && pend.marked[1] === "400ms", JSON.stringify(pend));
 await check("pending: the line is the dd-drain animation, over exactly that long",
-  async () => (await evaluate(`cs("#sf", "animation-name", "::after")`)) === "dd-drain" &&
-    (await evaluate(`cs("#sf", "animation-duration", "::after")`)) === "0.4s");
-await evaluate("new Promise((r) => setTimeout(r, 250))");
-await evaluate(`markPending($("#q"), 400); null`); // anything inside the field will do
-await evaluate(`new Promise((r) => setTimeout(r, Math.max(0, 500 - (performance.now() - t0))))`);
+  () => pend.marked[2] === "dd-drain" && pend.marked[3] === "0.4s", JSON.stringify(pend));
+// read between the first call's deadline and the second's, with the second made before the first expired
 await check("pending: each call RESTARTS it — still pending past the first call's deadline",
-  () => evaluate(`$("#sf").hasAttribute("data-pending")`));
-await evaluate(`new Promise((r) => setTimeout(r, Math.max(0, 800 - (performance.now() - t0))))`);
-await check("pending: ...and it settles `ms` after the LAST call", async () => !(await evaluate(`$("#sf").hasAttribute("data-pending")`)));
+  () => pend.restarted && pend.second < 400 && pend.read > 400 && pend.read < pend.second + 400, JSON.stringify(pend));
+await check("pending: ...and it settles `ms` after the LAST call", () => pend.settled, JSON.stringify(pend));
 await evaluate(`markPending($("#sf2"), 5000); null`);
 await click(`$("#sf2 .search-clear")`);
 await check("pending: clearing the box settles it at once — the pending query was thrown away",

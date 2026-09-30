@@ -107,10 +107,13 @@ already carries two, and if you cannot write the sentence you do not have an exc
    - `{{TAGLINE}}` — the full-width lede under the title (it has no max-width — let it run full).
    - **Sections** — one `<section class="doc" id="SLUG" data-term>` per topic, each with a `.prompt`
      header and a `[data-term-out]` body. Add/remove sections to fit the subject; give each a unique
-     `id`. Inside, use `.prompt` for shell-style headers, `ol.steps` for ordered steps, `ul.plain`
-     for lists, `table.kv` (see below) for key/value specs, `pre.block` + `code.inline` for code,
-     `.grid` + `.card-terminal` for cards, `.eli5` for callouts/tips, `.ascii-rule` for dividers,
-     `.link-quiet` for inline links, and `pre.mermaid` for diagrams (see step 5).
+     `id`. Every component below is the design system's, and the template declares none of them
+     (0.61.0): `.prompt` for shell-style headers, `ol.steps` for ordered steps, `ul.plain` for lists,
+     `table.kv` (see below) for key/value specs, a bare `<pre>` for a code block and a bare `<code>`
+     for inline code (no class; `base.css` draws both), a `ul.card-grid` of `.card-terminal`s for
+     cards, `.eli5` for callouts/tips, `.ascii-rule` for dividers, `.link-quiet` for inline links,
+     and `pre.mermaid` for diagrams (see step 5). The title is the template's `h1.page-title` and
+     the tagline its `.lede`.
    - **Reader first.** Open the page with a TL;DR: three to five bullets in the first section
      (`#overview`), for a reader who reads it once. Put a diagram before the paragraph it
      explains. Fold detail into `details.fold`.
@@ -197,8 +200,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
    from an older page — `bin/design-conformance` check 5 fails a page that applies a zoom.
 
    **Every measurement in the page's `<style>` block is a token with a literal fallback.**
-   The local CSS is the page's own *layout* only (`.wrap`, `.content`, `ol.steps`, `table.kv`, …) —
-   never a restyle of the system's own classes. `.minimap` is the system's, not the page's: do not
+   The local CSS is the page's own *layout* only (the template keeps `.wrap`, `section.doc`,
+   `.body` and `pre.mermaid`) — never a restyle of the system's own classes (`ol.steps`,
+   `table.kv`, `.lede`, `code`, `pre` and the rest are the system's). `.minimap` is the system's, not the page's: do not
    declare it locally, the same as any other class in the shared vocabulary. Within it:
    - **No bare numbers.** The column is `max-width: var(--content-w, 90rem)` +
      `padding-inline: var(--content-pad, 1.5rem)`; sizes are `var(--fs-base|--fs-lg|--fs-xl|--fs-2xl, <literal>)`
@@ -210,8 +214,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
      opened over `file://` with no route to the CDN gets no stylesheet at all — the site-absolute
      `onerror` path does not resolve there — and a bare `var(--content-w)` resolves to *nothing*:
      full-bleed page, collapsed type. Use the token's own value as the literal, so an offline
-     reader gets the same column as every live surface — `90rem` / `1.5rem` / `1.7rem` (h1) / `0.75rem` (`pre`, as
-     `var(--fs-base, 0.75rem)`) / `1.5` (line-height). Tables get no entry: their size is the
+     reader gets the same column as every live surface — `90rem` / `1.5rem` / `0.75rem`
+     (`pre.mermaid`, as `var(--fs-base, 0.75rem)`) / `1.5` (line-height). The title, code and
+     tables get no entry: they are the system's elements. Tables' size is the
      system's (`table { font-size: var(--fs-base) }`). Neither does the minimap — it is fixed, sized in the
      system's own CSS, and a page that never loads that CSS has no minimap to size.
 
@@ -348,7 +353,8 @@ already carries two, and if you cannot write the sentence you do not have an exc
   - rounded corners: `4px` on inline code chips, badges and verdict tags, `6px` on `pre` blocks,
     warning boxes and the Mermaid source fallback (twenty declarations, 2026-08-07; Daniel: "We
     have no rounded corners.");
-  - a second type size for code: `code.inline { font-size: 0.92em }` (2026-09-08), and `pre` at
+  - a second type size for code: a local `code.inline { font-size: 0.92em }` (2026-09-08; inline
+    code is the bare `<code>` now, with no class), and `pre` at
     `var(--fs-md, 0.86rem)`, whose fallback kept 13.76px alive after `--fs-md` was deleted
     (17 pages, 2026-08-11);
   - a status colour written as a hex outside a Mermaid `classDef`: `#a02c2c` 41 times across

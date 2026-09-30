@@ -24,17 +24,24 @@ locally are now the system's, so those local copies can go (see *Changed*).
   all four themes; in forced colours the segments keep their words.
 - **Stacked blocks keep a gap** (`base.css`). A callout, a table toolbar, a table, a fold and the
   other `STACKED_BLOCKS` keep 0.6rem above them even when a JS-painted page wraps each in its own
-  unclassed mount `<div>` or tab panel, where sibling rhythm rules cannot see them touch. A fold after
-  a fold stays flush, and `data-flush` opts a block out.
+  unclassed mount `<div>` or tab panel, where sibling rhythm rules cannot see them touch. Only inside a
+  container that flows as a column (an unclassed, unstyled `<div>`, a section, main, `.wrap`, a tab
+  panel, a fold's, dialog's or panel's body), never inside a class-carrying `<div>` or an element with
+  a `style` attribute, where it would drop one item of a flex or grid row. A fold after a fold stays
+  flush, and `data-flush` opts a block out. Not covered, and found by `findFlushBlocks()` instead: an
+  empty mount between two blocks, a classed mount, a mount two deep.
 - **`findFlushBlocks(root)`** and **`STACKED_BLOCKS`** (`runtime/rhythm.js`, also in the barrel): a
   consumer's browser check can ask a rendered page for two stacked blocks with 0px between them.
 
 ### Changed
 
-- **Table body text is `--foreground` in every table.** `.muted`, `.text-muted-foreground` and
-  `.when-exact` inside a cell read at full strength; header cells stay muted chrome; colour that
-  means something (tones, tags, state words, links, failures) and a dimmed or disabled row keep their
-  colour. In a Tailwind app a `text-muted-foreground` utility on a cell still wins.
+- **Table text is `--foreground`.** The table sets it, so a table inside a muted container reads at
+  full strength, and a colour set on a row, a `tbody` or a cell (a failure row, a dimmed or disabled
+  row) still reaches its cells. `.muted`, `.text-muted-foreground` and `.when-exact` inside a cell
+  take the cell's colour; a cell that itself carries `.muted` or `.text-muted-foreground` is
+  `--foreground`. Header cells stay muted chrome, anything with its own colour (tones, tags, state
+  words) keeps it, and a bare link in a cell follows the cell's colour. In a Tailwind app the
+  `text-muted-foreground` utility stays muted anywhere in a cell, on the cell or inside it.
 - **`.card-head` aligns on a baseline**, so a `.card-title` and a `.tag--bracket` beside it share a
   line; a lone glyph centres on the row.
 - **Templates.** `templates/documentation.html` drops its ten local component rules and uses the
@@ -43,19 +50,25 @@ locally are now the system's, so those local copies can go (see *Changed*).
 
 ### Fixed
 
-- **An engine table moved to another place in the DOM** takes its search bar, pager and result count
-  with it and keeps the reader's sort, filters, search and page. Before, they stayed where the table
+- **An engine table moved to another place in the DOM** takes the search bar the engine drew, its
+  pager and its result count with it (a page-drawn `search[data-table-bar]` stays where the page put
+  it) and keeps the reader's sort, filters, search and page. Before, they stayed where the table
   had been, and a table detached and re-inserted got a second count. A table removed from the
   document no longer leaves its pager or engine-made count behind.
 - **An enhanced `<select>` is named by its label alone**, and the current option is the combobox's
   value. Before, the value was read into the name as well: "label x x" for a select wrapped in its
-  `<label>` (the pager's "rows 20 20"), and "label x" for a `for=` label.
+  `<label>` (the pager's "rows 20 20"), and "label x" for a `for=` label. A select inside a label
+  with no words gets an empty name, as a native select does.
 - **A renderer that patches `data-tip` or `data-tip-parts` on the anchor of an open tip** now updates
   the panel; before, it kept the text it opened with. A patcher that strips the tip's
   `aria-describedby` token no longer silences the open tip for a screen reader.
 - **Inline code in a table cell** no longer breaks one character per line on a phone
-  (`overflow-wrap: break-word` inside `td`/`th`).
+  (`overflow-wrap: break-word` inside `td`/`th`). A key wider than its table widens the table: with
+  the runtime (`initTableScroll()`) it scrolls inside the `.tablewrap`; on a page without it the table
+  can widen the page (measured 375 to 451px).
 - **`.navlist-lead`** no longer wraps ("Part / 5").
+- **`examples/cards.html` fits a phone.** It rendered 435px wide at 375: two rows showed every tag
+  tone in one nowrap meta slot, and a console status was a sentence long.
 - **Four rules that depended on file load order**: the table filter panel's padding,
   `.cursor-block--static` (it blinked), the burger's anim toggle (it never lit on hover), and
   `.dropdown-item.ls-row` (it could render centred with an 8px gap).

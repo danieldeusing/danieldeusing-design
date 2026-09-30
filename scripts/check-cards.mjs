@@ -331,10 +331,14 @@ const load = async (query = "") => {
   await evaluate(HELPERS);
 };
 // A theme switch is a colour change and a stat tile transitions its edge: read after it settles, or
-// the computed value is an interpolation rather than the theme's colour.
+// the computed value is an interpolation rather than the theme's colour. Settled means no transition
+// is still running, asked of the page: a fixed 250ms was not enough on a loaded Linux runner, which
+// read a green tile's fill and edge halfway from warm.
 const setTheme = async (theme) => {
   await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; null`);
-  await sleep(250);
+  await evaluate(`(async () => { await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    for (let i = 0; i < 100 && document.getAnimations().some((a) => a instanceof CSSTransition && a.playState === "running"); i += 1)
+      await new Promise((r) => setTimeout(r, 50)); })()`);
 };
 const W = (expr) => evaluate(`(() => { const W = window.__wp8; return ${expr}; })()`);
 

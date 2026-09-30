@@ -60,7 +60,7 @@ export function findFlushBlocks(root = document, { blocks = STACKED_BLOCKS, tole
 }
 
 const FILTER_CONTROLS = ".filter-dd, select[data-filter], .sort-ctl, .chip-set";
-const BAR_LEAD = ".search-field, h2, h3, h4, h5, h6, .filter-bar-lead";
+const BAR_LEAD = 'input[type="search"], .search-field, h2, h3, h4, h5, h6, .filter-bar-lead';
 
 // Drawn, and seen: display none (and every hidden ancestor) is a zero box, visibility hidden is not.
 const rendered = (el) => {
@@ -74,9 +74,13 @@ const rendered = (el) => {
  *   "outside-filter-bar"  a `.filter-dd`, a `select[data-filter]` the runtime has not wrapped, a
  *                         `.sort-ctl` or a `.chip-set` with no `.filter-bar` around it. A table
  *                         header (`th`) and a `.dropdown-panel` keep their own controls; a dialog
- *                         does not — its toolbar is a `.filter-bar` too.
- *   "lead-not-left"       a bar's lead (a `.search-field`, a heading h2–h6, a `.filter-bar-lead`)
- *                         whose left edge is not the bar's left content edge.
+ *                         does not — its toolbar is a `.filter-bar` too. A `.chip-set` of
+ *                         `.chip--remove` chips is a list of values, not a filter, and is not judged.
+ *                         (A `.switch` or `.segmented` is not judged either: both are settings too.)
+ *   "lead-not-left"       a bar's lead (a search input or `.search-field`, a heading h2–h6, a
+ *                         `.filter-bar-lead`) that is not in the run of leads a row starts with, or
+ *                         the first lead of a row whose left edge is not the bar's left content edge.
+ *                         Several leads in a row are fine (a prompt label, then the search).
  *   "controls-not-right"  on a visual row of a bar, the right-most control that is not the lead does
  *                         not end at the bar's right content edge. `element` is that control.
  *   "active-unmarked"     an optional `.filter-dd` (its select has an empty option) holding a value
@@ -94,7 +98,7 @@ export function findMisplacedFilters(root = document, { tolerance = 1 } = {}) {
 
   for (const el of root.querySelectorAll(FILTER_CONTROLS)) {
     if (el.matches("select") && el.closest(".filter-dd")) continue; // its .filter-dd answers for it
-    if (!rendered(el) || el.closest(".filter-bar, th, .dropdown-panel")) continue;
+    if (!rendered(el) || el.closest(".filter-bar, th, .dropdown-panel") || el.matches(".chip-set:has(> .chip--remove)")) continue;
     report(el, "outside-filter-bar");
   }
 
@@ -105,25 +109,28 @@ export function findMisplacedFilters(root = document, { tolerance = 1 } = {}) {
     const style = getComputedStyle(bar);
     const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
     const right = box.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight);
+    // One visual row = children whose boxes overlap vertically (align-items centres them, so their
+    // tops differ within a row); a row keeps its children in document order.
     const rows = [];
     for (const child of bar.children) {
       if (!rendered(child)) continue;
       const at = child.getBoundingClientRect();
-      if (child.matches(BAR_LEAD)) {
-        if (Math.abs(at.left - left) > tolerance) report(child, "lead-not-left");
-        continue;
-      }
-      // One visual row = children whose boxes overlap vertically (align-items centres them, so their
-      // tops differ within a row).
       const row = rows.find((r) => at.top < r.bottom - tolerance && at.bottom > r.top + tolerance);
-      if (!row) rows.push({ top: at.top, bottom: at.bottom, right: at.right, last: child });
-      else {
+      if (row) {
         row.top = Math.min(row.top, at.top);
         row.bottom = Math.max(row.bottom, at.bottom);
-        if (at.right > row.right) Object.assign(row, { right: at.right, last: child });
-      }
+        row.items.push([child, at]);
+      } else rows.push({ top: at.top, bottom: at.bottom, items: [[child, at]] });
     }
-    for (const row of rows) if (Math.abs(row.right - right) > tolerance) report(row.last, "controls-not-right");
+    for (const { items } of rows) {
+      let last = null;
+      items.forEach(([child, at], i) => {
+        if (!child.matches(BAR_LEAD)) {
+          if (!last || at.right > last[1].right) last = [child, at];
+        } else if (last || (i === 0 && Math.abs(at.left - left) > tolerance)) report(child, "lead-not-left");
+      });
+      if (last && Math.abs(last[1].right - right) > tolerance) report(last[0], "controls-not-right");
+    }
   }
 
   for (const dd of root.querySelectorAll(".filter-dd")) {

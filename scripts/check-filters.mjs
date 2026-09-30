@@ -1913,11 +1913,25 @@ await evaluate(`mount(\`
     <select data-filter aria-label="c" id="fx-c-sel"><option value="">all</option><option value="x">x</option></select></div>
   <div class="filter-bar" id="fx-de"><select data-filter aria-label="d" id="fx-d"><option value="">all</option><option value="v">v</option></select>
     <select data-filter aria-label="e" id="fx-e"><option value="a">a</option><option value="b">b</option></select></div>
+  <div class="chip-set" id="fx-values" role="group" aria-label="authors"><button type="button" class="chip chip--remove" aria-label="remove ada">ada</button></div>
+  <div class="filter-bar" id="two-leads"><label class="filter-bar-lead" id="tl-label" for="tl-in">~ $</label>
+    <div class="search-field" id="tl-search"><input type="search" id="tl-in"></div>
+    <select data-filter aria-label="two leads" id="tl-sel"><option value="">all</option><option value="x">x</option></select></div>
+  <div class="filter-bar" id="bare-lead"><input type="search" id="bl-in" aria-label="bare">
+    <select data-filter aria-label="bare lead" id="bl-sel"><option value="">all</option><option value="x">x</option></select></div>
+  <div class="filter-bar" id="bare-late"><select data-filter aria-label="late" id="bl2-sel"><option value="">all</option><option value="x">x</option></select>
+    <input type="search" id="bl2-in" aria-label="late"></div>
+  <div class="filter-bar" id="inc-bar"><div class="chip-set" data-inclusive role="group" aria-label="series">
+    <button type="button" class="chip" id="chip-inc" aria-pressed="true">ddmini</button></div></div>
 \`); initSelects(); initSortControls(); document.getElementById("fx-dlg").showModal(); tick()`);
 await evaluate("tick()");
 
 const BASE = ["outside-filter-bar fx-a", "outside-filter-bar fx-a-sort", "outside-filter-bar fx-a-chips", "outside-filter-bar fx-dlg-sel",
-  "lead-not-left fx-b-lead", "controls-not-right fx-b-first", "controls-not-right fx-c-sel"];
+  "lead-not-left fx-b-lead", "controls-not-right fx-b-first", "controls-not-right fx-c-sel",
+  "lead-not-left bl2-in", "controls-not-right bl2-sel"];
+// A throw inside the function arrives as a "threw: …" line: every check below that could pass on an
+// EMPTY or partial answer also asks that the fixture's known faults are there, so a throw fails it.
+const ran = (list) => !list.some((r) => r.startsWith("threw: ")) && list.includes("outside-filter-bar fx-a");
 const m0 = await misplaced();
 await check("findMisplacedFilters: a filter, a sort and a chip set outside any bar are reported — one in an open dialog too; one in a th and one in an open .dropdown-panel are not",
   async () => ["outside-filter-bar fx-a", "outside-filter-bar fx-a-sort", "outside-filter-bar fx-a-chips", "outside-filter-bar fx-dlg-sel"].every((r) => m0.includes(r)) &&
@@ -1928,6 +1942,18 @@ await check("findMisplacedFilters: a bar whose controls are not pushed right is 
   () => m0.includes("controls-not-right fx-c-sel"), JSON.stringify(m0));
 await check("findMisplacedFilters: nothing else — a searched bar, a bar with no lead, a wrapped chip bar and a quiet filter pass",
   () => sameSet(m0, BASE), JSON.stringify(m0));
+await check("findMisplacedFilters: a chip set of .chip--remove chips outside a bar is a list of values, not a filter, and is not reported",
+  () => ran(m0) && !m0.some((r) => r.includes("fx-values")), JSON.stringify(m0));
+await check("findMisplacedFilters: a row led by a prompt label AND a search passes; a search after a control is lead-not-left",
+  () => ran(m0) && !m0.some((r) => /tl-|bl-in|bl-sel/.test(r)) && m0.includes("lead-not-left bl2-in"), JSON.stringify(m0));
+const twoLeads = await evaluate(`(() => { const bar = $("#two-leads").getBoundingClientRect(), l = box("#tl-label"), s = box("#tl-search"), f = box(triggerOf("tl-sel").closest(".filter-dd"));
+  return { label: l.left - bar.left, gap: s.left - l.right, last: bar.right - f.right }; })()`);
+await check("css: two leads — the label at the left edge, the search one gap (8px) after it, not floated mid-row; the filter at the right",
+  () => near(twoLeads.label, 0) && near(twoLeads.gap, 8) && near(twoLeads.last, 0), JSON.stringify(twoLeads));
+const bareLead = await evaluate(`(() => { const bar = $("#bare-lead").getBoundingClientRect();
+  return { lead: box("#bl-in").left - bar.left, last: bar.right - box(triggerOf("bl-sel").closest(".filter-dd")).right }; })()`);
+await check("css: a bare input[type=search] leads its bar — flush left, the filter flush right",
+  () => near(bareLead.lead, 0) && near(bareLead.last, 0), JSON.stringify(bareLead));
 
 await evaluate(`$("#fx-d").value = "v"; null`);
 const md = await misplaced();
@@ -1942,8 +1968,9 @@ const me = await misplaced();
 await check("findMisplacedFilters: a required picker showing a × is \"required-clearable\"",
   () => sameSet(me, [...BASE, "required-clearable fx-e"]), JSON.stringify(me));
 await evaluate(`clearOf("fx-e").hidden = true; $("#fx-dlg").close(); null`);
+const closed = await misplaced();
 await check("findMisplacedFilters: a closed dialog is not rendered, and is skipped",
-  async () => !(await misplaced()).includes("outside-filter-bar fx-dlg-sel"));
+  () => ran(closed) && !closed.includes("outside-filter-bar fx-dlg-sel"), JSON.stringify(closed));
 
 await check("css: a chip set in a bar wraps against the right edge — every row of twelve chips in 300px ends at the set's right",
   () => evaluate(`(() => { const set = $("#wrap-set").getBoundingClientRect(), rows = new Map();
@@ -1955,12 +1982,26 @@ await check("css: a pressed chip carries the × (--ico-x, --icon-sm), drawn",
   async () => (await evaluate(`cs("#chip-on", "mask-image", "::after")`)) === x &&
     (await evaluate(`cs("#chip-on", "width", "::after")`)) === (await evaluate(`probe("var(--icon-sm)", "width")`)),
   async () => `${await evaluate(`cs("#chip-on", "mask-image", "::after")`)} ${await evaluate(`cs("#chip-on", "width", "::after")`)}`);
-await check("css: ...the pressed \"all\" chip (data-all) and a chip at rest carry none",
-  async () => (await evaluate(`cs("#chip-all", "content", "::after")`)) === "none" && (await evaluate(`cs("#chip-off", "content", "::after")`)) === "none",
-  async () => `${await evaluate(`cs("#chip-all", "content", "::after")`)} / ${await evaluate(`cs("#chip-off", "content", "::after")`)}`);
+await check("css: ...the pressed \"all\" chip (data-all) carries none, and a chip at rest keeps the slot unpainted",
+  async () => (await evaluate(`cs("#chip-all", "content", "::after")`)) === "none" &&
+    (await evaluate(`cs("#chip-off", "background-color", "::after")`)) === "rgba(0, 0, 0, 0)" &&
+    (await evaluate(`cs("#chip-on", "background-color", "::after")`)) !== "rgba(0, 0, 0, 0)",
+  async () => `${await evaluate(`cs("#chip-all", "content", "::after")`)} / ${await evaluate(`cs("#chip-off", "background-color", "::after")`)}`);
+await check("css: a pressed chip in a data-inclusive set (pressed = shown, not a filter in force) carries no ×",
+  async () => (await evaluate(`cs("#chip-inc", "content", "::after")`)) === "none", () => evaluate(`cs("#chip-inc", "content", "::after")`));
+const pressWidth = await evaluate(`(async () => { const before = [box("#chip-off").width, box("#chip-all").left];
+  $("#chip-off").setAttribute("aria-pressed", "true"); await tick();
+  const after = [box("#chip-off").width, box("#chip-all").left];
+  $("#chip-off").setAttribute("aria-pressed", "false"); return { before, after }; })()`);
+await check("css: pressing a chip does not change its width, and moves nothing before it in a right-aligned set",
+  () => near(pressWidth.before[0], pressWidth.after[0], 0.5) && near(pressWidth.before[1], pressWidth.after[1], 0.5), JSON.stringify(pressWidth));
 await evaluate(`mount('<div class="filter-bar"><span class="filter-bar-spacer" id="old-spacer"></span><button type="button">x</button></div>'); null`);
 await check("css: .filter-bar-spacer is gone — an old one left in a page is an empty span that grows nothing",
   async () => (await evaluate(`cs("#old-spacer", "flex-grow")`)) === "0");
+await evaluate(`mount('<div class="filter-bar" id="safe-bar" style="inline-size: 200px"><button type="button" id="wide" style="inline-size: 400px; flex: none">wide</button></div>'); null`);
+const safe = await evaluate(`({ value: cs("#safe-bar", "justify-content"), start: box("#wide").left - box("#safe-bar").left })`);
+await check("css: the bar is safe flex-end — an item wider than the bar starts at its left edge and overflows to the right, never off the start",
+  () => safe.value === "safe flex-end" && near(safe.start, 0), JSON.stringify(safe));
 
 // The demo page's bars, measured directly — not through the function above.
 const edgesOf = (bar, lead, last) => evaluate(`(() => { const $ = (s) => document.querySelector(s), b = $(${JSON.stringify(bar)}).getBoundingClientRect();
@@ -1980,6 +2021,16 @@ for (const width of [1280, 375]) {
   await check(`demo at ${width}px: a bar with no search — its heading leads on the left, its required picker sits on the right`,
     () => near(noSearch.lead, 0) && near(noSearch.last, 0), JSON.stringify(noSearch));
 }
+
+// 32c3fb6: the header's filter funnel sits on the sort arrows' baseline, at their size. As a block
+// <details> it rode 1.70px above them.
+await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+await open("/examples/data.html", `!!document.querySelector("th .tbl-sort") && !!document.querySelector("th .tbl-filter > summary")`);
+const funnels = await evaluate(`[...document.querySelectorAll("th")].filter((th) => th.getClientRects().length && th.querySelector(".tbl-sort") && th.querySelector(".tbl-filter > summary"))
+  .map((th) => { const a = th.querySelector(".tbl-sort").getBoundingClientRect(), b = th.querySelector(".tbl-filter > summary").getBoundingClientRect();
+    return { col: th.dataset.col, offset: +(b.top - a.top).toFixed(2), sort: a.height, funnel: b.height }; })`);
+await check(`data demo: every header with a sort and a filter (${funnels.length}) has the funnel within 0.5px of the arrows' top, at their height`,
+  () => funnels.length > 0 && funnels.every((f) => Math.abs(f.offset) <= 0.5 && f.sort === f.funnel), JSON.stringify(funnels));
 
 // Every example page, and every dialog on it opened, at both widths. Each page reports its YIELD — the
 // rendered bars and filter controls the function measured — because "nothing found" on a page that

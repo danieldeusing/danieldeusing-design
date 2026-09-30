@@ -6185,14 +6185,21 @@ p.state { display: flex; white-space: normal; }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  /* `safe`: an item wider than the bar overflows to the end, where it can be scrolled to, never off
+     the start edge. The plain value first, for an engine that does not know `safe`. */
   justify-content: flex-end;
+  justify-content: safe flex-end;
   gap: 0.5rem;
   margin-block-end: 1rem;
 }
-.filter-bar > :is(.search-field, h2, h3, h4, h5, h6, .filter-bar-lead) {
+/* A bare search input is a lead too. SEVERAL LEADS may start a row — cockpit's home puts a prompt
+   label (`.filter-bar-lead`) before its search — and only the last of a run takes the free space, or
+   the space is split between them and the search floats mid-row. */
+.filter-bar > :is(input[type="search"], .search-field, h2, h3, h4, h5, h6, .filter-bar-lead) {
   margin-block: 0;
   margin-inline-end: auto;
 }
+.filter-bar > :is(input[type="search"], .search-field, h2, h3, h4, h5, h6, .filter-bar-lead):has(+ :is(input[type="search"], .search-field, h2, h3, h4, h5, h6, .filter-bar-lead)) { margin-inline-end: 0; }
 .filter-bar > .search-field {
   flex: 1 1 14rem;
   max-inline-size: 24rem;
@@ -6310,9 +6317,13 @@ p.state { display: flex; white-space: normal; }
 }
 /* A PRESSED CHIP CARRIES THE × TOO (0.62.0), drawn the same way: pressing it again removes that
    filter, and Daniel's rule is that an active filter shows the x that removes it. Not the chip marked
-   `data-all` — the "all" chip resets the set, and pressing it again removes nothing. A link chip on
-   `aria-current="page"` navigates rather than toggles, so it gets none either. */
-.chip[aria-pressed="true"]:not([data-all])::after,
+   `data-all` — the "all" chip resets the set, and pressing it again removes nothing. Not a chip in a
+   set marked `data-inclusive`, where pressed means SHOWN and every chip starts pressed (netmon's
+   series, the family calendar's people): there a pressed chip is not a filter in force. A link chip
+   on `aria-current="page"` navigates rather than toggles, so it gets none either.
+   THE SLOT IS KEPT AT REST, unpainted, so pressing a chip does not grow it by the glyph and its gap
+   and shift every chip before it in a right-aligned set. */
+.chip-set:not([data-inclusive]) .chip[aria-pressed]:not([data-all])::after,
 .chip--remove::after {
   content: "";
   flex: none;
@@ -6322,6 +6333,7 @@ p.state { display: flex; white-space: normal; }
   -webkit-mask: var(--ico-x) center / contain no-repeat;
   mask: var(--ico-x) center / contain no-repeat;
 }
+.chip-set:not([data-inclusive]) .chip[aria-pressed]:not([aria-pressed="true"], [data-all])::after { background: transparent; }
 .chip--remove:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 12%, transparent); }
 .chip-key { color: var(--muted-foreground); }
 /* the same measurement as .chip-count above: on the hover fill the key takes the chip's ink */
@@ -6508,7 +6520,7 @@ p.state { display: flex; white-space: normal; }
   .sort-dir,
   .load-more > button,
   .search-field[data-pending]::after,
-  .chip[aria-pressed="true"]:not([data-all])::after,
+  .chip-set:not([data-inclusive]) .chip[aria-pressed]:not([data-all])::after,
   .chip--remove::after {
     display: none !important;
   }

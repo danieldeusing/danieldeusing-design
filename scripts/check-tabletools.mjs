@@ -366,6 +366,56 @@ await check("...and the pager does not count it: with no match the pager's statu
   evaluate(`(() => { const s = document.querySelector("#mount .table-pager-status"); return !!s && !s.parentElement.hidden && s.textContent === "no rows"; })()`),
   async () => evaluate(`(document.querySelector("#mount .table-pager-status") || {}).textContent || "no pager"`));
 
+/* ── a filter the reader takes back gives back every row ─────────────────────────────────────────────
+   cockpit /links on 0.59.0: pick a value, set it back to "all", and the table stayed filtered — 10 of
+   65 rows for good. The pager's own `hidden` writes on the rows it pages were read as a renderer
+   rewriting them, and the rows the filter was holding back were dropped from the set. 65 rows, 22 of
+   them "core", so the filtered set is itself more than one page and a page can be turned inside it. */
+const pagedState = () => evaluate(`JSON.stringify({ body: document.querySelectorAll("#mount tbody tr:not([data-table-placeholder])").length,
+  shown: window.order().length, status: (document.querySelector("#mount .table-pager-status") || {}).textContent })`);
+const nextPage = () => evaluate(`document.querySelector("#mount .table-pager-nav button:last-child").click(); null`);
+const pagedRows = `rows: Array.from({ length: 65 }, (_, i) => ["r" + String(i).padStart(2, "0"), i % 3 ? "ops" : "core", String(i)])`;
+await evaluate(`localStorage.clear(); window.build({ paged: true, id: "paged-pick", ${pagedRows} }); null`);
+await sleep(100);
+await evaluate('window.pick("team", "core"); null');
+await sleep(100);
+await nextPage();
+await sleep(100);
+const pickPaged = await pagedState();
+await evaluate('window.pick("team", "all"); null');
+await sleep(100);
+const pickBack = await pagedState();
+await check("a pick filter on a paged table, a page turned inside it, then \"all\": all 65 rows are back, and the pager counts 65", async () =>
+  pickPaged === JSON.stringify({ body: 22, shown: 2, status: "21–22 of 22" }) &&
+  pickBack === JSON.stringify({ body: 65, shown: 20, status: "21–40 of 65" }), () => `filtered+paged ${pickPaged}, after "all" ${pickBack}`);
+await check("...and the pick menu still offers every value, since it is built from the whole set", async () =>
+  (await evaluate(`[...document.querySelectorAll('#mount th[data-col="team"] .dropdown-item')].map((b) => b.textContent).join()`)) === "all,core,ops");
+// 5 a page, so the ten rows "r1" finds are two pages of their own.
+await evaluate(`localStorage.clear(); localStorage.setItem("table-rows:paged-search", "5");
+  window.build({ paged: true, id: "paged-search", ${pagedRows} }); null`);
+await sleep(100);
+await evaluate('window.setSearch("r1"); null');
+await sleep(100);
+await nextPage();
+await sleep(100);
+const searchPaged = await pagedState();
+await evaluate('window.setSearch(""); null');
+await sleep(100);
+const searchBack = await pagedState();
+await check("the same through the search box: \"r1\", a page turned, the search cleared — all 65 rows are back", async () =>
+  searchPaged === JSON.stringify({ body: 10, shown: 5, status: "6–10 of 10" }) &&
+  searchBack === JSON.stringify({ body: 65, shown: 5, status: "6–10 of 65" }), () => `searched+paged ${searchPaged}, after clearing ${searchBack}`);
+// The pager is one writer of that shape, not the only one: a hover on a `data-tip` cell has
+// initTooltips() write `aria-describedby` on it, with no pager anywhere.
+await evaluate(`localStorage.clear(); window.build(); window.setFilter("name", "ada"); null`);
+await sleep(50);
+await evaluate(`document.querySelector("#mount tbody td").setAttribute("aria-describedby", "ddtip"); null`);
+await sleep(50);
+await evaluate(`window.setFilter("name", ""); null`);
+await sleep(50);
+await check("...and an attribute this file does not read (a tooltip's aria-describedby) on a filtered row loses nothing", async () =>
+  (await evaluate("window.order()")).join(",") === "ada,grace,linus", async () => JSON.stringify(await evaluate("window.order()")));
+
 /* ── the pick filter is a menu of menuitemradios ─────────────────────────────────────────────────── */
 
 await evaluate("localStorage.clear(); window.build(); null");

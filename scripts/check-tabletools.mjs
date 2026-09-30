@@ -140,7 +140,11 @@ window.ready = true;
 <\/script></body></html>`;
 
 // A real origin, because localStorage is the subject.
-const server = await serve(root, { "/__tabletools.html": HARNESS });
+const ORDER = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/src/tokens.css">
+<script>for (const f of location.search.slice(1).split(",")) document.write('<link rel="stylesheet" href="/src/' + f + '.css">');<\/script></head>
+<body><details class="dropdown tbl-filter" open><summary aria-label="filter name"></summary>
+<div class="dropdown-panel dropdown-panel--down tbl-filter-panel">panel</div></details></body></html>`;
+const server = await serve(root, { "/__tabletools.html": HARNESS, "/__tabletools-order.html": ORDER });
 const browser = await launch("tabletools");
 const { evaluate, until, navigate, send } = browser;
 await navigate(`${server.origin}/__tabletools.html`);
@@ -940,6 +944,19 @@ const shared = await answered(evaluate(`(async () => {
 })()`), 5000);
 await check("fix round 1 — a table drawn between a neighbour and its count makes its own count, and each says its own thing under its own table", async () =>
   shared === JSON.stringify({ first: "", second: "1 of 2 runs — 1 hidden by the filters" }), shared);
+
+/* ── 0.61.0 · the filter panel's box does not depend on which stylesheet loads last ──────────────────
+   `.dropdown-panel` (components.css) and `.tbl-filter-panel` (data.css) were one class each, so the
+   panel's padding was whichever file came later: .4rem in the bundle, 4px 0 with data.css first. */
+const panelPadding = async (files) => {
+  await navigate(`${server.origin}/__tabletools-order.html?${files.join(",")}`);
+  await until("document.querySelectorAll('link[rel=stylesheet]').length === 3 && [...document.styleSheets].every((s) => s.cssRules.length)", "the stylesheets");
+  return evaluate(`getComputedStyle(document.querySelector(".tbl-filter-panel")).padding`);
+};
+const padBundle = await panelPadding(["components", "data"]);
+const padReversed = await panelPadding(["data", "components"]);
+await check("0.61.0 — a table filter's panel keeps its .4rem padding with data.css loaded before components.css, as in the bundle",
+  async () => padBundle === "6.4px" && padReversed === "6.4px", JSON.stringify({ bundle: padBundle, reversed: padReversed }));
 
 browser.close();
 server.close();

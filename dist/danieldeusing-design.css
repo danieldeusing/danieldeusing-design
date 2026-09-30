@@ -6710,7 +6710,9 @@ th[aria-sort]:not([aria-sort="none"]) .tbl-sort,
 .tbl-sort:focus-visible,
 .tbl-filter > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
-.tbl-filter-panel { padding: 0.4rem; max-block-size: 60vh; overflow-y: auto; }
+/* Two classes deep, so the panel's padding outranks `.dropdown-panel`'s whichever of components.css and
+   data.css loads last: at one class it was decided by the order of two stylesheets. */
+.tbl-filter > .tbl-filter-panel { padding: 0.4rem; max-block-size: 60vh; overflow-y: auto; }
 .tbl-filter > ul.dropdown-panel { max-block-size: 60vh; overflow-y: auto; }
 
 /* WHAT IS IN FORCE GOES ON THE COLUMN, not in a bar above the table (Daniel, 2026-08-19). A separate

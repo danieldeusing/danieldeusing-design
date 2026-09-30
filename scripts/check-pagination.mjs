@@ -233,3 +233,50 @@ test("the pager's rows picker is the system's dropdown on a page that never call
     server.close();
   }
 });
+
+/* ── the pager keeps focus on its last page ─────────────────────────────────────── */
+
+// Enter on "next" that reaches the last page switches off the very button that holds focus. A
+// `disabled` button throws focus to <body>, and the next Tab starts from the top of the page; so the
+// pager marks it `aria-disabled` (the X5 rule), and ignores a press on it.
+test("Enter on \"next\" onto the last page leaves focus on the button, which is marked off and ignores the next press", async (t) => {
+  if (!CHROME) {
+    assert.notEqual(process.env.DD_REQUIRE_BROWSER, "1", "DD_REQUIRE_BROWSER=1 and no headless chromium on this machine");
+    t.skip("no headless chromium on this machine — install one with `npx playwright install chromium`");
+    return;
+  }
+  const rows = Array.from({ length: 30 }, (_, i) => `<tr><td>row ${i}</td></tr>`).join("");
+  const page = `<!doctype html><html><head><meta charset="utf-8">
+    <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/components.css"></head><body>
+    <table data-table-id="pager-focus"><tbody>${rows}</tbody></table>
+    <script type="module">
+      import { initTablePagination } from "/runtime/pagination.js";
+      initTablePagination();
+      window.ready = true;
+    </script></body></html>`;
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const server = await serve(root, { "/__pager-focus.html": page });
+  const browser = await launch("pagination-focus");
+  try {
+    await browser.navigate(`${server.origin}/__pager-focus.html`);
+    await browser.until("window.ready === true && !!document.querySelector('.table-pager')");
+    const enter = async () => {
+      const key = { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 };
+      await browser.send("Input.dispatchKeyEvent", { type: "keyDown", text: "\r", ...key });
+      await browser.send("Input.dispatchKeyEvent", { type: "keyUp", ...key });
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    };
+    await browser.evaluate(`window.localStorage.clear(); document.querySelector(".table-pager-nav button:last-child").focus(); null`);
+    await enter();
+    const state = () => browser.evaluate(`(() => { const next = document.querySelector(".table-pager-nav button:last-child");
+      return { focused: document.activeElement === next, off: next.getAttribute("aria-disabled"), disabled: next.disabled,
+        status: document.querySelector(".table-pager-status").textContent }; })()`);
+    const last = await state();
+    assert.deepEqual(last, { focused: true, off: "true", disabled: false, status: "21–30 of 30" }, "Enter onto the last page");
+    await enter();
+    assert.deepEqual(await state(), last, "a press on the switched-off button changed something");
+  } finally {
+    browser.close();
+    server.close();
+  }
+});

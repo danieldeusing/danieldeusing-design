@@ -97,6 +97,9 @@ import { initSearchFields } from "./search.js";
 
 const STORE_PREFIX = "table-view:";
 const PLACEHOLDER = "data-table-placeholder";
+// Every attribute this file reads from a body row or cell. An edit to any other one changes no view,
+// so the body observer does not answer it — see "NOT EVERY OTHER WRITER IS A RENDERER" there.
+const ROW_READS = new Set(["data-value", "data-sort-value", "data-search-text", "data-pin", "data-row-key", "data-row-for", PLACEHOLDER]);
 const COUNT_DELAY = 400;
 const instances = new WeakMap();
 
@@ -1051,9 +1054,36 @@ function enhance(table) {
      * header repaint targets the thead — so a record whose target is inside the body
      * but is not the body is, by construction, somebody else's write. That is what
      * keeps this from re-entering on its own output.
+     *
+     * BUT NOT EVERY OTHER WRITER IS A RENDERER, and the answer to one costs rows. A
+     * rewrite is answered with snapshot(), which reads the set from the BODY — and the
+     * body holds only what the filter let through, so every row it withholds is dropped
+     * from the set for good. The pager writes `hidden` on the rows it pages, a tooltip
+     * writes `aria-describedby` on the cell it describes, a copy button its
+     * `data-state`: none of them changes a value, and each of them took the withheld
+     * rows with it. Found on cockpit /links; measured in check-tabletools: a pick
+     * filter set back to "all" on a paged 65-row table showed the 22 it had filtered
+     * to, because the pager had re-windowed the filtered set in between.
+     *
+     * So an attribute record counts only when it names an attribute this file READS
+     * from a row or a cell — ROW_READS, a finite list owned here, not a list of other
+     * writers, which would never be complete. Skipping anything else loses nothing:
+     * no matter what it is set to, applyTableView() would compute the same view. A
+     * renderer that rewrites a row's text or a `data-value` is still seen, by the
+     * characterData, childList or attribute record that write makes.
+     *
+     * A RELATIVE TIME RELABELLING ITSELF is the one text write treated the same way.
+     * Inside a `[data-ago]` element the only writer is the one keeping "3 minutes ago"
+     * true — time.js's initRelativeTimes() and cockpit's stamp.js share the hook, every
+     * 30 s — and it relabels a time the row already showed; answering it dropped the
+     * withheld rows as surely as the pager did. A renderer's rewrite of a row touches
+     * other cells or attributes and is still seen through them. The cost, accepted: a
+     * search can match a relative label up to 30 s stale until something else re-applies.
      */
+    const relabel = (node) => !!(node.nodeType === 1 ? node : node.parentElement)?.closest("[data-ago]");
     const rewritten = !moved && records.some((rec) =>
-      rec.target !== body && body.contains(rec.target));
+      rec.target !== body && body.contains(rec.target) &&
+      (rec.type === "attributes" ? ROW_READS.has(rec.attributeName) : !relabel(rec.target)));
 
     if (moved || rewritten) {
       snapshot(inst);

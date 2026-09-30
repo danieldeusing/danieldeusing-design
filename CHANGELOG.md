@@ -19,15 +19,21 @@ has one line to delete; see *Migration*.
 - **`.filter-bar` right-aligns everything but its lead, at every width.** The bar packs its
   children against its end edge (`justify-content: flex-end`), and the lead takes the free space
   after itself (`margin-inline-end: auto`). The lead is a `.search-field`, a heading `h2`–`h6`, or an
-  element marked `.filter-bar-lead` (a label that is not a heading). A bar with no lead has every
-  control on the right, so a row of filters with no search — cockpit's stats picker — is a
-  `.filter-bar` too. On a phone (below `40rem`) the search keeps its whole first row and the
-  controls wrap under it right-aligned; until now they went to the left there.
+  element marked `.filter-bar-lead` (a label that is not a heading); a bare `input[type=search]`
+  counts too. Several leads may start a row (cockpit's prompt label, then its search), and only the
+  last takes the free space. A bar with no lead has every control on the right, so a row of filters
+  with no search — cockpit's stats picker — is a `.filter-bar` too. On a phone (below `40rem`) the
+  search keeps its whole first row and the controls wrap under it right-aligned; until now they went
+  to the left there. The bar is `safe flex-end`, so an item wider than the bar overflows to the
+  right, where it can be scrolled to, and never off the left edge.
 - **A pressed chip draws an ×** (`.chip[aria-pressed="true"]`: the icon set's `--ico-x`, `--icon-sm`
   wide, drawn like `.chip--remove`'s), because pressing it again removes that filter. A chip marked
-  `data-all` — the "all" chip that resets the set — never draws one, and nor does a link chip on
-  `aria-current="page"`. A `.segmented` choice and a `.switch` get no ×: the first always has one
-  value, and flipping the second back is its clear.
+  `data-all` — the "all" chip that resets the set — never draws one, nor does any chip in a set
+  marked `data-inclusive` (pressed means shown there, and every chip starts pressed: netmon's series,
+  the family calendar's people), nor a link chip on `aria-current="page"`. The ×'s slot is kept,
+  unpainted, on a chip at rest, so pressing a chip does not widen it or shift the chips before it.
+  A `.segmented` choice and a `.switch` get no ×: the first always has one value, and flipping the
+  second back is its clear.
 - **A `.chip-set` inside a `.filter-bar` wraps its chips against the right edge.**
 - **A dialog toolbar that filters is a `.filter-bar`:** `class="dialog-toolbar filter-bar"`, the
   search first, then the filters and switches, then the count and the steppers. The bar's bottom
@@ -45,8 +51,10 @@ has one line to delete; see *Migration*.
   `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no bar around it; a `th` and a
   `.dropdown-panel` are exempt, a dialog is not), `lead-not-left`, `controls-not-right` (per visual
   row), `active-unmarked` (an optional filter holding a value without its active mark or its ×, which
-  is what a page setting `.value` without a `change` leaves behind) and `required-clearable`. It
-  skips what is not rendered, as `findFlushBlocks()` does. It finds nothing on any example page, at
+  is what a page setting `.value` without a `change` leaves behind) and `required-clearable`. A
+  `.chip-set` of `.chip--remove` chips is a list of values and is not judged; a `.switch` or a
+  `.segmented` is not judged at all, since both are settings too. It skips what is not rendered, as
+  `findFlushBlocks()` does. It finds nothing on any example page, at
   1280px and 375px, with every dialog opened.
 
 ### Removed
@@ -58,13 +66,22 @@ has one line to delete; see *Migration*.
 
 ### Migration
 
-- Delete every `.filter-bar-spacer` element; the bar right-aligns without it. In a `.panel-foot`,
-  wrap what went after it in a `.panel-actions`.
-- Put the search, or a heading, first in each `.filter-bar`. A label that is not a heading takes
-  `.filter-bar-lead`. A filter, sort or chip set that sits outside any bar goes into one.
-- Mark each "all" chip `data-all`, or it draws an × while pressed.
-- A dialog toolbar with a search and filters: add `filter-bar` to it and move the search first.
-- Run `findMisplacedFilters()` in the page's browser check.
+- Delete every `.filter-bar-spacer` element; the bar right-aligns without it. The spacer was used
+  outside `.filter-bar` too, and there it did nothing on its own either: in a `.panel-foot`, wrap
+  what went after it in a `.panel-actions`; a spacer inside a `.chip-set` (the family calendar) must
+  be replaced by explicit layout.
+- Put the search, or a heading, first in each `.filter-bar`. **Everything else that belongs on the
+  left must be marked `.filter-bar-lead`**, or it packs right with the filters: a bar whose left part
+  holds several items — a view switch, step buttons and a date label (the family calendar's
+  `.cal-bar`), a prompt label before the search (cockpit's home) — marks each of them. A filter,
+  sort or chip set that sits outside any bar goes into one.
+- Wrap a bare search input in a `.search-field`. (A bare `input[type=search]` still leads a bar.)
+- Mark each "all" chip `data-all`, or it draws an × while pressed. Mark a chip set where pressed
+  means included (every chip starts pressed) `data-inclusive`, or every chip draws an ×.
+- A dialog toolbar with a search and filters: add `filter-bar` to it and move the search first. It
+  loses the bar's bottom margin (`.dialog-toolbar.filter-bar { margin-block-end: 0 }`).
+- Run `findMisplacedFilters()` in the page's browser check. It does not report a `.switch` or a
+  `.segmented` outside a bar, so put filter toggles in a bar yourself.
 
 ## 0.61.1 (2026-09-30)
 

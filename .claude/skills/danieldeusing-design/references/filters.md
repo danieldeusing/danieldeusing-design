@@ -95,9 +95,16 @@ choose something.
 2026-09-30: *"Filters, sort and so on are always right aligned. Search input field always left
 aligned. Active filters have colored text and there must be the 'x' icon to remove the filter (only
 not if one filter must always be set)."* The bar packs its children against its end edge, and its
-**lead** takes the free space after itself. The lead is a `.search-field`, a heading `h2`–`h6`, or
+**lead** takes the free space after itself. The lead is a `.search-field` (or a bare
+`input[type=search]`, though a page should wrap it in a `.search-field`), a heading `h2`–`h6`, or
 anything marked `.filter-bar-lead` (a label that is not a heading, such as a `<p>` or a `<span>`).
 Write the lead first.
+
+**Several leads may start a row**, and only the last of them takes the free space: cockpit's home
+puts its prompt label before its search, `<label class="ps1 filter-bar-lead">` then the
+`.search-field`. **Anything else that belongs on the left must be marked `.filter-bar-lead` too** —
+a view switch, step buttons and a date label (the family calendar's `.cal-bar`) — or it packs to the
+right with the filters.
 
 ```html
 <!-- no search: a heading leads, the required picker sits on the right (cockpit's stats) -->
@@ -130,8 +137,8 @@ keeps the rule:
 
 | reason | what it found |
 |---|---|
-| `outside-filter-bar` | a `.filter-dd`, an un-enhanced `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no `.filter-bar` around it. A table header (`th`) and a `.dropdown-panel` are exempt; a dialog is not |
-| `lead-not-left` | a bar's lead whose left edge is not the bar's left content edge |
+| `outside-filter-bar` | a `.filter-dd`, an un-enhanced `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no `.filter-bar` around it. A table header (`th`) and a `.dropdown-panel` are exempt; a dialog is not. A `.chip-set` of `.chip--remove` chips is a list of values (cockpit's author lists), not a filter, and is not judged |
+| `lead-not-left` | a lead after a control in its row, or a row's first lead whose left edge is not the bar's left content edge. A run of leads (a prompt label, then the search) is fine |
 | `controls-not-right` | on one visual row of a bar, the right-most control does not end at the bar's right content edge |
 | `active-unmarked` | an optional filter holding a value without `data-active="true"` on its trigger or with its × hidden — the page set the value and the runtime never heard (dispatch `change` on the select) |
 | `required-clearable` | a required filter (no empty option) showing a × |
@@ -143,6 +150,9 @@ const wrong = findMisplacedFilters().map(({ element, reason }) => `${reason}: ${
 
 What is not rendered (`display: none` on it or an ancestor, a closed dialog, zero size,
 `visibility: hidden`) is skipped, so run it in each state that shows a bar.
+
+A `.switch` or a `.segmented` outside a bar is not reported — both are used as settings too — so a
+page puts its filter toggles in a `.filter-bar` itself.
 
 ## A search box — `.search-field` and `initSearchFields()`
 
@@ -376,7 +386,17 @@ cockpit's said "on" by colour alone.
   when nothing else is; OR within one set, AND across sets.
 - **A pressed chip carries an ×** (0.62.0), drawn by the stylesheet from `aria-pressed="true"`:
   pressing it again removes that filter. **Mark the "all" chip `data-all`** — it resets the set, so
-  it never draws one. A link chip on `aria-current="page"` navigates, and draws none either.
+  it never draws one. A link chip on `aria-current="page"` navigates, and draws none either. The ×'s
+  slot is kept, unpainted, on a chip at rest, so pressing a chip moves nothing in the row.
+- **A set where pressed means INCLUDED is `data-inclusive`**, and none of its chips draws an ×:
+  netmon's series and the family calendar's people start with every chip pressed, and a pressed chip
+  there is shown, not a filter in force.
+
+  ```html
+  <div class="chip-set" data-inclusive role="group" aria-label="series">
+    <button type="button" class="chip" aria-pressed="true">ddmini</button>
+  </div>
+  ```
 - **A `.segmented` choice and a `.switch` get no ×.** A segmented control always has exactly one
   value, like a required picker, so there is nothing to clear. Flipping a switch back is its clear.
 - **An identity chip** — a host, a tag, a person, a netmon series — sets `--chip-accent` to one of the

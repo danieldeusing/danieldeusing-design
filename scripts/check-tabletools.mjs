@@ -59,6 +59,14 @@ const { check, done } = reporter("check-tabletools");
 const HARNESS = `<!doctype html><html><head><meta charset="utf-8"></head><body>
 <div id="mount"></div>
 <div id="later"></div>
+<script>
+// S1 counts MutationObservers by their JS objects, and V8 may drop the JS object of an observer no
+// script holds — the document-level ones, tabletools.js and search.js — and make a new one when its
+// callback next runs. The count then moved by one with nothing leaked (CI run 36695224254), and an
+// observer leaked the same way was under-counted. A subclass instance is never dropped: Blink could
+// not remake its prototype. So every observer on this page is one, and the count is what is alive.
+{ const Native = MutationObserver; window.MutationObserver = class MutationObserver extends Native {}; }
+<\/script>
 <script type="module">
 import { initTableTools, applyTableView, resetTableView } from "/runtime/tabletools.js";
 import { initTablePagination } from "/runtime/pagination.js";
@@ -663,7 +671,8 @@ await evaluate(`document.getElementById("later").replaceChildren(); null`);
    outlived the table, so each repaint kept the old instance, its header controls and its rows alive:
    measured, +13,800 nodes, +1,100 listeners and +200 MutationObservers over 50 repaints. A repaint is
    also not a patcher rebuilding the table, so it draws no contract warning. Counted after a garbage
-   collection, once the count's timer has run. */
+   collection, once the count's timer has run, and by observers whose JS object cannot be dropped (the
+   harness's first <script>). */
 await send("HeapProfiler.enable");
 const liveObservers = async () => {
   const { result: proto } = await send("Runtime.evaluate", { expression: "MutationObserver.prototype" });

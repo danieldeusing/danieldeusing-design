@@ -613,13 +613,13 @@ const measure = async (items) => {
   const out = {};
   for (const [name, selector, part, ink] of items) {
     const region = await evaluate(`R(${JSON.stringify(selector)}, ${JSON.stringify(part || null)})`);
-    await frames(1);
+    await frames();
     if (!region || region.width <= 0 || region.height <= 0) { out[name] = null; continue; }
     const shown = await shoot(region);
     out[name] = paint(shown);
     if (!ink) continue;
     await evaluate(`INK(${JSON.stringify(selector)}, ${JSON.stringify(ink)}, true)`);
-    await frames(1);
+    await frames();
     const hidden = await shoot(region);
     await evaluate(`INK(${JSON.stringify(selector)}, ${JSON.stringify(ink)}, false)`);
     await frames(1);
@@ -634,7 +634,7 @@ const measure = async (items) => {
 const ringOf = async (selector) => {
   await evaluate(REGIONS);
   const clip = await evaluate(`R(${JSON.stringify(selector)}, "ring")`);
-  await frames(1);
+  await frames();
   const before = await shoot(clip);
   // REAL keyboard focus: the focusable element before this one, then Tab. A :focus-visible forced
   // through DevTools computes the outline and paints nothing (RULES-CROSSCUT X1).
@@ -645,7 +645,7 @@ const ringOf = async (selector) => {
     prev.focus({ preventScroll: true });
     return true; })()`);
   for (const type of ["rawKeyDown", "keyUp"]) await send("Input.dispatchKeyEvent", { type, key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
-  await frames(1);
+  await frames();
   const tabbed = primed && await evaluate(`document.activeElement === document.querySelector(${JSON.stringify(selector)}) && document.activeElement.matches(":focus-visible")`);
   const focused = await shoot(clip);
   await evaluate(`document.activeElement.blur(); null`);

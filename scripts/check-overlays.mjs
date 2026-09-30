@@ -329,7 +329,12 @@ const diffIn = (shown, hidden, box) => {
   }
   return { changed, ratio: Math.round(ratio * 100) / 100, ownInk: ink };
 };
-const screenshot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
+// Two animation frames before every capture (RULES-CROSSCUT X1): a capture taken as soon as a theme,
+// a palette, a hidden mark or a focus changed can read the frame before that paint landed.
+const screenshot = async () => {
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
+  return decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
+};
 
 const axOf = async (selector) => {
   const { root: doc } = await send("DOM.getDocument", { depth: 0 });

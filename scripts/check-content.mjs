@@ -846,7 +846,10 @@ const focusRings = async () => {
       return { x: r.left - off - w / 2 - 0.5 + scrollX, y: r.top + 2 + scrollY, width: 1, height: Math.max(1, r.height - 4), scale: 1 };
     })()`);
     if (!clip) { problems.push(`${sel}: no outline when focused from the keyboard`); continue; }
-    const shot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data, "base64"));
+    // Two animation frames before every capture (RULES-CROSSCUT X1): the frame after the focus or the
+    // hidden mark changed, never the one before it.
+    const shot = async () => { await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
+      return decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data, "base64")); };
     const ring = await shot();
     await evaluate(`document.activeElement?.blur(); null`);
     const ground = await shot();
@@ -884,7 +887,10 @@ const painted = async () => {
     // page's centred column moves 7.5px right under a clip measured before it (measured: the at-rest
     // glyph's capture held its button's border, and a glyph painted at 1.34:1 passed at 21:1). The
     // element is scrolled into view above, so the viewport as it is holds it.
-    const shot = async () => decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data, "base64"));
+    // Two animation frames before every capture (RULES-CROSSCUT X1): the frame after the focus or the
+    // hidden mark changed, never the one before it.
+    const shot = async () => { await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
+      return decodePng(Buffer.from((await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: false })).data, "base64")); };
     const drawn = await shot();
     await evaluate(`(() => {
       if (!document.getElementById("own-probe")) document.head.insertAdjacentHTML("beforeend", ${JSON.stringify(HIDE_PROBE)});

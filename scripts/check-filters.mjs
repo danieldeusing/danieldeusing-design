@@ -540,6 +540,9 @@ const shot = async (clip) => {
   if (view.x || view.y || clip.x < 0 || clip.y < 0 || clip.x + clip.width > view.w || clip.y + clip.height > view.h) {
     throw new Error(`screenshot clip ${JSON.stringify(clip)} is not inside the unscrolled viewport ${JSON.stringify(view)}`);
   }
+  // Two animation frames before every capture (RULES-CROSSCUT X1): a capture taken as soon as a
+  // theme, a palette, a hidden mark or a focus changed can read the frame before that paint landed.
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false, clip: { ...clip, scale: 1 } });
   return decode(Buffer.from(data, "base64"));
 };

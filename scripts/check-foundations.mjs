@@ -508,9 +508,13 @@ await evaluate(`Object.assign(window.M, {
 const owned = async (selector, pad = 3) => {
   const box = await evaluate(`M.shot(${JSON.stringify(selector)})`);
   const clip = { x: box.x - pad, y: box.y - pad, width: box.w + 2 * pad, height: box.h + 2 * pad, scale: 1 };
+  // Two animation frames before every capture (RULES-CROSSCUT X1): a capture taken as soon as a
+  // theme, a palette, a hidden mark or a focus changed can read the frame before that paint landed.
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const drawn = (await send("Page.captureScreenshot", { format: "png", clip })).data;
   // the ELEMENT the clip was taken for, not its selector: a selector may match its neighbours too
   await evaluate(`document.querySelector(${JSON.stringify(selector)}).style.setProperty("visibility", "hidden", "important")`);
+  await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
   const bare = (await send("Page.captureScreenshot", { format: "png", clip })).data;
   await evaluate(`document.querySelector(${JSON.stringify(selector)}).style.removeProperty("visibility")`);
   return evaluate(`M.owned(${JSON.stringify(drawn)}, ${JSON.stringify(bare)}, ${JSON.stringify(clip)}, ${JSON.stringify(box)})`);

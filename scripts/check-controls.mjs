@@ -996,8 +996,12 @@ const paint = async () => {
     // launch, above): with a scrollbar, the capture is offset from the page by its width. Do not drop the
     // flag — and if the capture does land elsewhere, the ownership test below reads the ink off its box.
     const clip = { x: r.x - PAD, y: r.y - PAD, width: Math.max(1, r.w) + 2 * PAD, height: Math.max(1, r.h) + 2 * PAD, scale: 1 };
+    // Two animation frames before every capture (RULES-CROSSCUT X1): a capture taken as soon as a
+    // theme, a palette, a hidden mark or a focus changed can read the frame before that paint landed.
+    await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
     const drawn = (await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: true })).data;
     await evaluate(HIDE(r));
+    await evaluate("new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))");
     const bare = (await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: true })).data;
     await evaluate(UNHIDE);
     shots.push([drawn, bare]);

@@ -41,3 +41,4 @@ export * from "./tickstrip.js";
 export * from "./pick.js";
 export * from "./toc.js";
 export * from "./copy.js";
+export * from "./rhythm.js";

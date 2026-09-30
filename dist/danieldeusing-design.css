@@ -1129,6 +1129,45 @@ body::after {
   margin-block-start: 0.6rem;
 }
 
+/* ── STACKED BLOCKS KEEP A GAP, WRAPPED OR NOT (Daniel, 2026-09-30) ─────────────
+   A note sat flush on a table's search toolbar in cockpit. Every rhythm rule here is a SIBLING
+   rule (`p + .tablewrap`), and a page that paints itself from JS puts each block in its own mount:
+
+     <div id="rules-note"><p class="callout">…</p></div>
+     <div id="rules-table"><search class="filter-bar">…</search><div class="tablewrap">…</div></div>
+
+   The callout and the toolbar are not siblings, so no sibling rule could see them touch. So a
+   BLOCK — the list below, `STACKED_BLOCKS` in runtime/rhythm.js — keeps .6rem (the in-component
+   gap: `.fold-body`, `p + .tablewrap`) from what is above it in three shapes:
+     1. after another block, as siblings (two callouts are two notes, not one taller one) — only
+        in a container known to flow as a column of blocks: a mount, a section, a tab panel, a
+        fold's or a dialog's or a panel's body. A class-carrying <div> is a layout, a grid or a
+        flex row with a gap of its own, and a margin there ADDS to the gap and pushes one item of
+        a row below its neighbours (measured on the feedback demo's grid of callouts: 9.6px);
+     2. after a MOUNT — an unclassed <div>, or a tab panel — that holds something;
+     3. as the first thing in a mount that follows something.
+   Margins collapse through a plain mount and between blocks in a column, so where a gap was
+   already there (the toolbar's own 1rem, a section's rhythm) this adds nothing: it fills gaps,
+   it does not add to them. ZERO SPECIFICITY, like everything in this section: any margin a surface
+   writes wins. The one shape it cannot read is a grid whose ITEMS are unclassed <div>s: there the
+   margin stays inside the second item. Give those items a class.
+
+   FLUSH ON PURPOSE is allowed, and said out loud. A run of folds is one list — each fold draws its
+   own rule above it — so `details.fold + details.fold` stays flush. Anything else a surface wants
+   flush carries `data-flush` on the LOWER block, and `findFlushBlocks()` (runtime/rhythm.js), the
+   check a page runs to find every pair this rule missed, honours the same two exceptions. */
+:where(:is(div:not([class]), [role="tabpanel"], .tab-panel, section, article, main, .wrap, .content, .fold-body, .dialog-body, .panel-body) > :is(.callout, .notice, .fence, .filter-bar, .tablewrap, table, pre, .code-block, .cmd, .legend, .chart, .tabs, details.fold, .card-grid, .stat-grid, .row-list, .console)
+  + :is(.callout, .notice, .fence, .filter-bar, .tablewrap, table, pre, .code-block, .cmd, .legend, .chart, .tabs, details.fold, .card-grid, .stat-grid, .row-list, .console):not([data-flush])),
+:where(:is(div:not([class]), [role="tabpanel"]):not(:empty)
+  + :is(.callout, .notice, .fence, .filter-bar, .tablewrap, table, pre, .code-block, .cmd, .legend, .chart, .tabs, details.fold, .card-grid, .stat-grid, .row-list, .console):not([data-flush])),
+:where(:not(:empty) + :is(div:not([class]), [role="tabpanel"])
+  > :is(.callout, .notice, .fence, .filter-bar, .tablewrap, table, pre, .code-block, .cmd, .legend, .chart, .tabs, details.fold, .card-grid, .stat-grid, .row-list, .console):not([data-flush]):first-child) {
+  margin-block-start: 0.6rem;
+}
+:where(details.fold + details.fold) {
+  margin-block-start: 0;
+}
+
 
 /* ── ELEMENT DEFAULTS — the house look for bare markup (0.60.0) ─────────────────
    Until 0.60.0 the system styled the body, tables and focus, and left every other element to the
@@ -1185,6 +1224,16 @@ pre { line-height: var(--lh-base); }
   background: var(--muted);
   border: 1px solid var(--border);
   overflow-wrap: anywhere;
+}
+/* …EXCEPT IN A TABLE CELL, where `anywhere` broke a key one character per line on a phone.
+   `anywhere` lets the word break while the browser computes the cell's MIN-CONTENT width, so an
+   auto-layout table hands the code's column whatever the prose columns leave it, down to a single
+   character. `break-word` breaks the same word only when it would overflow its line, never while
+   sizing, so the column keeps the key's width and the prose column gives way instead. A key wider
+   than the whole table widens the table, and the `.tablewrap` around it scrolls: the table's answer
+   to width everywhere else (initTableScroll). */
+:where(td, th) :where(:not(pre) > code, kbd) {
+  overflow-wrap: break-word;
 }
 :where(pre) {
   margin: 0;
@@ -2824,7 +2873,7 @@ details.fold--boxed > summary { padding-block: 0.5rem; }
  *   <header class="bar">
  *     <div class="bar-side"><a href="/" class="brand"><span class="glow">name</span><span class="cursor-block"></span></a></div>
  *     <div class="bar-center">                       <!-- optional: history + the path, centred over <main> -->
- *       <div class="bar-history" role="group" aria-label="history">…back, forward, history menu…</div>
+ *       <div class="bar-history">…back, forward, history menu…</div>
  *       <nav class="crumbs" aria-label="breadcrumb">…</nav>
  *     </div>
  *     <div class="bar-side bar-right">
@@ -3264,8 +3313,10 @@ header.bar.bar--app {
   padding-block: 0; padding-inline: var(--bar-inset-start, 1.25rem) 0.75rem;
 }
 /* An app window's wordmark keeps its cursor still: it sits beside the OS's own controls, and a
-   blinking block there reads as a caret waiting for input. */
-.cursor-block--static { animation: none; }
+   blinking block there reads as a caret waiting for input. Two classes, because components.css's
+   `.cursor-block` sets the blink at one: at equal weight the file loaded LAST won, so a surface that
+   loaded chrome.css before components.css blinked (0.61.0). */
+.cursor-block.cursor-block--static { animation: none; }
 
 /* ── .crumbs — THE PROMPT-PATH BREADCRUMB (0.60.0) ─────────────────────────────────────────────
    `visitor@danieldeusing:~/articles/fantasy-football` — a shell prompt's path, which is where
@@ -3469,8 +3520,11 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
 .navlist a[aria-current="page"] { color: var(--primary); font-weight: 700; }
 .navlist-sub { padding-inline-start: 0.75rem; }
 /* "part 2" before a title. pagr drew it at /70 of the muted ink, an unmeasured alpha; it is the
-   muted token. With a lead the entry is a row, and the link a flex item beside it. */
-.navlist-lead { color: var(--muted-foreground); margin-inline-end: 0.5rem; }
+   muted token. With a lead the entry is a row, and the link a flex item beside it.
+   THE LEAD NEVER WRAPS OR SHRINKS (0.61.0). As a flex item it shrank to its min-content beside a
+   long title, and "part 5" broke at its space into "part" over "5". `flex: none` keeps its width and
+   `nowrap` its line; the title beside it is what wraps. */
+.navlist-lead { flex: none; white-space: nowrap; color: var(--muted-foreground); margin-inline-end: 0.5rem; }
 .navlist li:has(> .navlist-lead) { display: flex; align-items: baseline; }
 .navlist-lead + a { display: inline; }
 @media (pointer: coarse) {
@@ -3506,7 +3560,11 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
    browser's own list styles, and the pre-rail `ul.dropdown-panel.ls-panel` keeps its panel
    padding. */
 :where(.ls-panel) { list-style: none; margin: 0; padding: 0; }
-.ls-row { display: flex; align-items: baseline; gap: 0.9rem; }
+/* `.dropdown-item.ls-row` too: the rail's rows ARE dropdown items (the popup's row box), and
+   components.css's `.dropdown-item` sets its own alignment and gap at the same weight as `.ls-row`.
+   The file loaded last won, so a reversed load drew the rail centred at an 8px gap (0.61.0). */
+.ls-row,
+.dropdown-item.ls-row { display: flex; align-items: baseline; gap: 0.9rem; }
 /* THE PERMISSION STRING SITS BEHIND THE NAME (0.20.0). Daniel: "the folder info should also
    be in some grey style color so that it does not have the same color as the path/folder
    name." It was `--muted-foreground` flat, and measured across the four themes that was worse
@@ -3910,11 +3968,17 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   .mobile-theme[open] .mf-chev { transform: rotate(180deg); }
   .mobile-footer .mf-panel { display: flex; flex-direction: column; margin-top: 0.3rem; }
   .mobile-footer .mf-panel .dropdown-item { text-align: left; padding: 0.4rem 0.6rem; }
-  .mobile-footer .anim-toggle {
-    display: inline-flex; gap: 0.5rem; align-items: center;
-    background: none; border: 0; padding: 0.2rem 0; color: var(--muted-foreground);
+  /* The button's reset is restated for a surface without components.css (tokens + chrome), at
+     components.css's own weight and values, so the two tie harmlessly in either load order and its
+     `.anim-toggle:hover` still wins. At two classes the restated colour out-ranked that hover, so
+     the burger's toggle never lit (0.61.0). Only the gap and the padding differ, and they win. */
+  :where(.mobile-footer) .anim-toggle {
+    display: inline-flex; align-items: center;
+    background: none; border: 0; color: var(--muted-foreground);
     font: inherit; cursor: pointer;
   }
+  :where(.mobile-footer) .anim-toggle:hover { color: var(--primary); }
+  .mobile-footer .anim-toggle { gap: 0.5rem; padding: 0.2rem 0; }
 }
 /* A thumb, not a pointer: every control folded into the burger is a 44px row. They measured about
    22px (`padding: .2rem` on 18px of text) — the controls of a menu that exists only on a phone
@@ -3938,7 +4002,8 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   .ls-nav-toggle { min-block-size: 44px; min-inline-size: 44px; }
   /* A rail row is a 44px target here (components.css), and its text sits in the middle of it,
      not on a baseline at the top of a tall row. */
-  .ls-row { align-items: center; }
+  .ls-row,
+  .dropdown-item.ls-row { align-items: center; }
   :root:has(body > footer.status) { --status-h: 2.875rem !important; }
 }
 @media (max-width: 48rem) and (pointer: coarse) {
@@ -6440,6 +6505,7 @@ p.state { display: flex; white-space: normal; }
  * the family pages had a variant, the entry below says which parts were taken and why.
  *
  * Contents:
+ *   D0  table body text is --foreground
  *   D1  table.dense, the cell vocabulary (.num, .actions, .pick), row states, .stackable
  *   D3  table.kv, dl.kv
  *   D4  .when
@@ -6447,6 +6513,28 @@ p.state { display: flex; white-space: normal; }
  *   D8  .tabs, .tab, --compact, --strip
  *   print
  */
+
+/* ── TABLE BODY TEXT IS --foreground (Daniel, 2026-09-30) ─────────────────────────────────── (D0)
+   "Table text in all activity tables should be foreground, not muted grey." A cell is the data a
+   reader came for, so every `td` reads at full strength whatever it sits in: a table inside a muted
+   container (a card's description, a callout, a field's help) no longer inherits the grey. The
+   helpers a surface uses to quieten a cell's words read at full strength too: the common `.muted`,
+   `.text-muted-foreground`, and the system's own quiet cell part, the `when` cell's exact stamp.
+   Inside a cell they take `inherit`, not --foreground, so a row the page has dimmed as a STATE
+   keeps its dimmed words. Cockpit shipped this first (portal.css, `table.act`); it holds for every
+   table now, the base table, `.dense` and `.kv` alike.
+
+   WHAT KEEPS ITS COLOUR is colour that MEANS something, and none of it is touched here, because each
+   sets its own `color` on its own element: a tone, a tag, a state word, a link, a failure, `.kv`'s
+   label. A row that cannot be acted on (`tr[aria-disabled]`, below) and a surface's own row dimming
+   (cockpit's `.srcrow:not(.srcrow-on) td`) out-rank these on weight, on purpose. Header cells are
+   chrome and keep their muted treatment.
+
+   In a Tailwind app a `text-muted-foreground` utility on a cell sits in the utilities layer and
+   wins: there it is a decision somebody wrote down, not a grey the cell inherited. */
+td,
+td:is(.muted, .text-muted-foreground) { color: var(--foreground); }
+td :is(.muted, .text-muted-foreground, .when-exact) { color: inherit; }
 
 /* ── THE DENSE TABLE — cockpit's activity table, one class instead of four copies ─────────── (D1)
    `table.act` was declared FOUR times in cockpit (review, cicd, docs, execution.css), each copy a
@@ -6831,7 +6919,9 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
    reader do the subtraction, so the age leads and the exact stamp sits under it. `whenHtml()` in
    runtime/time.js writes the markup and `initRelativeTimes()` keeps the age true.
 
-   THE SECOND LINE IS "LITTLE" BY COLOUR, NOT BY SIZE. It is --muted-foreground: a smaller font was
+   THE SECOND LINE IS "LITTLE" BY COLOUR, NOT BY SIZE — outside a table. It is --muted-foreground
+   there; inside a table cell it reads at full strength, like every word of a table's body (D0), and
+   the line of its own is what keeps it second. A smaller font was
    exactly the near-miss the estate deleted (one size of text), and cockpit's opacity .6 measured
    3.26-3.40:1 on warm — under AA — where --muted-foreground holds 4.67 or better. `nowrap` on both
    lines is what makes each fit on one line, and it made the column NARROWER (the review table fell
@@ -7331,13 +7421,19 @@ section.doc.tab-panel { margin-top: 1.35rem; }
   }
 }
 
+/* ON A BASELINE (0.61.0). `flex-start` top-aligned boxes of different heights: a `.card-title` leads
+   1.3 (15.6px) and a tag is a 20px box with its word centred, so a title beside a `.tag--bracket` sat
+   3px above the tag's word. A baseline lines up the WORDS, whatever box each sits in. A glyph has no
+   word to align, so a lone `.ico` or `.btn-icon` centres on the row instead: on a baseline it would
+   sit on the text's baseline with its whole height above it. */
 .card-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
 }
+.card-head > :is(.ico, .btn-icon) { align-self: center; }
 /* 500, not bold: the title is the name of the thing, and in a grid of forty cards forty bold titles
    are a wall. seedr and configr both settled on medium weight at the body size.
    The LEADING is stated, here and on .panel-title and .entry-title: 0.60.0's base.css gives h1–h3

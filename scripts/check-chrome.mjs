@@ -87,9 +87,23 @@ const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascrip
 const LAYERED = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>@import url("/src/tokens.css"); @import url("/src/chrome.css") layer(components); :root { --status-h: 2rem; }</style>
 </head><body><main>content</main><footer class="status"><span class="status-left">x</span><nav class="status-right">y</nav></footer></body></html>`;
+/*
+ * LOAD ORDER. chrome.css and components.css both style a rail row, the anim toggle and the cursor, and
+ * a rule that wins only because its file loads second is a tie, not a decision: a surface that loads
+ * the two the other way round gets the other answer. Each page loads tokens and then the pair in one
+ * order; the three findings of 0.61.0's triage must come out the same both ways.
+ */
+const ORDER_FIXTURE = `<span class="cursor-block cursor-block--static" id="t-cursor"></span>
+<div class="mobile-footer"><button type="button" class="anim-toggle" id="t-anim">anim</button></div>
+<a class="dropdown-item ls-row" id="t-row" href="#"><span class="ls-perm">-rw-r--r--</span><span class="ls-name">row</span></a>`;
+const ORDERS = Object.fromEntries([["components", "chrome"], ["chrome", "components"]].map((files, i) => [`__order-${i}.html`,
+  `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/src/tokens.css">${files.map((f) => `<link rel="stylesheet" href="/src/${f}.css">`).join("")}
+<style>* { transition: none !important; }</style></head><body>${ORDER_FIXTURE}</body></html>`]));
 const server = createServer((req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname)).replace(/^\/+/, "");
   if (path === "__layered.html") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(LAYERED); return; }
+  if (ORDERS[path]) { res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); res.end(ORDERS[path]); return; }
   const file = overrides.get(path) ?? join(root, path);
   if (path.includes("..") || !existsSync(file)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "content-type": `${TYPES[extname(path)] || "application/octet-stream"}; charset=utf-8`, "cache-control": "no-store" });
@@ -457,6 +471,16 @@ await check("coarse pointer: every crumb is a 44px target (a link's padding grow
   () => coarse.link >= 44 && coarse.button >= 44, coarse);
 await check("…inside the SAME line box: the path does not move", () => near(coarse.line, crumbs.line, 0.01), { fine: crumbs.line, coarse: coarse.line });
 await check("…and a TOC entry is a 44px row", () => near(coarse.navlist, 44, 0.01), coarse);
+// A series entry's lead ("part 5") beside a title long enough to wrap: the lead stays one line at its
+// own width and the title wraps. On 0.60.0 the lead shrank as a flex item and broke into "part" / "5".
+await load("nobanner", { width: 375, height: 812 });
+const lead = await page(`(() => { const a = T.q("#series li:first-child a"); a.textContent = "a design system for one person, and why it keeps every surface on one release";
+  const lines = (node) => { const r = document.createRange(); r.selectNodeContents(node); return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size; };
+  const el = T.q("#series li:first-child .navlist-lead");
+  return { lines: lines(el), titleLines: lines(a),
+    flex: T.cs(el, "flex"), ws: T.cs(el, "whiteSpace") }; })()`);
+await check("a series entry's lead stays one line at its own width beside a title that wraps (flex none, nowrap)",
+  () => lead.lines === 1 && lead.titleLines > 1 && lead.flex === "0 0 auto" && lead.ws === "nowrap", lead);
 await load("nobanner&burger", { width: 375, height: 812, coarse: true });
 const burger = await page(`({ rows: T.qa(".mobile-footer :is(.doc-link, .mobile-theme > summary, .anim-toggle, .mf-panel .dropdown-item)").map((e) => e.getBoundingClientRect().height),
   list: [T.cs(".site-nav .ls-panel", "listStyleType"), T.cs(".site-nav .ls-panel", "paddingLeft"), T.cs(".site-nav .ls-panel", "marginTop")],
@@ -464,6 +488,24 @@ const burger = await page(`({ rows: T.qa(".mobile-footer :is(.doc-link, .mobile-
 await check("burger, coarse pointer: every folded footer control is a 44px row", () => burger.rows.length >= 8 && burger.rows.every((h) => near(h, 44, 0.01)), burger.rows);
 await check("…the chevron of an open accordion is turned", () => burger.chev.length === 2 && burger.chev.every((t) => t !== "none"), burger.chev);
 await load("bare&nobanner&burger", { width: 375, height: 812 });
+// NETMON'S CASE: tokens + chrome, no components.css. The burger's anim toggle is a <button>, and without
+// chrome.css's own reset it rendered as the platform's button — Arial 13.33px, a grey fill, a 2px
+// outset border — in a font the page never chose. The body takes the mono face as netmon's does.
+{
+  const { root: doc } = await (async () => { await send("DOM.enable"); await send("CSS.enable"); return send("DOM.getDocument", { depth: 0 }); })();
+  const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector: ".mobile-footer .anim-toggle" });
+  const read = () => page(`(() => { document.body.style.fontFamily = "var(--font-mono)"; const c = getComputedStyle(T.q(".mobile-footer .anim-toggle"));
+    return { font: c.fontFamily, mono: getComputedStyle(document.body).fontFamily, bg: c.backgroundColor, border: c.borderTopStyle + " " + c.borderTopWidth,
+      colour: c.color, primary: T.colour("var(--primary)") }; })()`);
+  const rest = await read();
+  await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: ["hover"] });
+  await frames(2);
+  const hover = await read();
+  await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: [] });
+  await check("with tokens + chrome only, the burger's anim toggle is not a native button: the page's mono face, no fill, no outset border — and it lights --primary under the pointer",
+    () => /JetBrains Mono/.test(rest.font) && rest.font === rest.mono && rest.bg === "rgba(0, 0, 0, 0)" && rest.border === "none 0px" &&
+      rest.colour !== rest.primary && hover.colour === hover.primary, { rest, hover });
+}
 await check("the rail's list is reset in the burger with NOTHING but tokens + chrome loaded (no bullets, no indent)",
   () => page(`T.cs(".site-nav .ls-panel", "listStyleType") === "none" && T.cs(".site-nav .ls-panel", "paddingLeft") === "0px" && T.cs(".site-nav .ls-panel", "marginTop") === "0px"`));
 
@@ -1059,6 +1101,31 @@ await check("the reveal steps by position: row n at 0.6s + (n−1) × 0.11s for 
 const inline = ["examples/chrome.html", "templates/page-chrome.html", "templates/documentation.html", ".claude/skills/danieldeusing-design/references/chrome.md"]
   .flatMap((f) => readFileSync(join(root, f), "utf8").split("\n").map((l, i) => [f, i + 1, l]).filter(([, , l]) => /<[a-z][^>]*\sstyle\s*=\s*["']/i.test(l) || /`style="/.test(l)).map(([f, n]) => `${f}:${n}`));
 await check("no documented markup carries a style attribute: the demo, both templates, chrome.md", () => inline.length === 0, inline);
+
+/* ═══ 15b. no rule of chrome.css wins by load order alone (0.61.0) ═════════════════════════════════ */
+await send("DOM.enable");
+await send("CSS.enable");
+for (const [i, order] of ["components → chrome (the bundle)", "chrome → components"].entries()) {
+  for (const coarse of [false, true]) {
+    await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+    await send("Emulation.setTouchEmulationEnabled", coarse ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+    const loaded = next("Page.loadEventFired");
+    await send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/__order-${i}.html` });
+    await loaded;
+    await send("CSS.enable");
+    const { root: doc } = await send("DOM.getDocument", { depth: 0 });
+    const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector: "#t-anim" });
+    await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: ["hover"] });
+    const got = await evaluate(`(() => { const cs = (id) => getComputedStyle(document.getElementById(id)); const p = document.createElement("i");
+      p.style.color = "var(--primary)"; document.body.append(p); const primary = getComputedStyle(p).color; p.remove();
+      return { coarse: matchMedia("(pointer: coarse)").matches, cursor: cs("t-cursor").animationName, hover: cs("t-anim").color, primary,
+        row: cs("t-row").alignItems + " " + cs("t-row").columnGap }; })()`);
+    const pointer = coarse ? "coarse" : "fine";
+    await check(`${order}, ${pointer} pointer: a static cursor does not blink, the burger's anim toggle lights --primary under the pointer, a rail row keeps its ${coarse ? "centred" : "baseline"} 14.4px row`,
+      () => got.coarse === coarse && got.cursor === "none" && got.hover === got.primary && got.row === (coarse ? "center 14.4px" : "baseline 14.4px"), got);
+  }
+}
+await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 
 /* ═══ 16. a second initToc() never hangs the tab ══════════════════════════════════════════════════
    Two spies over the same entries used to re-assert their own stored `current` over each other's in

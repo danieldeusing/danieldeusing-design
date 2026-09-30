@@ -66,7 +66,7 @@ bar, between the brand and the nav. Two sources, so it is an element, not a loca
 <header class="bar">
   <div class="bar-side"><a class="brand" href="/"><span class="glow">danieldeusing</span><span class="cursor-block" aria-hidden="true"></span></a></div>
   <div class="bar-center">                                   <!-- optional -->
-    <div class="bar-history" role="group" aria-label="history">
+    <div class="bar-history">
       <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-left" aria-label="back" disabled></button>
       <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-right" aria-label="forward" disabled></button>
       <details class="dropdown" hidden>
@@ -101,6 +101,10 @@ bar, between the brand and the nav. Two sources, so it is an element, not a loca
   `aria-current="true"`. There is no `initNavHistory()`: danieldeusing.de keeps a sessionStorage
   stack, seedr asks its router — neither is chrome. The menu itself is an ordinary
   `details.dropdown` (`initDropdowns()`); do not fork the dropdown runtime for it.
+- **The cluster is a plain `div.bar-history`, with no role and no name** (0.61.0). It was a
+  `role="group"` named "history" around a menu button also named "history", so a screen reader
+  announced "history, group … history, button": one word twice for one control. Each control already
+  names what it does (back, forward, history); pagr dropped the wrapper's name first.
 - **`.bar-status`** is a connection that can drop, in words beside a dot: `connecting…` (tone
   `pending`), `live` (`success`), `down` (`destructive`). It is `role="status"` so the change is
   announced — cockpit's changed silently. The words are the state; the dot is aria-hidden.
@@ -373,7 +377,8 @@ full-width document such as the html-doc template; `initMinimap()` refuses on a 
   </nav>
   ```
 
-  `.navlist-lead` is the muted "part N" (danieldeusing.de drew it at an unmeasured /70).
+  `.navlist-lead` is the muted "part N" (danieldeusing.de drew it at an unmeasured /70). It never
+  wraps or shrinks (0.61.0): beside a long title it broke into "part" over "5"; now the title wraps.
 - Under a coarse pointer every entry is a 44px row. In print the TOC is hidden; a series list prints.
 - Cockpit's `.toc-label` and its bare `nav` move to this markup (`.navlist-label`).
 

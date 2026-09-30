@@ -11,7 +11,7 @@
  *   <header class="bar">
  *     <div class="bar-side"><a href="/" class="brand"><span class="glow">name</span><span class="cursor-block"></span></a></div>
  *     <div class="bar-center">                       <!-- optional: history + the path, centred over <main> -->
- *       <div class="bar-history" role="group" aria-label="history">…back, forward, history menu…</div>
+ *       <div class="bar-history">…back, forward, history menu…</div>
  *       <nav class="crumbs" aria-label="breadcrumb">…</nav>
  *     </div>
  *     <div class="bar-side bar-right">
@@ -451,8 +451,10 @@ header.bar.bar--app {
   padding-block: 0; padding-inline: var(--bar-inset-start, 1.25rem) 0.75rem;
 }
 /* An app window's wordmark keeps its cursor still: it sits beside the OS's own controls, and a
-   blinking block there reads as a caret waiting for input. */
-.cursor-block--static { animation: none; }
+   blinking block there reads as a caret waiting for input. Two classes, because components.css's
+   `.cursor-block` sets the blink at one: at equal weight the file loaded LAST won, so a surface that
+   loaded chrome.css before components.css blinked (0.61.0). */
+.cursor-block.cursor-block--static { animation: none; }
 
 /* ── .crumbs — THE PROMPT-PATH BREADCRUMB (0.60.0) ─────────────────────────────────────────────
    `visitor@danieldeusing:~/articles/fantasy-football` — a shell prompt's path, which is where
@@ -656,8 +658,11 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
 .navlist a[aria-current="page"] { color: var(--primary); font-weight: 700; }
 .navlist-sub { padding-inline-start: 0.75rem; }
 /* "part 2" before a title. pagr drew it at /70 of the muted ink, an unmeasured alpha; it is the
-   muted token. With a lead the entry is a row, and the link a flex item beside it. */
-.navlist-lead { color: var(--muted-foreground); margin-inline-end: 0.5rem; }
+   muted token. With a lead the entry is a row, and the link a flex item beside it.
+   THE LEAD NEVER WRAPS OR SHRINKS (0.61.0). As a flex item it shrank to its min-content beside a
+   long title, and "part 5" broke at its space into "part" over "5". `flex: none` keeps its width and
+   `nowrap` its line; the title beside it is what wraps. */
+.navlist-lead { flex: none; white-space: nowrap; color: var(--muted-foreground); margin-inline-end: 0.5rem; }
 .navlist li:has(> .navlist-lead) { display: flex; align-items: baseline; }
 .navlist-lead + a { display: inline; }
 @media (pointer: coarse) {
@@ -693,7 +698,11 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
    browser's own list styles, and the pre-rail `ul.dropdown-panel.ls-panel` keeps its panel
    padding. */
 :where(.ls-panel) { list-style: none; margin: 0; padding: 0; }
-.ls-row { display: flex; align-items: baseline; gap: 0.9rem; }
+/* `.dropdown-item.ls-row` too: the rail's rows ARE dropdown items (the popup's row box), and
+   components.css's `.dropdown-item` sets its own alignment and gap at the same weight as `.ls-row`.
+   The file loaded last won, so a reversed load drew the rail centred at an 8px gap (0.61.0). */
+.ls-row,
+.dropdown-item.ls-row { display: flex; align-items: baseline; gap: 0.9rem; }
 /* THE PERMISSION STRING SITS BEHIND THE NAME (0.20.0). Daniel: "the folder info should also
    be in some grey style color so that it does not have the same color as the path/folder
    name." It was `--muted-foreground` flat, and measured across the four themes that was worse
@@ -1097,11 +1106,17 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   .mobile-theme[open] .mf-chev { transform: rotate(180deg); }
   .mobile-footer .mf-panel { display: flex; flex-direction: column; margin-top: 0.3rem; }
   .mobile-footer .mf-panel .dropdown-item { text-align: left; padding: 0.4rem 0.6rem; }
-  .mobile-footer .anim-toggle {
-    display: inline-flex; gap: 0.5rem; align-items: center;
-    background: none; border: 0; padding: 0.2rem 0; color: var(--muted-foreground);
+  /* The button's reset is restated for a surface without components.css (tokens + chrome), at
+     components.css's own weight and values, so the two tie harmlessly in either load order and its
+     `.anim-toggle:hover` still wins. At two classes the restated colour out-ranked that hover, so
+     the burger's toggle never lit (0.61.0). Only the gap and the padding differ, and they win. */
+  :where(.mobile-footer) .anim-toggle {
+    display: inline-flex; align-items: center;
+    background: none; border: 0; color: var(--muted-foreground);
     font: inherit; cursor: pointer;
   }
+  :where(.mobile-footer) .anim-toggle:hover { color: var(--primary); }
+  .mobile-footer .anim-toggle { gap: 0.5rem; padding: 0.2rem 0; }
 }
 /* A thumb, not a pointer: every control folded into the burger is a 44px row. They measured about
    22px (`padding: .2rem` on 18px of text) — the controls of a menu that exists only on a phone
@@ -1125,7 +1140,8 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   .ls-nav-toggle { min-block-size: 44px; min-inline-size: 44px; }
   /* A rail row is a 44px target here (components.css), and its text sits in the middle of it,
      not on a baseline at the top of a tall row. */
-  .ls-row { align-items: center; }
+  .ls-row,
+  .dropdown-item.ls-row { align-items: center; }
   :root:has(body > footer.status) { --status-h: 2.875rem !important; }
 }
 @media (max-width: 48rem) and (pointer: coarse) {

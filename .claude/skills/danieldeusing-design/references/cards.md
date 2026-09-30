@@ -90,7 +90,7 @@ The parts:
 
 | class | what it is |
 |---|---|
-| `.card-head` | the top row — a value filter, a tag, a glyph, a star. Wraps, first item start, last item end |
+| `.card-head` | the top row — a value filter, a tag, a glyph, a star. Wraps, first item start, last item end. Its words sit on one baseline, so a `.card-title` beside a `.tag--bracket` lines up (0.61.0; they were 3px apart), and a lone `.ico` or `.btn-icon` centres on the row |
 | `.card-title` | the name, **any heading level**; the class sets the size (body size, weight 500). 500, not bold: forty bold titles in a grid are a wall |
 | `.card-link` | the title's link. Takes the title's colour, no underline; the card's hover is its hover |
 | `.card-desc` | the description, muted, clamped to 3 lines (`--clamp-lines: 2` on it, in the page's stylesheet, to change it). Left-aligned — seedr's justified text opens rivers in a narrow monospace column |

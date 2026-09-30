@@ -362,6 +362,7 @@ const FIXTURE = `
     <li class="card-terminal card-terminal--flash" id="fx-card-flash" data-tone="success"><h3 class="card-title">flash</h3></li>
   </ul>
   <div data-tone="warning"><article class="card-terminal card-terminal--flash" id="fx-card-flash-leak"><h3 class="card-title">untoned flash in a toned box</h3></article></div>
+  <div style="width: 20rem"><article class="card-terminal" id="fx-card-head-words"><div class="card-head"><h3 class="card-title" id="fx-head-title">skills</h3><span class="tag tag--bracket" id="fx-head-bracket">installed</span><span class="tag" id="fx-head-tag">mcp</span><span class="ico" data-icon="package" id="fx-head-ico" aria-hidden="true"></span></div></article></div>
   <div style="width: 20rem"><article class="card-terminal" id="fx-card-lone"><h3 class="card-title">lone</h3><p class="card-desc">desc</p></article></div>
   <section class="panel" id="fx-panel-leak"><header class="panel-head"><span class="ico" data-icon="folder-tree" id="fx-leak-ico" aria-hidden="true"></span><span id="fx-leak-text">bare</span><time id="fx-leak-time" datetime="2026-09-29">today</time><span class="dot" id="fx-leak-dot" aria-hidden="true"></span><button type="button" class="disclosure-btn" id="fx-leak-disclosure" aria-expanded="true" aria-label="collapse leak"></button><span class="tag" id="fx-leak-tag">tag</span><button type="button" class="btn-icon btn-icon--sm" data-icon="star" id="fx-leak-btn" aria-label="favourite leak"></button><a href="#fx" id="fx-leak-link">plain link</a></header></section>
   <div style="width: 20rem"><article class="card-terminal" id="fx-card-p-title"><p class="card-title" id="fx-title-on-p">a title on a p</p></article></div>
@@ -481,7 +482,7 @@ const CURRENT = (row, title) => [
 const EXPECT = [
   ["K2 card anatomy — head, title (500, body size), description (3-line clamp), foot", [
     ["#fx-card-head", "", "display", { is: "flex" }], ["#fx-card-head", "", "flex-wrap", { is: "wrap" }],
-    ["#fx-card-head", "", "align-items", { is: "flex-start" }], ["#fx-card-head", "", "justify-content", { is: "space-between" }],
+    ["#fx-card-head", "", "align-items", { is: "baseline" }], ["#fx-card-star", "", "align-self", { is: "center" }], ["#fx-card-head", "", "justify-content", { is: "space-between" }],
     ["#fx-card-head", "", "row-gap", "0.5rem"], ["#fx-card-head", "", "column-gap", "0.5rem"],
     ["#fx-card-title", "", "margin-top", { is: "0px" }], ["#fx-card-title", "", "margin-bottom", { is: "0px" }],
     ["#fx-card-title", "", "font-size", "var(--fs-base)"], ["#fx-card-title", "", "font-weight", { is: "500" }], ["#fx-card-title", "", "color", "var(--foreground)"],
@@ -714,6 +715,13 @@ const GEOMETRY = [
       const cs = getComputedStyle(W.q(id)), got = parseFloat(cs.lineHeight) / parseFloat(cs.fontSize);
       return Math.abs(got - want) < 0.01 ? null : id + " leads " + got.toFixed(3) + ", not --lh-tight " + want;
     }).filter(Boolean);
+  })()`)],
+  ["K2 a head lines its WORDS up on one baseline — a title beside a bracket tag and a boxed tag (3px apart on 0.60.0) — and centres a lone glyph on the row", () => W(`(() => {
+    const words = (id) => { const r = document.createRange(); r.selectNodeContents(W.q(id)); return r.getBoundingClientRect(); };
+    const title = words("#fx-head-title"), row = W.box("#fx-card-head-words .card-head"), ico = W.box("#fx-head-ico");
+    return [W.near(words("#fx-head-bracket").bottom, title.bottom, "the bracket tag's words sit on the title's baseline"),
+      W.near(words("#fx-head-tag").bottom, title.bottom, "the boxed tag's words sit on the title's baseline"),
+      W.near(ico.top + ico.height / 2, row.top + row.height / 2, "the glyph is centred on the row")].filter(Boolean);
   })()`)],
   ["K2/K6 a description clamps at three lines in a card and two in a row, and hides the rest", () => W(`(() => {
     const lines = (id, n) => { const el = W.q(id), lh = parseFloat(getComputedStyle(el).lineHeight);

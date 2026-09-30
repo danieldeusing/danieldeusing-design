@@ -117,11 +117,12 @@
 
   <!-- OPTIONAL: the centre band — history and the path, centred over <main>. For a site a
        reader moves around (danieldeusing.de, seedr). It gives way to the burger on a phone.
-       The history menu carries `hidden` until the page has two entries to list.
+       The history menu carries `hidden` until the page has two entries to list. The cluster is
+       a plain div: named "history" as a group too, a reader heard the word twice for one menu.
        Write the crumbs WITHOUT whitespace between the tags: they are one line of inline
        text, and a newline between two <li> is a space in the path ("~ /articles").
   <div class="bar-center">
-    <div class="bar-history" role="group" aria-label="history">
+    <div class="bar-history">
       <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-left" aria-label="back" disabled></button>
       <button type="button" class="btn-icon btn-icon--bare" data-icon="chevron-right" aria-label="forward" disabled></button>
       <details class="dropdown" hidden>

@@ -7,7 +7,7 @@ component vocabulary".
 
 Contents:
 
-- A `td` has no colour: the Tailwind-typography trapdoor
+- A `td` is `--foreground` (0.61.0), and the Tailwind-typography trapdoor it closes
 - Authoring a plain table: column widths and cell content
 - A dashboard table is `table.dense`: the cell vocabulary, row states, a phone (0.60.0)
 - Pairs: `table.kv` and `dl.kv` (0.60.0)
@@ -17,9 +17,14 @@ Contents:
 - A table gets a search, a filter and a sort (0.29.0)
 - `.field-row`: a settings panel is a two-column table
 
-## A `td` has no colour: the Tailwind-typography trapdoor
+## A `td` is `--foreground` (0.61.0), and the Tailwind-typography trapdoor it closes
 
-**`td` deliberately has no colour, and on a Tailwind-typography surface that is a trapdoor.** The
+**Since 0.61.0 every `td` is `--foreground`** (Daniel: table text is foreground, not muted grey), with
+the quiet helpers inside a cell reading at full strength too; the rule and its exceptions are in
+`data.md`, "Table body text is `--foreground`". The history below is why a cell that inherits its
+colour was never safe.
+
+**Until 0.61.0 `td` deliberately had no colour, and on a Tailwind-typography surface that was a trapdoor.** The
 system styles `td`'s padding, alignment and rule but never its ink, because a cell is body copy and
 must inherit `body { color: var(--foreground) }` — correct everywhere the page is plain HTML, which
 is cockpit, docs, netmon, ci-orchestrator and the seedr playgrounds (audited 2026-08-08: not one of
@@ -62,6 +67,14 @@ The widths go in the page's stylesheet, never in a style attribute: a page under
 `style-src 'self'` policy (seedr's) drops every one. Give the sentence column no width and let
 it take the remainder. Without this a three-sentence cell sizes the column to its longest line
 and squeezes every other column into a vertical stack of single words.
+
+**Inline code in a cell keeps its word** (0.61.0). A bare `<code>` breaks anywhere (`base.css`), and
+in a cell that let the browser size the code's column down to a few characters: at 375px a
+28-character config key stood three to five lines tall while the prose column beside it took the
+width. Inside `td` and `th` the code breaks only where it would overflow its line
+(`overflow-wrap: break-word`), so the column keeps the key's width and the prose gives way. A key
+with no break in it that is wider than the whole table widens the table, and the `.tablewrap`
+scrolls it.
 
 A long inline-code value or a cell holding more than one item forces the table wider than its
 column; without a scrolling wrapper the browser scrolls the whole page horizontally — the header

@@ -56,8 +56,8 @@ two-line title into two separate lines.
 - **One `h1.page-title` per page.** A long path or package name wraps anywhere rather than overflow.
 - **Tailwind**: pagr deletes `text-3xl sm:text-4xl tracking-tight font-bold glow-lg mt-6` from its
   titles. The entry is layered, so a utility left in place now beats the class.
-- Replaces cockpit's `h1.title` and `.lede` in `portal.css`, and the DS template's local `h1.title`
-  and `.lede`. Delete those when a page adopts this.
+- Replaces cockpit's `h1.title` and `.lede` in `portal.css`. Delete those when a page adopts this.
+  `templates/documentation.html` has worn it since 0.61.0, with no local copy of anything below.
 
 ## `.eyebrow` — the one label look
 
@@ -178,7 +178,7 @@ never put `.prose` and `.markdown` on one element.
 ## Code: `.code-block`, `.code-view`, syntax and diff colours
 
 **Inline code and `kbd` are elements, with no class** (`base.css`). Cockpit's `code.inline` (831
-uses) and the template's `code.inline` / `pre.block` are deleted in the migration.
+uses) is deleted in the migration; the documentation template's `code.inline` / `pre.block` went in 0.61.0.
 
 ```html
 <pre class="code-block" tabindex="0">…</pre>

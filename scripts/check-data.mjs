@@ -673,7 +673,12 @@ const cues = async (mode) => {
       const r = box(li); return inkBox({ left: r.left - 1, right: r.left + 14, top: r.top - 2, bottom: r.bottom + 2 }); });
     const near = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i]))) <= 12;
     const hues = ["green", "red", "blue"].map((h) => M.rgba("var(--cat-" + h + ")"));
-    const painted = [centre(bars[0]), ...bars.slice(1).map((r) => px(r.left + 0.5, (r.top + r.bottom) / 2))];
+    // The INKIEST pixel inside each bar, not one picked by arithmetic: a bar at a fractional x put
+    // \`left + 0.5\` on an anti-aliased edge, half hue and half canvas, and read no series' colour at
+    // all. An outlined bar has no inside to sample, and its stroke's fully covered pixels are the
+    // ones furthest from the canvas; so are a hatch's and a solid fill's.
+    const inkiest = (r) => pixels(r).reduce((best, p) => (M.ratio(p, canvas) > M.ratio(best, canvas) ? p : best), canvas);
+    const painted = bars.map(inkiest);
     return { rects: { bars, swatches }, bars: bars.map((r) => kindOf(r, 2.5)),
       swatches: swatches.map((r) => (r ? { ...kindOf(r, 3), w: r.right - r.left, h: r.bottom - r.top } : { kind: "missing" })),
       hue: painted.map((p, i) => near(p, hues[i])) };`);

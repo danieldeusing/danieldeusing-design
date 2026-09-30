@@ -100,11 +100,13 @@ not if one filter must always be set)."* The bar packs its children against its 
 anything marked `.filter-bar-lead` (a label that is not a heading, such as a `<p>` or a `<span>`).
 Write the lead first.
 
-**Several leads may start a row**, and only the last of them takes the free space: cockpit's home
-puts its prompt label before its search, `<label class="ps1 filter-bar-lead">` then the
-`.search-field`. **Anything else that belongs on the left must be marked `.filter-bar-lead` too** —
-a view switch, step buttons and a date label (the family calendar's `.cal-bar`) — or it packs to the
-right with the filters.
+**Everything that belongs on the left goes in ONE lead.** When a row starts with more than the
+search — a prompt label before it (cockpit's home), or a view switch, step buttons and a date label
+(the family calendar's `.cal-bar`) — wrap them in one element marked `.filter-bar-lead`
+(`<div class="btn-row filter-bar-lead">…</div>`). Consecutive separate leads work on a wide screen,
+but on a phone they wrap onto their own rows, only the last takes the free space, and the first packs
+RIGHT with the filters; `findMisplacedFilters()` reports it as `lead-not-left` on a 375px screen.
+Anything on the left that is not in a lead packs right with the filters.
 
 ```html
 <!-- no search: a heading leads, the required picker sits on the right (cockpit's stats) -->

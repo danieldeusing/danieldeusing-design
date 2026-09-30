@@ -139,9 +139,22 @@ const PAGE = `${ORIGIN}/examples/controls.html`;
 
 /* ── the browser ── */
 const profile = mkdtempSync(join(tmpdir(), "dd-controls-"));
+// A POINTER DEVICE, SET, NOT ASSUMED. Headless Chrome reports the host's input: a Mac says
+// (hover: hover) and (pointer: fine); a Linux CI runner with no mouse says (hover: none), where a
+// revealed action is visible at rest BY DESIGN, so every "hidden until needed" check read 1 there.
+// The protocol cannot emulate these two features (Emulation.setEmulatedMedia takes `hover` and
+// `pointer` and ignores both), so the device is Blink's own setting, the one touch emulation flips:
+// hover type 2 = hover, pointer type 4 = fine. The coarse section still gets (hover: none) from touch
+// emulation, and its precondition fails if it does not.
+// GREYSCALE TEXT, SET, NOT ASSUMED. Chrome on Linux draws text with LCD subpixel antialiasing; the
+// colour filter bleeds a glyph's edge into the next pixel column, so the forced-colours pixel read saw
+// the chosen card's "user" change a pixel 1.09px past its text box, outside the ±1px ownership margin
+// (a Mac draws greyscale and never did). --disable-lcd-text draws greyscale on every host.
 const chrome = spawn(CHROME, [
   "--remote-debugging-port=0", "--remote-allow-origins=*", "--headless=new", "--no-first-run",
-  "--no-default-browser-check", "--disable-gpu", "--hide-scrollbars", `--user-data-dir=${profile}`, "about:blank",
+  "--no-default-browser-check", "--disable-gpu", "--hide-scrollbars", "--disable-lcd-text",
+  "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
+  `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 let socket;
 const shutdown = () => {
@@ -289,6 +302,8 @@ await send("DOM.enable");
 await send("CSS.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 await load();
+const device = await evaluate("[matchMedia('(hover: hover)').matches, matchMedia('(pointer: fine)').matches]");
+check("precondition: the page sees a pointer device, (hover: hover) and (pointer: fine), whatever the host has", device.join() === "true,true", device);
 // Transitions are .15s; a computed style read mid-transition is a colour halfway between two states.
 // html.anim-off is the estate's switch that stops them (F6), so the state checks read end states.
 await evaluate("document.documentElement.classList.add('anim-off'); null");

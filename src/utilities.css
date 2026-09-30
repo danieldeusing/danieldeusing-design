@@ -13,9 +13,9 @@
  *
  * ⚠️ index.css IMPORTS THIS FILE AFTER EVERY COMPONENT FILE, and the order is the point. A utility
  * is written ON a component — `.doc-link.text-primary`, `.prompt.text-destructive`,
- * `.btn-terminal--ghost.text-destructive` — and at equal specificity the later rule wins. While
- * these lived in base.css, which the bundle loads before components.css, the component's own
- * colour won and the utility did nothing, and the same markup in a Tailwind app took the utility,
+ * `.btn-terminal--ghost.text-destructive` — and at equal specificity the later rule wins. In base.css,
+ * which the bundle loads before components.css, the component's own colour would win and the
+ * utility would do nothing, and the same markup in a Tailwind app took the utility,
  * whose layer comes after components. After the components, the markup means the same in both
  * worlds. Only print.css comes later, as it does in a Tailwind app: on paper, print wins.
  *

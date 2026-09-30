@@ -241,7 +241,8 @@
    quiet. Setting `background: transparent` here would strip it to `--primary-foreground` text on
    the page background — near-invisible on all four themes — so the one property that reads as
    "off" on both variants is the only one touched. */
-.btn-terminal:disabled {
+.btn-terminal:disabled,
+.btn-terminal[aria-disabled="true"]:not([aria-busy="true"]) {
   opacity: 0.45;
   cursor: default;
   box-shadow: none;
@@ -1479,7 +1480,8 @@ details.fold--boxed > summary { padding-block: 0.5rem; }
    dark forced palette, on all four themes. */
 @media (forced-colors: active) {
   .btn-terminal { color: ButtonText; }
-  .btn-terminal:disabled { color: GrayText; }
+  .btn-terminal:disabled,
+  .btn-terminal[aria-disabled="true"]:not([aria-busy="true"]) { color: GrayText; }
   .select-option,
   .dropdown-item { color: CanvasText; }
   /* Before the highlight, so a current row under the pointer reads HighlightText on Highlight. */

@@ -384,8 +384,9 @@ every one of them has drifted. Adding a surface is one entry in that array.
   A stale cached stylesheet there means slightly older colours, never a broken page. netmon's
   `tokens.css` layer, the seedr playgrounds and pagr-docs are on this side today.
   **This is where a surface should sit, not a roster of where they are** — audited 2026-08-06,
-  morning-briefs is hard-pinned at **0.1.3** in four `@import url()` lines in its `lib/tokens.css`
-  and `deploy/ci-orchestrator` at **0.1.5**, so neither has had a token since. A pin nobody bumps
+  `deploy/ci-orchestrator` was hard-pinned at **0.1.5** and had no token since. morning-briefs
+  imports the unpinned `src/` files (look-only) and keeps its own fixes in its stylesheet; for
+  0.60.0 its `pre.mermaid` keeps the unboxed look there. A pin nobody bumps
   is the failure mode on this side, exactly as a poisoned cache is on the other.
 - **A surface that ships the system's markup → pin** and bump the pin in the same commit as the
   markup that needs it. Cockpit — and **the docs site since 2026-08-06**, when its pages adopted

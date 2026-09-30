@@ -525,6 +525,11 @@ the pager slices exactly the matching set and needs to know nothing about filter
   house ring, 2px off, and under a coarse pointer each — the badge too — is at least 44 × 44. Clearing a
   filter by its badge leaves focus on that column's filter summary.
 - **A table rendered later is enhanced when it arrives**: call `initTableTools()` once at startup.
+- **A moved table takes its bar, its pager and its count with it (0.61.0).** Append the table or its
+  `.tablewrap` somewhere else and the engine's bar goes directly before it, the pager and the count
+  directly after it, with the sort, filters, search and page the reader had. A table detached and
+  inserted again later comes back with that view too, with or without a `data-table-id`; a table
+  removed for good leaves no count or pager where it stood.
 - **A renderer that re-renders the header gets the engine's parts back.** `aria-sort`, `.is-filtered`,
   the controls, the badge and `aria-checked` are the engine's; a patcher (cockpit's `cockpitPatch`)
   that writes the header's markup removes them, and the engine puts the same nodes back. Its

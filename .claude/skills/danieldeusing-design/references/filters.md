@@ -51,6 +51,12 @@ Daniel, with a screenshot of a rounded, blue-highlighted system list beside seed
   React owns.
 - `bin/design-conformance` (danieldeusing-infra) fails a page that ships a `<select>` and never runs
   `initSelects()`, any `data-select="off"`, and a JSX `<select` in a framework app.
+- **The trigger is named by the label; the value is its value (0.61.0).** A reader hears
+  "lines, combobox, 200", once each. The label is found as the platform finds it — `aria-label`,
+  `aria-labelledby`, `<label for>`, a wrapping `<label>` — and a wrapping label is read for its own
+  words, because referenced whole it carries the trigger inside it and its value along with it.
+  Until 0.61.0 the name also held the value: "lines 200 200" for a wrapped select, the pager's
+  "rows 20 20". A filter is named differently, below.
 
 ## What replaces `.filter-ctl` and `.filter-set`
 

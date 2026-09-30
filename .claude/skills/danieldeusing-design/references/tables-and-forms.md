@@ -259,8 +259,17 @@ every `required` select.
   `.select-option` too**. Before that it was dropped: the panel replaces the native option list, so
   every per-option explanation ever written was unreachable, in either attribute. Labels are found
   the way the platform finds them — `aria-label`, then `aria-labelledby`, then a `<label>` by `for=`
-  or by wrapping — and the trigger's name becomes *label + current value*, as a native select
-  announces.
+  or by wrapping — and since 0.61.0 the trigger's name is the label alone, with the chosen option as
+  its value, once each ("lines, combobox, 200"), as a native select announces (`filters.md` has
+  the whole rule).
+- **Playwright sees no name on a trigger labelled by a `<label for>` without an id.** Since 0.60.0
+  that one case is named by element reference (`ariaLabelledByElements`), which leaves the
+  `aria-labelledby` attribute empty. Chromium reads the name; Playwright's own name computation
+  (`getByRole`'s `name`, `toHaveAccessibleName`, `ariaSnapshot`) reads only the attribute. To
+  assert the name, give the `<label>` an id, which the runtime then references by id, or read name
+  and value from Chromium's accessibility tree over CDP (`Accessibility.getPartialAXTree`). There
+  the name is the label as shown, CSS `text-transform` included, and the value ends in the
+  zero-width space `.select-value::after` draws.
 - **`multiple` and `size > 1` are left alone** — the platform renders those inline, and there is
   no popup to replace. There is no other opt-out: `data-select="off"` is gone in 0.60.0, because
   every dropdown list is the system's list.

@@ -1353,7 +1353,9 @@ try {
   /* ── the footer against controls.css loaded AFTER overlays.css ── */
   section("the dialog footer against controls.css loaded after overlays.css");
   await send("Page.navigate", { url: `${BASE}/harness/foot-order` });
-  await sleep(300);
+  // Until the harness has loaded, not a fixed 300ms: on a loaded host the read came first and threw on
+  // a page that had no #foot yet, which aborted the suite.
+  for (let i = 0; i < 100 && !(await evaluate(`document.readyState === "complete" && !!document.getElementById("foot")`).catch(() => false)); i += 1) await sleep(50);
   const foot = await evaluate(`(() => { const s = getComputedStyle(document.getElementById("foot"));
     return { margin: s.marginTop, padding: s.paddingTop + " " + s.paddingLeft, border: s.borderTopWidth, display: s.display }; })()`);
   console.log(`NOTE  controls.css in the harness: ${realControls ? "src/controls.css" : "WP5's .form-actions rules, copied (no src/controls.css in this tree)"}`);

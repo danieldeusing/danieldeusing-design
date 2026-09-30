@@ -4,6 +4,68 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.62.0 (2026-09-30)
+
+### Filters sit on the right, the search on the left, and an active filter shows its ×
+
+Daniel, 2026-09-30: *"Filters, sort and so on are always right aligned. Search input field always
+left aligned. Active filters have colored text and there must be the 'x' icon to remove the filter
+(only not if one filter must always be set)."* And: *"The filter icon should be same size and
+position as the sort icons."* One class is removed (`.filter-bar-spacer`), so a surface that used it
+has one line to delete; see *Migration*.
+
+### Changed
+
+- **`.filter-bar` right-aligns everything but its lead, at every width.** The bar packs its
+  children against its end edge (`justify-content: flex-end`), and the lead takes the free space
+  after itself (`margin-inline-end: auto`). The lead is a `.search-field`, a heading `h2`–`h6`, or an
+  element marked `.filter-bar-lead` (a label that is not a heading). A bar with no lead has every
+  control on the right, so a row of filters with no search — cockpit's stats picker — is a
+  `.filter-bar` too. On a phone (below `40rem`) the search keeps its whole first row and the
+  controls wrap under it right-aligned; until now they went to the left there.
+- **A pressed chip draws an ×** (`.chip[aria-pressed="true"]`: the icon set's `--ico-x`, `--icon-sm`
+  wide, drawn like `.chip--remove`'s), because pressing it again removes that filter. A chip marked
+  `data-all` — the "all" chip that resets the set — never draws one, and nor does a link chip on
+  `aria-current="page"`. A `.segmented` choice and a `.switch` get no ×: the first always has one
+  value, and flipping the second back is its clear.
+- **A `.chip-set` inside a `.filter-bar` wraps its chips against the right edge.**
+- **A dialog toolbar that filters is a `.filter-bar`:** `class="dialog-toolbar filter-bar"`, the
+  search first, then the filters and switches, then the count and the steppers. The bar's bottom
+  margin is dropped there, since the toolbar's rule is its edge. The overlays demo's plan toolbar and
+  logs drawer follow it; the drawer had its search third, and cockpit copied that.
+- **The table header's filter funnel** sits on the sort arrows' baseline, the same size:
+  `.tbl-filter` was a block `<details>` whose line box lifted the funnel 1.70px above the sort
+  button beside it; it is `inline-flex` now (0.00px on every demo header with both controls).
+
+### Added
+
+- **`findMisplacedFilters(root, { tolerance })`** (`runtime/rhythm.js`, also in the barrel): a
+  consumer's browser check asks a rendered page for filter controls that break the rule, as
+  `[{ element, reason }]` — `outside-filter-bar` (a `.filter-dd`, an un-enhanced
+  `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no bar around it; a `th` and a
+  `.dropdown-panel` are exempt, a dialog is not), `lead-not-left`, `controls-not-right` (per visual
+  row), `active-unmarked` (an optional filter holding a value without its active mark or its ×, which
+  is what a page setting `.value` without a `change` leaves behind) and `required-clearable`. It
+  skips what is not rendered, as `findFlushBlocks()` does. It finds nothing on any example page, at
+  1280px and 375px, with every dialog opened.
+
+### Removed
+
+- **`.filter-bar-spacer`.** The bar right-aligns without it, and a page that forgot it used to get
+  its filters on the left beside the search. An old one left in a page is an empty span that pushes
+  nothing. The panel demo's footer used it to push its button to the end; a `.panel-actions` in a
+  `.panel-foot` does that, as it does in the head.
+
+### Migration
+
+- Delete every `.filter-bar-spacer` element; the bar right-aligns without it. In a `.panel-foot`,
+  wrap what went after it in a `.panel-actions`.
+- Put the search, or a heading, first in each `.filter-bar`. A label that is not a heading takes
+  `.filter-bar-lead`. A filter, sort or chip set that sits outside any bar goes into one.
+- Mark each "all" chip `data-all`, or it draws an × while pressed.
+- A dialog toolbar with a search and filters: add `filter-bar` to it and move the search first.
+- Run `findMisplacedFilters()` in the page's browser check.
+
 ## 0.61.1 (2026-09-30)
 
 ### Fixed

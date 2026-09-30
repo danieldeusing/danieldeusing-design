@@ -751,16 +751,6 @@ await check(`fix round 1 — a keyboard-focused sort button and badge take the h
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   await until("matchMedia('(forced-colors: active)').matches", "forced colours");
-  // CHROME KEEPS A COLLAPSED BORDER'S OLD COLOUR across a palette switch, sometimes. On the Linux runner
-  // image the dark pass painted every table rule in the LIGHT palette's CanvasText (black on black),
-  // while getComputedStyle said 2px white: 0px of ink, in roughly two runs of three under load, never on
-  // a Mac. Neither a wait, a repaint, a relayout nor re-entering the palette cleared it; rebuilding the
-  // collapsed borders did. A page opened in a palette never has the old one, so each table rebuilds
-  // them here, as a page opened in this palette would.
-  await evaluate(`(async () => { const tables = [...document.querySelectorAll("table")];
-    for (const t of tables) t.style.borderCollapse = "separate";
-    await new Promise((r) => requestAnimationFrame(() => r()));
-    for (const t of tables) t.style.borderCollapse = ""; })()`);
   await settle();
   console.log(`forced colours, ${scheme} palette (Canvas / CanvasText / Highlight / HighlightText / GrayText): ${await evaluate(
     `["Canvas", "CanvasText", "Highlight", "HighlightText", "GrayText"].map(M.tok).join(" / ")`)}`);
@@ -784,6 +774,16 @@ for (const scheme of ["light", "dark"]) {
     () => glyphs.length === 4 && glyphs.every((o) => o.ok && o.carried >= 3), shown(glyphs));
   // F5: the filtered header's underline is a shadow, which a forced palette drops, so data.css makes it
   // a 2px CanvasText border there. Read as the run of ink down the header's padding at its foot.
+  // CHROME KEEPS A COLLAPSED BORDER'S OLD COLOUR across a palette switch, sometimes. On the Linux runner
+  // image the dark pass painted every table rule in the LIGHT palette's CanvasText (black on black),
+  // while getComputedStyle said 2px white: 0px of ink, in about two runs of three under load, never on
+  // a Mac. Neither a wait, a repaint, a relayout nor re-entering the palette cleared it; rebuilding the
+  // collapsed borders did, right before the read (done at the switch, the stale colour came back). A
+  // page opened in this palette never had the old one, and that page is what is read here.
+  await evaluate(`document.querySelector("#engine-table").style.borderCollapse = "separate"; null`);
+  await settle();
+  await evaluate(`document.querySelector("#engine-table").style.borderCollapse = ""; null`);
+  await settle();
   await shoot("#engine-table thead");
   const edges = await measure(`
     const run = (sel) => { const r = box(sel), bg = common(r), x = r.left + 2.5, step = 1 / S.k; let y = r.bottom + 2, n = 0;

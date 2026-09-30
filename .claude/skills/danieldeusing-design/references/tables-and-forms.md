@@ -203,7 +203,8 @@ definitions such as contact details.
 ## A `<select>` is enhanced automatically (0.21.0) — write plain HTML, add nothing
 
 ```html
-<select data-k="mode">
+<label for="review-mode">mode</label>
+<select id="review-mode" data-k="mode">
   <option value="public" selected>public — posts on the PR</option>
   <option value="silent">silent — private report only</option>
 </select>
@@ -402,8 +403,17 @@ attribute and `initTableTools()`:
 - Per column, two controls **in the `<th>`**: sort, and a filter that opens a dropdown.
   `data-filter="pick"` builds the list from the column's own cells, so it can never offer
   a value the table does not contain; the default is a contains-box.
-- `data-value` on a `<td>` sorts by something the cell does not print — an ISO date under
-  a friendly one, cents under a formatted amount.
+- `data-value` on a `<td>` is what the cell is worth, for matching and sorting, when that is not
+  what it prints — an ISO date under a friendly one, cents under a formatted amount.
+- `data-sort-value` on a `<td>` overrides it again for the order only: a duration filters on
+  "1m 30s", as the reader types it, and sorts on the millisecond count.
+- `data-col-label` on a `<th>` is the column's name in the controls' labels when the header's own
+  text is not a good one.
+- `data-sort-sticky="off"` on the `<table>` keeps the filters across visits but not the order: a
+  table whose subject is time opens in its declared `data-sort-key` / `data-sort-dir` every time.
+- A detail row that belongs to another is `data-row-for="<key>"`, its parent `data-row-key="<key>"`.
+  It is left out of the match and the sort, follows its parent, and goes when its parent is filtered
+  out.
 
 **Do not write a row of filter boxes under the header.** That shape is what this replaces.
 It spends a whole row of vertical space advertising a capability idle on most visits, it
@@ -431,7 +441,7 @@ from "was this restored", so it cannot go stale while the filter is still in for
 It composes with the pager (0.22.0): filtered-out rows are detached from the tbody, so
 the pager slices exactly the matching set and needs to know nothing about filtering.
 
-### What the engine does besides (D2, 0.60.0 — cockpit's table, moved into the system)
+### What the engine does besides (0.60.0 — cockpit's table, moved into the system)
 
 ```html
 <search class="filter-bar" data-table-bar aria-label="runs">
@@ -452,7 +462,7 @@ the pager slices exactly the matching set and needs to know nothing about filter
   whose search cannot be expressed per row (the contacts book searches conversation summaries).
 - **The page's bar is used, not duplicated.** A `<search class="filter-bar" data-table-bar>` directly
   before the table's wrapper gets the search FIRST in it; the page's `.filter-bar-spacer` and its one
-  action stay. Without one, the engine builds the bar (WP6's `.filter-bar` + `.search-field`).
+  action stay. Without one, the engine builds the bar (a `.filter-bar` + `.search-field`, `filters.md`).
 - **The box and the count survive a re-render.** Neither is in the page's markup, so a renderer that
   patches the whole mount takes both; the engine puts the same nodes back, the box holding the query.
   A patching renderer (cockpit's `cockpitPatch`) should draw them itself instead, and the engine adopts
@@ -496,16 +506,16 @@ the pager slices exactly the matching set and needs to know nothing about filter
   `data-table-empty`, or "no runs yet". With rows and no match it says "no runs match these filters."
   and offers a real button, "reset filters", which is `resetTableView()`. The row spans every column,
   is `tr[data-table-placeholder]`, and is passed over by the match, the sort and the pager. It holds
-  S1's inline empty state as feedback.html documents it: the sentence is the `.empty--inline` box's own
+  the inline empty state as `feedback.md` documents it: the sentence is the `.empty--inline` box's own
   text, the reset follows it, no `<p>` between.
-- **A failure and a load are the page's.** A failed fetch is S1's failure in the table's place
+- **A failure and a load are the page's.** A failed fetch is the empty state's failure form in the table's place
   (`.empty[data-tone="warning"][role="alert"]` with a retry); until the first rows arrive the mount
-  holds S6's `.loading`, not an empty table — which would otherwise say "no runs yet" and be wrong.
+  holds a `.loading` row, not an empty table — which would otherwise say "no runs yet" and be wrong.
   Every exit path replaces it. Three sentences, never one "nothing here".
 - **A pick filter is a menu.** `ul.dropdown-panel[role=menu] > li[role=none] >
   button.dropdown-item[role=menuitemradio][aria-checked]`, "all" first and checked at rest, then the
-  values counted as a reader counts (gpt-5.9 before gpt-5.10). M1 gives it the keys and M0 draws the ✓.
-  A filter's panel is placed `fixed` against its summary (WP6's `popup.js`, as `select.js` does), so the
+  values counted as a reader counts (gpt-5.9 before gpt-5.10). The menu keys and the one popup look's ✓ come with it.
+  A filter's panel is placed `fixed` against its summary (`positionPopup()` from `popup.js`, as `select.js` does), so the
   scrolling `.tablewrap` never clips it — a table filtered down to its placeholder is shorter than its
   own menu. It follows its summary through every scroll, and closes once the reader scrolls the column
   out of the wrapper — moving no focus, unless focus was inside the panel, which then goes to its summary.

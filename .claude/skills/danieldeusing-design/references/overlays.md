@@ -18,7 +18,7 @@ Contents:
 - The parts: head, toolbar, body, foot
 - Sizes
 - The answer is `returnValue`
-- A confirmation — `.dialog--confirm`
+- A confirmation — the footer is the answer pair
 - While the footer commits: busy is `aria-busy` + `aria-disabled`
 - An alert — `.dialog--alert`
 - A drawer — `.dialog--drawer`
@@ -100,8 +100,8 @@ Rules for the markup:
   `--foreground`, not the icon button's `--primary`: they are the dialog's furniture, and the one
   primary action lives in the footer.
 - **The footer only commits.** Dismissing is the X's job (configr's lint rule: a dialog footer never
-  carries a dismiss), except in a confirmation, whose footer is the answer pair. It is C4's
-  `.form-actions`: status first, cancel next, the one primary action last.
+  carries a dismiss), except in a confirmation, whose footer is the answer pair. It is the controls'
+  `.form-actions` (`controls.md`): status first, cancel next, the one primary action last.
 - **The head is outside the body, and that is load-bearing.** Eight cockpit call sites re-render an
   open dialog's content with `cockpitPatch()` as it arrives; with the X inside the patched markup,
   each had to remember to re-emit it, and the one that forgot left a dialog with no way out but
@@ -170,10 +170,10 @@ line that matters:** the platform keeps `returnValue` across opens, and a close 
 not overwrite it — so a confirmation answered "remove" once and dismissed the next time read
 "remove" again, and the page removed twice.
 
-## A confirmation — `.dialog--confirm`
+## A confirmation — the footer is the answer pair
 
 ```html
-<dialog class="dialog dialog--confirm dialog--sm" id="rm-dlg" aria-labelledby="rm-t">
+<dialog class="dialog dialog--sm" id="rm-dlg" aria-labelledby="rm-t">
   <header class="dialog-head"><h2 class="dialog-title" id="rm-t">remove poi/vu3?</h2></header>
   <div class="dialog-body">
     <p>Its reviews, its runs and its settings go with it.</p>
@@ -309,7 +309,7 @@ from inside it and appended to `<body>` renders UNDER it — correctly placed, a
 </ul>
 ```
 
-The rows are the one popup look (M0, `components.md`): the same row as a dropdown menu and a listbox,
+The rows are the one popup look (`components.md`): the same row as a dropdown menu and a listbox,
 so a menu opened at the pointer cannot drift from one opened by a button. `.context-menu` adds only
 what a menu with no trigger needs: `position: fixed` and `z-index: 60`.
 
@@ -524,7 +524,7 @@ what this replaces).
   `.btn-icon`'s own on specificity.) The one row this file colours, the stated
   context-menu row, is `GrayText` there; without it the row read like an action and, under the keys,
   painted the theme's muted ink at 3.00–3.52:1. Its focus ring is `CanvasText`, and that one is
-  `components.css`'s (M0), not this file's: the popup row's ring is `HighlightText`, drawn for a
+  `components.css`'s, not this file's: the popup row's ring is `HighlightText`, drawn for a
   `Highlight` fill, and a disabled row has no fill — `HighlightText` is the `Canvas` colour on both
   palettes, so the keys vanished on it (1:1). `scripts/check-overlays.mjs` reads all
   of these back as painted pixels, on a light and a dark forced palette, with real keyboard focus,

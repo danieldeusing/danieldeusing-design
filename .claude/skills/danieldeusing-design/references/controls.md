@@ -318,6 +318,8 @@ it renders on a page that loads `tokens.css` and `controls.css` and nothing else
 
 - The focus ring is drawn on the **zone** while the input has keyboard focus, and not after a mouse
   click (which focuses the input too).
+- `.dropzone-note` is a page class, not a system class: the note is a plain span in the zone's text,
+  and the class only names it for the page and its tests.
 - **Hover and drag light the whole zone**: `--primary` edge, text and glyph, on an 8% fill. The text
   changes colour with the fill because `--muted-foreground` on it measures under AA.
 - **The page sets `data-dragging`.** Enter and leave fire for every child the pointer crosses, and

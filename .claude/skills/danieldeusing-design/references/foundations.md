@@ -193,10 +193,10 @@ did not change):
 | your own unlayered CSS (Astro-scoped styles, rules outside `@layer`) | specificity decided | yours wins |
 | the tokens, `html.anim-off`, `data-tone`; print | — | unchanged: unlayered |
 
-What a consumer sees move, measured by the WP1 review (2026-09-29): pagr's own Tailwind 4.3.0
+What a consumer sees move, measured in the release review (2026-09-29): pagr's own Tailwind 4.3.0
 rebuilt its CSS against 0.59.0 and against this entry, and 14 pages were compared at 1280 and 375px
 (warm theme, a Tab walk, state probes). It includes the element defaults below. What each site does
-about each row is the 0.60.0 migration map's (`docs/migrations/0.60.0.md`); this is only what moves.
+about each row is decided in that surface's own 0.60.0 rollout; this is only what moves.
 
 | # | danieldeusing.de (pagr) | where | kind |
 |---|---|---|---|

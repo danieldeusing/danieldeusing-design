@@ -3,7 +3,7 @@
 Reference for the `danieldeusing-design` skill. Read it before you build a grid of cards, a dashboard
 tile, a pane with a title strip, a list of links or of choices, a timeline, a file tree, a resizable
 split, a clamped README or a log view. All of it is `src/cards.css` (0.60.0). The card box itself,
-`.card-terminal`, is K1 in `components.css` — its padding, its edge and the hover of a card that is a
+`.card-terminal`, is in `components.css` — its padding, its edge and the hover of a card that is a
 link are described in `components.md`; this file is what goes inside it and around it.
 
 Before 0.60.0 most of these were drawn separately on several of seedr, configr, studio,
@@ -71,8 +71,8 @@ a `role=button` div. This is seedr's pattern, with one focus ring where seedr dr
   an `input`, a `select`, a `textarea`, a `summary`, a `label`, anything a `tabindex` of 0 or more
   makes focusable. A value filter (`button.value-filter`) or a favourite star (`.btn-icon`) presses
   as itself. Do not give it a z-index of your own.
-- **The overlay stretches only inside a host that declares it** — `.card-terminal--link`, or K7's
-  `.entry`. A `.card-link` in a card without the modifier is a plain title link and the card has
+- **The overlay stretches only inside a host that declares it** — `.card-terminal--link`, or the
+  `.entry` below. A `.card-link` in a card without the modifier is a plain title link and the card has
   no hover: visibly wrong, and harmless. Unscoped, the same slip would lay an invisible link over
   whatever positioned box sits above the card.
 - **One focus ring, on the card.** The card draws the ring when its link has keyboard focus
@@ -80,7 +80,7 @@ a `role=button` div. This is seedr's pattern, with one focus ring where seedr dr
   word in the middle of a card says nothing about the card. An engine without `:has()` keeps the
   link's ring instead.
 - **A card whose whole box is the link and that holds no other control** may be the `<a>` itself —
-  `a.card-terminal` (K1) — or, when it opens something in place rather than a page, the `<button>`
+  `a.card-terminal` — or, when it opens something in place rather than a page, the `<button>`
   itself. The moment it needs a second control, it is `--link` and `.card-link`, because an
   interactive element inside an `<a>` or a `<button>` is invalid HTML.
 - **A link that opens a new tab says so**: an `aria-label` suffix ("… (opens seedr.dev)") or a
@@ -118,7 +118,7 @@ card that has a `.card-title` child. In a grid every card also stretches to the 
   configr's hover lift is not adopted: a card that moves under the pointer is a card the pointer can
   lose. Reduced motion and `html.anim-off` stop it.
 
-**No hover on a card that is not a link** (K1): a static card, a settings box, a figure. The pointer
+**No hover on a card that is not a link**: a static card, a settings box, a figure. The pointer
 is answered only where a click lands.
 
 ## `.card-grid`
@@ -175,12 +175,12 @@ tabular.
 
 **Unknown never reads as 0.** A tile that could not count renders `—` or `?`, never `0`: a confident
 zero on a dashboard is a lie that looks exactly like good news. A tile can also take a plain
-`data-tone` (F7), which colours its start edge and its label.
+`data-tone`, which colours its start edge and its label.
 
 - **4% tint, not 6%**: the label and the note are `--muted-foreground`, which measures 4.47:1 on a
   6% warning tint and 4.42 on a 6% destructive one (warm, over `--card`). At 4% the worst is 4.56,
   and the warning value on its own tint is still 4.89.
-- **The state edge keeps its colour under the pointer.** A tile that is a link takes K1's hover
+- **The state edge keeps its colour under the pointer.** A tile that is a link takes the card's hover
   (`--primary` edge, `--secondary` fill) on every side but the state edge, so hovering a broken
   service never makes it look fine.
 - **Write the state in the note.** Forced colours reduce every edge to one colour; the dashed
@@ -335,7 +335,7 @@ and below every one, with 2rem of air (2.5rem around `--wide` ones).
 
 **The whole entry opens the title.** danieldeusing.de underlined the title when the pointer was
 anywhere on the entry while only the title took the click — a hover that promised more than it
-delivered. The title link is K2's `.card-link`, stretched over the entry, the `#tag` buttons are
+delivered. The title link is the card's `.card-link`, stretched over the entry, the `#tag` buttons are
 raised above it, and the entry draws the one focus ring. The title is a real heading; the date is a
 `<time datetime>`; a list whose order means something (a timeline) is an `ol`.
 
@@ -358,7 +358,7 @@ bodies indented 1.25rem (1.75rem from 40rem) in `--muted-foreground`. Two correc
 faint text at 11px (2.3–2.9:1) and are the body size in `--muted-foreground` now (4.84:1 on
 `--card`); the section labels were paragraphs and are **headings** now, at the level the page's
 outline needs, so NAME → SYNOPSIS is something a screen reader can jump between. The capitals are
-authored, as a man page prints them. The card is static: K1's padding, no hover.
+authored, as a man page prints them. The card is static: the card's padding, no hover.
 
 ## `.tree`
 

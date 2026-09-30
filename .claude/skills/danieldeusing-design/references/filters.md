@@ -148,7 +148,7 @@ input.addEventListener("input", () => {
 - `.match-count` ("3/17") sits beside a search that steps through matches. The field is not a live
   region; the count is.
 - **A query the page cannot use (a broken regex) is `aria-invalid="true"` on the input AND a
-  `.field-error` (C9) that says what is wrong, tied to the input by `aria-describedby`.** The edge
+  `.field-error` that says what is wrong, tied to the input by `aria-describedby`.** The edge
   turns `--destructive` and stays so under the pointer and in focus — but colour is never the only
   signal (WCAG 1.4.1), and a forced-colours palette has no error colour at all. The words do the
   work; `role="alert"` when they appear after the reader typed.
@@ -225,7 +225,7 @@ An `<option data-icon="…">` shows its `.ico` before its label in the row and, 
 in the trigger (configr's option icons).
 
 **An invalid select says what is wrong in TEXT.** Put `aria-invalid="true"` on the `<select>` AND
-tie a `.field-error` (C9) to it with `aria-describedby`. The runtime mirrors BOTH onto the trigger
+tie a `.field-error` to it with `aria-describedby`. The runtime mirrors BOTH onto the trigger
 (the select itself is transparent and hidden from assistive technology, so anything pinned only to
 it reaches nobody): the trigger's edge turns `--destructive`, and the error text is its description.
 The edge alone is colour alone (WCAG 1.4.1), and it is gone in a forced-colours palette. **Invalid
@@ -242,7 +242,7 @@ and clear; in a forced palette it drops the `Highlight` edge, so it never reads 
 A **filter** (`select[data-filter]`) of more than twenty options opens with a search row (configr's
 threshold); `data-search` asks for one on any select, of any length. **A plain select never gets
 one unasked**, however long: it keeps the listbox keys — a typed letter jumps to the first option it
-starts, Home and End move the highlight, Space picks (C8).
+starts, Home and End move the highlight, Space picks.
 
 ```html
 <button type="button" class="select-trigger select-trigger--filter" role="combobox"

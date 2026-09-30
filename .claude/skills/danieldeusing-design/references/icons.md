@@ -205,7 +205,7 @@ is a word or a mark — `.prompt`'s `$ `, `.comment`'s `# `, `.tag--bracket`'s `
 element a `.ico` child instead.
 
 A glyph that shows a STATE on a fill — the ✓ in a checked box, the check column of a chosen option —
-is a drawn state, and X1's state rule applies: `Highlight` fill, `HighlightText` mark.
+is a drawn state, and the forced-colours state rule applies: `Highlight` fill, `HighlightText` mark.
 
 ## The set: 51 words, and nothing else (0.60.0)
 

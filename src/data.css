@@ -796,7 +796,7 @@ section.doc.tab-panel { margin-top: 1.35rem; }
   .tbl-badge { border-color: currentColor; background: none; }
   .tbl-badge::after { content: none; }
   .tabs { display: none !important; }
-  [role="tabpanel"][hidden]:not([hidden="until-found"]) { display: block !important; }
+  [role="tabpanel"][hidden]:not([hidden="until-found" i]) { display: block !important; }
   table.dense tr[data-pin] > :first-child {
     box-shadow: none;
     border-inline-start: 3px solid var(--warning);

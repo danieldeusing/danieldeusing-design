@@ -19,9 +19,17 @@ every removal and rename, the markup a component now requires, and what a strict
 
 Every new stylesheet renders on `tokens.css` alone, so a tokens-only surface (netmon, configr, seedr's
 studio) can load any one of them. Every one is imported by the bundle (`index.css`), by the Tailwind
-entry in `layer(components)`, and exported on its own (`@danieldeusing/design/<file>.css`). The runtime
+entry in `layer(components)` (except `utilities.css`, which the Tailwind entry deliberately leaves out:
+Tailwind generates its own `text-*` utilities from the same tokens), and exported on its own
+(`@danieldeusing/design/<file>.css`). The runtime
 barrel re-exports every module, and importing it touches no DOM (`check-integration` imports it in
 Node), so a server-side render can import it.
+
+The minified bundle grows from 40.9 kB to 162.7 kB (gzip 8.8 kB to about 28 kB); the 51 lucide icon
+masks are about 20 kB of that.
+
+Letter-and-number ids in brackets below (F5, M0, K2, D10…) refer to the release's design-element
+inventory; they name an element, not a section of this file.
 
 ### Breaking
 
@@ -43,6 +51,14 @@ Node), so a server-side render can import it.
   bold; a `.dropdown-item` rests in `--popover-foreground`; `.select-panel` no longer sets `position`
   (`select.js` writes it inline, so a framework can put the class on its own listbox). Every popup has
   the `--control-edge` edge and the `--elev-float` glow.
+- **The theme menu's current mark needs `initThemeSwitcher()`.** The CSS rule
+  `html[data-theme=…] .dropdown-item[data-theme-value=…]` (a `--primary` colour and a glow) is gone;
+  the chosen theme is the ✓ the runtime draws by setting `aria-checked` (in a menu) or `aria-pressed`.
+  A page that does not call `initThemeSwitcher()` shows four identical items.
+- **`.tick-dot` draws its own glyph** (●, ✕, ○ by state) in CSS. A renderer that types the glyph into
+  the cell shows two; write only the visually hidden state word.
+- **`data-tip-bare` is gone**, with the `.minimap-bar` exception: both suppressed a tooltip marker
+  that no longer exists. The attribute is inert; delete it from markup.
 - **A `details.dropdown` panel of rows is an ARIA menu** (roles, arrow keys, typeahead), and a labelled
   section in it is a `role="group"` named by its label. A renderer that writes menus writes that shape.
 - **Checkboxes and radios are restyled everywhere** (a square box, a `--primary` fill), and text inputs
@@ -67,8 +83,6 @@ Node), so a server-side render can import it.
   `.navlist-label` (`chrome.css`).
 - **The minimap marks its bar `aria-current="true"`**, not `.active`, and returns `null` on a page that
   has a table of contents.
-- **`.text-*` utilities moved** from `base.css` to `utilities.css`, which the bundle loads after every
-  component file, so a utility beats a component's colour as it does in a Tailwind app.
 
 ### Added
 
@@ -116,7 +130,10 @@ Node), so a server-side render can import it.
 - **Components (`components.css`).** `.btn-terminal` icon slot, busy state and `--danger` / `--success`;
   `.disclosure-btn`; `.field-desc`, `.field-error` and the row variants; `details.fold` counts, tones and
   `initFolds()` for print; `.legend-label`; `attachMenuKeys()` for a menu a page places itself.
-- **`base.css`:** the element defaults and `.bg-dots`. **`utilities.css`:** the text colour utilities.
+- **`base.css`:** the element defaults and `.bg-dots`. **`utilities.css`** (new): the text colour
+  utilities (`.text-foreground`, `.text-muted-foreground`, `.text-primary`, the status colours), loaded
+  by the bundle after every component file so a utility beats a component's colour as it does in a
+  Tailwind app.
 
 ### Fixed
 

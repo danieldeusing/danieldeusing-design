@@ -28,7 +28,7 @@ Node), so a server-side render can import it.
 The minified bundle grows from 40.9 kB to 162.7 kB (gzip 8.8 kB to about 28 kB); the 51 lucide icon
 masks are about 20 kB of that.
 
-Letter-and-number ids in brackets below (F5, M0, K2, D10…) refer to the release's design-element
+Letter-and-number ids in parentheses below (F5, M0, K2, D10…) refer to the release's design-element
 inventory; they name an element, not a section of this file.
 
 ### Breaking

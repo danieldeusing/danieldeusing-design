@@ -31,7 +31,7 @@
     <link rel="stylesheet" href="../src/icons.css" />
     <link rel="stylesheet" href="../src/controls.css" />
     <link rel="stylesheet" href="../src/content.css" />
-    <!-- The text colour utilities (WP1's utilities.css), after every component file as index.css
+    <!-- The text colour utilities (utilities.css), after every component file as index.css
          orders them. #md-embedded is `.markdown.text-muted-foreground`, the embedded-document idiom. -->
     <link rel="stylesheet" href="../src/utilities.css" data-full />
 
@@ -78,6 +78,17 @@
          surface colours its own links, and so does this page there. */
       html[data-bare] :is(.doc-link, .link-quiet) { color: var(--muted-foreground); }
       html[data-bare] .doc-link--forward { color: var(--primary); }
+      /* The knobs content.md documents, set from the page's stylesheet as it says, never a style attribute. */
+      #code-scroll { --code-max-h: 6rem; }
+      #code-view { --code-gutter: 3ch; }
+      .skill-stat > .ico { --tone: var(--cat-teal); }
+      .copy-stat > .ico { --tone: var(--cat-violet); }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-mt-075 { margin-top: 0.75rem; }
+      .demo-w-18 { max-width: 18rem; }
+      .demo-w-20 { max-width: 20rem; }
+      .demo-w-22 { max-width: 22rem; }
     </style>
   </head>
   <body>
@@ -93,7 +104,7 @@
     </script>
 
     <header class="demo-head">
-      <h1>WP12 · typography and content</h1>
+      <h1>Typography and content</h1>
       <span class="spacer"></span>
       <span class="demo-row" role="group" aria-label="theme">
         <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
@@ -106,8 +117,8 @@
 
     <main class="demo-main">
       <p class="demo-intro">
-        Every element of spec entries P1–P8, P10 and S9 in every state it has at rest (P9 is WP3's
-        <code>.navlist</code>). The page loads tokens.css and content.css; reset, base, components and
+        Every element of the design inventory's entries P1–P8, P10 and S9 in every state it has at rest (P9 is the chrome's
+        <code>.navlist</code>). The letter-and-number ids (such as P1) name an element in the 0.60.0 design inventory. The page loads tokens.css and content.css; reset, base, components and
         chrome only for the surrounding markup the examples borrow. Open it with <code>?bare</code> for the tokens-only rendering. Hover,
         focus, print and a coarse pointer are asserted by <code>scripts/check-content.mjs</code>, the
         copy runtime by <code>scripts/check-copy.mjs</code>.
@@ -184,7 +195,7 @@
             <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="chevrons-up-down"
                     aria-expanded="false" aria-label="show full content"></button>
           </div>
-          <div style="max-width: 18rem" class="demo-frame">
+          <div class="demo-frame demo-w-18">
             <div class="section-head" id="head-narrow">
               <h2 class="prompt">a section name long enough to fill the row</h2>
               <a class="doc-link doc-link--forward" href="#p3">open →</a>
@@ -255,7 +266,7 @@
             </article>
           </div>
         </div>
-        <div class="demo-grid" style="margin-top: 0.75rem">
+        <div class="demo-grid demo-mt-075">
           <div class="demo-cell">
             <p class="demo-cap">ol.steps</p>
             <ol class="steps" id="list-steps">
@@ -272,7 +283,7 @@
               <li>docs</li>
             </ul>
           </div>
-          <div class="demo-cell" style="max-width: 22rem">
+          <div class="demo-cell demo-w-22">
             <p class="demo-cap">ul.dash — mixed inline content stays one line of text</p>
             <ul class="dash" id="list-dash">
               <li>Led the <strong>migration</strong> of <code>@danieldeusing/design</code> to a <a class="link-quiet" href="#p4">single release</a>.</li>
@@ -298,7 +309,7 @@ git push</pre>
           </div>
           <div class="demo-cell">
             <p class="demo-cap">.code-block--scroll (--code-max-h: 6rem)</p>
-            <pre class="code-block code-block--scroll" id="code-scroll" tabindex="0" style="--code-max-h: 6rem">line 1
+            <pre class="code-block code-block--scroll" id="code-scroll" tabindex="0">line 1
 line 2
 line 3
 line 4
@@ -313,10 +324,10 @@ line 9</pre>
             <div class="code-block" id="code-div">{ "div": "renders as code too" }</div>
           </div>
         </div>
-        <div class="demo-grid" style="margin-top: 0.75rem">
+        <div class="demo-grid demo-mt-075">
           <div class="demo-cell">
             <p class="demo-cap">.code-view — gutter, tokens, a wrapped line</p>
-<pre class="code-block code-view" id="code-view" style="--code-gutter: 3ch" tabindex="0" role="region" aria-label="package.json"><code><span class="line"><span class="tok-punct">{</span>
+<pre class="code-block code-view" id="code-view" tabindex="0" role="region" aria-label="package.json"><code><span class="line"><span class="tok-punct">{</span>
 </span><span class="line">  <span class="tok-key">"name"</span><span class="tok-punct">:</span> <span class="tok-string">"@danieldeusing/design"</span><span class="tok-punct">,</span>
 </span><span class="line">  <span class="tok-key">"version"</span><span class="tok-punct">:</span> <span class="tok-number">60</span><span class="tok-punct">,</span>
 </span><span class="line">  <span class="tok-key">"private"</span><span class="tok-punct">:</span> <span class="tok-literal">false</span><span class="tok-punct">,</span>
@@ -350,7 +361,7 @@ line 9</pre>
               <button type="button" class="btn-icon btn-icon--bare" data-icon="copy" data-copy aria-label="copy install command"></button>
             </div>
           </div>
-          <div class="demo-cell" style="max-width: 20rem">
+          <div class="demo-cell demo-w-20">
             <p class="eyebrow">a long command wraps before the button</p>
             <div class="cmd" id="cmd-long">
               <code class="cmd-text">npm install --save-dev @danieldeusing/design @fontsource-variable/jetbrains-mono</code>
@@ -428,8 +439,8 @@ context: vu3
           <div class="demo-cell">
             <p class="demo-cap">stats — glyph + count (the glyph is 12px whatever class it carries; its type colour comes through --tone, never a color of its own)</p>
             <p class="meta" id="meta-stats">
-              <span class="meta-stat"><span class="ico" data-icon="package" data-tone aria-hidden="true" style="--tone: var(--cat-teal)"></span>12</span>
-              <span class="meta-stat"><span class="ico ico--sm" data-icon="copy" data-tone aria-hidden="true" style="--tone: var(--cat-violet)"></span>1,204</span>
+              <span class="meta-stat skill-stat"><span class="ico" data-icon="package" data-tone aria-hidden="true"></span>12</span>
+              <span class="meta-stat copy-stat"><span class="ico ico--sm" data-icon="copy" data-tone aria-hidden="true"></span>1,204</span>
             </p>
           </div>
         </div>

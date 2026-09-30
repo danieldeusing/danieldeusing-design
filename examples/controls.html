@@ -47,6 +47,15 @@
       .demo-drawer-bar > strong { margin-right: auto; }
       .demo-drawer pre { margin: 0; padding: 0.5rem 0.75rem; color: var(--muted-foreground); font: inherit; }
       table.demo-table { max-width: 32rem; }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-flex-none { flex: none; }
+      .demo-on-background { background: var(--background); }
+      .demo-on-card { background: var(--card); }
+      .demo-on-muted { background: var(--muted); }
+      .demo-w-20 { inline-size: 20rem; }
+      .demo-w-22 { inline-size: 22rem; }
+      .demo-w-wide { inline-size: min(44rem, 100%); }
     </style>
   </head>
 
@@ -294,12 +303,12 @@
           the zone; the page sets <code>data-dragging</code>. Choose or drop images to fill the grid below it. The third
           shot's remove is disabled, and stays dimmed when its thumbnail reveals it.</p>
         <div class="demo-stack">
-          <label class="dropzone" data-icon="image-plus" style="inline-size: min(44rem, 100%);" data-t="dropzone" data-demo-drop>
+          <label class="dropzone demo-w-wide" data-icon="image-plus" data-t="dropzone" data-demo-drop>
             <input type="file" accept="image/*" multiple data-t="dropzone-input" />
             drop screenshots or choose files
             <span class="dropzone-note">max 5 MB each · png, jpg, webp</span>
           </label>
-          <ul class="thumb-grid" style="inline-size: min(44rem, 100%);" data-demo-thumbs data-t="thumbs">
+          <ul class="thumb-grid demo-w-wide" data-demo-thumbs data-t="thumbs">
             <li class="thumb"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 90'%3E%3Crect width='160' height='90' fill='%23020604'/%3E%3Crect x='10' y='10' width='80' height='5' fill='%2333ff66'/%3E%3Crect x='10' y='22' width='120' height='4' fill='%234fdd7d'/%3E%3Crect x='10' y='31' width='100' height='4' fill='%234fdd7d'/%3E%3Crect x='10' y='40' width='110' height='4' fill='%233da45e'/%3E%3C/svg%3E" /><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove shot-1.png" data-t="thumb-remove"></button></li>
             <li class="thumb"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 90'%3E%3Crect width='160' height='90' fill='%23f5efe2'/%3E%3Crect x='10' y='10' width='70' height='5' fill='%238a4516'/%3E%3Crect x='10' y='22' width='130' height='4' fill='%2343352a'/%3E%3Crect x='10' y='31' width='90' height='4' fill='%2371614e'/%3E%3C/svg%3E" /><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove shot-2.png"></button></li>
             <li class="thumb"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 90'%3E%3Crect width='160' height='90' fill='%23fafafa'/%3E%3Crect x='10' y='10' width='60' height='5' fill='%23000'/%3E%3Crect x='10' y='22' width='120' height='4' fill='%231f1f1f'/%3E%3Crect x='10' y='31' width='60' height='4' fill='%23595959'/%3E%3C/svg%3E" /><button type="button" class="btn-icon btn-icon--sm" data-tone="destructive" data-icon="x" aria-label="remove shot-3.png" disabled data-t="thumb-remove-disabled"></button></li>
@@ -307,11 +316,11 @@
         </div>
         <h3>data-dragging, and disabled</h3>
         <div class="demo-states">
-          <label class="dropzone" data-icon="image-plus" style="inline-size: 20rem;" data-dragging data-t="dropzone-dragging">
+          <label class="dropzone demo-w-20" data-icon="image-plus" data-dragging data-t="dropzone-dragging">
             <input type="file" accept="image/*" multiple />
             drop screenshots or choose files
           </label>
-          <label class="dropzone" data-icon="image-plus" style="inline-size: 20rem;" data-t="dropzone-disabled">
+          <label class="dropzone demo-w-20" data-icon="image-plus" data-t="dropzone-disabled">
             <input type="file" accept="image/*" disabled />
             5 of 5 screenshots attached
           </label>
@@ -353,7 +362,7 @@
         <p class="demo-lede">Type the code back. The confirming button stays disabled until it matches; the status line is a
           polite live region whose tone the page sets.</p>
         <div class="demo-states">
-          <div class="demo-box" style="inline-size: 22rem;">
+          <div class="demo-box demo-w-22">
             <div class="confirm-code" data-t="confirm-code">
               <p class="confirm-code-value" role="img" aria-label="code 4 8 1 7" data-t="code-value">4817</p>
               <label>type the code <input class="confirm-code-input" inputmode="numeric" autocomplete="off" spellcheck="false" data-demo-code="4817" data-t="code-input" /></label>
@@ -364,7 +373,7 @@
               <button type="button" class="btn-terminal btn-terminal--compact" disabled data-demo-code-go data-t="code-go">approve</button>
             </div>
           </div>
-          <div class="demo-box" style="inline-size: 22rem;">
+          <div class="demo-box demo-w-22">
             <div class="confirm-code">
               <p class="confirm-code-value" role="img" aria-label="code 9 0 3 6">9036</p>
               <label>type the code <input class="confirm-code-input" inputmode="numeric" autocomplete="off" spellcheck="false" value="9063" /></label>
@@ -375,7 +384,7 @@
               <button type="button" class="btn-terminal btn-terminal--compact" disabled>approve</button>
             </div>
           </div>
-          <div class="demo-box" style="inline-size: 22rem;">
+          <div class="demo-box demo-w-22">
             <div class="confirm-code">
               <p class="confirm-code-value" role="img" aria-label="code 5 5 2 0">5520</p>
               <label>type the code <input class="confirm-code-input" inputmode="numeric" autocomplete="off" spellcheck="false" disabled data-t="code-input-disabled" /></label>
@@ -394,9 +403,9 @@
         <p class="demo-lede">The same states on <code>--background</code>, <code>--card</code> and <code>--muted</code>.
           <code>scripts/check-controls.mjs</code> measures every pairing here, on all four themes.</p>
         <div class="demo-matrix">
-          <div class="demo-surface" data-surface="background" style="background: var(--background)"><small>--background</small></div>
-          <div class="demo-surface" data-surface="card" style="background: var(--card)"><small>--card</small></div>
-          <div class="demo-surface" data-surface="muted" style="background: var(--muted)"><small>--muted</small></div>
+          <div class="demo-surface demo-on-background" data-surface="background"><small>--background</small></div>
+          <div class="demo-surface demo-on-card" data-surface="card"><small>--card</small></div>
+          <div class="demo-surface demo-on-muted" data-surface="muted"><small>--muted</small></div>
         </div>
         <template id="probes">
           <div class="demo-probes">
@@ -427,7 +436,7 @@
             <span class="confirm-inline-note" data-probe="confirm-note">commits on main</span>
             <p class="confirm-code-value" data-probe="code-value">4817</p>
             <p class="confirm-code-status" data-tone="warning" data-probe="code-status">not the code</p>
-            <p class="form-status" style="flex: none" data-probe="form-status">saved 12s ago</p>
+            <p class="form-status demo-flex-none" data-probe="form-status">saved 12s ago</p>
             <button type="button" class="choice-card" aria-pressed="false" data-icon="home" data-probe="choice-rest"><span class="choice-title">user</span><span class="choice-desc">~/.claude</span></button>
             <button type="button" class="choice-card" aria-pressed="true" data-icon="folder" data-probe="choice-pressed"><span class="choice-title">project</span><span class="choice-desc">.claude/ here</span></button>
             <button type="button" class="choice-card" aria-pressed="true" data-tone="warning" data-icon="triangle-alert" data-probe="choice-warning"><span class="choice-title">theirs</span><span class="choice-desc">overwrites</span></button>

@@ -26,9 +26,9 @@
     <link rel="stylesheet" href="../src/components.css" data-full />
     <link rel="stylesheet" href="../src/chrome.css" />
     <link rel="stylesheet" href="../src/tooltip.css" data-full />
-    <!-- The merged 0.60.0 packages this page borrows from, until index.css imports them (WP13):
-         the glyphs (WP4), the tags and the drawn checkbox (WP7, WP5), the empty and loading states
-         (WP7) and the search box, filter bar and count (WP6). -->
+    <!-- The other 0.60.0 stylesheets this page borrows from: the glyphs (icons.css), the tags and the
+         drawn checkbox (tags.css, controls.css), the empty and loading states (feedback.css) and the
+         search box, filter bar and count (filters.css). -->
     <link rel="stylesheet" href="../src/icons.css" data-full />
     <link rel="stylesheet" href="../src/tags.css" data-full />
     <link rel="stylesheet" href="../src/controls.css" data-full />
@@ -99,7 +99,7 @@
     </script>
 
     <header class="demo-head">
-      <h1>WP11 · data: tables, time, charts, tabs</h1>
+      <h1>Data: tables, time, charts, tabs</h1>
       <span class="spacer"></span>
       <span class="row" role="group" aria-label="theme">
         <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
@@ -113,7 +113,7 @@
 
     <main class="wrap">
       <p class="lede">
-        Every element of spec entries D1 and D3–D10 in every state. The page loads tokens.css,
+        Every element of the design inventory's entries D1 and D3–D10 in every state. The letter-and-number ids (such as D4) name an element in the 0.60.0 design inventory. The page loads tokens.css,
         chrome.css and data.css; reset, base, components and tooltip only for what the examples
         borrow (<code>.btn-terminal</code>, <code>.card-terminal</code>, the tooltip). Open it with
         <code>?bare</code> for the tokens + chrome rendering, and at a phone width to see the tables stack.
@@ -183,7 +183,7 @@
           </table>
         </div>
 
-        <h3>a dense table on a card — the sticky header paints the card (WP3's line)</h3>
+        <h3>a dense table on a card — the sticky header paints the card (the chrome's line)</h3>
         <div class="card-terminal demo-pad card-fade">
           <div class="tablewrap" id="card-wrap">
             <table class="dense">

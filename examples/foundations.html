@@ -30,8 +30,8 @@
       mark.demo-cls { background: transparent; }
     </style>
 
-    <!-- What a build-free page gets from the bundle, minus the component files: WP1 is the token
-         layer, the element defaults and the text utilities, and must stand on these alone. -->
+    <!-- What a build-free page gets from the bundle, minus the component files: the token
+         layer, the element defaults and the text utilities must stand on these alone. -->
     <link rel="stylesheet" href="../src/reset.css" />
     <link rel="stylesheet" href="../src/tokens.css" />
     <link rel="stylesheet" href="../src/base.css" />
@@ -127,11 +127,52 @@
       section { scroll-margin-top: 4rem; }
       .demo-flex { display: flex; gap: 0.5rem; }
       .demo-restack { display: block; }
+      /* Which token a demo glyph and a swatch draw, by attribute: documented markup carries no style
+         attribute, and a page under style-src 'self' refuses one. */
+      #ctl-box { inline-size: 6rem; block-size: var(--control-h); }
+      .demo-ico[data-i="check"] { --i: var(--ico-check); }
+      .demo-ico[data-i="minus"] { --i: var(--ico-minus); }
+      .demo-ico[data-i="x"] { --i: var(--ico-x); }
+      .demo-ico[data-i="search"] { --i: var(--ico-search); }
+      .demo-ico[data-i="filter"] { --i: var(--ico-filter); }
+      .demo-ico[data-i="arrow-up"] { --i: var(--ico-arrow-up); }
+      .demo-ico[data-i="arrow-down"] { --i: var(--ico-arrow-down); }
+      .demo-ico[data-i="chevron-down"] { --i: var(--ico-chevron-down); }
+      .demo-ico[data-i="chevron-left"] { --i: var(--ico-chevron-left); }
+      .demo-ico[data-i="trash-2"] { --i: var(--ico-trash-2); }
+      .demo-ico[data-i="pencil"] { --i: var(--ico-pencil); }
+      .demo-ico[data-i="loader-circle"] { --i: var(--ico-loader-circle); }
+      .demo-ico[data-i="refresh-cw"] { --i: var(--ico-refresh-cw); }
+      .demo-ico[data-i="star"] { --i: var(--ico-star); }
+      .demo-ico[data-i="star-filled"] { --i: var(--ico-star-filled); }
+      .demo-ico[data-i="history"] { --i: var(--ico-history); }
+      .demo-ico[data-i="home"] { --i: var(--ico-home); }
+      .demo-ico[data-i="image-plus"] { --i: var(--ico-image-plus); }
+      .demo-ico[data-i="triangle-alert"] { --i: var(--ico-triangle-alert); }
+      .demo-ico[data-i="package"] { --i: var(--ico-package); }
+      .demo-ico[data-i="download"] { --i: var(--ico-download); }
+      .demo-swatch[data-c="red"] { --c: var(--cat-red); }
+      .demo-swatch[data-c="orange"] { --c: var(--cat-orange); }
+      .demo-swatch[data-c="amber"] { --c: var(--cat-amber); }
+      .demo-swatch[data-c="lime"] { --c: var(--cat-lime); }
+      .demo-swatch[data-c="green"] { --c: var(--cat-green); }
+      .demo-swatch[data-c="teal"] { --c: var(--cat-teal); }
+      .demo-swatch[data-c="cyan"] { --c: var(--cat-cyan); }
+      .demo-swatch[data-c="blue"] { --c: var(--cat-blue); }
+      .demo-swatch[data-c="indigo"] { --c: var(--cat-indigo); }
+      .demo-swatch[data-c="violet"] { --c: var(--cat-violet); }
+      .demo-swatch[data-c="purple"] { --c: var(--cat-purple); }
+      .demo-swatch[data-c="pink"] { --c: var(--cat-pink); }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-gap-050 { gap: 0.5rem; }
+      .demo-mt-050 { margin-top: 0.5rem; }
+      .demo-mt-075 { margin-top: 0.75rem; }
     </style>
   </head>
   <body>
     <div class="demo-bar">
-      <span><strong>foundations</strong> <span class="demo-label">· WP1 · tokens.css + base.css + utilities.css</span></span>
+      <span><strong>foundations</strong> <span class="demo-label">· tokens.css + base.css + utilities.css</span></span>
       <span class="demo-controls" role="group" aria-label="theme">
         <button type="button" class="demo-btn" data-set-theme="warm">warm</button>
         <button type="button" class="demo-btn" data-set-theme="green">green</button>
@@ -144,7 +185,7 @@
     <main class="demo-wrap">
       <h1 id="page-title">Foundations</h1>
       <p class="demo-lede">Every token and element default the 0.60.0 foundations package adds, in every state, on every theme.
-        This page loads reset.css, tokens.css and base.css and nothing else.</p>
+        This page loads reset.css, tokens.css and base.css and nothing else. The letter-and-number ids (such as X3) name an element in the 0.60.0 design inventory.</p>
 
       <!-- ── F1 ─────────────────────────────────────────────────────────── -->
       <section id="f1">
@@ -165,21 +206,21 @@
             <input class="demo-field" aria-label="sample field on muted" placeholder="same edge" />
           </div>
         </div>
-        <div class="demo-row" style="margin-top: 0.75rem">
-          <div id="ctl-box" class="demo-box" style="inline-size: 6rem; block-size: var(--control-h)">28px</div>
+        <div class="demo-row demo-mt-075">
+          <div id="ctl-box" class="demo-box">28px</div>
           <div id="card-pad" class="demo-card">--card-pad</div>
-          <span class="demo-row" style="gap: 0.5rem">
-            <span class="demo-ico" data-size="sm" id="ico-sm" style="--i: var(--ico-check)"></span>
-            <span class="demo-ico" id="ico-md" style="--i: var(--ico-check)"></span>
-            <span class="demo-ico" data-size="lg" id="ico-lg" style="--i: var(--ico-check)"></span>
-            <span class="demo-ico" data-size="xl" id="ico-xl" style="--i: var(--ico-check)"></span>
+          <span class="demo-row demo-gap-050">
+            <span class="demo-ico" data-size="sm" id="ico-sm" data-i="check"></span>
+            <span class="demo-ico" id="ico-md" data-i="check"></span>
+            <span class="demo-ico" data-size="lg" id="ico-lg" data-i="check"></span>
+            <span class="demo-ico" data-size="xl" id="ico-xl" data-i="check"></span>
             <span class="demo-label">--icon-sm / -size / -lg / -xl</span>
           </span>
           <span><span class="demo-dot" id="dot"></span> <span class="demo-label">--dot-size</span></span>
         </div>
-        <div id="status-bar" class="demo-status" style="margin-top: 0.75rem">--status-h: the footer.status height</div>
-        <div class="demo-gutter" id="gutter" style="margin-top: 0.75rem"><div>--content-pad: <span id="gutter-value"></span> (1.25rem below 40rem)</div></div>
-        <p class="demo-values" id="f1-values" style="margin-top: 0.5rem"></p>
+        <div id="status-bar" class="demo-status demo-mt-075">--status-h: the footer.status height</div>
+        <div class="demo-gutter demo-mt-075" id="gutter"><div>--content-pad: <span id="gutter-value"></span> (1.25rem below 40rem)</div></div>
+        <p class="demo-values demo-mt-050" id="f1-values"></p>
       </section>
 
       <!-- ── display step ───────────────────────────────────────────────── -->
@@ -189,11 +230,11 @@
           30px, 36px from 40rem. An app's title stays --fs-2xl. Resize the window across 40rem to see it step.</p>
         <p class="demo-label">a public page title (what .page-title--display will wear)</p>
         <h1 class="demo-display" id="display-title">Articles<span class="cursor-block demo-cursor" aria-hidden="true"></span></h1>
-        <p class="demo-label" style="margin-top: 0.75rem">an error page's status code</p>
+        <p class="demo-label demo-mt-075">an error page's status code</p>
         <p class="demo-display" id="display-code">404</p>
-        <p class="demo-label" style="margin-top: 0.75rem">for contrast, an app title at --fs-2xl</p>
+        <p class="demo-label demo-mt-075">for contrast, an app title at --fs-2xl</p>
         <h1 id="display-app-title">Automation · review</h1>
-        <p class="demo-values" id="display-value" style="margin-top: 0.5rem"></p>
+        <p class="demo-values demo-mt-050" id="display-value"></p>
       </section>
 
       <!-- ── F2 ─────────────────────────────────────────────────────────── -->
@@ -257,7 +298,7 @@
             <figcaption id="el-figcaption">A figure keeps its caption muted and italic.</figcaption>
           </figure>
         </div>
-        <div class="demo-cols" style="margin-top: 0.75rem">
+        <div class="demo-cols demo-mt-075">
           <div class="demo-surface" data-surface="card"><p>On --card: <code>inline</code> and <mark>mark</mark>.</p></div>
           <div class="demo-surface" data-surface="muted"><p>On --muted: <code>inline</code> and <mark>mark</mark>.</p></div>
         </div>
@@ -279,7 +320,7 @@
         <p class="demo-lede">Nothing below is visible. The last line is hidden="until-found": searching the page for
           "reveal this" shows it, which is why the rule must not force it to display: none.</p>
         <div class="demo-flex" id="hid-class" hidden>a class that sets display: flex, plus hidden</div>
-        <span id="hid-inline" style="display: inline-block" hidden>an inline display, plus hidden</span>
+        <span id="hid-inline" hidden>an inline display, plus hidden</span>
         <table><tbody><tr class="demo-restack" id="hid-row" hidden><td>a row a narrow-screen rule restacks, plus hidden</td></tr></tbody></table>
         <div class="demo-flex" id="hid-until" hidden="until-found">hidden="until-found": find-in-page can reveal this</div>
       </section>
@@ -344,6 +385,9 @@
 
     <script type="module">
       const html = document.documentElement;
+      // X3's hardest case: an INLINE display, set through the CSSOM (which a strict CSP allows, unlike a
+      // style attribute). The global [hidden] rule must beat even that.
+      document.getElementById("hid-inline").style.display = "inline-block";
       const ICONS = ["check", "minus", "x", "search", "filter", "arrow-up", "arrow-down", "chevron-down", "chevron-left",
         "trash-2", "pencil", "loader-circle", "refresh-cw", "star", "star-filled", "history", "home", "image-plus",
         "triangle-alert", "package", "download"];
@@ -351,11 +395,11 @@
       const TEXT = ["foreground", "muted-foreground", "primary", "success", "warning", "destructive", "info", "pending"];
 
       document.getElementById("icon-list").innerHTML = ICONS.map((n) =>
-        `<li><span class="demo-ico" style="--i: var(--ico-${n})"></span>` +
-        `<span class="demo-tinted"><span class="demo-ico" style="--i: var(--ico-${n})"></span></span>` +
-        `<span class="demo-ico" data-size="xl" style="--i: var(--ico-${n})"></span><code>--ico-${n}</code></li>`).join("");
+        `<li><span class="demo-ico" data-i="${n}"></span>` +
+        `<span class="demo-tinted"><span class="demo-ico" data-i="${n}"></span></span>` +
+        `<span class="demo-ico" data-size="xl" data-i="${n}"></span><code>--ico-${n}</code></li>`).join("");
       document.getElementById("cats").innerHTML = CATS.map((n) =>
-        `<div class="demo-swatch" id="cat-${n}" style="--c: var(--cat-${n})">` +
+        `<div class="demo-swatch" id="cat-${n}" data-c="${n}">` +
         `<div class="on-bg"><span>--cat-${n}</span><span>bg</span></div>` +
         `<div class="on-card"><span>text</span><span>card</span></div>` +
         `<div class="on-muted"><span>text</span><span>muted</span></div>` +

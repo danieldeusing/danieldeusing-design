@@ -60,6 +60,14 @@
       .demo-diagram { display: grid; place-items: center; block-size: 7rem; max-inline-size: 22rem; border: 1px solid var(--border); background: var(--card); }
       /* The page loads no reset, so a bare prose link would be the browser's blue. */
       .demo-wrap a:not([class]) { color: var(--primary); }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-card-note { margin: 0.4rem 0 0; color: var(--muted-foreground); }
+      .demo-m-0 { margin: 0; }
+      .demo-mt-100 { margin-top: 1rem; }
+      .demo-mt-125 { margin-top: 1.25rem; }
+      .demo-panel-pad { padding: 0.5rem; }
+      input.demo-w-6 { max-width: 6rem; }
     </style>
   </head>
 
@@ -89,7 +97,7 @@
       <p class="prompt">cat components.css | diff 0.59.0</p>
       <h1>Buttons, fields, the one popup look, menus, cards</h1>
       <p class="demo-lede">
-        Every element WP2 revised, in every state. Switch the theme top right — the switcher is itself a
+        Every element 0.60.0 revised, in every state. Switch the theme top right — the switcher is itself a
         revised menu (arrow keys, Home/End, typeahead, Escape back to the summary).
       </p>
 
@@ -127,20 +135,20 @@
         <!-- Computed by the page from its own controls, on load and on every theme change. -->
         <p class="demo-note" id="height-check" role="status">height check: not run</p>
         <div class="demo-surfaces">
-          <div class="demo-surface" data-s="background"><div class="demo-row" style="margin:0">
+          <div class="demo-surface" data-s="background"><div class="demo-row demo-m-0">
             <input type="search" aria-label="search skills" placeholder="search…" />
             <select aria-label="type"><option>all types</option><option>skill</option><option>agent</option></select>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">refresh</button>
             <button type="button" class="btn-terminal btn-terminal--compact">publish</button>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove selection"></button>
           </div></div>
-          <div class="demo-surface" data-s="card"><div class="demo-row" style="margin:0">
+          <div class="demo-surface" data-s="card"><div class="demo-row demo-m-0">
             <input type="search" aria-label="search skills" placeholder="search…" />
             <select aria-label="type"><option>all types</option><option>skill</option></select>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success">approve</button>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger">deny</button>
           </div></div>
-          <div class="demo-surface" data-s="muted"><div class="demo-row" style="margin:0">
+          <div class="demo-surface" data-s="muted"><div class="demo-row demo-m-0">
             <input type="text" aria-label="name" value="poi/vu3" />
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">rename</button>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--edit" aria-label="edit poi/vu3"></button>
@@ -162,7 +170,7 @@
           <div><label class="demo-label" for="in-invalid">invalid</label><input type="text" id="in-invalid" aria-invalid="true" aria-describedby="in-invalid-err" value="not a repo" /><p class="field-error" id="in-invalid-err">not an owner/repo — write it as poi/vu3</p></div>
           <label><span class="demo-label">disabled</span><input type="text" id="in-disabled" disabled value="read only" /></label>
         </div>
-        <div class="demo-cols" style="margin-top:1rem">
+        <div class="demo-cols demo-mt-100">
           <label><span class="demo-label">textarea</span><textarea id="in-textarea" rows="3">A reviewer note that wraps onto a second line.</textarea></label>
           <div><label class="demo-label" for="in-textarea-invalid">textarea, invalid</label><textarea id="in-textarea-invalid" aria-invalid="true" aria-describedby="in-textarea-invalid-err" rows="3" placeholder="required"></textarea><p class="field-error" id="in-textarea-invalid-err">a note is required before the review can run</p></div>
           <label><span class="demo-label">textarea, disabled</span><textarea disabled rows="3">frozen</textarea></label>
@@ -175,7 +183,7 @@
         <div class="demo-row">
           <label>model <select id="sel-model"><option>claude-fable-5</option><option selected>gpt-5.9</option><option disabled>gpt-4 (retired)</option><optgroup label="local"><option>qwen</option></optgroup></select></label>
           <label>disabled <select disabled><option>locked</option></select></label>
-          <!-- aria-invalid mirrored onto the trigger is WP6's select.js; the trigger here is the rendered markup. -->
+          <!-- aria-invalid mirrored onto the trigger is select.js's; the trigger here is the rendered markup. -->
           <span class="select-field"><button type="button" class="select-trigger" id="trigger-invalid" aria-invalid="true" aria-describedby="trigger-invalid-err" aria-haspopup="listbox" aria-expanded="false"><span class="select-value">pick a model</span></button></span>
           <span class="demo-note">← invalid trigger (rendered markup)</span>
           <span class="field-error" id="trigger-invalid-err">pick a model the agent supports</span>
@@ -249,7 +257,7 @@
           </details>
           <details class="dropdown" id="dd-disclosure">
             <summary>filter ⌕</summary>
-            <div class="dropdown-panel dropdown-panel--down" style="padding: 0.5rem">
+            <div class="dropdown-panel dropdown-panel--down demo-panel-pad">
               <input type="search" aria-label="filter names" placeholder="name contains…" />
             </div>
           </details>
@@ -285,7 +293,7 @@
           </div>
           <div class="field-row" id="row-button-label">
             <button type="button" class="lbl" id="f-hint">max per hour</button>
-            <div class="field-val"><input type="number" aria-label="max per hour" value="6" style="max-width: 6rem" /><span class="field-desc">the label is a button: on a phone it opens its explanation</span></div>
+            <div class="field-val"><input class="demo-w-6" type="number" aria-label="max per hour" value="6" /><span class="field-desc">the label is a button: on a phone it opens its explanation</span></div>
           </div>
           <div class="field-row field-row--stacked" id="row-stacked">
             <span class="lbl">agents</span>
@@ -323,10 +331,10 @@
       <section id="cards">
         <h2>.card-terminal</h2>
         <div class="demo-cards">
-          <div class="card-terminal" id="card-static"><strong>static</strong><p style="margin:0.4rem 0 0; color: var(--muted-foreground)">No hover: nothing happens on a click.</p></div>
-          <a class="card-terminal" href="#cards" id="card-link"><strong>a.card-terminal</strong><p style="margin:0.4rem 0 0; color: var(--muted-foreground)">The whole card is the link.</p></a>
-          <button type="button" class="card-terminal" id="card-button"><strong>button.card-terminal</strong><p style="margin:0.4rem 0 0; color: var(--muted-foreground)">Picks this option.</p></button>
-          <article class="card-terminal card-terminal--link" id="card-modlink"><strong><a href="#cards">.card-terminal--link</a></strong><p style="margin:0.4rem 0 0; color: var(--muted-foreground)">Its title link is the target.</p></article>
+          <div class="card-terminal" id="card-static"><strong>static</strong><p class="demo-card-note">No hover: nothing happens on a click.</p></div>
+          <a class="card-terminal" href="#cards" id="card-link"><strong>a.card-terminal</strong><p class="demo-card-note">The whole card is the link.</p></a>
+          <button type="button" class="card-terminal" id="card-button"><strong>button.card-terminal</strong><p class="demo-card-note">Picks this option.</p></button>
+          <article class="card-terminal card-terminal--link" id="card-modlink"><strong><a href="#cards">.card-terminal--link</a></strong><p class="demo-card-note">Its title link is the target.</p></article>
           <div class="card-terminal card-terminal--flush" id="card-flush">
             <table><thead><tr><th>host</th><th>state</th></tr></thead><tbody><tr><td>ddmini</td><td>up</td></tr><tr><td>ddstudio</td><td>up</td></tr></tbody></table>
           </div>
@@ -355,7 +363,7 @@
         </details>
         <p class="fold-empty" id="fold-empty" data-tip="no hooks in this registry yet">hooks/ <span class="fold-count">0</span></p>
 
-        <span class="demo-label" style="margin-top:1.25rem">--compact (a log)</span>
+        <span class="demo-label demo-mt-125">--compact (a log)</span>
         <details class="fold fold--compact" id="fold-compact">
           <summary>ran 3 commands</summary>
           <div class="fold-body"><p><code>git status</code></p><p><code>npm test</code></p><p><code>npm run build</code></p></div>
@@ -365,7 +373,7 @@
           <div class="fold-body"><p><code>npm run lint</code> — 2 errors</p></div>
         </details>
 
-        <span class="demo-label" style="margin-top:1.25rem">--boxed (a case)</span>
+        <span class="demo-label demo-mt-125">--boxed (a case)</span>
         <details class="fold fold--boxed" id="fold-boxed" open>
           <summary>case 1 · the queue has no consumer</summary>
           <div class="fold-body"><p>queued ✓ was reported while nothing drained the queue.</p></div>
@@ -379,7 +387,7 @@
       <!-- ── K14 ────────────────────────────────────────────────────────── -->
       <section id="legends">
         <h2>.legend-label</h2>
-        <!-- .doc-link--forward is WP3's; unstyled on this branch. -->
+        <!-- .doc-link--forward is chrome.css's; unstyled on this page. -->
         <p class="legend-label" id="legend-label"><span id="lg-src">what a source reports</span>
           <a class="doc-link doc-link--forward" href="#legends">where they are configured →</a></p>
         <ul class="legend" aria-labelledby="lg-src" id="legend-list">
@@ -393,7 +401,7 @@
       <!-- ── O4, the opener's half ──────────────────────────────────────── -->
       <section id="zoom">
         <h2>.dgm-zoomable — the opener's corner hint</h2>
-        <p class="demo-note">The view it opens is WP9's <code>&lt;dialog&gt;</code> (overlays.css); this page shows the opener only, as <code>initDiagramZoom()</code> marks it.</p>
+        <p class="demo-note">The view it opens is a <code>&lt;dialog&gt;</code> (overlays.css); this page shows the opener only, as <code>initDiagramZoom()</code> marks it.</p>
         <div class="diagram demo-diagram dgm-zoomable" id="dgm" role="button" tabindex="0" aria-label="zoom diagram">
           <svg viewBox="0 0 200 60" width="200" height="60" aria-hidden="true"><rect x="5" y="15" width="60" height="30" fill="none" stroke="currentColor" /><rect x="135" y="15" width="60" height="30" fill="none" stroke="currentColor" /><path d="M65 30h70" stroke="currentColor" /></svg>
         </div>

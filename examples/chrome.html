@@ -50,7 +50,7 @@
     <link rel="stylesheet" href="../src/print.css" data-bare-off />
     <!-- ?bare: tokens.css + chrome.css and nothing else — the surface netmon is. base.css draws a
          global :focus-visible ring, so a focus check that passes WITH it proves nothing about
-         chrome.css's own rules (RULES-CROSSCUT X2). -->
+         chrome.css's own rules. -->
     <script>
       if (new URLSearchParams(location.search).has("bare")) {
         for (const link of document.querySelectorAll("link[data-bare-off]")) link.disabled = true;
@@ -173,7 +173,7 @@
         <div class="content">
           <h1>chrome</h1>
           <p class="demo-lede">
-            WP3 of 0.60.0: the header's slots, the prompt-path breadcrumb, the rail, the footer and its
+            0.60.0's chrome: the header's slots, the prompt-path breadcrumb, the rail, the footer and its
             clearance, the page column, the table of contents, the burger, the sticky layers — plus thin
             scrollbars, text actions on a button, the sticky table header and the ticker strip's glyphs.
             This page is its own specimen: the bar, toolbar, TOC, rail and footer around this text are
@@ -370,7 +370,7 @@
     </main>
 
     <footer class="status">
-      <span class="status-left"><span class="glow">[design]</span> chrome — the WP3 specimen page</span>
+      <span class="status-left"><span class="glow">[design]</span> chrome — the specimen page</span>
       <nav class="status-right" aria-label="page settings">
         <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
         <span class="sep" aria-hidden="true" data-demo-lang></span>

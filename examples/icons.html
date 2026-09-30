@@ -80,11 +80,16 @@
       code { font-family: inherit; }
       section { scroll-margin-top: 4rem; }
       @media (max-width: 40rem) { .demo-table { display: block; overflow-x: auto; } }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-fg { color: var(--foreground); }
+      .demo-muted-fg { color: var(--muted-foreground); }
+      .demo-primary { color: var(--primary); }
     </style>
   </head>
   <body>
     <div class="demo-bar">
-      <span><strong>icons</strong> <span class="demo-label" id="mode">· WP4 · I1 I2 I3</span></span>
+      <span><strong>icons</strong> <span class="demo-label" id="mode">· I1 I2 I3</span></span>
       <span class="demo-controls" role="group" aria-label="theme">
         <button type="button" class="demo-btn" data-set-theme="warm">warm</button>
         <button type="button" class="demo-btn" data-set-theme="green">green</button>
@@ -104,8 +109,8 @@
       <section id="set" aria-labelledby="set-h">
         <h2 id="set-h">I1 · the set</h2>
         <p class="demo-lede">The 51 words of the spec's icon table: lucide 0.559.0 outlines at stroke 2, each at 14px and 24px. The name is the <code>data-icon</code>
-          word and the token is <code>--ico-&lt;word&gt;</code>.</p>
-        <h3>the controls' glyphs <span class="demo-label">· WP1 · C1, C2, C6, M0, M4–M6, M9, S6, and part 1's markup</span></h3>
+          word and the token is <code>--ico-&lt;word&gt;</code>. The letter-and-number ids (such as I1, C2) name an element in the 0.60.0 design inventory.</p>
+        <h3>the controls' glyphs <span class="demo-label">· C1, C2, C6, M0, M4–M6, M9, S6, and part 1's markup</span></h3>
         <ul class="demo-icons">
           <li><span class="ico" data-icon="check" aria-hidden="true"></span><span class="ico ico--xl" data-icon="check" aria-hidden="true"></span><code>check</code></li>
           <li><span class="ico" data-icon="minus" aria-hidden="true"></span><span class="ico ico--xl" data-icon="minus" aria-hidden="true"></span><code>minus</code></li>
@@ -203,9 +208,9 @@
         <div class="demo-cols">
           <div class="demo-surface" data-surface="background">
             <p class="demo-label">currentColor, on --background</p>
-            <p><span class="demo-pair" style="color: var(--foreground)"><span class="ico ico--lg" id="cc-fg" data-icon="history" aria-hidden="true"></span>--foreground</span></p>
-            <p><span class="demo-pair" style="color: var(--muted-foreground)"><span class="ico ico--lg" id="cc-muted" data-icon="history" aria-hidden="true"></span>--muted-foreground</span></p>
-            <p><span class="demo-pair" style="color: var(--primary)"><span class="ico ico--lg" id="cc-primary" data-icon="history" aria-hidden="true"></span>--primary</span></p>
+            <p><span class="demo-pair demo-fg"><span class="ico ico--lg" id="cc-fg" data-icon="history" aria-hidden="true"></span>--foreground</span></p>
+            <p><span class="demo-pair demo-muted-fg"><span class="ico ico--lg" id="cc-muted" data-icon="history" aria-hidden="true"></span>--muted-foreground</span></p>
+            <p><span class="demo-pair demo-primary"><span class="ico ico--lg" id="cc-primary" data-icon="history" aria-hidden="true"></span>--primary</span></p>
           </div>
           <div class="demo-surface" data-surface="card" id="tones">
             <p class="demo-label">data-tone on the .ico, on --card</p>
@@ -219,7 +224,7 @@
           </div>
           <div class="demo-tone" data-tone="destructive" id="leak">
             <p class="demo-label">a container with data-tone="destructive"</p>
-            <p><span class="demo-pair" style="color: var(--primary)"><span class="ico ico--lg" id="leak-plain" data-icon="refresh-cw" aria-hidden="true"></span>retry — the glyph stays its label's --primary</span></p>
+            <p><span class="demo-pair demo-primary"><span class="ico ico--lg" id="leak-plain" data-icon="refresh-cw" aria-hidden="true"></span>retry — the glyph stays its label's --primary</span></p>
             <p><span class="demo-pair"><span class="ico ico--lg" id="leak-own" data-tone="destructive" data-icon="circle-x" aria-hidden="true"></span>its own data-tone paints it</span></p>
           </div>
         </div>
@@ -329,7 +334,7 @@
       document.getElementById("bad-word-host").replaceWith(bad);
 
       const bare = html.hasAttribute("data-bare");
-      document.getElementById("mode").textContent = bare ? "· WP4 · tokens.css + icons.css only" : "· WP4 · I1 I2 I3";
+      document.getElementById("mode").textContent = bare ? "· tokens.css + icons.css only" : "· I1 I2 I3";
       const link = document.getElementById("bare-link");
       link.textContent = bare ? "full page" : "tokens + icons only";
       link.href = bare ? "?" : "?bare";

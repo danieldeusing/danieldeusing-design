@@ -37,6 +37,7 @@ import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateSync } from "node:zlib";
+import { launch as launchApart } from "./lib/chromium.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHROME = process.env.DD_CHROME
@@ -1058,6 +1059,42 @@ await check("the reveal steps by position: row n at 0.6s + (n−1) × 0.11s for 
 const inline = ["examples/chrome.html", "templates/page-chrome.html", "templates/documentation.html", ".claude/skills/danieldeusing-design/references/chrome.md"]
   .flatMap((f) => readFileSync(join(root, f), "utf8").split("\n").map((l, i) => [f, i + 1, l]).filter(([, , l]) => /<[a-z][^>]*\sstyle\s*=\s*["']/i.test(l) || /`style="/.test(l)).map(([f, n]) => `${f}:${n}`));
 await check("no documented markup carries a style attribute: the demo, both templates, chrome.md", () => inline.length === 0, inline);
+
+/* ═══ 16. a second initToc() never hangs the tab ══════════════════════════════════════════════════
+   Two spies over the same entries used to re-assert their own stored `current` over each other's in
+   microtasks that never yield: the renderer sat at 100% and never answered again. Each case runs in a
+   browser of its own, because a hung renderer takes every later check down with it, and the wait is
+   bounded here in node, so a hang reads as a FAIL. chrome.html has already called initToc() once. */
+const TOC_AGAIN = [
+  ["initToc(); initToc() — the same root twice returns the first call's handle",
+    `const a = initToc(), b = initToc(); same = a === window.ddToc && b === window.ddToc;`],
+  ["initToc() and then initToc(aside) — a second root over the same entries",
+    `initToc(document.querySelector("aside.toc")); same = true;`],
+  ["a second initToc() 800 ms after the first, and then a scroll",
+    `await new Promise((ok) => setTimeout(ok, 800)); same = initToc() === window.ddToc;`],
+];
+for (const [label, call] of TOC_AGAIN) {
+  const apart = await launchApart("chrome-toc");
+  try {
+    await apart.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+    await apart.navigate(BASE + "?nobanner");
+    await apart.until("window.ddToc");
+    const answer = await Promise.race([
+      apart.evaluate(`(async () => { const { initToc } = await import("/runtime/toc.js"); let same = false;
+        const frames = (n) => new Promise((ok) => { const f = () => (--n ? requestAnimationFrame(f) : setTimeout(ok, 30)); requestAnimationFrame(f); });
+        ${call}
+        await frames(4);
+        document.getElementById("table").scrollIntoView({ behavior: "instant" });
+        await frames(4);
+        return { same, marked: [...document.querySelectorAll("[data-toc-link][aria-current]")].map((a) => a.dataset.tocLink + "=" + a.getAttribute("aria-current")) }; })()`),
+      sleep(6000).then(() => "no answer in 6 s — the tab hung"),
+    ]);
+    await check(`${label}: the page answers, and a scroll to #table marks that entry alone`,
+      () => typeof answer === "object" && answer.same && answer.marked.length === 1 && answer.marked[0] === "table=true", answer);
+  } finally {
+    apart.close();
+  }
+}
 
 console.log(failures ? `\ncheck-chrome: ${failures} FAILED (last check to pass: ${lastPassed})` : "\ncheck-chrome: all checks passed");
 process.exit(failures ? 1 : 0);

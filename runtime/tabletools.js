@@ -1071,10 +1071,19 @@ function enhance(table) {
      * no matter what it is set to, applyTableView() would compute the same view. A
      * renderer that rewrites a row's text or a `data-value` is still seen, by the
      * characterData, childList or attribute record that write makes.
+     *
+     * A RELATIVE TIME RELABELLING ITSELF is the one text write treated the same way.
+     * Inside a `[data-ago]` element the only writer is the one keeping "3 minutes ago"
+     * true — time.js's initRelativeTimes() and cockpit's stamp.js share the hook, every
+     * 30 s — and it relabels a time the row already showed; answering it dropped the
+     * withheld rows as surely as the pager did. A renderer's rewrite of a row touches
+     * other cells or attributes and is still seen through them. The cost, accepted: a
+     * search can match a relative label up to 30 s stale until something else re-applies.
      */
+    const relabel = (node) => !!(node.nodeType === 1 ? node : node.parentElement)?.closest("[data-ago]");
     const rewritten = !moved && records.some((rec) =>
       rec.target !== body && body.contains(rec.target) &&
-      (rec.type !== "attributes" || ROW_READS.has(rec.attributeName)));
+      (rec.type === "attributes" ? ROW_READS.has(rec.attributeName) : !relabel(rec.target)));
 
     if (moved || rewritten) {
       snapshot(inst);

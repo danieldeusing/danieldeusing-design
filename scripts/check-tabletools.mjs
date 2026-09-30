@@ -415,6 +415,19 @@ await evaluate(`window.setFilter("name", ""); null`);
 await sleep(50);
 await check("...and an attribute this file does not read (a tooltip's aria-describedby) on a filtered row loses nothing", async () =>
   (await evaluate("window.order()")).join(",") === "ada,grace,linus", async () => JSON.stringify(await evaluate("window.order()")));
+// ...nor a relative time relabelling itself: initRelativeTimes() re-ticks on every call, so the 30 s
+// wait is one call. The label is stale on purpose, so the relabel is a real write.
+await evaluate(`localStorage.clear(); window.build({ rows: [["ada", "core", '<span data-ago="' + new Date(Date.now() - 2 * 3600e3).toISOString() + '">just now</span>'],
+  ["linus", "core", "10"], ["grace", "ops", "20"]] }); window.setFilter("name", "ada"); null`);
+await sleep(50);
+await evaluate(`(async () => { (await import("/runtime/time.js")).initRelativeTimes(); })()`);
+await sleep(50);
+const relabelled = await evaluate(`document.querySelector("#mount [data-ago]").textContent`);
+await evaluate(`window.setFilter("name", ""); null`);
+await sleep(50);
+await check("...nor a [data-ago] label relabelling itself on a filtered row: every row is back when the filter is cleared", async () =>
+  relabelled !== "just now" && (await evaluate("window.order()")).join(",") === "ada,grace,linus",
+  async () => JSON.stringify({ relabelled, order: await evaluate("window.order()") }));
 
 /* ── the pick filter is a menu of menuitemradios ─────────────────────────────────────────────────── */
 

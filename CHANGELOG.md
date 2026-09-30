@@ -147,8 +147,10 @@ inventory; they name an element, not a section of this file.
 - **A filtered table forgot the rows it was holding back.** On a table with a pager, a filter set
   back to "all" (or a search cleared) left the table filtered for good: the pager's `hidden` writes
   were read as a renderer rewriting the rows, and the set was re-read from a body holding only the
-  matches. A tooltip's `aria-describedby` on a filtered row did the same with no pager. tabletools
-  now answers only an attribute it reads (measured: 22 of 65 rows before, 65 of 65 after).
+  matches. A tooltip's `aria-describedby` on a filtered row did the same with no pager, and so did a
+  `[data-ago]` label relabelling itself every 30 s. tabletools now answers only an attribute it reads,
+  and no relabel of a relative time (measured: 22 of 65 rows before, 65 of 65 after). The accepted
+  cost: a search can match a relative label up to 30 s stale.
 
 ### Docs
 

@@ -158,6 +158,21 @@
       pre.mermaid { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-base, 0.75rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); white-space: pre; }
       pre.mermaid[data-processed] { white-space: normal; text-align: center; }
       pre.mermaid svg { max-width: 100%; height: auto; }
+      /* A status node takes its colour from the TOKEN, here, and never from its classDef. Mermaid
+         does not parse var() in a style at all (11.16.0: with or without a fallback, the whole
+         diagram fails and shows its source), and a literal hex is right on one theme of four — the
+         #a02c2c this template used to write is warm's red and wrong on green, mono and paper. So the
+         classDef keeps only the shape (a width, a dash) and these rules paint it. `!important`
+         because mermaid's own theme rules sit inside the svg under an id selector, which no class
+         selector here out-ranks. `warn` is a failure or a gap; `new` is a proposed node. */
+      pre.mermaid .node.warn > :is(rect, polygon, circle, ellipse, path) {
+        stroke: var(--destructive, #a02c2c) !important;
+        fill: color-mix(in srgb, var(--destructive, #a02c2c) 13%, transparent) !important;
+      }
+      pre.mermaid .node.new > :is(rect, polygon, circle, ellipse, path) {
+        stroke: var(--primary, #8a4516) !important;
+        fill: color-mix(in srgb, var(--primary, #8a4516) 13%, transparent) !important;
+      }
     </style>
   </head>
 
@@ -291,9 +306,11 @@ flowchart TD
     B -- no --> D["{{FLOW_NO}}"]
 
     class D warn
-    %% Literal hex only: a comma inside var() splits Mermaid's style list and the
-    %% whole diagram fails to parse, falling back to its source silently.
-    classDef warn fill:#a02c2c22,stroke:#a02c2c,stroke-width:2px
+    %% Shape only. Mermaid parses no var() in a style, and a hex is right on one theme of
+    %% four: the colour of .node.warn and .node.new comes from the page's CSS, from the
+    %% tokens. `class X new` marks a proposed node.
+    classDef warn stroke-width:2px
+    classDef new stroke-width:2px,stroke-dasharray:4 3
 </pre>
             </div>
           </section>

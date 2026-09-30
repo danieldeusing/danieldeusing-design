@@ -16,6 +16,11 @@ All notable changes to this project are documented here. The format follows
   URL or path still breaks, but only where it cannot fit its line. A token wider than the whole table
   widens it, and the `.tablewrap` scrolls it (`initTableScroll()`). `dl.kv` keeps `anywhere`: its
   value column is sized by the free space, never by its content, so it cannot squeeze the prose.
+- **The documentation template's diagram status colours follow the theme.** Its `classDef warn`
+  carried `#a02c2c`, warm's red and wrong on green, mono and paper, and the html-doc skill taught it
+  as staying "in the palette across themes". Mermaid 11.16.0 parses no `var()` in a style, so the
+  `classDef` keeps only the shape and the page's CSS paints `.node.warn` from `--destructive` and a
+  new `.node.new` from `--primary`; the skill teaches that instead.
 - Every current-version pin (README, the html-doc skill, the documentation and error-page templates)
   moves to 0.61.1.
 

@@ -347,7 +347,10 @@ if (!CHROME) {
   console.log("      the init-twice section SKIPPED — no headless chromium on this machine.");
   if (process.env.DD_REQUIRE_BROWSER === "1") check("DD_REQUIRE_BROWSER=1: every init is called twice in a browser", () => ["no headless chromium on this machine"]);
 } else {
-  const server = await serve(root, { "/__twice.html": TWICE_PAGE });
+  // The documentation template as a reader gets it, with its pinned design system served from this
+  // checkout (mermaid still comes from its CDN, as the template loads it).
+  const DOC_PAGE = read("templates/documentation.html").replaceAll(/https:\/\/cdn\.jsdelivr\.net\/npm\/@danieldeusing\/design@[\d.]+\//g, "/");
+  const server = await serve(root, { "/__twice.html": TWICE_PAGE, "/__doc.html": DOC_PAGE });
   const browser = await launch("integration");
   // Bounded in node: toc.js's second spy hung the renderer, and a hung renderer never answers.
   const within = (promise, ms = 15000) => Promise.race([promise, new Promise((ok) => setTimeout(() => ok("no answer in " + ms + " ms — the tab hung"), ms))]);
@@ -396,6 +399,31 @@ if (!CHROME) {
       return document.querySelectorAll("dialog.dgm-overlay").length; })()`));
     check("...and a figure a later initDiagramZoom() wires opens in the page's one view: 1 overlay <dialog> after both have opened", () =>
       zoom === 1 ? [] : [`${zoom} overlay dialogs`]);
+
+    // THE TEMPLATE'S DIAGRAM, IN THE THEME'S OWN RED (0.61.1). Its `classDef warn` carried a literal
+    // #a02c2c: warm's --destructive, and wrong on the other three themes. Mermaid does not take var() in
+    // a style at all (measured with 11.16.0: with or without a fallback the diagram fails to parse), so
+    // the classDef keeps only the shape and the page colours `.node.warn` from the token. Here: the
+    // diagram renders to an <svg>, and its warn node's stroke is --destructive on every theme.
+    await browser.send("Page.addScriptToEvaluateOnNewDocument", { source: `try { localStorage.setItem("anim", "off"); } catch {}` });
+    await browser.navigate(`${server.origin}/__doc.html`);
+    const rendered = await within(browser.evaluate(`(async () => {
+      for (let i = 0; i < 200 && !document.querySelector("pre.mermaid[data-processed] svg .node.warn"); i += 1) await new Promise((ok) => setTimeout(ok, 50));
+      return !!document.querySelector("pre.mermaid[data-processed] svg .node.warn"); })()`), 20000);
+    check("templates/documentation.html: its diagram renders to an <svg> with the warn node in it", () =>
+      rendered === true ? [] : [rendered === false ? "no rendered svg with a .node.warn (did mermaid load from its CDN?)" : String(rendered)]);
+    for (const theme of ["warm", "green", "mono", "paper"]) {
+      const got = rendered !== true ? null : await within(browser.evaluate(`(async () => {
+        document.documentElement.dataset.theme = ${JSON.stringify(theme)};
+        await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+        for (let i = 0; i < 200 && !document.querySelector("pre.mermaid[data-processed] svg .node.warn"); i += 1) await new Promise((ok) => setTimeout(ok, 50));
+        const shape = document.querySelector("pre.mermaid svg .node.warn > :is(rect, polygon, circle, ellipse, path)");
+        const p = document.createElement("i"); p.style.color = "var(--destructive)"; document.body.append(p);
+        const want = getComputedStyle(p).color; p.remove();
+        return { stroke: shape && getComputedStyle(shape).stroke, want }; })()`));
+      check(`templates/documentation.html, ${theme}: the warn node's stroke is the theme's --destructive`, () =>
+        got && got.stroke === got.want ? [] : [JSON.stringify(got)]);
+    }
   } finally {
     browser.close();
     server.close();

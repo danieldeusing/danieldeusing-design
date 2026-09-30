@@ -243,12 +243,22 @@ already carries two, and if you cannot write the sentence you do not have an exc
      already monospace, so it buys nothing and gets sanitized away.
    - **Keep labels short.** One idea plus an optional `file.ts:12-34` reference. Long prose makes
      Mermaid render a tall narrow column; put the explanation in the surrounding paragraph.
-   - **Mark failure/gap nodes** with a red class so problems read at a glance, e.g.
-     `class D warn` + `classDef warn fill:#a02c2c22,stroke:#a02c2c,stroke-width:2px`. Use the
-     `--destructive` hue (`#a02c2c`), and the primary hue (`#8a4516`) for "new/proposed" nodes,
-     so diagrams stay in the design system's palette across themes. (Mermaid's `classDef` takes
-     literal colours only — this is the one place a hex is unavoidable, and the reason the
-     renderer is otherwise fed `themeVariables` read from the live tokens.)
+   - **Mark failure/gap nodes** with the template's `warn` class so problems read at a glance, and
+     "new/proposed" nodes with its `new` class: `class D warn`, `class E new`. **The `classDef`
+     carries the shape only** (`classDef warn stroke-width:2px`, `classDef new
+     stroke-width:2px,stroke-dasharray:4 3`); **the colour comes from the page's CSS**, which
+     paints `pre.mermaid .node.warn` from `--destructive` and `.node.new` from `--primary` (stroke,
+     and a 13% `color-mix()` fill), with `!important` because mermaid's own rules sit inside the
+     svg under an id selector. Never put a colour in a `classDef`:
+     - `var()` does not work there at all. Mermaid 11.16.0 rejects it with or without a fallback
+       (a comma splits its style list, and a bare `var(--x)` fails to parse too), so the whole
+       diagram silently shows its source — 14 diagrams on docs did (2026-09-30).
+     - A hex does not follow the theme. `#a02c2c` is warm's `--destructive` and wrong on green,
+       mono and paper; this skill used to recommend it and claim it stayed in the palette across
+       themes. It did not.
+     Another status colour is one more rule of the same shape beside the template's two, reading
+     its token. The renderer's own palette still comes from `themeVariables` read from the live
+     tokens.
    - **Verify it renders — don't assume.** A diagram that fails to parse silently falls back to
      its source. Render the finished page headlessly and check every diagram produced an SVG:
      ```bash
@@ -357,8 +367,10 @@ already carries two, and if you cannot write the sentence you do not have an exc
     code is the bare `<code>` now, with no class), and `pre` at
     `var(--fs-md, 0.86rem)`, whose fallback kept 13.76px alive after `--fs-md` was deleted
     (17 pages, 2026-08-11);
-  - a status colour written as a hex outside a Mermaid `classDef`: `#a02c2c` 41 times across
-    four pages, right on warm and wrong on the other three themes (2026-08-06);
+  - a status colour written as a hex: `#a02c2c` 41 times across four pages (2026-08-06), and in
+    every Mermaid `classDef` this skill taught until 0.61.1 — right on warm, wrong on the other
+    three themes. A diagram's status colour is the page's CSS on `.node.<class>`, from the token;
+    the `classDef` keeps the shape;
   - the navigation as a dropdown menu instead of the rail (2026-08-06; Daniel: "not a dropdown,
     but a sidebar").
 

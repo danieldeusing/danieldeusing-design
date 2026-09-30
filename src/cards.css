@@ -92,13 +92,19 @@
   }
 }
 
+/* ON A BASELINE (0.61.0). `flex-start` top-aligned boxes of different heights: a `.card-title` leads
+   1.3 (15.6px) and a tag is a 20px box with its word centred, so a title beside a `.tag--bracket` sat
+   3px above the tag's word. A baseline lines up the WORDS, whatever box each sits in. A glyph has no
+   word to align, so a lone `.ico` or `.btn-icon` centres on the row instead: on a baseline it would
+   sit on the text's baseline with its whole height above it. */
 .card-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
 }
+.card-head > :is(.ico, .btn-icon) { align-self: center; }
 /* 500, not bold: the title is the name of the thing, and in a grid of forty cards forty bold titles
    are a wall. seedr and configr both settled on medium weight at the body size.
    The LEADING is stated, here and on .panel-title and .entry-title: 0.60.0's base.css gives h1–h3

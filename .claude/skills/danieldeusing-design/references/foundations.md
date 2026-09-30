@@ -242,7 +242,7 @@ Rules for a Tailwind author:
 | `h1` · `h2` · `h3` | `--fs-2xl` · `--fs-xl` · `--fs-lg`, weight 700, `--lh-tight`, colour inherited |
 | `h4` · `h5` · `h6` | body size (`--fs-base`), weight 700 — no fourth heading size |
 | `code`, `kbd`, `samp`, `pre` | the page's font at `--fs-base`, even inside a heading |
-| inline `code`, `kbd` | a `--muted` box, 1px `--border` hairline, `.05rem .35rem`, wraps anywhere; square |
+| inline `code`, `kbd` | a `--muted` box, 1px `--border` hairline, `.05rem .35rem`, wraps anywhere — in a table cell only where it would overflow (0.61.0); square |
 | `pre` | a `--muted` block, 1px `--border`, `.75rem 1rem`, `--lh-base`, scrolls sideways, `tab-size: 2`; its `code` draws no second box |
 | `mark` | `--warning` at 30% under `--foreground` text; in forced colours the palette's `Mark` under `MarkText` |
 | `hr` | one 1px `--border` rule, 1.5rem above and below |
@@ -269,6 +269,43 @@ Rules for a Tailwind author:
 - **Pages that relied on unstyled elements change.** A bare h3 goes from the browser's 14.04px to
   15px; code switches font. Style an element with a class if it must look different; do not reset
   the default locally.
+
+## Stacked blocks keep a gap, wrapped or not (0.61.0, Daniel)
+
+A callout sat flush on a table's search toolbar in cockpit. The system's rhythm rules were all
+sibling rules (`p + .tablewrap`), and a page that paints itself from JS puts every block in its own
+mount `<div>`, so the two blocks were never siblings and nothing spaced them. `base.css` now keeps
+**.6rem** above a block when it follows another one:
+
+- **as siblings**, inside a container that flows as a column of blocks — an unclassed `<div>`, a
+  `section`, `article`, `main`, `.wrap`, `.content`, a tab panel, a fold's, a dialog's or a panel's
+  body. Never inside a class-carrying `<div>`: that is a grid or a flex row with a gap of its own,
+  and a margin there adds to the gap and drops one item of a row below its neighbours;
+- **after a mount** (an unclassed `<div>` or a tab panel that holds something);
+- **as the first thing in a mount** that follows something.
+
+The blocks are `STACKED_BLOCKS` in `runtime/rhythm.js`: `.callout` `.notice` `.fence` `.filter-bar`
+`.tablewrap` `table` `pre` `.code-block` `.cmd` `.legend` `.chart` `.tabs` `details.fold` `.card-grid`
+`.stat-grid` `.row-list` `.console`. Margins collapse, so where a gap was already there nothing
+changes, and the rules weigh nothing: any margin a page writes wins.
+
+**Flush on purpose is said out loud.** A run of folds is one list, each fold drawing its own rule, so
+`details.fold + details.fold` stays flush. Anything else a page wants flush carries **`data-flush`**
+on the lower block. The one shape the rule cannot read is a grid whose items are unclassed `<div>`s
+(the margin stays inside the second item): give those items a class.
+
+**The check.** `findFlushBlocks(root = document)` (runtime, `rhythm.js`) returns every pair of
+rendered blocks from that list, neither inside the other, overlapping horizontally, with 0px between
+their border boxes — honouring the same two exceptions. A page-level browser check calls it and fails
+on a non-empty answer:
+
+```js
+const { findFlushBlocks } = await import("/runtime/rhythm.js"); // or the pinned CDN barrel
+const flush = findFlushBlocks().map(({ upper, lower }) => [upper, lower].map((el) => el.id || el.className));
+```
+
+`scripts/check-data.mjs` renders cockpit's case — a callout in one mount over a table the engine
+paints in the next — and proves the helper finds the pair once the gap is taken away.
 
 ## Motion: one switch stops all of it (0.60.0)
 

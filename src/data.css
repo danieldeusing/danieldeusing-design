@@ -15,6 +15,7 @@
  * the family pages had a variant, the entry below says which parts were taken and why.
  *
  * Contents:
+ *   D0  table body text is --foreground
  *   D1  table.dense, the cell vocabulary (.num, .actions, .pick), row states, .stackable
  *   D3  table.kv, dl.kv
  *   D4  .when
@@ -22,6 +23,28 @@
  *   D8  .tabs, .tab, --compact, --strip
  *   print
  */
+
+/* ── TABLE BODY TEXT IS --foreground (Daniel, 2026-09-30) ─────────────────────────────────── (D0)
+   "Table text in all activity tables should be foreground, not muted grey." A cell is the data a
+   reader came for, so every `td` reads at full strength whatever it sits in: a table inside a muted
+   container (a card's description, a callout, a field's help) no longer inherits the grey. The
+   helpers a surface uses to quieten a cell's words read at full strength too: the common `.muted`,
+   `.text-muted-foreground`, and the system's own quiet cell part, the `when` cell's exact stamp.
+   Inside a cell they take `inherit`, not --foreground, so a row the page has dimmed as a STATE
+   keeps its dimmed words. Cockpit shipped this first (portal.css, `table.act`); it holds for every
+   table now, the base table, `.dense` and `.kv` alike.
+
+   WHAT KEEPS ITS COLOUR is colour that MEANS something, and none of it is touched here, because each
+   sets its own `color` on its own element: a tone, a tag, a state word, a link, a failure, `.kv`'s
+   label. A row that cannot be acted on (`tr[aria-disabled]`, below) and a surface's own row dimming
+   (cockpit's `.srcrow:not(.srcrow-on) td`) out-rank these on weight, on purpose. Header cells are
+   chrome and keep their muted treatment.
+
+   In a Tailwind app a `text-muted-foreground` utility on a cell sits in the utilities layer and
+   wins: there it is a decision somebody wrote down, not a grey the cell inherited. */
+td,
+td:is(.muted, .text-muted-foreground) { color: var(--foreground); }
+td :is(.muted, .text-muted-foreground, .when-exact) { color: inherit; }
 
 /* ── THE DENSE TABLE — cockpit's activity table, one class instead of four copies ─────────── (D1)
    `table.act` was declared FOUR times in cockpit (review, cicd, docs, execution.css), each copy a
@@ -404,7 +427,9 @@ dl.kv > dt > .ico:first-child { margin-inline-end: 0.4rem; }
    reader do the subtraction, so the age leads and the exact stamp sits under it. `whenHtml()` in
    runtime/time.js writes the markup and `initRelativeTimes()` keeps the age true.
 
-   THE SECOND LINE IS "LITTLE" BY COLOUR, NOT BY SIZE. It is --muted-foreground: a smaller font was
+   THE SECOND LINE IS "LITTLE" BY COLOUR, NOT BY SIZE — outside a table. It is --muted-foreground
+   there; inside a table cell it reads at full strength, like every word of a table's body (D0), and
+   the line of its own is what keeps it second. A smaller font was
    exactly the near-miss the estate deleted (one size of text), and cockpit's opacity .6 measured
    3.26-3.40:1 on warm — under AA — where --muted-foreground holds 4.67 or better. `nowrap` on both
    lines is what makes each fit on one line, and it made the column NARROWER (the review table fell

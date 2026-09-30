@@ -183,6 +183,45 @@ body::after {
   margin-block-start: 0.6rem;
 }
 
+/* ── STACKED BLOCKS KEEP A GAP, WRAPPED OR NOT (Daniel, 2026-09-30) ─────────────
+   A note sat flush on a table's search toolbar in cockpit. Every rhythm rule here is a SIBLING
+   rule (`p + .tablewrap`), and a page that paints itself from JS puts each block in its own mount:
+
+     <div id="rules-note"><p class="callout">…</p></div>
+     <div id="rules-table"><search class="filter-bar">…</search><div class="tablewrap">…</div></div>
+
+   The callout and the toolbar are not siblings, so no sibling rule could see them touch. So a
+   BLOCK — the list below, `STACKED_BLOCKS` in runtime/rhythm.js — keeps .6rem (the in-component
+   gap: `.fold-body`, `p + .tablewrap`) from what is above it in three shapes:
+     1. after another block, as siblings (two callouts are two notes, not one taller one) — only
+        in a container known to flow as a column of blocks: a mount, a section, a tab panel, a
+        fold's or a dialog's or a panel's body. A class-carrying <div> is a layout, a grid or a
+        flex row with a gap of its own, and a margin there ADDS to the gap and pushes one item of
+        a row below its neighbours (measured on the feedback demo's grid of callouts: 9.6px);
+     2. after a MOUNT — an unclassed <div>, or a tab panel — that holds something;
+     3. as the first thing in a mount that follows something.
+   Margins collapse through a plain mount and between blocks in a column, so where a gap was
+   already there (the toolbar's own 1rem, a section's rhythm) this adds nothing: it fills gaps,
+   it does not add to them. ZERO SPECIFICITY, like everything in this section: any margin a surface
+   writes wins. The one shape it cannot read is a grid whose ITEMS are unclassed <div>s: there the
+   margin stays inside the second item. Give those items a class.
+
+   FLUSH ON PURPOSE is allowed, and said out loud. A run of folds is one list — each fold draws its
+   own rule above it — so `details.fold + details.fold` stays flush. Anything else a surface wants
+   flush carries `data-flush` on the LOWER block, and `findFlushBlocks()` (runtime/rhythm.js), the
+   check a page runs to find every pair this rule missed, honours the same two exceptions. */
+:where(:is(div:not([class]), [role="tabpanel"], .tab-panel, section, article, main, .wrap, .content, .fold-body, .dialog-body, .panel-body) > :is(.callout, .notice, .fence, .filter-bar, .tablewrap, table, pre, .code-block, .cmd, .legend, .chart, .tabs, details.fold, .card-grid, .stat-grid, .row-list, .console)
+  + :is(.callout, .notice, .fence, .filter-bar, .tablewrap, table, pre, .code-block, .cmd, .legend, .chart, .tabs, details.fold, .card-grid, .stat-grid, .row-list, .console):not([data-flush])),
+:where(:is(div:not([class]), [role="tabpanel"]):not(:empty)
+  + :is(.callout, .notice, .fence, .filter-bar, .tablewrap, table, pre, .code-block, .cmd, .legend, .chart, .tabs, details.fold, .card-grid, .stat-grid, .row-list, .console):not([data-flush])),
+:where(:not(:empty) + :is(div:not([class]), [role="tabpanel"])
+  > :is(.callout, .notice, .fence, .filter-bar, .tablewrap, table, pre, .code-block, .cmd, .legend, .chart, .tabs, details.fold, .card-grid, .stat-grid, .row-list, .console):not([data-flush]):first-child) {
+  margin-block-start: 0.6rem;
+}
+:where(details.fold + details.fold) {
+  margin-block-start: 0;
+}
+
 
 /* ── ELEMENT DEFAULTS — the house look for bare markup (0.60.0) ─────────────────
    Until 0.60.0 the system styled the body, tables and focus, and left every other element to the
@@ -239,6 +278,16 @@ pre { line-height: var(--lh-base); }
   background: var(--muted);
   border: 1px solid var(--border);
   overflow-wrap: anywhere;
+}
+/* …EXCEPT IN A TABLE CELL, where `anywhere` broke a key one character per line on a phone.
+   `anywhere` lets the word break while the browser computes the cell's MIN-CONTENT width, so an
+   auto-layout table hands the code's column whatever the prose columns leave it, down to a single
+   character. `break-word` breaks the same word only when it would overflow its line, never while
+   sizing, so the column keeps the key's width and the prose column gives way instead. A key wider
+   than the whole table widens the table, and the `.tablewrap` around it scrolls: the table's answer
+   to width everywhere else (initTableScroll). */
+:where(td, th) :where(:not(pre) > code, kbd) {
+  overflow-wrap: break-word;
 }
 :where(pre) {
   margin: 0;

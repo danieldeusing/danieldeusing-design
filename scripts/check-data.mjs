@@ -27,6 +27,7 @@
  *
  *   node scripts/check-data.mjs
  */
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { launch, reporter, requireBrowser, serve, sleep } from "./lib/chromium.mjs";
@@ -247,10 +248,11 @@ await check("dl.kv: an 8.5rem label column, the label --primary 700, the value -
 
 /* ── D4 · when ────────────────────────────────────────────────────────────────────────────────── */
 
-await check(".when: an inline block with the column's 5.5rem floor, two nowrap lines, the stamp muted and tabular",
+// In a table the stamp reads at full strength (D0); the muted default is the stamp's own, asserted in D0 below.
+await check(".when: an inline block with the column's 5.5rem floor, two nowrap lines, the stamp --foreground in a table and tabular",
   async () => (await css("#row-pinned .when", "display")) === "inline-block" && (await css("#row-pinned .when", "minWidth")) === "88px" &&
     (await css("#row-pinned .when-ago", "whiteSpace")) === "nowrap" && (await css("#row-pinned .when-exact", "display")) === "block" &&
-    (await css("#row-pinned .when-exact", "color")) === (await tok("var(--muted-foreground)")) &&
+    (await css("#row-pinned .when-exact", "color")) === (await tok("var(--foreground)")) &&
     (await css("#row-pinned .when-exact", "fontVariantNumeric")) === "tabular-nums" && (await css("#row-pinned .when-exact", "opacity")) === "1");
 await check(".when--inline: one quiet line, the glyph and the short age", async () => (await css("#when-inline .when", "display")) === "inline-flex" &&
   (await css("#when-inline .when", "color")) === (await tok("var(--muted-foreground)")) && (await evaluate(`/^\\d+(s|m|h|d|w|mo|y) ago$/.test(document.querySelector("#when-inline [data-ago]").textContent)`)));
@@ -897,6 +899,119 @@ await check("X1 — stacked, the pinned card carries the bar on its edge", async
   (await css("#row-pinned > td:first-child", "borderLeftWidth")) === "0px");
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 await send("Emulation.setEmulatedMedia", { features: [] });
+
+/* ── D0 · table body text is --foreground (0.61.0, Daniel 2026-09-30) ──────────────────────────────
+   The fixture is a table inside a MUTED container, the shape that greyed a cell by inheritance, with
+   every helper a surface quietens a cell with, the semantic colours that must stay, and a dimmed row. */
+
+await open("theme=warm");
+await evaluate(`(() => {
+  const s = document.createElement("section");
+  s.id = "fx-d0";
+  // The helpers as the bundle and a surface give them: utilities.css after data.css, and a page's own
+  // .muted (cockpit's). The container is muted the way a card's description or a field's help is.
+  const link = document.createElement("link");
+  link.rel = "stylesheet"; link.href = "/src/utilities.css"; link.id = "fx-d0-utilities";
+  const own = document.createElement("style");
+  own.textContent = ".muted { color: var(--muted-foreground); } .fx-quiet { color: var(--muted-foreground); }";
+  document.head.append(link, own);
+  s.innerHTML = '<div class="fx-quiet"><table id="fx-ink"><thead><tr><th>state</th><th>what</th><th>when</th></tr></thead><tbody>' +
+    '<tr><td id="fx-ink-td">text</td><td><span class="muted" id="fx-ink-muted">not reported</span> <span class="text-muted-foreground" id="fx-ink-util">lap 2</span></td>' +
+    '<td class="text-muted-foreground" id="fx-ink-tdutil"><span class="when"><span class="when-ago">3 min ago</span><span class="when-exact" id="fx-ink-exact">2026-09-30 09:00</span></span></td></tr>' +
+    '<tr><td><span class="tag" data-tone="destructive" id="fx-ink-tag">failed</span> <a href="#top" id="fx-ink-link">log</a></td><td></td><td></td></tr>' +
+    '<tr aria-disabled="true"><td>off</td><td id="fx-ink-off"><span class="muted" id="fx-ink-off-muted">paused</span></td><td></td></tr>' +
+    '</tbody></table></div><p><a href="#top" id="fx-ink-link-out">log</a> <span class="when"><span class="when-exact" id="fx-exact-alone">2026-09-30 09:00</span></span></p>';
+  document.querySelector("main").append(s); })(); null`);
+await until(`document.getElementById("fx-d0-utilities").sheet`, "utilities.css to load");
+const ink = () => evaluate(`Object.fromEntries(["fx-ink-td", "fx-ink-muted", "fx-ink-util", "fx-ink-tdutil", "fx-ink-exact", "fx-ink-tag", "fx-ink-link",
+  "fx-ink-link-out", "fx-ink-off", "fx-ink-off-muted", "fx-exact-alone"].map((id) => [id, getComputedStyle(document.getElementById(id)).color])
+  .concat([["th", getComputedStyle(document.querySelector("#fx-ink thead th")).color], ["fg", M.tok("var(--foreground)")], ["muted", M.tok("var(--muted-foreground)")],
+    ["destructive", M.tok("var(--destructive)")]]))`);
+for (const t of THEMES) {
+  await theme(t);
+  const c = await ink();
+  await check(`D0 ${t}: a cell in a muted container is --foreground, and so are .muted, .text-muted-foreground (on the cell or inside it) and the when stamp`,
+    () => ["fx-ink-td", "fx-ink-muted", "fx-ink-util", "fx-ink-tdutil", "fx-ink-exact"].every((id) => c[id] === c.fg), c);
+  await check(`D0 ${t}: what MEANS something keeps its colour — the header muted, a toned tag, a link as it is outside the table`,
+    () => c.th === c.muted && c["fx-ink-tag"] === c.destructive && c["fx-ink-link"] === c["fx-ink-link-out"], c);
+  await check(`D0 ${t}: a row dimmed as a state stays dim, helpers inside it too; the stamp outside a table keeps its muted default`,
+    () => c["fx-ink-off"] === c.muted && c["fx-ink-off-muted"] === c.muted && c["fx-exact-alone"] === c.muted, c);
+}
+await theme("warm");
+
+/* ── stacked blocks keep a gap, and findFlushBlocks() finds the ones that do not (0.61.0) ─────────────
+   Cockpit's case, rebuilt: a callout in one mount <div>, a table the engine paints in the next. On main
+   the two touched (0px). The helper is proved able to FAIL: with the gap taken away it names the pair,
+   and a lower block's `data-flush` and a fold after a fold are the two exceptions it honours. */
+
+await evaluate(`(() => {
+  const s = document.createElement("section");
+  s.id = "fx-rhythm";
+  s.innerHTML = '<div id="fx-rh-note"><p class="callout" id="fx-rh-callout">Only the rules in force are listed.</p></div>' +
+    '<div id="fx-rh-mount"><table data-table-tools><thead><tr><th data-col="rule">rule</th><th data-col="scope">scope</th></tr></thead><tbody><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></tbody></table></div>' +
+    '<p class="callout" id="fx-rh-c1">first</p><p class="callout" id="fx-rh-c2">second</p>' +
+    '<details class="fold"><summary>one</summary></details><details class="fold"><summary>two</summary></details>';
+  document.querySelector("main").append(s); })(); null`);
+await until(`document.querySelector("#fx-rh-mount > .filter-bar") && document.querySelector("#fx-rh-mount .tablewrap")`, "the table engine to paint the fixture");
+const rhythm = () => evaluate(`(async () => {
+  const helper = await import("/runtime/rhythm.js").catch((error) => ({ error }));
+  const top = (sel) => document.querySelector(sel).getBoundingClientRect().top, bottom = (sel) => document.querySelector(sel).getBoundingClientRect().bottom;
+  const name = (el) => el.id || el.tagName.toLowerCase() + "." + [...el.classList].join(".");
+  return { note: top("#fx-rh-mount > .filter-bar") - bottom("#fx-rh-callout"), twoNotes: top("#fx-rh-c2") - bottom("#fx-rh-c1"),
+    folds: top("#fx-rhythm details.fold + details.fold") - bottom("#fx-rhythm details.fold"),
+    flush: helper.error ? "runtime/rhythm.js did not load: " + helper.error.message
+      : helper.findFlushBlocks(document.getElementById("fx-rhythm")).map((p) => name(p.upper) + " / " + name(p.lower)) }; })()`);
+const r0 = await rhythm();
+await check("a callout in one mount div over a table the engine paints in the next: .6rem between the note and the toolbar (0px on 0.60.0)",
+  () => Math.abs(r0.note - 9.6) < 0.1, r0);
+await check("two callouts in a row are two notes, .6rem apart; a run of folds stays flush, each drawing its own rule",
+  () => Math.abs(r0.twoNotes - 9.6) < 0.1 && Math.abs(r0.folds) < 0.1, r0);
+await check("findFlushBlocks() finds no flush pair in the fixture (the folds are the documented exception)", () => r0.flush.length === 0, r0.flush);
+await evaluate(`(() => { const st = document.createElement("style"); st.id = "fx-rh-zero";
+  st.textContent = "#fx-rhythm .filter-bar, #fx-rh-c2 { margin-block-start: 0 !important; }"; document.head.append(st); })(); null`);
+const r1 = await rhythm();
+await check("...and it CAN fail: with the gap taken away it names the note over the toolbar, and the second callout",
+  () => r1.flush.length === 2 && r1.flush.includes("fx-rh-callout / search.filter-bar") && r1.flush.includes("fx-rh-c1 / fx-rh-c2"), r1.flush);
+await evaluate(`document.getElementById("fx-rh-c2").setAttribute("data-flush", ""); null`);
+const rh2 = await rhythm();
+await check("...and a lower block's data-flush is the page's word that it sits flush on purpose",
+  () => rh2.flush.length === 1 && rh2.flush[0] === "fx-rh-callout / search.filter-bar", rh2.flush);
+await evaluate(`document.getElementById("fx-rh-zero").remove(); document.getElementById("fx-rhythm").remove(); null`);
+const demoFlush = [];
+for (const width of [1280, 375]) {
+  await open("theme=warm", width);
+  const found = await evaluate(`(async () => { const helper = await import("/runtime/rhythm.js").catch((error) => ({ error }));
+    if (helper.error) return ["runtime/rhythm.js did not load: " + helper.error.message];
+    return helper.findFlushBlocks().map((p) => [p.upper, p.lower].map((el) => el.id || el.tagName.toLowerCase() + "." + [...el.classList].join(".")).join(" / ")); })()`);
+  demoFlush.push(...found.map((f) => `${width}: ${f}`));
+}
+await check("the data demo itself has no flush pair of stacked blocks, at 1280 and at 375", () => demoFlush.length === 0, demoFlush);
+await check("base.css spaces exactly the blocks runtime/rhythm.js checks (one list, written twice)", async () => {
+  const { STACKED_BLOCKS } = await import(join(root, "runtime/rhythm.js"));
+  const rule = readFileSync(join(root, "src/base.css"), "utf8").match(/\.panel-body\) > :is\(([^)]*)\)/);
+  return rule && rule[1].split(",").map((x) => x.trim()).join(",") === STACKED_BLOCKS.join(",");
+});
+
+/* ── inline code in a table cell keeps its word on a phone (0.61.0) ─────────────────────────────────
+   `overflow-wrap: anywhere` shrank the code column's min-content to one character: at 375px a
+   28-character key stood five lines tall in a 70px column. `break-word` keeps the key whole. */
+
+await open("theme=warm", 375);
+const longKey = await evaluate(`(async () => {
+  const s = document.createElement("section");
+  s.innerHTML = '<table id="fx-code"><thead><tr><th>key</th><th>what it does</th></tr></thead><tbody>' +
+    '<tr><td><code>automation.execution.enabled</code></td><td>Turns the executor on for every registered repository, which is the act that spends money, so only Daniel flips it and the page says so.</td></tr>' +
+    '<tr><td><code>DD_COCKPIT_DOM_PATCH_FIXTURE_FOR_THE_RELEASE_WORKFLOW</code></td><td>Where CI finds the vendored patcher.</td></tr></tbody></table>';
+  document.querySelector("main").append(s);
+  await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+  const lines = (el) => new Set([...el.getClientRects()].map((r) => Math.round(r.top))).size;
+  const codes = [...document.querySelectorAll("#fx-code code")];
+  return { lines: codes.map(lines), wrapped: document.querySelector("#fx-code").parentElement.classList.contains("tablewrap"),
+    table: document.querySelector("#fx-code").getBoundingClientRect().width, wrap: document.querySelector("#fx-code").parentElement.getBoundingClientRect().width,
+    page: document.scrollingElement.scrollWidth, vw: innerWidth }; })()`);
+await check("375px: a key that fits the column stays on one line (broken over three lines on 0.60.0)", () => longKey.lines[0] === 1, longKey);
+await check("...a key with no break in it wider than the phone widens its table inside the scrolling .tablewrap, never the page", () =>
+  longKey.lines[1] === 1 && longKey.wrapped && longKey.table > longKey.wrap && longKey.page <= longKey.vw, longKey);
 
 /* ── contrast: every new pairing, four themes, three surfaces ─────────────────────────────────── */
 

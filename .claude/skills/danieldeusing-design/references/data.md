@@ -15,6 +15,7 @@ below whole; nothing in it leans on `base.css`, which is why the tab bar moved h
 
 Contents:
 
+- Table body text is `--foreground` (0.61.0)
 - An instant is `formatStamp()`, an age is `formatAgo()` — in the viewer's zone
 - The `when` cell: how long ago, over the exact stamp
 - A chart is drawn at the size it is shown
@@ -22,6 +23,28 @@ Contents:
 - The ticker strip: push a row, register a refresher
 - A state is a `.tag`: cockpit's vocabulary
 - Forced colours and print
+
+## Table body text is `--foreground` (0.61.0, Daniel)
+
+> *"Table text in all activity tables should be foreground, not muted grey."* (2026-09-30)
+
+A cell is the data a reader came for, so **every `td` is `--foreground`** (`data.css`, D0), whatever
+container the table sits in: a table inside a card's description, a callout or a field's help no
+longer inherits the grey. That covers the base table, `table.dense` and `table.kv` alike.
+
+- **The quiet helpers read at full strength inside a cell**: `.muted`, `.text-muted-foreground` (on
+  the cell or on anything in it) and the `when` cell's exact stamp. Do not reach for them to quieten
+  a column; a column that is secondary is a narrower column or a later one, not a greyer one.
+- **Colour that means something stays**, because it is set on its own element: a `data-tone`, a
+  `.tag`, a `.state` word, a link, a failure, `table.kv`'s `--primary` label, the stacked table's
+  column label.
+- **Header cells are chrome** and keep `--muted-foreground`, 600.
+- **A row dimmed as a STATE stays dim**, helpers inside it included: `tr[aria-disabled="true"]`, or a
+  surface's own row rule (cockpit's `.srcrow:not(.srcrow-on) td`). Those out-rank the cell rule on
+  weight, and inside a cell the helpers take `inherit` rather than `--foreground` for exactly this.
+- **Tailwind**: a `text-muted-foreground` utility on a cell sits in the utilities layer and wins.
+  There it is a decision somebody wrote, not a grey the cell inherited; do not write it.
+- `scripts/check-data.mjs` (D0) measures a table inside a muted container on all four themes.
 
 ## An instant is `formatStamp()`, an age is `formatAgo()` — in the viewer's zone
 
@@ -91,9 +114,11 @@ renders
 
 - **The age leads, the exact stamp sits under it** (Daniel, 2026-08-22): a log is read to answer "is
   this recent?", and a bare wall clock makes every reader do the subtraction.
-- **The second line is quieter by colour, not size.** `.when-exact` is `--muted-foreground`
-  (4.67:1 or better on every theme and surface). Cockpit's opacity .6 measured 3.26 on warm; a
-  smaller font is the near-miss the system deleted. Do not add either back.
+- **The second line is quieter by colour, not size — outside a table.** `.when-exact` is
+  `--muted-foreground` (4.67:1 or better on every theme and surface) on a card or in prose. **In a
+  table cell it is `--foreground`**, like all of a table's body text (below): its own line is what
+  keeps it second. Cockpit's opacity .6 measured 3.26 on warm; a smaller font is the near-miss the
+  system deleted. Do not add either back.
 - **The long form belongs in a table, the short one on a card.** "3 minutes ago" is Daniel's wording
   for the when column; "3d ago" is the cards'. `whenHtml` picks by `inline`; `style` overrides.
 - **The column's 5.5rem floor comes from the content**, so the `<th>` needs no class.

@@ -258,7 +258,8 @@ exception is `.wrap` on an unpinned build-free page — a *token* declaration wi
 fallbacks, not a copy of the system's rule. See "Measurements" above.)
 
 **Tables are in that set too, by element rather than by class (0.10.0).** `table`, `th` and `td`
-carry the system's padding, top alignment, hairline row rule, header treatment and `width: 100%`
+carry the system's padding, top alignment, hairline row rule, header treatment and `width: 100%`,
+and since 0.61.0 its body text is `--foreground` whatever the table sits in (`references/data.md`)
 — so a consumer authors a plain `<table>` and adds nothing. A local `td { padding }` or a
 hand-rolled row border is a fork exactly like redeclaring `.legend`, and it will disagree with
 the system at the next release. The three things a page legitimately owns are **column widths**
@@ -270,7 +271,7 @@ not sit on `--background`, because on a `--card` surface the default paints a 1.
 
 | Group | Classes | Source |
 | --- | --- | --- |
-| element defaults | bare `h1`–`h4`, `p`, `code`, `kbd`, `pre`, `mark`, `hr`, `blockquote`, `figure`, `table`, the mark on a checkbox or radio; `.bg-dots` | `src/base.css` |
+| element defaults | bare `h1`–`h4`, `p`, `code`, `kbd`, `pre`, `mark`, `hr`, `blockquote`, `figure`, `table`, the mark on a checkbox or radio; `.bg-dots`; the stacked-block gap and `[data-flush]` (0.61.0, checked by `findFlushBlocks()`) | `src/base.css` |
 | text colour | `.text-foreground` `.text-muted-foreground` `.text-primary` `.text-destructive` `.text-success` `.text-warning` `.text-info` `.text-pending` | `src/utilities.css` (the bundle loads it after every component file; a Tailwind app writes its own) |
 | chrome | `.wrap` (+ `.wrap--full`) `.tablewrap` (+ `--tablewrap-max-h`, `--tablewrap-fade`) `.bleed-rail` `.skip-link` `.visually-hidden` `.bar-stack` `header.bar` (+ `.bar--app`) `.bar-side` `.bar-center` `.bar-right` `.bar-history` `.bar-status` `.brand` `.cursor-block--static` `.crumbs` (`.crumbs-home`) `.page-toolbar` `footer.status` `.status-left` `.status-right` `.sep` `.doc-link` (+ `--forward`, `button.doc-link`) `.nav-burger` `.mobile-nav` `.mobile-footer` `.mobile-theme` `.mf-panel` `.mf-chev` `.layout` `.content` `.toc` `.toc-inner` `.navlist` (`-label`, `-sub`, `-lead`) `.scrollbars-thin`; token `--sticky-top` | `src/chrome.css` |
 | `ls -l` rail | `.ls-nav-head` `.ls-nav-title` `.ls-nav-toggle` `.ls-nav` `.ls-panel` `.ls-row` (`--sub`, `--sub2`, `--dir`, **`[aria-current="page"]`**) `.ls-perm` `.ls-name` `.ls-group`; `data-term-list` + `--i` on the list | `src/chrome.css` |

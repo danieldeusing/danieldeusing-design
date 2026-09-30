@@ -206,6 +206,32 @@ for (const file of docs) {
 check(`no documented markup carries a style attribute (${docs.length} files: the templates and the skill's code blocks)`, () =>
   docs.length > 10 ? cspDocs : [`read ${docs.length} files — the wrong directory`]);
 
+// ── the templates wear the system's components, not local copies (0.61.0) ──────────────────────
+// content.md retired the documentation template's own title, lists, grid, code and key/value rules;
+// a copy left in its <style> is a fork that disagrees with the system at the next release.
+check("templates/documentation.html declares none of the system's components in its <style>, and titles itself with .page-title", () => {
+  const text = read("templates/documentation.html");
+  const style = (text.match(/<style>([\s\S]*?)<\/style>/) || ["", ""])[1].replace(/\/\*[\s\S]*?\*\//g, "");
+  const forks = ["h1.title", ".lede", "ol.steps", "ul.plain", ".grid", ".pad", ".muted", "code.inline", "pre.block", "table.kv"]
+    .filter((sel) => new RegExp(`(^|[\\s,}])${sel.replace(/\./g, "\\.")}(?![\\w-])[^{]*\\{`, "m").test(style)).map((sel) => `declares ${sel}`);
+  if (!/<h1 class="page-title">/.test(text)) forks.push("the title is not h1.page-title");
+  if (/class="title"|code class="inline"|pre class="block"/.test(text)) forks.push("markup still uses a retired local class");
+  return forks;
+});
+// The history cluster's menu is named "history"; a group named "history" around it made a reader hear
+// the word twice for one control (pagr made the wrapper a plain div). And the rail's list keeps its
+// role, which Safari drops from a list with `list-style: none`.
+check("the history cluster is a plain div wherever it is documented, and every ul.ls-panel keeps role=\"list\"", () => {
+  const out = [];
+  for (const file of ["templates/page-chrome.html", "examples/chrome.html", "src/chrome.css", ".claude/skills/danieldeusing-design/references/chrome.md"]) {
+    for (const tag of read(file).match(/<div class="bar-history"[^>]*>/g) || []) if (tag !== '<div class="bar-history">') out.push(`${file}: ${tag}`);
+  }
+  for (const file of readdirSync(join(root, "templates")).filter((f) => f.endsWith(".html")).map((f) => `templates/${f}`)) {
+    for (const tag of read(file).match(/<ul class="ls-panel"[^>]*>/g) || []) if (!/role="list"/.test(tag)) out.push(`${file}: ${tag}`);
+  }
+  return out;
+});
+
 // ── the vendored cockpit patcher ────────────────────────────────────────────────────────────────
 // CI points DD_COCKPIT_DOM_PATCH at scripts/fixtures/cockpit-dom-patch.js. It must say which commit it
 // is a copy of, and a local run with the infra checkout beside this one says when the live file has

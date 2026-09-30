@@ -126,8 +126,8 @@
          where am I — moved to the MINIMAP in the left gutter (src/components.css,
          initMinimap()), which does them in 2rem and is fixed, so it costs the column nothing.
          (`.content` itself is the system's since 0.60.0 — chrome.css — so nothing is declared here.) */
-      h1.title { font-size: var(--fs-2xl, 1.7rem); font-weight: 700; margin: 0.4rem 0 0.5rem; }
-      .lede { color: var(--muted-foreground); } /* full width — no max-width cap */
+      /* The title is the system's `h1.page-title` and the tagline its `.lede` (content.css): nothing
+         is declared for them here. */
 
       /* design-conformance: spacing BETWEEN doc sections on this page template, not a restyle
          of the shared .doc — the system sets its own margin for the standalone case. */
@@ -137,17 +137,10 @@
       .body { margin-top: 0.85rem; }
       .body > * + * { margin-top: 0.75rem; }
 
-      /* content components the generator uses */
-      ol.steps { counter-reset: step; padding: 0; }
-      ol.steps > li { position: relative; padding-left: 2.25rem; margin-top: 0.6rem; counter-increment: step; }
-      ol.steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 1.5rem; text-align: right; color: var(--primary); font-weight: 700; }
-      ul.plain { padding-left: 1.1rem; }
-      ul.plain > li { margin-top: 0.3rem; }
-      .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
-      .pad { padding: 1rem; }
-      .muted { color: var(--muted-foreground); }
-      code.inline { font-family: inherit; background: var(--muted); border: 1px solid var(--border); padding: 0.05rem 0.35rem; }
-      pre.block { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; font-size: var(--fs-base, 0.75rem); line-height: var(--lh-base, 1.5); background: var(--muted); border: 1px solid var(--border); white-space: pre; }
+      /* Every content component the generator uses is the system's, so none is declared here:
+         `ol.steps` and `ul.plain` (content.css), `table.kv` (data.css), and a bare <code> and <pre>
+         for inline code and a code block (base.css). A local copy of any of them is a fork that
+         disagrees with the system at the next release. */
       /* No table CSS for scrolling or size here on purpose. `initTableScroll()` at the
          bottom of this file gives every table a `.tablewrap` parent (overflow-x plus a
          right-edge fade), so a table wider than its column scrolls itself instead of
@@ -158,9 +151,6 @@
          local font-size here would only reintroduce the 3px disagreement between pages
          it was added to end. Still never `white-space: nowrap` on a cell that can hold
          more than one token (a file list): that is what forces the runaway width. */
-      table.kv { width: 100%; border-collapse: collapse; }
-      table.kv th, table.kv td { text-align: left; vertical-align: top; padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid var(--border); }
-      table.kv th { color: var(--primary); font-weight: 700; white-space: nowrap; }
 
       /* Mermaid diagrams. Before rendering, the <pre> shows the raw diagram source —
          so with JS disabled (or if the CDN is unreachable) the page degrades to a
@@ -265,7 +255,7 @@
     <main class="wrap" id="top">
       <div class="content">
           <p class="prompt">cat {{FOLDER}}/README.md</p>
-          <h1 class="title">{{DOC_TITLE}}</h1>
+          <h1 class="page-title">{{DOC_TITLE}}</h1>
           <p class="lede">{{TAGLINE}}</p>
 
           <!-- one <section> per topic; each id must match a TOC entry. -->

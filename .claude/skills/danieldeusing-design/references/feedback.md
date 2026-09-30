@@ -393,7 +393,9 @@ skills <span class="count">12</span>
   of every fixture, font family and size among them.
 - **They never set a component's outer margin.** How far a notice stands from the paragraph above
   it is your page's layout, and your reset decides it for every element alike. The fence is the one
-  exception, because a `<figure>` arrives with 40px side margins.
+  exception, because a `<figure>` arrives with 40px side margins. What `base.css` adds is a floor, not
+  a margin of the component's: a notice or a callout stacked on another block keeps .6rem, also across
+  the mount `<div>`s a JS-painted page wraps them in (`foundations.md`, "Stacked blocks keep a gap").
 - **Print:** the dismiss disappears, a fence does not split, a dot keeps its fill, and `--solid`
   tags and overlay counts print outlined. The page colour on a fill would otherwise print white on
   white once the browser drops background colours.

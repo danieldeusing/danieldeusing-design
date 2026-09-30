@@ -88,7 +88,7 @@ const chrome = spawn(CHROME, [
 ], { stdio: "ignore" });
 let socket;
 const shutdown = () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close();
-  rmSync(profile, { recursive: true, force: true, maxRetries: 10 }); };
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch (error) { console.error(`note: the browser profile ${profile} was not removed: ${error.message}`); } };
 process.on("exit", shutdown);
 
 let port = 0;

@@ -102,7 +102,7 @@ const chrome = spawn(CHROME, [
 ], { stdio: "ignore" });
 let socket;
 process.on("exit", () => { try { socket?.close(); } catch {} chrome.kill("SIGKILL"); server.close();
-  rmSync(profile, { recursive: true, force: true, maxRetries: 10 }); });
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch (error) { console.error(`note: the browser profile ${profile} was not removed: ${error.message}`); } });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let PORT = 0;
 for (let i = 0; ; i += 1) {

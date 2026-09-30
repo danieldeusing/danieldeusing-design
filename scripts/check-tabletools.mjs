@@ -595,6 +595,46 @@ await check("fix round 3 — two engine tables sharing data-table-id \"twin\" dr
   JSON.parse(twinWarnings).length === 1 && JSON.parse(twinWarnings)[0].includes("data-table-id"), twinWarnings);
 await evaluate(`document.getElementById("later").replaceChildren(); null`);
 
+/* ── S1 · a mount repainted with innerHTML retires the table it replaced ───────────────────────────
+   The pattern of every page that does not patch. The observer the engine puts on the table's parent
+   outlived the table, so each repaint kept the old instance, its header controls and its rows alive:
+   measured, +13,800 nodes, +1,100 listeners and +200 MutationObservers over 50 repaints. A repaint is
+   also not a patcher rebuilding the table, so it draws no contract warning. Counted after a garbage
+   collection, once the count's timer has run. */
+await send("HeapProfiler.enable");
+const liveObservers = async () => {
+  const { result: proto } = await send("Runtime.evaluate", { expression: "MutationObserver.prototype" });
+  const { objects } = await send("Runtime.queryObjects", { prototypeObjectId: proto.objectId });
+  const { result } = await send("Runtime.callFunctionOn", { objectId: objects.objectId, functionDeclaration: "function () { return this.length; }", returnByValue: true });
+  await send("Runtime.releaseObject", { objectId: objects.objectId });
+  await send("Runtime.releaseObject", { objectId: proto.objectId });
+  return result.value;
+};
+const heap = async () => {
+  await sleep(700);
+  await send("HeapProfiler.collectGarbage");
+  await sleep(50);
+  await send("HeapProfiler.collectGarbage");
+  const { nodes, jsEventListeners } = await send("Memory.getDOMCounters");
+  return { nodes, listeners: jsEventListeners, observers: await liveObservers() };
+};
+const REPAINT = `<table data-table-tools data-table-id="s1-leak" aria-label="leak"><thead><tr><th data-col="a">a</th><th data-col="b" data-filter="pick">b</th></tr></thead><tbody>${
+  Array.from({ length: 30 }, (_, i) => `<tr><td>r${i}</td><td>${i % 3}</td></tr>`).join("")}</tbody></table>`;
+const repaint = (times) => evaluate(`(async () => { const later = document.getElementById("later");
+  for (let i = 0; i < ${times}; i += 1) { later.innerHTML = ${JSON.stringify(REPAINT)}; await new Promise((r) => setTimeout(r, 0)); await new Promise((r) => setTimeout(r, 0)); } })()`);
+await evaluate(`window.warned = []; if (!window.warnWrapped) { window.warnWrapped = true; const warn = console.warn; console.warn = (...args) => { window.warned.push(args.join(" ")); warn.apply(console, args); }; } null`);
+await repaint(5);
+const leakBefore = await heap();
+await repaint(50);
+const leakAfter = await heap();
+const leakGrowth = Object.fromEntries(Object.keys(leakBefore).map((k) => [k, leakAfter[k] - leakBefore[k]]));
+await check("S1 — 50 innerHTML repaints of an engine table's mount leave nothing behind: 0 more nodes, listeners and MutationObservers",
+  async () => leakGrowth.nodes <= 0 && leakGrowth.listeners <= 0 && leakGrowth.observers <= 0, JSON.stringify({ before: leakBefore, growth: leakGrowth }));
+await check("...and a repaint is not a patcher rebuilding the table: no contract warning",
+  async () => (await evaluate(`window.warned.filter((w) => w.includes("data-table-bar")).length`)) === 0,
+  () => evaluate(`JSON.stringify(window.warned)`));
+await evaluate(`document.getElementById("later").replaceChildren(); window.warned = []; null`);
+
 const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
 const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
   .find((path) => path && existsSync(path));

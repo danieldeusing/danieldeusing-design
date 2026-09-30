@@ -977,7 +977,22 @@ function enhance(table) {
   const bar = pageBarOf(anchor);
   if (bar && inst.label && !bar.hasAttribute("aria-label")) bar.setAttribute("aria-label", "search " + inst.label);
   inst.countText = "";
-  inst.chrome = new MutationObserver(() => { if (!renewed(inst)) ensureChrome(inst); });
+  inst.chrome = new MutationObserver((records) => {
+    if (renewed(inst)) return;
+    if (inst.table.isConnected) { ensureChrome(inst); return; }
+    /*
+     * GONE, AND NOT PUT BACK (a move lands before this runs: observers deliver after the script that
+     * moved it). The mount outlives the table, and this observer on the mount held the instance, its
+     * header controls and its rows for the life of the tab — measured, +13,800 nodes, +1,100
+     * listeners and +200 observers over 50 innerHTML repaints. So it is retired. A mount repainted
+     * WHOLESALE (innerHTML, replaceChildren) takes the bar and the table out in ONE record: that is
+     * the page drawing a new table, not a patcher rebuilding this one, and it is not warned.
+     */
+    const anchor = inst.table.closest(".tablewrap") || inst.table;
+    const wholesale = records.some((r) => [...r.removedNodes].includes(anchor) && [...r.removedNodes].includes(inst.ownBar));
+    if (inst.ownBar && inst.ownBarParent && !inst.ownBar.isConnected && !wholesale) ownBarLost(inst);
+    retire(inst);
+  });
   if (anchor.parentElement) inst.chrome.observe(anchor.parentElement, { childList: true });
   ensureChrome(inst);
 

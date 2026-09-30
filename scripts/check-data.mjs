@@ -1006,7 +1006,7 @@ const rows = await evaluate(`(() => {
   const st = document.createElement("style"); st.textContent = ".fx-row { display: flex; gap: 8px; align-items: flex-start; }"; document.head.append(st);
   const s = document.createElement("section");
   s.innerHTML = '<div class="fx-row"><div id="fx-row-label">label</div><table id="fx-row-table"><tbody><tr><td>x</td></tr></tbody></table></div>' +
-    '<div style="display: flex; gap: 8px; align-items: flex-start"><p class="callout" id="fx-flex-a">a</p><p class="callout" id="fx-flex-b">b</p></div>';
+    '<div style="display: flex; gap: 8px; align-items: flex-start"><span>label</span><p class="callout" id="fx-flex-a">a</p><p class="callout" id="fx-flex-b">b</p></div>';
   document.querySelector("main").append(s);
   const top = (id) => document.getElementById(id).getBoundingClientRect().top;
   return { labelVsTable: top("fx-row-table") - top("fx-row-label"), calloutVsCallout: top("fx-flex-b") - top("fx-flex-a") }; })()`);

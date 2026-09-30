@@ -6872,8 +6872,16 @@ tr[data-table-placeholder] > td { text-align: start; background: none; }
    form beside it; the 140px, 220px and 9rem that danieldeusing.de chose per page go.
 
    `table.kv` restates the base cell box (padding, first/last inset 0, the 55% rule, top-aligned) so it
-   renders the same on a tokens-only surface. A long URL or path in a value breaks anywhere rather
-   than pushing the table wide: it is a payload, and truncating it would lie. */
+   renders the same on a tokens-only surface.
+
+   A LONG VALUE BREAKS ONLY WHERE IT WOULD OVERFLOW (0.61.1). Until then the cells were `anywhere`,
+   which breaks a word while the table is SIZED: every prose cell's min-content fell to one
+   character. Once 0.61.0 made the code in a cell keep its word (base.css), a row with a long code
+   value kept that width and the prose beside it paid for it, breaking mid-word: "exists (producti|on)"
+   on a docs page 1280px wide, and 107 words cut on a phone. `break-word` breaks the same long URL or
+   path only when it cannot fit its line, never while sizing, so prose breaks at its spaces. A token
+   wider than the whole table widens it, and the `.tablewrap` around it scrolls (initTableScroll),
+   as for any table. */
 table.kv {
   inline-size: 100%;
   border-collapse: collapse;
@@ -6894,7 +6902,7 @@ table.kv th {
   font-weight: 700;
   white-space: nowrap;
 }
-table.kv td { overflow-wrap: anywhere; }
+table.kv td { overflow-wrap: break-word; }
 /* An aligned label column for a stacked run of definitions; cockpit widens it on the table itself
    (`style="--field-label-w: 15rem"`). The width includes the label's end padding (the cells are
    border-box), so the value starts where a `dl.kv` or `.field-row` value does, near the same edge. */
@@ -6906,6 +6914,9 @@ table.kv td { overflow-wrap: anywhere; }
   table.kv th { white-space: normal; }
 }
 
+/* `dl.kv > dd` may break anywhere, unlike a `table.kv` cell: its column is `minmax(0, 1fr)` beside a
+   fixed label column, sized by the free space and never by the dd's min-content, so `anywhere` cannot
+   squeeze the prose beside a long value the way it did in a table (0.61.1). */
 dl.kv {
   display: grid;
   grid-template-columns: var(--field-label-w) minmax(0, 1fr);

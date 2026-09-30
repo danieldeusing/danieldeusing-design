@@ -204,7 +204,12 @@ definitions such as contact details.
   danieldeusing.de and seedr's studio muted the value, which made the one thing on the line that
   mattered the quietest thing on it. Cockpit, danieldeusing.de and studio already agreed on the
   label.
-- **A long value breaks anywhere** — a URL or a path is a payload, and truncating it would lie.
+- **A long value breaks only where it would overflow** (0.61.1) — a URL or a path is a payload, and
+  truncating it would lie, but a `table.kv` cell is `overflow-wrap: break-word`, not `anywhere`.
+  `anywhere` let every prose cell shrink to one character while the table was sized, so beside a long
+  code value (which keeps its word since 0.61.0) prose broke mid-word: "exists (producti|on)". A token
+  wider than the table widens it and the `.tablewrap` scrolls. `dl.kv`'s value may still break
+  anywhere: its grid column is sized by the label column and the free space, never by its content.
   The label never wraps, except on a phone, where a nowrap label pushes the value off the screen.
 - **The label column is `--field-label-w`**, the system's one label width, so a block of pairs lines
   up with a `.field-row` form beside it; the 140px, 220px and 9rem chosen per page go. `dl.kv` always

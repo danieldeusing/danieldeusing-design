@@ -234,9 +234,9 @@ await check("a tab is 44px tall on a phone, and the reference half no longer pus
 /* ── D3 · key/value ───────────────────────────────────────────────────────────────────────────── */
 
 await open("theme=warm");
-await check("table.kv: the label --primary 700 nowrap, the value --foreground and breaking anywhere, the base cell box",
+await check("table.kv: the label --primary 700 nowrap, the value --foreground and breaking only where it would overflow (0.61.1), the base cell box",
   async () => (await css("#kv-table th", "color")) === (await tok("var(--primary)")) && (await css("#kv-table th", "fontWeight")) === "700" &&
-    (await css("#kv-table th", "whiteSpace")) === "nowrap" && (await css("#kv-table td", "overflowWrap")) === "anywhere" &&
+    (await css("#kv-table th", "whiteSpace")) === "nowrap" && (await css("#kv-table td", "overflowWrap")) === "break-word" &&
     (await css("#kv-table td", "color")) === (await tok("var(--foreground)")) && (await css("#kv-table th", "paddingLeft")) === "0px" &&
     (await css("#kv-table td", "paddingTop")) === "7.2px" && (await css("#kv-table tr:last-child td", "borderBottomWidth")) === "0px");
 await check("table.kv--labels: the label column is --field-label-w set on the table (15rem = 240px), its end padding included",
@@ -1035,6 +1035,42 @@ const longKey = await evaluate(`(async () => {
 await check("375px: a key that fits the column stays on one line (broken over three lines on 0.60.0)", () => longKey.lines[0] === 1, longKey);
 await check("...a key with no break in it wider than the phone widens its table inside the scrolling .tablewrap, never the page", () =>
   longKey.lines[1] === 1 && longKey.wrapped && longKey.table > longKey.wrap && longKey.page <= longKey.vw, longKey);
+
+/* ── table.kv: prose never breaks inside a word beside a long code value (0.61.1) ─────────────────
+   Found on a docs page: a three-column kv whose third cell holds long code kept the code's width
+   (0.61.0's code-in-cell `break-word`), while `table.kv td { overflow-wrap: anywhere }` let every
+   prose cell's min-content fall to one character — "exists (producti|on)" 1280px wide, 107 words cut
+   at 375. Every word outside code is measured with a Range: one that spans two line boxes is cut. A
+   hyphen or a slash is a legitimate break, so words are split on those too. */
+const kvWords = [];
+for (const width of [1280, 375]) {
+  await open("theme=warm", width);
+  const cut = await evaluate(`(async () => {
+    const s = document.createElement("section");
+    s.innerHTML = '<table class="kv" id="fx-kv-prose"><tbody>' +
+      '<tr><td>SALES-side id persistence (the precedent to copy)</td><td>exists</td><td><code>Offer.java:157-160</code>, <code>SalesContract.java:597-603</code>, save pattern <code>DocFlowFrontendService.java:375</code></td></tr>' +
+      '<tr><td>"Open or replace" dialog for contract and offer</td><td>exists (production)</td><td><code>doc-flow.service.ts:25-54</code> (feature service), i18n <code>columbus.contract.docflow.action.openOrReplace.title</code></td></tr>' +
+      '<tr><td><strong>PURCHASE process and component ids persisted</strong></td><td><strong>missing</strong></td><td>nothing saved — <code>DocFlowFrontendFacadeImpl.java:159-193</code></td></tr>' +
+      '</tbody></table>' +
+      '<table class="kv" id="fx-kv-pairs"><tbody><tr><th>message key</th><td>The dialog reads <code>columbus.contract.docflow.action.openOrReplace.description</code> and nothing else, whatever the folder.</td></tr></tbody></table>';
+    document.querySelector("main").append(s);
+    await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+    const out = [];
+    for (const cell of s.querySelectorAll("td, th")) {
+      const walk = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+        if (n.parentElement.closest("code, kbd, pre")) continue;
+        for (const m of n.data.matchAll(/[^\\s\\-\\/]+/g)) {
+          const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
+          if (new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size > 1) out.push(m[0]);
+        }
+      }
+    }
+    return { cut: out, page: document.scrollingElement.scrollWidth, vw: document.documentElement.clientWidth }; })()`);
+  kvWords.push({ width, ...cut });
+}
+await check("table.kv: no word outside code is cut across two lines beside a long code value, at 1280 and at 375, and the page does not scroll sideways",
+  () => kvWords.every((k) => k.cut.length === 0 && k.page <= k.vw), kvWords);
 
 /* ── contrast: every new pairing, four themes, three surfaces ─────────────────────────────────── */
 

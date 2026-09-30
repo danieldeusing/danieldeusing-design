@@ -4,6 +4,64 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.61.0 (2026-09-30)
+
+### Tables read at full strength, blocks keep their gap, and tooltips can carry colour
+
+A follow-up to 0.60.0 from what the first day of running it estate-wide turned up. Nothing is
+removed or renamed; a surface upgrades by bumping its pin. Three rules a surface may have written
+locally are now the system's, so those local copies can go (see *Changed*).
+
+### Added
+
+- **`data-tip-parts`: toned tooltip segments.** A JSON array of strings and `{text, tone}` objects,
+  where the tone is one of the `data-tone` words (primary, success, warning, destructive, info,
+  pending, muted). It renders `+210 −109 · 319 lines` with `+210` green and `−109` red. It never
+  renders HTML: text goes in by `textContent`, and a tone is only ever a `data-tone` attribute, so an
+  unknown or hostile tone renders untoned. `data-tip` stays the fallback and is what a screen reader
+  hears; a dev `console.warn` fires once per element when the parts do not parse or say different
+  words than `data-tip`. `#ddtip [data-tone]` paints each tone at 4.84:1 or better on `--popover` in
+  all four themes; in forced colours the segments keep their words.
+- **Stacked blocks keep a gap** (`base.css`). A callout, a table toolbar, a table, a fold and the
+  other `STACKED_BLOCKS` keep 0.6rem above them even when a JS-painted page wraps each in its own
+  unclassed mount `<div>` or tab panel, where sibling rhythm rules cannot see them touch. A fold after
+  a fold stays flush, and `data-flush` opts a block out.
+- **`findFlushBlocks(root)`** and **`STACKED_BLOCKS`** (`runtime/rhythm.js`, also in the barrel): a
+  consumer's browser check can ask a rendered page for two stacked blocks with 0px between them.
+
+### Changed
+
+- **Table body text is `--foreground` in every table.** `.muted`, `.text-muted-foreground` and
+  `.when-exact` inside a cell read at full strength; header cells stay muted chrome; colour that
+  means something (tones, tags, state words, links, failures) and a dimmed or disabled row keep their
+  colour. In a Tailwind app a `text-muted-foreground` utility on a cell still wins.
+- **`.card-head` aligns on a baseline**, so a `.card-title` and a `.tag--bracket` beside it share a
+  line; a lone glyph centres on the row.
+- **Templates.** `templates/documentation.html` drops its ten local component rules and uses the
+  system's elements and `h1.page-title`. The page chrome's history cluster is a plain
+  `div.bar-history`, so it is no longer named "history" twice.
+
+### Fixed
+
+- **An engine table moved to another place in the DOM** takes its search bar, pager and result count
+  with it and keeps the reader's sort, filters, search and page. Before, they stayed where the table
+  had been, and a table detached and re-inserted got a second count. A table removed from the
+  document no longer leaves its pager or engine-made count behind.
+- **An enhanced `<select>` is named by its label alone**, and the current option is the combobox's
+  value. Before, the value was read into the name as well: "label x x" for a select wrapped in its
+  `<label>` (the pager's "rows 20 20"), and "label x" for a `for=` label.
+- **A renderer that patches `data-tip` or `data-tip-parts` on the anchor of an open tip** now updates
+  the panel; before, it kept the text it opened with. A patcher that strips the tip's
+  `aria-describedby` token no longer silences the open tip for a screen reader.
+- **Inline code in a table cell** no longer breaks one character per line on a phone
+  (`overflow-wrap: break-word` inside `td`/`th`).
+- **`.navlist-lead`** no longer wraps ("Part / 5").
+- **Four rules that depended on file load order**: the table filter panel's padding,
+  `.cursor-block--static` (it blinked), the burger's anim toggle (it never lit on hover), and
+  `.dropdown-item.ls-row` (it could render centred with an 8px gap).
+- **`check-tooltip-click`** runs each assertion as a thunk, so one throw is a named FAIL, not an
+  aborted suite.
+
 ## 0.60.0 (2026-09-29)
 
 ### One vocabulary for every surface

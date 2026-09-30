@@ -3977,6 +3977,7 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
     background: none; border: 0; color: var(--muted-foreground);
     font: inherit; cursor: pointer;
   }
+  :where(.mobile-footer) .anim-toggle:hover { color: var(--primary); }
   .mobile-footer .anim-toggle { gap: 0.5rem; padding: 0.2rem 0; }
 }
 /* A thumb, not a pointer: every control folded into the burger is a 44px row. They measured about

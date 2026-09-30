@@ -488,6 +488,24 @@ const burger = await page(`({ rows: T.qa(".mobile-footer :is(.doc-link, .mobile-
 await check("burger, coarse pointer: every folded footer control is a 44px row", () => burger.rows.length >= 8 && burger.rows.every((h) => near(h, 44, 0.01)), burger.rows);
 await check("…the chevron of an open accordion is turned", () => burger.chev.length === 2 && burger.chev.every((t) => t !== "none"), burger.chev);
 await load("bare&nobanner&burger", { width: 375, height: 812 });
+// NETMON'S CASE: tokens + chrome, no components.css. The burger's anim toggle is a <button>, and without
+// chrome.css's own reset it rendered as the platform's button — Arial 13.33px, a grey fill, a 2px
+// outset border — in a font the page never chose. The body takes the mono face as netmon's does.
+{
+  const { root: doc } = await (async () => { await send("DOM.enable"); await send("CSS.enable"); return send("DOM.getDocument", { depth: 0 }); })();
+  const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector: ".mobile-footer .anim-toggle" });
+  const read = () => page(`(() => { document.body.style.fontFamily = "var(--font-mono)"; const c = getComputedStyle(T.q(".mobile-footer .anim-toggle"));
+    return { font: c.fontFamily, mono: getComputedStyle(document.body).fontFamily, bg: c.backgroundColor, border: c.borderTopStyle + " " + c.borderTopWidth,
+      colour: c.color, primary: T.colour("var(--primary)") }; })()`);
+  const rest = await read();
+  await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: ["hover"] });
+  await frames(2);
+  const hover = await read();
+  await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: [] });
+  await check("with tokens + chrome only, the burger's anim toggle is not a native button: the page's mono face, no fill, no outset border — and it lights --primary under the pointer",
+    () => /JetBrains Mono/.test(rest.font) && rest.font === rest.mono && rest.bg === "rgba(0, 0, 0, 0)" && rest.border === "none 0px" &&
+      rest.colour !== rest.primary && hover.colour === hover.primary, { rest, hover });
+}
 await check("the rail's list is reset in the burger with NOTHING but tokens + chrome loaded (no bullets, no indent)",
   () => page(`T.cs(".site-nav .ls-panel", "listStyleType") === "none" && T.cs(".site-nav .ls-panel", "paddingLeft") === "0px" && T.cs(".site-nav .ls-panel", "marginTop") === "0px"`));
 

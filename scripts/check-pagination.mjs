@@ -280,3 +280,86 @@ test("Enter on \"next\" onto the last page leaves focus on the button, which is 
     server.close();
   }
 });
+
+/* ── 0.61.0 · the rows picker says its name once, and the pager goes where its table goes ── */
+
+test("the rows picker is named \"rows\" and its value is the size — the size is not read into the name too", async (t) => {
+  if (!CHROME) {
+    assert.notEqual(process.env.DD_REQUIRE_BROWSER, "1", "DD_REQUIRE_BROWSER=1 and no headless chromium on this machine");
+    t.skip("no headless chromium on this machine — install one with `npx playwright install chromium`");
+    return;
+  }
+  const rows = Array.from({ length: 30 }, (_, i) => `<tr><td>row ${i}</td></tr>`).join("");
+  const page = `<!doctype html><html><head><meta charset="utf-8">
+    <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/components.css"></head><body>
+    <table data-table-id="pager-name"><tbody>${rows}</tbody></table>
+    <script type="module">
+      import { initTablePagination } from "/runtime/pagination.js";
+      initTablePagination();
+      window.ready = true;
+    </script></body></html>`;
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const server = await serve(root, { "/__pager-name.html": page });
+  const browser = await launch("pagination-name");
+  try {
+    await browser.navigate(`${server.origin}/__pager-name.html`);
+    await browser.until("window.ready === true && !!document.querySelector('.table-pager .select-trigger')");
+    await browser.send("Accessibility.enable");
+    await browser.send("DOM.enable");
+    const { root: doc } = await browser.send("DOM.getDocument", { depth: 0 });
+    const { nodeId } = await browser.send("DOM.querySelector", { nodeId: doc.nodeId, selector: ".table-pager .select-trigger" });
+    const { nodes } = await browser.send("Accessibility.getPartialAXTree", { nodeId, fetchRelatives: false });
+    // The zero-width space components.css puts after the value (a line box for an empty option) is
+    // passed over by screen readers, and dropped here.
+    const clean = (text) => (text ?? "").replace(/​/g, "");
+    assert.deepEqual({ role: nodes[0].role?.value, name: clean(nodes[0].name?.value), value: clean(nodes[0].value?.value) },
+      { role: "combobox", name: "rows", value: "20" }, "until 0.61.0 the name read \"rows 20 20\"");
+  } finally {
+    browser.close();
+    server.close();
+  }
+});
+
+test("a pager follows its table: appended elsewhere, detached and put back, or removed for good", async (t) => {
+  if (!CHROME) {
+    assert.notEqual(process.env.DD_REQUIRE_BROWSER, "1", "DD_REQUIRE_BROWSER=1 and no headless chromium on this machine");
+    t.skip("no headless chromium on this machine — install one with `npx playwright install chromium`");
+    return;
+  }
+  const rows = Array.from({ length: 30 }, (_, i) => `<tr><td>row ${i}</td></tr>`).join("");
+  const page = `<!doctype html><html><head><meta charset="utf-8"></head><body>
+    <div id="a"><div class="tablewrap"><table data-table-id="pager-move"><tbody>${rows}</tbody></table></div></div><div id="b"></div>
+    <script type="module">
+      import { initTablePagination } from "/runtime/pagination.js";
+      initTablePagination();
+      window.ready = true;
+    </script></body></html>`;
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const server = await serve(root, { "/__pager-move.html": page });
+  const browser = await launch("pagination-move");
+  try {
+    await browser.navigate(`${server.origin}/__pager-move.html`);
+    await browser.until("window.ready === true && !!document.querySelector('.table-pager')");
+    await browser.evaluate(`localStorage.clear(); document.querySelector(".table-pager-nav button:last-child").click(); null`);
+    // Each step waits for the observers to have answered: a task, then a frame.
+    const settled = () => new Promise((resolve) => setTimeout(resolve, 0)).then(() => browser.evaluate("new Promise((r) => requestAnimationFrame(() => r(null)))"));
+    const state = () => browser.evaluate(`JSON.stringify({
+      pagers: [...document.querySelectorAll(".table-pager")].map((p) => p.parentElement.id),
+      afterWrap: document.querySelector(".tablewrap")?.nextElementSibling?.className ?? null,
+      status: document.querySelector(".table-pager-status")?.textContent ?? null })`);
+    const here = (id) => JSON.stringify({ pagers: [id], afterWrap: "table-pager", status: "21–30 of 30" });
+    assert.equal(await state(), here("a"), "precondition: page 2 under the table");
+    await browser.evaluate(`document.getElementById("b").appendChild(document.querySelector(".tablewrap")); null`);
+    await settled();
+    assert.equal(await state(), here("b"), "appended into another container");
+    await browser.evaluate(`window.held = document.querySelector(".tablewrap"); window.held.remove(); null`);
+    await settled();
+    assert.equal(await state(), JSON.stringify({ pagers: [], afterWrap: null, status: null }), "a removed table left its pager behind");
+    await browser.evaluate(`document.getElementById("a").appendChild(window.held); null`);
+    await settled();
+    assert.equal(await state(), here("a"), "detached and put back");
+  } finally {
+    browser.close();
+    server.close();
+  }
+});

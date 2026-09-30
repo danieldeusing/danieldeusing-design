@@ -192,6 +192,7 @@ function syncTrigger(instance) {
   syncIcon(instance, option);
   if (!instance.filter) {
     value.textContent = option ? label(option) : "";
+    if (instance.wrapLabel) nameFromWrap(instance);
     return;
   }
 
@@ -226,18 +227,28 @@ function syncTrigger(instance) {
 }
 
 /*
- * The trigger's accessible name is the LABEL plus the CURRENT VALUE — "lines,
- * 200" — which is what a native select announces and what the APG's select-only
- * combobox prescribes. Pointing `aria-labelledby` at the trigger's own id is
- * how the value gets into the name; it looks like a mistake and is the pattern.
+ * The trigger's accessible name is the LABEL, and the current value is the combobox's VALUE — "lines,
+ * combobox, 200", which is what a native select announces and what the APG's select-only combobox
+ * prescribes. Chromium already exposes the trigger's text as that value, so the value is not put in the
+ * name as well: until 0.61.0 `aria-labelledby` named the label AND the trigger, and a reader heard
+ * "lines 200" as the name and 200 again as the value.
  *
- * The label is found the same three ways the platform finds it, in the platform's
- * order, so a page that already labels its select correctly needs no change:
- * an explicit aria-label, an explicit aria-labelledby, then a <label> — whether
- * associated by `for=` or by wrapping.
+ * The label is found the same three ways the platform finds it, in the platform's order, so a page
+ * that already labels its select correctly needs no change: an explicit aria-label, an explicit
+ * aria-labelledby, then a <label> — associated by `for=` or by wrapping.
+ *
+ * A WRAPPING <label> IS NOT REFERENCED, IT IS READ. The trigger sits inside it, and a label's name is
+ * computed from its content — which includes an embedded combobox's value. Referenced, it read
+ * "wrapped x" as the name ("wrapped x x" with the trigger's own id beside it, the pager's "rows 20 20").
+ * So the trigger is named with the label's own words, re-read on every sync.
  *
  * A filter is named in syncTrigger() instead: its name changes with its value.
  */
+function nameFromWrap({ wrapLabel, trigger }) {
+  const words = ownText(wrapLabel);
+  if (trigger.getAttribute("aria-label") !== words) trigger.setAttribute("aria-label", words);
+}
+
 function nameTrigger(instance) {
   const { select, trigger } = instance;
   const explicit = select.getAttribute("aria-label");
@@ -250,12 +261,17 @@ function nameTrigger(instance) {
     const element =
       (select.id && document.querySelector(`label[for="${CSS.escape(select.id)}"]`)) ||
       select.closest("label");
+    if (element && element.contains(trigger)) {
+      instance.wrapLabel = element;
+      nameFromWrap(instance);
+      return;
+    }
     if (element && !element.id && "ariaLabelledByElements" in trigger) {
       // The page's <label> is the page's: an id written onto it is an attribute its renderer never
       // draws, so a patcher matching by id could never find that label again — it rebuilt the rest
       // of the mount around a new one, and the trigger's aria-labelledby named a node that was gone.
       // Element reflection names the trigger by the node itself, and writes nothing on the label.
-      trigger.ariaLabelledByElements = [element, trigger];
+      trigger.ariaLabelledByElements = [element];
       return;
     }
     if (element) {
@@ -263,7 +279,7 @@ function nameTrigger(instance) {
       labelId = element.id;
     }
   }
-  if (labelId) trigger.setAttribute("aria-labelledby", `${labelId} ${trigger.id}`);
+  if (labelId) trigger.setAttribute("aria-labelledby", labelId);
 }
 
 /*

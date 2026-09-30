@@ -481,7 +481,7 @@ const axNode = async (selector) => {
     for (let i = 0; i < attributes.length; i += 2) if (attributes[i] === "id") return attributes[i + 1];
     return `(a ${target.nodeName} with no id)`;
   };
-  const out = { role: self.role?.value, name: self.name?.value ?? "", description: self.description?.value ?? "" };
+  const out = { role: self.role?.value, name: self.name?.value ?? "", description: self.description?.value ?? "", value: self.value?.value ?? null };
   for (const p of self.properties || []) {
     out[p.name] = p.value.relatedNodes ? await Promise.all(p.value.relatedNodes.map((r) => idOf(r.backendDOMNodeId))) : p.value.value;
   }
@@ -671,6 +671,8 @@ await evaluate(`document.getElementById("pa")?.remove(); document.getElementById
 
 await evaluate(`mount(\`
   <label>plain <select id="plain"><option>alpha</option><option selected>beta</option><option>gamma</option></select></label>
+  <label for="forl">kind</label> <select id="forl"><option>agent</option><option selected>skill</option></select>
+  <span id="byid-l">model</span> <select id="byid" aria-labelledby="byid-l"><option>claude</option><option selected>codex</option></select>
   <select id="off" data-select="off"><option>kept native before 0.60.0</option></select>
   <select id="src" data-filter aria-label="source"><option value="">all</option><option value="seedr">seedr</option>
     <option value="skills">skills.sh</option><option value="aitmpl" disabled>aitmpl</option></select>
@@ -720,6 +722,28 @@ await press("Escape");
 await press(" ");
 await check("...and so does Space", () => evaluate("!!panel()"));
 await press("Escape");
+
+// 0.61.0: the NAME is the label and the VALUE is the value — once each. A wrapping <label> used to be
+// referenced along with the trigger itself, and its content holds the trigger, so the tree read
+// "plain beta beta"; a for= label read "kind skill" and then skill again as the value.
+const nameAndValue = async (id) => {
+  const n = await axNode(`#${await evaluate(`triggerOf(${JSON.stringify(id)}).id`)}`);
+  // components.css's zero-width space after .select-value (a line box for an empty option) is in the
+  // value too; screen readers pass over it, so it is dropped here.
+  return { name: n.name, value: n.value && n.value.replace(/\u200b/g, "") };
+};
+const named = {};
+for (const id of ["plain", "forl", "byid"]) named[id] = await nameAndValue(id);
+await evaluate(`(() => { const s = document.getElementById("plain"); s.value = "gamma"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+named.picked = await nameAndValue("plain");
+await check("0.61.0 — a select WRAPPED in its <label> is named by the label's words alone, and its value is the combobox's value: \"plain\" / \"beta\"",
+  () => JSON.stringify(named.plain) === JSON.stringify({ name: "plain", value: "beta" }), () => JSON.stringify(named));
+await check("...and after a pick the name is still \"plain\" and the value \"gamma\"",
+  () => JSON.stringify(named.picked) === JSON.stringify({ name: "plain", value: "gamma" }), () => JSON.stringify(named));
+await check("0.61.0 — a select named by <label for> reads \"kind\" / \"skill\", and one by aria-labelledby \"model\" / \"codex\"",
+  () => JSON.stringify([named.forl, named.byid]) === JSON.stringify([{ name: "kind", value: "skill" }, { name: "model", value: "codex" }]),
+  () => JSON.stringify(named));
+await evaluate(`(() => { const s = document.getElementById("plain"); s.value = "beta"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 
 await evaluate(`document.getElementById("mount").insertAdjacentHTML("beforeend",
   '<select id="late"><option>rendered after initSelects()</option></select>'); null`);

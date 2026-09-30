@@ -112,10 +112,11 @@ Import the build-free bundle once, anywhere your bundler handles CSS:
 import "@danieldeusing/design"; // the "." export = the full bundle: every stylesheet but fonts.css
 ```
 
-Every stylesheet is exported on its own too (`@danieldeusing/design/<file>.css`), and each renders
-on `tokens.css` alone: `tokens.css`, `reset.css`, `base.css`, `fonts.css`, `components.css`,
-`chrome.css`, `icons.css`, `controls.css`, `tags.css`, `feedback.css`, `filters.css`, `data.css`,
-`cards.css`, `overlays.css`, `content.css`, `tooltip.css`, `utilities.css`, `print.css`.
+Every stylesheet is exported on its own too (`@danieldeusing/design/<file>.css`): `tokens.css`,
+`reset.css`, `base.css`, `fonts.css`, `components.css`, `chrome.css`, `icons.css`, `controls.css`,
+`tags.css`, `feedback.css`, `filters.css`, `data.css`, `cards.css`, `overlays.css`, `content.css`,
+`tooltip.css`, `utilities.css`, `print.css`. Every one except `components.css` renders on
+`tokens.css` alone; `components.css` is not separable (the design skill's `SKILL.md` says why).
 
 ## Runtime (optional)
 

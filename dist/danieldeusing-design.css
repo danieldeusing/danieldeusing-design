@@ -2740,7 +2740,7 @@ details.fold--boxed > summary { padding-block: 0.5rem; }
 @media (forced-colors: active) {
   .btn-terminal { color: ButtonText; }
   .btn-terminal:disabled,
-  .btn-terminal[aria-disabled="true"]:not([aria-busy="true"]) { color: GrayText; }
+  .btn-terminal[aria-disabled="true"]:not([aria-busy="true"]) { color: GrayText; border-color: GrayText; }
   .select-option,
   .dropdown-item { color: CanvasText; }
   /* Before the highlight, so a current row under the pointer reads HighlightText on Highlight. */

@@ -275,6 +275,10 @@ table.dense--form :where(th, td) { vertical-align: middle; }
   margin-inline-start: 0.4rem;
   vertical-align: baseline;
 }
+/* The funnel's <details> is a flex box too, never a block: as a block it laid a line box of the
+   cell's line-height around its 15px summary, and the funnel rode 1.7px above the sort arrows beside
+   it (0.62.0, measured on examples/data.html). One box model for both, so one baseline. */
+.tbl-filter { display: inline-flex; }
 .tbl-sort,
 .tbl-filter > summary {
   display: inline-flex;

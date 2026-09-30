@@ -774,6 +774,109 @@ await section("STATES — disabled, busy, and a panel that starts with something
     flush.ulPad === "0px" && flush.ulMargin === "0px" && flush.rowLeft === 1, flush);
 });
 
+/* ── OFF — an aria-disabled button is off exactly as a :disabled one is ───── */
+// The pager's prev/next are aria-disabled (so they keep focus), not disabled. Side by side in one
+// row, so the scanline overlay falls the same way on each: a disabled, an aria-disabled and a busy
+// button, primary and ghost.
+const OFF = [["primary", "btn-terminal btn-terminal--compact"], ["ghost", "btn-terminal btn-terminal--ghost btn-terminal--compact"]];
+const OFF_STATES = [["dis", "disabled"], ["aria", 'aria-disabled="true"'], ["busy", 'aria-busy="true" aria-disabled="true"']];
+// The left edge's colour, in painted pixels down the middle half of its column. The marker pass
+// paints the edge magenta: the column must turn magenta and a pixel 2px outside and 3px inside must
+// not, or the clip is not on the edge.
+const edge = async (selector) => {
+  await reveal(selector);
+  const box = await boxOf(selector);
+  const clip = clipAround(box);
+  const rows = [];
+  for (let y = Math.floor(box.y + box.height / 4) - clip.y; y < Math.ceil(box.y + box.height * 3 / 4) - clip.y; y += 1) rows.push(y);
+  const mid = rows[rows.length >> 1];
+  await setStyle("mark", `${selector} { border-color: rgb(255 0 255) !important; forced-color-adjust: none !important; opacity: 1 !important; }`);
+  const marked = await capture(clip);
+  await setStyle("mark", "");
+  // Layout is fractional, so the edge is the first magenta column from the left, not floor(box.x).
+  const x = Array.from({ length: 2 * PAD + 2 }, (_, i) => i).find((i) => isMagenta(marked.at(i, mid))) ?? -1;
+  const aligned = x > 1 && rows.every((y) => isMagenta(marked.at(x, y))) && !isMagenta(marked.at(x - 2, mid)) && !isMagenta(marked.at(x + 3, mid));
+  const img = await capture(clip);
+  return { aligned, colour: aligned ? modeOf(rows.map((y) => img.at(x, y))) : null };
+};
+// The pointer, moved there for real (Input.dispatchMouseEvent), never a forced pseudo-state.
+const pointAt = async (selector) => {
+  const [x, y] = await evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+  return evaluate(`document.querySelector(${JSON.stringify(selector)}).matches(":hover")`);
+};
+const pointAway = () => send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1 });
+
+await section("OFF — an aria-disabled button is off exactly as a :disabled one is; a busy one is not", async () => {
+  await evaluate(`(() => { const row = document.createElement("div"); row.className = "demo-row"; row.id = "x-off";
+    row.innerHTML = ${JSON.stringify(OFF.map(([v, cls]) => OFF_STATES.map(([s, attrs]) => `<button type="button" class="${cls}" id="x-off-${v}-${s}" ${attrs}>${s}</button>`).join(" ")).join(" "))};
+    document.querySelector("main").append(row); })()`);
+  // Scrolled to now, well before the first capture: a region scrolled into view from ~3000px away and
+  // captured at once came back unpainted (all Canvas, the marker pass missing) — every run, not one in n.
+  await reveal("#x-off");
+
+  const normal = await evaluate(`${JSON.stringify(OFF.map(([v]) => v))}.map((v) => ({ v,
+    aria: [cs("#x-off-" + v + "-aria").opacity, cs("#x-off-" + v + "-aria").cursor, cs("#x-off-" + v + "-aria").boxShadow],
+    busy: [cs("#x-off-" + v + "-busy").opacity, cs("#x-off-" + v + "-busy", "::before").maskImage.startsWith("url(")] }))`);
+  check("normal colours: an aria-disabled button is .45, default cursor, no glow — primary and ghost",
+    normal.every(({ aria }) => aria[0] === "0.45" && aria[1] === "default" && aria[2] === "none"), normal);
+  check("normal colours: a busy button (aria-disabled too) is excluded — opacity 1, its spinner drawn",
+    normal.every(({ busy }) => busy[0] === "1" && busy[1]), normal);
+
+  for (const scheme of ["light", "dark"]) {
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
+    await sleep(120);
+    const system = await evaluate(`["GrayText", "ButtonText"].map((c) => { const i = document.createElement("i"); i.style.color = c; document.body.append(i);
+      const v = getComputedStyle(i).color; i.remove(); return v; })`);
+    const misaligned = [], unlike = [], computed = [], notHovered = [], busyWrong = [];
+    for (const [v] of OFF) {
+      const id = (s) => `#x-off-${v}-${s}`;
+      const shot = {};
+      for (const s of ["dis", "aria", "busy"]) {
+        await pointAway();
+        shot[s] = { edge: await edge(id(s)), text: await words(id(s)) };
+        if (!(await pointAt(id(s)))) notHovered.push(`${v} ${s}`);
+        shot[`${s}+hover`] = { edge: await edge(id(s)), text: await words(id(s)),
+          computed: await evaluate(`[cs(${JSON.stringify(id(s))}).borderTopColor, cs(${JSON.stringify(id(s))}).color]`) };
+        await pointAway();
+      }
+      for (const [k, sh] of Object.entries(shot)) {
+        if (!sh.edge.aligned) misaligned.push(`${v} ${k} edge`);
+        if (!sh.text.aligned) misaligned.push(`${v} ${k} text`);
+        sh.ink = sh.text.ink;
+      }
+      for (const k of ["", "+hover"]) {
+        const [a, d] = [shot[`aria${k}`], shot[`dis${k}`]];
+        if (!a.edge.colour || !d.edge.colour || !near(a.edge.colour, d.edge.colour) || !near(a.ink, d.ink, 24))
+          unlike.push({ [`${v} aria${k}`]: [a.edge.colour, a.ink], [`${v} disabled${k}`]: [d.edge.colour, d.ink] });
+      }
+      for (const s of ["dis", "aria"]) {
+        const c = shot[`${s}+hover`].computed;
+        if (c[0] !== system[0] || c[1] !== system[0]) computed.push({ [`${v} ${s} under the pointer`]: c, GrayText: system[0] });
+      }
+      if (![shot.busy, shot["busy+hover"], shot.dis].every((sh) => sh.edge.colour)
+        || near(shot.busy.edge.colour, shot.dis.edge.colour) || near(shot["busy+hover"].edge.colour, shot.dis.edge.colour)
+        || shot["busy+hover"].computed[1] !== system[1])
+        busyWrong.push({ v, busy: shot.busy.edge.colour, "busy+hover": shot["busy+hover"].edge.colour, disabled: shot.dis.edge.colour, computed: shot["busy+hover"].computed });
+    }
+    check(`${scheme}: the real pointer is on each button when its hover shot is taken`, notHovered.length === 0, notHovered);
+    check(`${scheme}: an aria-disabled button paints the :disabled one's edge and text, at rest and under the pointer — primary and ghost`, unlike.length === 0, unlike);
+    check(`${scheme}: ...and both compute GrayText for the edge and the text under the pointer`, computed.length === 0, computed);
+    check(`${scheme}: a busy button is excluded — its edge is not the disabled GrayText, its text is ButtonText`, busyWrong.length === 0, busyWrong);
+    await toggle("solid", true);
+    const spinners = {};
+    for (const [v] of OFF) spinners[v] = await glyph(`#x-off-${v}-busy`, "before");
+    await toggle("solid", false);
+    for (const [v, g] of Object.entries(spinners)) if (g.drawn && !g.aligned) misaligned.push(`${v} spinner`);
+    check(`${scheme}: a busy button's spinner paints at 3:1 — primary and ghost`,
+      Object.values(spinners).every((g) => g.drawn && g.ratio >= 3), Object.fromEntries(Object.entries(spinners).map(([v, g]) => [v, g.ratio])));
+    check(`${scheme}: every clip holds its own element (a marker pass for edges and spinners, a two-shot diff for text)`, misaligned.length === 0, misaligned);
+  }
+  await send("Emulation.setEmulatedMedia", { features: [] });
+  await evaluate(`document.getElementById("x-off").remove(); null`);
+  await sleep(80);
+});
+
 /* ── COARSE and MOTION ────────────────────────────────────────────────────── */
 await section("COARSE — a 44px target under a coarse pointer", async () => {
   // Touch emulation is what makes (pointer: coarse) match in a headless shell; the media override alone does not.

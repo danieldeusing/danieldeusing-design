@@ -246,8 +246,8 @@ share the padding, the `--muted` highlight (on hover, `data-active="true"`, or R
 - **A labelled section is a group.** A `.dropdown-label` and the items under it, up to the next
   separator or label, are one `role="group"` named by the label (`aria-labelledby`), the APG shape:
   a reader hears "sort by, group" and then its choices, and "sort by" and "order" in one menu stay
-  two things. `initDropdowns()` wraps the section in a `details.dropdown` itself; a page-built menu
-  writes the group (below). A menu with no label is left as it is.
+  two things. `initDropdowns()` groups the section itself, inside the `details.dropdown`'s panel; a
+  page-built menu writes the group (below). A menu with no label is left as it is.
 - **44px under a coarse pointer**: every row, and a summary that is only text or a glyph (centred, with
   no weight, so a `.btn-icon` summary keeps its own box).
 - **Placement is not the look.** `.select-panel` sets no `position` — `initSelects()` writes
@@ -380,7 +380,7 @@ dropdown `initTableTools()` builds in a table header had no click-away and no Es
   its parent. Never put a `color` on the `.ico`: under forced colours a glyph that declares a colour
   keeps that author colour instead of its label's (a muted icon measured 2.89:1 there). One icon
   that needs a tone of its own takes `data-tone` on the `.ico` (`icons.md`). An untoned fold resets
-  `--tone` (F7), so a fold inside a toned card or notice stays neutral, icon included.
+  `--tone`, so a fold inside a toned card or notice stays neutral, icon included.
 - **`details.fold--compact`** is a log's folds ("▸ ran 3 commands"): no rule between them, a tight
   summary, a 1rem indent.
 - **`details.fold--boxed`** is a case in a frame: a `--border` box, .75rem inside, .5rem apart.
@@ -450,7 +450,7 @@ of the name. A note inside is `.text-muted-foreground`; the way to where the sta
 `initMinimap({ sections: "section.doc" })` draws one 2px bar per section in the left gutter from
 64rem, each a button named by its section's heading. The heading is its `data-tip` too — the one
 place a tip repeats a name, because the bar shows no words at all, and the tooltip does not
-announce a tip that equals the name (O3), so a screen reader hears it once. The current section's
+announce a tip that equals the name, so a screen reader hears it once. The current section's
 bar has `aria-current="true"`, and the stylesheet draws it from that attribute — there is no state
 class. No radius.
 
@@ -532,7 +532,7 @@ and a surface adds nothing.
   button colour included), each word on a state 4.5:1 with the state's fill under it, each state
   told apart from its neighbour, and a menu row's ring after real key presses. Each capture is taken
   in the viewport with the scrollbars hidden, and a marker pass proves the clip holds its element
-  before the ratio counts (RULES-CROSSCUT X1).
+  before the ratio counts.
 
 ## The rail marks the current page on `aria-current="page"` (0.19.0) — an attribute, not a class
 

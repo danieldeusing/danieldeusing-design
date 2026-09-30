@@ -86,6 +86,14 @@
       /* ?bare drops chrome.css, which owns the table wrapper; keep the dialog's table readable. */
       .demo-table { border-collapse: collapse; }
       .demo-table th, .demo-table td { padding: 0.3rem 0.9rem 0.3rem 0; text-align: left; }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-m-0 { margin: 0; }
+      .demo-m-b075 { margin: 0 0 0.75rem; }
+      .demo-m-t075 { margin: 0.75rem 0 0; }
+      .demo-mt-075 { margin-top: 0.75rem; }
+      .demo-primary { color: var(--primary); }
+      .demo-scroll-9 { max-block-size: 9rem; overflow: auto; }
     </style>
   </head>
   <body>
@@ -101,7 +109,7 @@
     </script>
 
     <header class="demo-head">
-      <h1>WP9 · dialogs and overlays</h1>
+      <h1>Dialogs and overlays</h1>
       <span class="spacer"></span>
       <span class="row" role="group" aria-label="theme">
         <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
@@ -212,7 +220,7 @@
             </ul>
           </div>
         </div>
-        <p class="row" style="margin-top: 0.75rem">
+        <p class="row demo-mt-075">
           <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-ctx" data-t="open-ctx">a context menu inside a dialog</button>
         </p>
       </section>
@@ -259,12 +267,12 @@
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close" data-t="default-x"></button>
       </header>
       <div class="dialog-body" data-t="default-body">
-        <p style="margin: 0 0 0.75rem">You join <span tabindex="0" data-tip="poi/vu3 · 12 open reviews · (from the forge)" data-t="tip-in-dialog">poi/vu3</span> as the fifth reviewer.</p>
+        <p class="demo-m-b075">You join <span tabindex="0" data-tip="poi/vu3 · 12 open reviews · (from the forge)" data-t="tip-in-dialog">poi/vu3</span> as the fifth reviewer.</p>
         <label for="join-agent">agent</label>
         <select id="join-agent" data-t="join-select">
           <option>claude</option><option>codex</option><option>copilot</option>
         </select>
-        <p style="margin: 0.75rem 0 0"><input type="text" aria-label="note" placeholder="a note for the others" data-t="join-note" /></p>
+        <p class="demo-m-t075"><input type="text" aria-label="note" placeholder="a note for the others" data-t="join-note" /></p>
       </div>
       <footer class="dialog-foot form-actions" data-t="default-foot">
         <p class="form-status" role="status" data-t="default-status">nothing is sent until you join</p>
@@ -277,7 +285,7 @@
         <h2 class="dialog-title" id="dlg-sm-t">--sm, 24rem</h2>
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
       </header>
-      <div class="dialog-body"><p style="margin: 0">A short question or a single field.</p></div>
+      <div class="dialog-body"><p class="demo-m-0">A short question or a single field.</p></div>
     </dialog>
 
     <dialog class="dialog dialog--lg" id="dlg-lg" aria-labelledby="dlg-lg-t" data-t="dlg-lg">
@@ -285,7 +293,7 @@
         <h2 class="dialog-title" id="dlg-lg-t">--lg, 42rem</h2>
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
       </header>
-      <div class="dialog-body"><p style="margin: 0">A form with a few rows.</p></div>
+      <div class="dialog-body"><p class="demo-m-0">A form with a few rows.</p></div>
     </dialog>
 
     <dialog class="dialog dialog--xl" id="dlg-xl" aria-labelledby="dlg-xl-t" data-t="dlg-xl">
@@ -293,7 +301,7 @@
         <h2 class="dialog-title" id="dlg-xl-t">--xl, 56rem</h2>
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
       </header>
-      <div class="dialog-body"><p style="margin: 0">A table or a plan.</p></div>
+      <div class="dialog-body"><p class="demo-m-0">A table or a plan.</p></div>
     </dialog>
 
     <dialog class="dialog dialog--full" id="dlg-full" aria-labelledby="dlg-full-t" data-t="dlg-full">
@@ -337,7 +345,7 @@ PASS  the skill pins the current release</div></div>
         </div>
         <div class="dialog-section" data-t="rich-section-2">
           <p>The second part. The table below keeps its header on the dialog's surface while it scrolls.</p>
-          <div class="tablewrap" style="max-block-size: 9rem; overflow: auto">
+          <div class="tablewrap demo-scroll-9">
             <table class="demo-table">
               <thead><tr><th data-t="rich-th">step</th><th>who</th><th>state</th></tr></thead>
               <tbody>
@@ -378,7 +386,7 @@ PASS  the skill pins the current release</div></div>
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
       </header>
       <div class="dialog-body">
-        <p style="margin: 0 0 0.75rem">A dialog opened from here goes on top; this one goes inert under it.</p>
+        <p class="demo-m-b075">A dialog opened from here goes on top; this one goes inert under it.</p>
         <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-open="dlg-nest-b" data-t="open-nest-b">open a second one</button>
       </div>
     </dialog>
@@ -388,7 +396,7 @@ PASS  the skill pins the current release</div></div>
         <h2 class="dialog-title" id="dlg-nest-b-t">second dialog</h2>
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close" data-t="nest-b-x"></button>
       </header>
-      <div class="dialog-body"><p style="margin: 0">Escape closes this one and only this one.</p></div>
+      <div class="dialog-body"><p class="demo-m-0">Escape closes this one and only this one.</p></div>
     </dialog>
 
     <dialog class="dialog dialog--sm" id="dlg-unnamed" data-t="dlg-unnamed">
@@ -396,15 +404,15 @@ PASS  the skill pins the current release</div></div>
         <h2 class="dialog-title" data-t="unnamed-title">named by its title</h2>
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
       </header>
-      <div class="dialog-body"><p style="margin: 0">No aria-labelledby in the markup; openDialog() links the title.</p></div>
+      <div class="dialog-body"><p class="demo-m-0">No aria-labelledby in the markup; openDialog() links the title.</p></div>
     </dialog>
 
-    <dialog class="dialog dialog--confirm dialog--sm" id="dlg-confirm" aria-labelledby="dlg-confirm-t" data-t="dlg-confirm">
+    <dialog class="dialog dialog--sm" id="dlg-confirm" aria-labelledby="dlg-confirm-t" data-t="dlg-confirm">
       <header class="dialog-head">
         <h2 class="dialog-title" id="dlg-confirm-t">remove poi/vu3?</h2>
       </header>
       <div class="dialog-body">
-        <p style="margin: 0 0 0.75rem">Its reviews, its runs and its settings go with it.</p>
+        <p class="demo-m-b075">Its reviews, its runs and its settings go with it.</p>
         <div class="callout" data-tone="warning"><p>This cannot be undone from cockpit.</p></div>
       </div>
       <footer class="dialog-foot form-actions">
@@ -413,11 +421,11 @@ PASS  the skill pins the current release</div></div>
       </footer>
     </dialog>
 
-    <dialog class="dialog dialog--confirm dialog--sm" id="dlg-discard" aria-labelledby="dlg-discard-t" data-t="dlg-discard">
+    <dialog class="dialog dialog--sm" id="dlg-discard" aria-labelledby="dlg-discard-t" data-t="dlg-discard">
       <header class="dialog-head">
         <h2 class="dialog-title" id="dlg-discard-t">discard the draft?</h2>
       </header>
-      <div class="dialog-body"><p style="margin: 0">The draft has 3 unsaved edits.</p></div>
+      <div class="dialog-body"><p class="demo-m-0">The draft has 3 unsaved edits.</p></div>
       <footer class="dialog-foot form-actions">
         <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-close="cancel">cancel</button>
         <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger" id="discard-go" data-t="discard-go">discard</button>
@@ -429,7 +437,7 @@ PASS  the skill pins the current release</div></div>
         <span class="ico ico--xl" data-icon="triangle-alert" data-tone="destructive" aria-hidden="true" data-t="alert-glyph"></span>
         <h2 class="dialog-title" id="dlg-alert-t">configr stopped</h2>
       </header>
-      <div class="dialog-body" data-t="alert-body"><p style="margin: 0">The scanner crashed while reading ~/.claude. A report with the stack trace can go to the maintainer.</p></div>
+      <div class="dialog-body" data-t="alert-body"><p class="demo-m-0">The scanner crashed while reading ~/.claude. A report with the stack trace can go to the maintainer.</p></div>
       <footer class="dialog-foot form-actions">
         <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-dialog-close="ok" data-t="alert-ok">ok</button>
         <button type="button" class="btn-terminal btn-terminal--compact" data-dialog-close="send" data-t="alert-send">send report</button>
@@ -438,7 +446,7 @@ PASS  the skill pins the current release</div></div>
 
     <dialog class="dialog dialog--drawer" id="logs" aria-labelledby="logs-t" data-t="dlg-drawer">
       <header class="dialog-head">
-        <h2 class="dialog-title" id="logs-t">logs — <span style="color: var(--primary)">ddstudio</span> / dd-infra-cockpit</h2>
+        <h2 class="dialog-title" id="logs-t">logs — <span class="demo-primary">ddstudio</span> / dd-infra-cockpit</h2>
         <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close logs" data-t="drawer-x"></button>
       </header>
       <div class="dialog-toolbar" data-t="drawer-toolbar">

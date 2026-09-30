@@ -8,20 +8,20 @@ behaviour is `runtime/copy.js`, and the error page is `templates/error-page.html
 
 Contents:
 
-- `.page-title` and `.lede` — lit, and two sizes (P1)
-- `.eyebrow` — the one label look (P2)
-- `.section-head` and `.subhead` (P3)
-- `.markdown`, and the lists outside it (P4) — `@tailwindcss/typography` is retired
-- Code: `.code-block`, `.code-view`, syntax and diff colours (P5)
-- `.cmd` — a command to copy (P6)
-- The copy button: `data-copy` and `initCopyButtons()` (P7)
-- `.meta`, and nothing is quieter than muted (P8)
-- Series navigation (P9) is `.navlist`, in `chrome.md`
-- `.boot-log` (P10)
-- The error page: `templates/error-page.html` (S9)
+- `.page-title` and `.lede` — lit, and two sizes
+- `.eyebrow` — the one label look
+- `.section-head` and `.subhead`
+- `.markdown`, and the lists outside it — `@tailwindcss/typography` is retired
+- Code: `.code-block`, `.code-view`, syntax and diff colours
+- `.cmd` — a command to copy
+- The copy button: `data-copy` and `initCopyButtons()`
+- `.meta`, and nothing is quieter than muted
+- Series navigation is `.navlist`, in `chrome.md`
+- `.boot-log`
+- The error page: `templates/error-page.html`
 - Where it works: tokens-only, Tailwind, print, forced colours, `hidden`
 
-## `.page-title` and `.lede` — lit, and two sizes (P1)
+## `.page-title` and `.lede` — lit, and two sizes
 
 ```html
 <p class="prompt">cat ~/about.txt</p>
@@ -59,7 +59,7 @@ two-line title into two separate lines.
 - Replaces cockpit's `h1.title` and `.lede` in `portal.css`, and the DS template's local `h1.title`
   and `.lede`. Delete those when a page adopts this.
 
-## `.eyebrow` — the one label look (P2)
+## `.eyebrow` — the one label look
 
 ```html
 <h3 class="eyebrow">install</h3>
@@ -82,11 +82,11 @@ nine labels over five spacings from .05 to .1em, and those move to `.05em`.
 - **Write the words in lower case.** The upper case is CSS; a screen reader reads the source, and
   some spell an upper-case source out letter by letter.
 - **A label that heads a region is a heading element** (`h3`, `h4`), so it is in the outline.
-- It is **the** eyebrow. A component with a label of its own — the fence (S7), the stat tile (K4), a
+- It is **the** eyebrow. A component with a label of its own — the fence, the stat tile, a
   dialog's labels — restates exactly these declarations in its own file (the fence at 700). Never a
   different letter-spacing.
 
-## `.section-head` and `.subhead` (P3)
+## `.section-head` and `.subhead`
 
 ```html
 <div class="section-head">
@@ -101,7 +101,7 @@ A section's name on the left and **one** thing on the right, one of three:
 |---|---|
 | a way in | `<a class="doc-link doc-link--forward">… →</a>` |
 | a date | `<time datetime="…">…</time>` — the head colours it muted |
-| an action | an icon button (C2), e.g. seedr's expand toggle |
+| an action | an icon button, e.g. seedr's expand toggle |
 
 - **The trailing item never shrinks and never wraps.** When the row runs out of room the whole item
   drops under the heading. That is why the link is `.doc-link--forward` and not pagr's quiet link
@@ -117,7 +117,7 @@ A section's name on the left and **one** thing on the right, one of three:
 below, and flush when it is the first thing in its container. It is cockpit's `h3.sub` — 37 of
 cockpit's 40 sub-heads already use those numbers; config and ci/cd move to them.
 
-## `.markdown`, and the lists outside it (P4)
+## `.markdown`, and the lists outside it
 
 ```html
 <article class="markdown">…rendered html…</article>
@@ -175,7 +175,7 @@ never put `.prose` and `.markdown` on one element.
   bug `.legend` once had.
 - All three are promoted from the cockpit portal and the DS template. Delete the local copies.
 
-## Code: `.code-block`, `.code-view`, syntax and diff colours (P5)
+## Code: `.code-block`, `.code-view`, syntax and diff colours
 
 **Inline code and `kbd` are elements, with no class** (`base.css`). Cockpit's `code.inline` (831
 uses) and the template's `code.inline` / `pre.block` are deleted in the migration.
@@ -241,7 +241,7 @@ uses) and the template's `code.inline` / `pre.block` are deleted in the migratio
 - cockpit's `.logview` drops its 13px and its `ui-monospace` family for the one size and the token
   face.
 
-## `.cmd` — a command to copy (P6)
+## `.cmd` — a command to copy
 
 ```html
 <p class="eyebrow">install</p>
@@ -264,7 +264,7 @@ uses) and the template's `code.inline` / `pre.block` are deleted in the migratio
 - The box is the code look, `--muted` with `--border`, so commands and code are one family. With the
   28px icon button the row is 44px tall.
 
-## The copy button: `data-copy` and `initCopyButtons()` (P7)
+## The copy button: `data-copy` and `initCopyButtons()`
 
 `data-copy` adds a behaviour to a button that already has a look — the icon button or the ghost
 text button. There is no copy-button class.
@@ -310,7 +310,7 @@ second call installs nothing.
   `role="status"` region, and never run `initCopyButtons()` over nodes the framework owns.
 - In print the button is gone.
 
-## `.meta`, and nothing is quieter than muted (P8)
+## `.meta`, and nothing is quieter than muted
 
 ```html
 <p class="meta"><time datetime="2026-09-02">02 Sep 2026</time><span class="meta-sep" aria-hidden="true">·</span><a class="doc-link" href="/about">by Daniel Deusing</a><span class="meta-sep" aria-hidden="true">·</span><span>~6 min read</span></p>
@@ -321,7 +321,8 @@ second call installs nothing.
 The line under a title or in a card's foot. Muted, and laid out as items that wrap **with** their
 separators, never as one sentence that breaks in the middle of a date.
 
-- **The separator is a `.meta-sep` span with `aria-hidden="true"`.** A typed `·` is read as "dot".
+- **The separator is its own span with `aria-hidden="true"`.** A typed `·` is read as "dot". `.meta-sep`
+  is a page class, not a system class: `.meta`'s gap spaces the items, and the class only names the span.
 - **A date is a `<time datetime>`.** pagr shipped none.
 - A link inside is `.doc-link` (muted, then `--primary` under the pointer). A value that must read
   louder than its key is `.meta-val` (configr's key/value lines).
@@ -350,12 +351,12 @@ opacity step: pagr's faint text and configr's neutral-600 tertiary become `--mut
 Only decoration that carries no information may sit lower — the `# ` of `.comment`, `.ls-perm` — and
 never an option or a control.
 
-## Series navigation (P9) is `.navlist`
+## Series navigation is `.navlist`
 
 An "in this series" card is `.navlist` with `aria-current="page"` on the current part: see
 `chrome.md`, "A table of contents".
 
-## `.boot-log` (P10)
+## `.boot-log`
 
 ```html
 <div class="boot-log card-terminal">
@@ -379,7 +380,7 @@ surface may reuse the idiom.
   (`width < 40rem`, so 640px is already two, the same step as the display title), where 14rem is most
   of a phone. The notes are muted (pagr's faint first line is corrected).
 
-## The error page: `templates/error-page.html` (S9)
+## The error page: `templates/error-page.html`
 
 ```
 $ articles/no-such-post
@@ -438,7 +439,7 @@ and `main` keeps its landmark. The markup is in the template, in a comment after
   so they survive with no rule. Every colour goes, so nothing may depend on one: the copy states
   are glyph SHAPES (copy, check, x), and links stay underlined. A glyph paints its parent's forced
   colour (`preserve-parent-color`, the icon system's default), so a state colour belongs on the
-  button or the text, **never on the glyph itself**; a `--cat-*` tint goes through `--tone` (P8).
+  button or the text, **never on the glyph itself**; a `--cat-*` tint goes through `--tone`.
   Nothing here opts out with `forced-color-adjust: none`, so every focus ring stays forced too.
   `scripts/check-content.mjs` measures what is painted against what it sits on — glyphs, state
   words and focused rings — four themes by both palettes.

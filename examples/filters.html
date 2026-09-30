@@ -46,6 +46,14 @@
       .theme-bar { display: flex; align-items: center; gap: 0.75rem; }
       .sticky-demo { max-block-size: 14rem; overflow: auto; padding: 0 0.75rem; border: 1px solid var(--border); }
       .sticky-rows { list-style: none; margin: 0; padding: 0 0 0.75rem; display: grid; gap: 0.35rem; color: var(--muted-foreground); }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-chip-info { --chip-accent: var(--info); }
+      .demo-chip-pending { --chip-accent: var(--pending); }
+      .demo-gap-050 { gap: 0.5rem; }
+      .demo-mt-075 { margin-top: 0.75rem; }
+      .demo-pending-long { --pending-ms: 600000ms; }
+      .demo-w-24 { max-inline-size: 24rem; }
     </style>
   </head>
 
@@ -130,13 +138,13 @@
           <div class="state"><span class="label">holding a query</span>
             <div class="search-field"><input type="search" aria-label="search, filled" value="review" /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
           <div class="state"><span class="label">pending (debounced)</span>
-            <div class="search-field" data-pending style="--pending-ms: 600000ms"><input type="search" aria-label="search, pending" value="revi" /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
+            <div class="search-field demo-pending-long" data-pending><input type="search" aria-label="search, pending" value="revi" /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
           <div class="state"><span class="label">disabled</span>
             <div class="search-field"><input type="search" aria-label="search, disabled" placeholder="search…" disabled /><button type="button" class="search-clear" aria-label="clear search" hidden></button></div></div>
           <div class="state"><span class="label">disabled, holding a query</span>
             <div class="search-field"><input type="search" aria-label="search, disabled with a query" value="review" disabled /><button type="button" class="search-clear" aria-label="clear search"></button></div></div>
           <div class="state"><span class="label">with a match count</span>
-            <div class="row" style="gap: 0.5rem"><div class="search-field"><input type="search" aria-label="search logs" value="error" /><button type="button" class="search-clear" aria-label="clear search"></button></div><span class="match-count" role="status">3/17</span></div></div>
+            <div class="row demo-gap-050"><div class="search-field"><input type="search" aria-label="search logs" value="error" /><button type="button" class="search-clear" aria-label="clear search"></button></div><span class="match-count" role="status">3/17</span></div></div>
         </div>
       </section>
 
@@ -154,7 +162,7 @@
             <select data-filter aria-label="host" disabled><option value="">all</option><option value="ddmini" selected>ddmini</option></select></div>
           <div class="state"><span class="label">long list: a search row</span>
             <select data-filter aria-label="model" id="f-model"></select></div>
-          <div class="state"><span class="label">option icons · invalid (C8)</span>
+          <div class="state"><span class="label">option icons · invalid</span>
             <select aria-label="kind" aria-invalid="true" aria-describedby="kind-err"><option data-icon="file">skill</option><option data-icon="folder">plugin</option><option data-icon="star">favourite</option></select>
             <p class="field-error" id="kind-err">pick a kind this list can show</p></div>
         </div>
@@ -183,11 +191,11 @@
           <button type="button" class="chip" aria-pressed="false">#design <span class="chip-count">7</span></button>
           <button type="button" class="chip" aria-pressed="false">#infra <span class="chip-count">31</span></button>
         </div>
-        <div class="row" style="margin-top: 0.75rem">
+        <div class="row demo-mt-075">
           <div class="state"><span class="label">identity (--chip-accent)</span>
             <div class="chip-set" role="group" aria-label="hosts">
-              <button type="button" class="chip" aria-pressed="true" style="--chip-accent: var(--info)">ddmini</button>
-              <button type="button" class="chip" aria-pressed="false" style="--chip-accent: var(--pending)">ddstudio</button>
+              <button type="button" class="chip demo-chip-info" aria-pressed="true">ddmini</button>
+              <button type="button" class="chip demo-chip-pending" aria-pressed="false">ddstudio</button>
             </div></div>
           <div class="state"><span class="label">a link chip (current page)</span>
             <div class="chip-set"><a class="chip" href="#top" aria-current="page">#agents</a><a class="chip" href="#top">#design</a></div></div>
@@ -218,7 +226,7 @@
       <section class="demo">
         <p class="prompt">man autocomplete</p>
         <p class="lede">The contract, wired by page code: a combobox field and a <code>.select-panel</code> listbox placed with <code>positionPopup()</code>. Type <code>/</code>.</p>
-        <div class="search-field" style="max-inline-size: 24rem">
+        <div class="search-field demo-w-24">
           <input type="search" id="cmd" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cmd-list"
                  aria-label="command" placeholder="type / for commands" autocomplete="off" spellcheck="false" data-1p-ignore />
           <button type="button" class="search-clear" aria-label="clear command" hidden></button>

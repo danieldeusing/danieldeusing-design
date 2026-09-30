@@ -41,10 +41,10 @@
      The theme, the animation choice and the rail state must be applied before first
      paint, or the page visibly flashes the default and jumps.
 
-     THERE IS NO ZOOM BLOCK ANY MORE (0.29.0). Scaling above 1920 is CSS now — the
-     root font size in tokens.css — so it needs no script and cannot be forgotten.
-     If you are copying an older page, DELETE its zoom IIFE: a page that still
-     assigns `document.documentElement.style.zoom` on top of 0.29.0 scales TWICE.
+     THERE IS NO ZOOM BLOCK, AND NO WIDE-SCREEN SCALING AT ALL (0.56.0). The page caps at
+     --content-w and the root font size is the browser's own. If you are copying an older
+     page, DELETE its zoom IIFE: `zoom` scales the coordinate space, so anything injected
+     from outside the page (a password manager's dropdown) lands in the wrong place.
   2. At the end of <body>, import and call the runtime:
        import { initLsNav, initBurgerNav, initThemeSwitcher, initDropdowns,
                 initAnimToggle, initTableScroll, initSelects, initToc }
@@ -59,7 +59,8 @@
      of under a guessed 3rem. Call it on a rail-less page too.
   4. `initTableScroll()` wraps every table so a wide one scrolls itself rather than
      scrolling the whole page sideways. The markup contract is nothing — author a
-     plain <table>. Call it again after rendering more rows.
+     plain <table>. Tables rendered later are wrapped too (a MutationObserver), so it is
+     called once, like every other init.
   5. `initSelects()` replaces the OS dropdown on every <select> with the estate's own —
      the one component CSS alone can never fix, because the option list is drawn outside
      the page. The markup contract is nothing here either: author a plain <select>, and
@@ -228,7 +229,8 @@
 <!-- .wrap is the shared column: --content-w wide, --content-pad from the edges (1.25rem on a
      phone). Set padding-BLOCK here for the page's own vertical rhythm — never the `padding`
      shorthand, which resets padding-inline and silently drops the shared margin. It no longer
-     needs room for the footer: the BODY reserves exactly --status-h below the content.
+     needs room for the footer: the BODY reserves the footer's height below the content,
+     --status-reserve as initLsNav() measures it (--status-h, its minimum, until it runs).
      In the page's stylesheet, never a style attribute (a strict CSP refuses inline style):
        main.wrap { padding-block: 1.1rem var(--space-section); } -->
 <main class="wrap">

@@ -75,6 +75,30 @@
          forgot to reset its own colour — the very thing the tokens-only rendering is for. */
       html[data-bare] a.link-quiet { color: var(--muted-foreground); text-underline-offset: 4px; }
       html[data-bare] .demo-head a { color: inherit; text-decoration: none; }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-clamp-short { --clamp-h: 7rem; }
+      .demo-console-12 { --console-h: 12rem; }
+      .demo-console-14 { --console-h: 14rem; }
+      .demo-hue-amber { display: contents; color: var(--cat-amber); }
+      .demo-hue-teal { display: contents; color: var(--cat-teal); }
+      .demo-lead-brief { --row-lead-w: 10.5rem; }
+      .demo-m-0 { margin: 0; }
+      .demo-m-b050 { margin: 0 0 0.5rem; }
+      .demo-mb-075 { margin-bottom: 0.75rem; }
+      .demo-mt-050 { margin-top: 0.5rem; }
+      .demo-mt-075 { margin-top: 0.75rem; }
+      .demo-mt-100 { margin-top: 1rem; }
+      .demo-mt-125 { margin-top: 1.25rem; }
+      .demo-mt-150 { margin-top: 1.5rem; }
+      .demo-pane-pad { padding: 0.75rem; }
+      .demo-pb-025 { padding-block: 0.25rem; }
+      .demo-rule-teal { --rule-color: var(--cat-teal); }
+      .demo-rule-violet { --rule-color: var(--cat-violet); }
+      .demo-split-8 { --split-size: 8rem; }
+      .demo-split-box { block-size: 8rem; border: 1px solid var(--border); }
+      .demo-split-main { --split-size: 16rem; block-size: 12rem; }
+      .demo-theme-picks { gap: 0.35rem; flex: none; }
     </style>
   </head>
   <body>
@@ -90,9 +114,9 @@
     </script>
 
     <header class="demo-head">
-      <h1>WP8 · cards and lists</h1>
+      <h1>Cards and lists</h1>
       <span class="spacer"></span>
-      <span class="demo-row" style="gap: 0.35rem; flex: none" role="group" aria-label="theme">
+      <span class="demo-row demo-theme-picks" role="group" aria-label="theme">
         <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
         <button type="button" class="demo-btn" data-theme-pick="green">green</button>
         <button type="button" class="demo-btn" data-theme-pick="mono">mono</button>
@@ -104,7 +128,7 @@
 
     <main class="demo-wrap">
       <p class="lede">
-        Every element of spec entries K2–K12 in every state. The page loads tokens.css and
+        Every element of the design inventory's entries K2–K12 in every state. The letter-and-number ids (such as K2) name an element in the 0.60.0 design inventory. The page loads tokens.css and
         cards.css; reset, base, components and chrome only for the surrounding markup
         (<code>.card-terminal</code> is K1, in components.css). Open it with <code>?bare</code> for
         the tokens-only rendering. K9 (tree), K10 (splitter) and K11 (clamp) have no runtime: what
@@ -126,7 +150,7 @@
             </div>
             <h3 class="card-title"><a class="card-link" href="#k2">review</a></h3>
             <p class="card-desc">Reviews the current diff against the repository's conventions, its tests and the house rules, and says which of them the change breaks and why that matters for the next reader of the code.</p>
-            <footer class="card-foot"><span class="meta-stat"><span style="display: contents; color: var(--cat-teal)"><span class="ico" data-icon="package" aria-hidden="true"></span></span>12</span><time datetime="2026-09-25">3 days ago</time></footer>
+            <footer class="card-foot"><span class="meta-stat"><span class="demo-hue-teal"><span class="ico" data-icon="package" aria-hidden="true"></span></span>12</span><time datetime="2026-09-25">3 days ago</time></footer>
           </li>
           <li class="card-terminal card-terminal--link" data-tone="success">
             <div class="card-head">
@@ -137,12 +161,12 @@
             <p class="card-desc">A toned card: data-tone="success" (configr's installed state).</p>
             <footer class="card-foot"><time datetime="2026-09-20">8 days ago</time></footer>
           </li>
-          <li class="card-terminal card-terminal--link card-terminal--rule" style="--rule-color: var(--cat-teal)">
+          <li class="card-terminal card-terminal--link card-terminal--rule demo-rule-teal">
             <h3 class="card-title"><a class="card-link" href="#k2">a hook</a></h3>
             <p class="card-desc">--rule with --rule-color: var(--cat-teal) — the type of the thing. Hover it: the rule stays teal.</p>
             <footer class="card-foot"><span>hook</span></footer>
           </li>
-          <li class="card-terminal card-terminal--link card-terminal--rule" data-tone="destructive" style="--rule-color: var(--cat-violet)">
+          <li class="card-terminal card-terminal--link card-terminal--rule demo-rule-violet" data-tone="destructive">
             <h3 class="card-title"><a class="card-link" href="#k2">broken-agent</a></h3>
             <p class="card-desc">Tone and rule together: the destructive state and a violet type.</p>
             <footer class="card-foot"><span>agent</span></footer>
@@ -171,7 +195,7 @@
           <a class="stat-tile" data-state="broken" href="#k4"><span class="stat-label">runners</span><span class="stat-value">1 down</span><span class="stat-note">dd-infra-ci-2 refused</span><span class="stat-cta">fix →</span></a>
           <a class="stat-tile" data-state="unknown" href="#k4"><span class="stat-label">executions</span><span class="stat-value">—</span><span class="stat-note">could not count</span><span class="stat-cta">retry →</span></a>
           <div class="stat-tile" data-tone="info"><span class="stat-label">in flight</span><span class="stat-value">2</span><span class="stat-note">a static tile, data-tone="info"</span></div>
-          <div class="stat-tile"><span style="display: contents; color: var(--cat-amber)"><span class="ico ico--xl" data-icon="package" aria-hidden="true"></span></span><span class="stat-label">skills</span><span class="stat-value">128</span><a class="stat-cta" href="#k4">browse →</a></div>
+          <div class="stat-tile"><span class="demo-hue-amber"><span class="ico ico--xl" data-icon="package" aria-hidden="true"></span></span><span class="stat-label">skills</span><span class="stat-value">128</span><a class="stat-cta" href="#k4">browse →</a></div>
         </div>
       </section>
 
@@ -189,12 +213,12 @@
               </div>
             </header>
             <div class="panel-body">
-              <p style="margin: 0 0 0.5rem">A fixed-height panel: the page sets block-size, the body scrolls, the head and the foot stay.</p>
-              <p style="margin: 0 0 0.5rem">Line two of the body.</p>
-              <p style="margin: 0 0 0.5rem">Line three of the body.</p>
-              <p style="margin: 0 0 0.5rem">Line four of the body.</p>
-              <p style="margin: 0 0 0.5rem">Line five of the body.</p>
-              <p style="margin: 0">Line six of the body.</p>
+              <p class="demo-m-b050">A fixed-height panel: the page sets block-size, the body scrolls, the head and the foot stay.</p>
+              <p class="demo-m-b050">Line two of the body.</p>
+              <p class="demo-m-b050">Line three of the body.</p>
+              <p class="demo-m-b050">Line four of the body.</p>
+              <p class="demo-m-b050">Line five of the body.</p>
+              <p class="demo-m-0">Line six of the body.</p>
             </div>
             <footer class="panel-foot"><span class="demo-note">12 files</span><span class="filter-bar-spacer"></span><button type="button" class="btn-icon btn-icon--sm" data-icon="refresh-cw" aria-label="refresh files"></button></footer>
           </section>
@@ -210,8 +234,8 @@
                 </ul>
               </div>
             </section>
-            <p class="demo-cap" style="margin-top: 1rem">collapsible (cockpit C95): one open, one collapsed</p>
-            <section class="panel" aria-labelledby="k5-t3" style="margin-bottom: 0.75rem">
+            <p class="demo-cap demo-mt-100">collapsible (cockpit C95): one open, one collapsed</p>
+            <section class="panel demo-mb-075" aria-labelledby="k5-t3">
               <header class="panel-head"><button type="button" class="disclosure-btn" aria-expanded="true" aria-controls="k5-b3" aria-label="collapse poi/vu3"></button><h3 class="panel-title" id="k5-t3">poi/vu3</h3></header>
               <div class="panel-body" id="k5-b3">review type: public — posts on the PR</div>
             </section>
@@ -219,7 +243,7 @@
               <header class="panel-head" id="k5-collapsed-head"><button type="button" class="disclosure-btn" aria-expanded="false" aria-controls="k5-b4" aria-label="expand dd/infra"></button><h3 class="panel-title" id="k5-t4">dd/infra</h3></header>
               <div class="panel-body" id="k5-b4" hidden>review type: internal</div>
             </section>
-            <p class="demo-cap" style="margin-top: 1rem">identity rail (cockpit C96)</p>
+            <p class="demo-cap demo-mt-100">identity rail (cockpit C96)</p>
             <article class="panel panel--mark" aria-labelledby="k5-t5">
               <div class="panel-mark" aria-hidden="true">CX</div>
               <div class="panel-main">
@@ -243,8 +267,8 @@
                 <li><a class="list-row" href="#k6"><time class="list-row-lead" datetime="2026-09-02">2026-09-02</time><span class="list-row-title">One text size</span><span class="list-row-desc">Four sizes one pixel apart cannot be told apart on sight, so nothing in the estate ever chose between them. A description clamps at two lines by default.</span></a></li>
               </ul>
             </div>
-            <p class="demo-cap" style="margin-top: 1rem">--ruled on the page, --row-lead-w: 10.5rem (the brief column), a new-tab row</p>
-            <ul class="row-list row-list--ruled" style="--row-lead-w: 10.5rem">
+            <p class="demo-cap demo-mt-100">--ruled on the page, --row-lead-w: 10.5rem (the brief column), a new-tab row</p>
+            <ul class="row-list row-list--ruled demo-lead-brief">
               <li><a class="list-row" href="#k6" aria-label="brief for 2026-09-28 (opens briefs.danieldeusing.de)"><time class="list-row-lead" datetime="2026-09-28">mon 2026-09-28</time><span class="list-row-title">markets calm, one deploy</span><span class="list-row-meta" aria-hidden="true">↗</span></a></li>
               <li><a class="list-row" href="#k6"><time class="list-row-lead" datetime="2026-09-27">sun 2026-09-27</time><span class="list-row-title">weekend</span></a></li>
             </ul>
@@ -258,12 +282,12 @@
                 <li><button type="button" class="list-row" disabled><span class="list-row-title">disabled</span><span class="list-row-meta">---</span></button></li>
               </ul>
             </div>
-            <p class="demo-cap" style="margin-top: 1rem">a listbox: aria-selected belongs to role="option" (or row, treeitem), not to a plain button</p>
+            <p class="demo-cap demo-mt-100">a listbox: aria-selected belongs to role="option" (or row, treeitem), not to a plain button</p>
             <ul class="row-list row-list--select" role="listbox" aria-label="agents" id="k6-listbox">
               <li role="none"><button type="button" class="list-row" role="option" aria-selected="false" tabindex="-1"><span class="list-row-title">claude</span></button></li>
               <li role="none"><button type="button" class="list-row" role="option" aria-selected="true" tabindex="0"><span class="list-row-title">codex</span><span class="list-row-meta">r--</span></button></li>
             </ul>
-            <p class="demo-cap" style="margin-top: 1rem">a nav list: aria-current="page"</p>
+            <p class="demo-cap demo-mt-100">a nav list: aria-current="page"</p>
             <ul class="row-list row-list--select" aria-label="settings">
               <li><a class="list-row" href="#k6"><span class="list-row-title">general</span></a></li>
               <li><a class="list-row" href="#k6" aria-current="page"><span class="list-row-title">agents</span></a></li>
@@ -282,7 +306,7 @@
             <div>
               <h2 class="entry-title"><a class="card-link" href="#k7">AI agents play fantasy football</a></h2>
               <p class="entry-desc">Five agents, one league, a season of weekly decisions — and what their mistakes say about how they read a table.</p>
-              <p class="meta" style="margin-top: 0.5rem"><span>~6 min read</span><span aria-hidden="true">·</span><button type="button" class="value-filter" aria-label="filter by tag: agents">#agents</button></p>
+              <p class="meta demo-mt-050"><span>~6 min read</span><span aria-hidden="true">·</span><button type="button" class="value-filter" aria-label="filter by tag: agents">#agents</button></p>
             </div>
           </li>
           <li class="entry entry--wide">
@@ -293,7 +317,7 @@
             </div>
           </li>
         </ol>
-        <div class="demo-row" style="margin-top: 1.5rem">
+        <div class="demo-row demo-mt-150">
           <div>
             <p class="demo-cap">--narrow with an --accent year (the timeline)</p>
             <ol class="entry-list">
@@ -332,7 +356,7 @@
         <div class="demo-row">
           <section class="panel" aria-labelledby="k9-t">
             <header class="panel-head"><span class="ico" data-icon="folder-tree" aria-hidden="true"></span><h3 class="panel-title" id="k9-t">files of review</h3></header>
-            <div class="panel-body panel-body--flush" style="padding-block: 0.25rem">
+            <div class="panel-body panel-body--flush demo-pb-025">
               <ul class="tree" role="tree" aria-label="files of review" id="k9-tree">
                 <li role="treeitem" aria-level="1" aria-expanded="true" tabindex="0" id="k9-src">
                   <span class="tree-row"><span class="ico" data-icon="folder-open" aria-hidden="true"></span><span class="tree-label">src</span></span>
@@ -365,7 +389,7 @@
                 </ul>
               </li>
             </ul>
-            <p class="demo-cap" style="margin-top: 1rem">tags and a count in a selected row follow it</p>
+            <p class="demo-cap demo-mt-100">tags and a count in a selected row follow it</p>
             <ul class="tree" role="tree" aria-label="changes" id="k9-tags">
               <li role="treeitem" aria-level="1" aria-selected="true" tabindex="0">
                 <span class="tree-row"><span class="ico" data-icon="file-code" aria-hidden="true"></span><span class="tree-label">app.ts</span><span class="tree-meta"><span class="tag">draft</span> <span class="count">3</span> <span class="tag" data-tone="success">ok</span> <span class="tag" data-tone="warning">stale</span> <span class="tag" data-tone="destructive">failed</span> <span class="tag" data-tone="info">new</span> <span class="tag" data-tone="pending">queued</span> <span class="tag" data-tone="muted">off</span></span></span>
@@ -378,7 +402,7 @@
       <!-- ── K10 ────────────────────────────────────────────────────────────────────────────── -->
       <section id="k10">
         <h2>K10 · .split / .splitter <span class="demo-note">(static — the app implements the APG window splitter)</span></h2>
-        <div class="split" id="k10-split" style="--split-size: 16rem; block-size: 12rem">
+        <div class="split demo-split-main" id="k10-split">
           <section class="panel split-pane" id="k10-files" aria-labelledby="k10-t1">
             <header class="panel-head"><h3 class="panel-title" id="k10-t1">files</h3><div class="panel-actions"><button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="panel-left-close" aria-controls="k10-files" aria-expanded="true" aria-label="hide files"></button></div></header>
             <div class="panel-body">the first pane is --split-size wide</div>
@@ -391,18 +415,18 @@
         </div>
         <div class="splitter" role="separator" tabindex="0" aria-orientation="horizontal" aria-controls="k10-split" aria-label="resize file preview" aria-valuemin="150" aria-valuemax="1200" aria-valuenow="192" id="k10-hsplit"></div>
 
-        <div class="demo-row" style="margin-top: 1.25rem">
+        <div class="demo-row demo-mt-125">
           <div>
             <p class="demo-cap">the left pane hidden: its strip, then the pane that takes the room</p>
-            <div class="split" style="block-size: 8rem; border: 1px solid var(--border)" id="k10-hidden-left">
+            <div class="split demo-split-box" id="k10-hidden-left">
               <button type="button" class="pane-collapsed" aria-controls="k10-files" aria-expanded="false" aria-label="show files" id="k10-collapsed"><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span aria-hidden="true">files</span></button>
-              <div class="split-pane" style="padding: 0.75rem" id="k10-rest-left">preview</div>
+              <div class="split-pane demo-pane-pad" id="k10-rest-left">preview</div>
             </div>
           </div>
           <div>
             <p class="demo-cap">the right pane hidden in place: --end, the left pane takes the room</p>
-            <div class="split" style="block-size: 8rem; border: 1px solid var(--border)" id="k10-hidden-right">
-              <div class="split-pane" style="padding: 0.75rem" id="k10-rest-right">files</div>
+            <div class="split demo-split-box" id="k10-hidden-right">
+              <div class="split-pane demo-pane-pad" id="k10-rest-right">files</div>
               <div class="splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="k10-preview" aria-label="resize preview" hidden></div>
               <div class="split-pane" id="k10-preview" hidden>preview</div>
               <button type="button" class="pane-collapsed pane-collapsed--end" aria-controls="k10-preview" aria-expanded="false" aria-label="show preview" id="k10-collapsed-end"><span class="ico" data-icon="panel-left-open" aria-hidden="true"></span><span aria-hidden="true">preview</span></button>
@@ -410,9 +434,9 @@
           </div>
           <div>
             <p class="demo-cap">a fixed master–detail: no splitter, a hairline</p>
-            <div class="split" style="--split-size: 8rem; block-size: 8rem; border: 1px solid var(--border)" id="k10-fixed">
-              <div class="split-pane" style="padding: 0.75rem">master</div>
-              <div class="split-pane" style="padding: 0.75rem" id="k10-detail">detail</div>
+            <div class="split demo-split-box demo-split-8" id="k10-fixed">
+              <div class="split-pane demo-pane-pad">master</div>
+              <div class="split-pane demo-pane-pad" id="k10-detail">detail</div>
             </div>
           </div>
         </div>
@@ -427,12 +451,12 @@
               <h3 class="prompt">cat README.md</h3>
               <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="chevrons-up-down" aria-expanded="false" aria-controls="k11-clamped" aria-label="show full content"></button>
             </div>
-            <div class="clamp" id="k11-clamped" data-clamped style="--clamp-h: 7rem">
-              <p style="margin: 0 0 0.5rem">clamped: --clamp-h 7rem here (15rem by default), and the fade blends into the card, because a card sets --clamp-fade: var(--card).</p>
-              <p style="margin: 0 0 0.5rem">Line two of the README. Line two of the README. Line two of the README.</p>
-              <p style="margin: 0 0 0.5rem">Line three of the README.</p>
-              <p style="margin: 0 0 0.5rem">Line four of the README.</p>
-              <p style="margin: 0">Line five of the README.</p>
+            <div class="clamp demo-clamp-short" id="k11-clamped" data-clamped>
+              <p class="demo-m-b050">clamped: --clamp-h 7rem here (15rem by default), and the fade blends into the card, because a card sets --clamp-fade: var(--card).</p>
+              <p class="demo-m-b050">Line two of the README. Line two of the README. Line two of the README.</p>
+              <p class="demo-m-b050">Line three of the README.</p>
+              <p class="demo-m-b050">Line four of the README.</p>
+              <p class="demo-m-0">Line five of the README.</p>
             </div>
           </div>
           <div class="card-terminal">
@@ -440,12 +464,12 @@
               <h3 class="prompt">cat README.md</h3>
               <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="chevrons-down-up" aria-expanded="true" aria-controls="k11-open" aria-label="show less content"></button>
             </div>
-            <div class="clamp" id="k11-open" style="--clamp-h: 7rem">
-              <p style="margin: 0 0 0.5rem">open: no data-clamped, no fade, every line.</p>
-              <p style="margin: 0 0 0.5rem">Line two of the README. Line two of the README. Line two of the README.</p>
-              <p style="margin: 0 0 0.5rem">Line three of the README.</p>
-              <p style="margin: 0 0 0.5rem">Line four of the README.</p>
-              <p style="margin: 0">Line five of the README.</p>
+            <div class="clamp demo-clamp-short" id="k11-open">
+              <p class="demo-m-b050">open: no data-clamped, no fade, every line.</p>
+              <p class="demo-m-b050">Line two of the README. Line two of the README. Line two of the README.</p>
+              <p class="demo-m-b050">Line three of the README.</p>
+              <p class="demo-m-b050">Line four of the README.</p>
+              <p class="demo-m-0">Line five of the README.</p>
             </div>
           </div>
         </div>
@@ -455,7 +479,7 @@
       <section id="k12">
         <h2>K12 · .console</h2>
         <div class="demo-row">
-          <section class="console" aria-labelledby="k12-t1" id="k12-console" style="--console-h: 14rem">
+          <section class="console demo-console-14" aria-labelledby="k12-t1" id="k12-console">
             <header class="console-bar">
               <span class="console-dots" aria-hidden="true"></span>
               <h3 class="console-title" id="k12-t1">agent output</h3>
@@ -464,7 +488,7 @@
             <div class="console-body" tabindex="0" aria-labelledby="k12-t1" id="k12-body"><div>$ claude --review poi/vu3!3302</div><div>reading 14 files…</div><div>  src/app.ts: 3 findings</div><div class="console-line--current">  src/lib/<mark>auth</mark>.ts: 1 finding</div><div>	tab-indented line (tab-size 2)</div><div>a very long line that wraps instead of scrolling sideways: https://example.invalid/a/really/long/path/that/keeps/going/and/going/and/going/until/it/wraps</div><div>done in 42s</div></div>
           </section>
           <div>
-            <section class="console" aria-labelledby="k12-t2" style="--console-h: 12rem; margin-bottom: 0.75rem">
+            <section class="console demo-console-12 demo-mb-075" aria-labelledby="k12-t2">
               <header class="console-bar">
                 <span class="console-dots" aria-hidden="true"></span>
                 <h3 class="console-title" id="k12-t2">live log</h3>
@@ -473,7 +497,7 @@
               <div class="console-body" tabindex="0" aria-labelledby="k12-t2"><div>line 1</div><div>line 2</div><div>line 3</div><div>line 4</div><div>line 5</div><div>line 6</div></div>
             </section>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">jump to newest</button>
-            <section class="console" aria-labelledby="k12-t3" style="--console-h: 12rem; margin-top: 0.75rem">
+            <section class="console demo-console-12 demo-mt-075" aria-labelledby="k12-t3">
               <header class="console-bar">
                 <span class="console-dots" aria-hidden="true"></span>
                 <h3 class="console-title" id="k12-t3">deploy</h3>

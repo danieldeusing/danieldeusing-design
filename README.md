@@ -21,8 +21,13 @@ paper  ▓ #fafafa on #1f1f1f   black-on-white (e-ink / printout)
 
 ### 1. A single HTML file (no build step)
 
-Link the built bundle from jsDelivr and you have the whole look. **Pin a release tag** — never
-`@latest` or `@main` in production (mutable refs cache for days on the CDN).
+Link the built bundle from jsDelivr and you have the whole look. **Whether to pin depends on the
+markup, not the page.** A page that ships the system's markup — the rail, tabs, dialogs, anything
+the runtime enhances, as this example does — pins a release tag and bumps it in the same commit as
+the markup that needs it, because jsDelivr caches an unpinned url for seven days in the browser and
+markup newer than a cached stylesheet comes apart. A page that only wears the look (tokens, fonts,
+colours) stays on the unpinned url and follows every release. Never `@main`. The skill's "Pin or
+unpin" section has the reasoning.
 
 ```html
 <!doctype html>
@@ -63,23 +68,23 @@ Link the built bundle from jsDelivr and you have the whole look. **Pin a release
 </html>
 ```
 
-> **There is deliberately no `style.zoom` in that block.** Scaling above the 1920px reference
-> has been pure CSS since **0.29.0** - one `font-size: max(...)` declaration in `tokens.css`,
-> applied by loading the stylesheet. A page that ALSO sets `document.documentElement.style.zoom`
-> scales **twice**, and `zoom` additionally scales the coordinate *space*, so anything injected
-> from outside the document (a password manager's dropdown, a translation bar) is measured
-> through one grid and positioned in another - measured on a real login page, the dropdown
-> landed 1.9x down and across from its field. `initResolutionZoom()` still exists and is a
-> no-op; calling it is dead code.
+> **There is deliberately no `style.zoom` in that block, and no wide-screen scaling at all.**
+> From 0.29.0 to 0.55.0 `tokens.css` grew the root font size above 1920px; 0.56.0 removed it,
+> because everything sized in px stayed behind while the text doubled. A page caps at
+> `--content-w` and the root font size is the browser's own. Never set `zoom` on a page: it scales
+> the coordinate *space*, so anything injected from outside the document (a password manager's
+> dropdown, a translation bar) is measured through one grid and positioned in another. Measured on
+> a real login page, the dropdown landed 1.9x down and across from its field.
+> `initResolutionZoom()` still exists and is a no-op; calling it is dead code.
 >
-> The pins above are `0.45.0`, the current release, and
-> `scripts/check-readme-pins.mjs` fails the build if they drift from `package.json`. This quick
-> start shipped pinned to `0.1.2` for many releases - a version from before the zoom was
-> removed - so the two most visible things a new surface copies were both wrong.
+> The pins above name the current release, and `scripts/check-readme-pins.mjs` fails the build if
+> they drift from `package.json`. This quick start once shipped pinned to `0.1.2` for many
+> releases, so the most visible thing a new surface copies was wrong.
 
-
-Need a starting point? Copy [`examples/style-guide.html`](examples/style-guide.html) or the
-documentation template at [`templates/documentation.html`](templates/documentation.html).
+Need a starting point? Copy the standard chrome in
+[`templates/page-chrome.html`](templates/page-chrome.html), or the one-page documentation template
+at [`templates/documentation.html`](templates/documentation.html). The pages in
+[`examples/`](examples/) show every component, one reference per page.
 
 ### 2. A Tailwind v4 app (Astro, Vite, …)
 
@@ -104,27 +109,32 @@ theme — `bg-background`, `text-foreground`, `border-border`, `font-mono`, etc.
 Import the build-free bundle once, anywhere your bundler handles CSS:
 
 ```js
-import "@danieldeusing/design"; // the "." export = the full bundle (reset + tokens + base + components)
+import "@danieldeusing/design"; // the "." export = the full bundle: every stylesheet but fonts.css
 ```
 
-Individual layers are exported too: `@danieldeusing/design/tokens.css`, `…/base.css`,
-`…/components.css`, `…/reset.css`, `…/fonts.css`.
+Every stylesheet is exported on its own too (`@danieldeusing/design/<file>.css`), and each renders
+on `tokens.css` alone: `tokens.css`, `reset.css`, `base.css`, `fonts.css`, `components.css`,
+`chrome.css`, `icons.css`, `controls.css`, `tags.css`, `feedback.css`, `filters.css`, `data.css`,
+`cards.css`, `overlays.css`, `content.css`, `tooltip.css`, `utilities.css`, `print.css`.
 
 ## Runtime (optional)
 
-Four dependency-free ES modules, tree-shakeable from `@danieldeusing/design/runtime`:
+27 dependency-free ES modules, re-exported from `@danieldeusing/design/runtime` and importable one
+by one from `@danieldeusing/design/runtime/<module>`. Nothing runs at import, so a server-side
+render can import the barrel, and every `init*()` is called once per page: a delegated listener or
+a MutationObserver reaches what is rendered later. The ones most pages call:
 
 | Import | Purpose |
 | --- | --- |
 | `applyStoredTheme()` | Apply the saved theme. **Call inline in `<head>` pre-paint** to avoid a flash. |
-| `setTheme(name)` / `initThemeSwitcher()` | Switch themes and wire `[data-theme-value]` buttons + `[data-theme-label]`. |
-| `initTerminal()` | The `$ command` typing animation. No-ops under reduced motion / `html.anim-off`. |
-| `initDropdowns()` | `<details class="dropdown">` behaviour: one-open, click-away, Escape. |
-| `initSelects()` | Replaces the OS dropdown on every `<select>` with the themed listbox — the option list is painted outside the page, so CSS alone can never reach it. Markup contract: none. The `<select>` keeps the value and still fires `input`/`change`, and selects rendered later are enhanced on their own. |
-| `initTablePagination()` | Page every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. It has no sort and no filter — it hides all but one window of the rows a page has **already** filtered and sorted, so the order is always filter → sort → slice over the full set. A table without a `data-table-id` is left alone. |
-| `initTableTools()` | Give every `<table data-table-tools>` a search box, per-column sort and filter controls in its header, and a bar naming whatever is in force. Markup contract: `<th data-col="key">`. Optional `data-filter="pick"` for a value list built from the column's own cells, `data-sort-type="num"`, and `data-value` on a `<td>` to sort by something it does not print. The view is remembered per table. |
-| `initAnimToggle()` | Wire `[data-anim-toggle]` buttons (`.anim-toggle`) to flip `html.anim-off` + persist it. |
-| `initResolutionZoom(1920)` | **Deprecated since 0.29.0 — a no-op.** Scaling above 1920 is CSS now (the fluid root font size in `tokens.css`), so it needs no script. Kept exported so a surface can bump its pin without editing its `<head>` in the same commit. Delete the call, and any inline pre-paint zoom block with it: a page that still sets `style.zoom` on top of 0.29.0 scales twice. |
+| `setTheme(name)` / `initThemeSwitcher()` | Switch themes; wire `[data-theme-value]` buttons and `[data-theme-label]`, and mark the theme in force with a ✓ (no CSS rule marks it). |
+| `initDropdowns()` | Every `<details class="dropdown">`: an ARIA menu with arrow keys and typeahead, one open at a time, click-away, Escape. |
+| `initSelects()` | Replaces the OS dropdown on every `<select>` with the themed listbox. Markup contract: none. The `<select>` keeps the value and still fires `input`/`change`. |
+| `initTableTools()` | Every `<table data-table-tools>`: a search box above it, per-column sort and filter controls in its header, a filtering column marked with a badge naming its value, and a result count. Markup contract: `<th data-col="key">`. A `data-table-id` keys the view each reader's browser remembers. |
+| `initTablePagination()` | Pages every `<table data-table-id>` to 20 rows, with a 5/10/20/50/100/200 picker remembered per table. It has no sort and no filter: it hides all but one window of the rows a page has **already** filtered and sorted. A table without a `data-table-id` is left alone. |
+| `initTooltips()` | One panel for every `[data-tip]` (below). |
+| `initBurgerNav()` / `initLsNav()` | The phone burger, and the `ls -l` rail and chrome measurements. |
+| `initTerminal()` / `initAnimToggle()` | The `$ command` typing animation, and the `[data-anim-toggle]` switch for `html.anim-off`. |
 
 ```js
 import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTablePagination, initTerminal, initAnimToggle } from "@danieldeusing/design/runtime";
@@ -137,28 +147,38 @@ initTerminal();
 initAnimToggle();
 ```
 
+Every function, with its markup contract, is in the skill's
+[`references/runtime.md`](.claude/skills/danieldeusing-design/references/runtime.md).
+
 The runtime is **progressive enhancement**: with JS disabled, or `prefers-reduced-motion`, all
 content is visible and the theme defaults to `warm`. A per-theme favicon swap is opt-in via
 `applyStoredTheme({ faviconHref: (t) => \`/favicon-\${t}.svg\` })`.
 
 ## Tokens
 
-The source of truth is [`src/tokens.css`](src/tokens.css) — 18 semantic palette tokens (shadcn
-naming), three CRT-atmosphere tokens (`--glow`, `--glow-soft`, `--scanline-opacity`), `--radius`
-(0 everywhere), and `--font-mono`, each declared for all four themes.
+The source of truth is [`src/tokens.css`](src/tokens.css): 22 semantic palette tokens (the shadcn
+names plus `--success`, `--warning`, `--info` and `--pending`), twelve categorical hues
+(`--cat-red` … `--cat-pink`), three CRT-atmosphere tokens (`--glow`, `--glow-soft`,
+`--scanline-opacity`), `--backdrop`, `--radius` (0 everywhere) and `--font-mono`, each declared for
+all four themes; and the layout, type, control, icon and elevation tokens (`--content-w`, `--fs-*`,
+`--control-h`, `--card-pad`, `--icon-*`, `--elev-*`), which do not vary by theme.
 
 For native / Tauri / Figma consumers, the build derives a machine-readable
 [`tokens/tokens.json`](tokens/tokens.json) (values grouped by theme) from `tokens.css`.
 
 ## Components
 
-Plain-CSS primitives in [`src/components.css`](src/components.css), usable anywhere:
+Plain-CSS classes, usable anywhere, one stylesheet per family: the chrome (`chrome.css`: the
+header, the `ls -l` rail, the status footer, a table of contents), buttons, cards, dropdowns and
+selects (`components.css`), icons (`icons.css`), controls (`controls.css`), tags and counts
+(`tags.css`), empty states, notices and banners (`feedback.css`), search, sort and filters
+(`filters.css`), tables, tabs and charts (`data.css`), card contents and lists (`cards.css`),
+dialogs and menus (`overlays.css`), and titles, prose and code (`content.css`). The `html.anim-off`
+kill switch is in `tokens.css`.
 
-`.glow` / `.glow-lg` · `.prompt` (`$ ` prefix) · `.comment` (`# ` prefix) · `.cursor-block`
-(blinking caret) · `.btn-terminal` (`> ` CTA) · `.link-quiet` · `.card-terminal` · `.ascii-rule`
-· `.dropdown` / `.dropdown-panel` / `.dropdown-item` · `.eli5` / `.eli5-term` (callout) ·
-the `[data-term]` / `[data-term-out]` typing-animation contract · the `html.anim-off`
-kill-switch.
+The whole vocabulary, with the markup each class expects, is the table in the skill's
+[`SKILL.md`](.claude/skills/danieldeusing-design/SKILL.md), and one reference per family sits
+beside it in `references/`.
 
 ## Tooltips: `data-tip`, never `title`
 
@@ -189,14 +209,15 @@ explanations were unreachable no matter which attribute they used.
 ## Repo layout
 
 ```
-src/          tokens.css · reset.css · base.css · components.css · index.css · tailwind.css · fonts.css
-runtime/      theme.js · terminal.js · dropdown.js · zoom.js · index.js  (dependency-free ESM)
+src/          the 18 stylesheets, index.css (the bundle) and tailwind.css (the Tailwind v4 entry)
+runtime/      27 dependency-free ES modules and index.js (the barrel)
 dist/         danieldeusing-design.css + .min.css   (committed — jsDelivr serves these)
 tokens/       tokens.json                            (committed — generated from tokens.css)
-examples/     style-guide.html                       (living showcase of every token + component)
-templates/    documentation.html                     (one-page doc template)
-docs/         migrations/                            (plans for adopting this in the apps)
-scripts/      build.mjs                              (zero-dependency build)
+examples/     one page per reference, every component rendered (not published to npm)
+templates/    page-chrome.html · documentation.html · error-page.html
+docs/         migrations/                            (what a surface changes to adopt a release)
+scripts/      build.mjs and the check-*.mjs suites   (zero-dependency build and checks)
+.claude/skills/danieldeusing-design/                 (the skill: SKILL.md and references/)
 ```
 
 ## Build

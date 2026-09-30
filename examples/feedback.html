@@ -76,6 +76,11 @@
          keep the UA's text colour — black, and invisible on green and mono. A tokens-only surface
          colours its own links the same way. */
       html[data-bare] .doc-link--forward { color: var(--primary); }
+      /* Spacing and component knobs for the demos. They live here, not in a style attribute:
+         documented markup carries none, and a page under style-src 'self' refuses them. */
+      .demo-cell-22 { max-width: 22rem; }
+      .demo-mt-075 { margin-top: 0.75rem; }
+      .demo-primary { color: var(--primary); }
     </style>
   </head>
   <body>
@@ -91,7 +96,7 @@
     </script>
 
     <header class="demo-head">
-      <h1>WP7 · feedback, states, tags and badges</h1>
+      <h1>Feedback, states, tags and badges</h1>
       <span class="spacer"></span>
       <span class="row" role="group" aria-label="theme">
         <button type="button" class="demo-btn" data-theme-pick="warm">warm</button>
@@ -105,7 +110,7 @@
 
     <main class="wrap">
       <p class="lede">
-        Every element of spec entries S1–S8, T1 and T2 in every state. The page loads tokens.css,
+        Every element of the design inventory's entries S1–S8, T1 and T2 in every state. The letter-and-number ids (such as S1) name an element in the 0.60.0 design inventory. The page loads tokens.css,
         feedback.css and tags.css; base, components and chrome only for the surrounding markup the
         examples borrow (<code>.prompt</code>, <code>.doc-link</code>, <code>.glow</code>). Open it
         with <code>?bare</code> for the tokens-only rendering.
@@ -231,7 +236,7 @@
             <tr><td><span class="state" data-state="none">not run</span></td><td><code>data-state="none"</code></td></tr>
           </tbody>
         </table>
-        <div class="demo-cell" style="max-width: 22rem; margin-top: 0.75rem">
+        <div class="demo-cell demo-cell-22 demo-mt-075">
           <p class="state" data-state="bad" role="alert">could not read the file: it is larger than the 2 MB preview limit, so open it in an editor instead.</p>
         </div>
       </section>
@@ -243,7 +248,7 @@
         <div class="row">
           <span class="spinner" aria-hidden="true"></span>
           <span class="spinner spinner--lg" aria-hidden="true"></span>
-          <span style="color: var(--primary)"><span class="spinner" aria-hidden="true"></span> takes its line's colour</span>
+          <span class="demo-primary"><span class="spinner" aria-hidden="true"></span> takes its line's colour</span>
         </div>
         <div aria-busy="true" id="busy-region">
           <p class="loading" role="status"><span class="spinner" aria-hidden="true"></span>loading skills…</p>

@@ -24,7 +24,7 @@ Contents:
 - Sticky layers — `.page-toolbar` and `--sticky-top` (0.60.0)
 - A text action on a `<button>` — `button.doc-link` (0.60.0)
 - `.scrollbars-thin` (0.60.0)
-- Two chrome.css lines that belong to other references (D1, D9)
+- Two chrome.css lines that belong to other references
 - Forced colours and `hidden`
 - The runtime calls
 
@@ -78,7 +78,7 @@ bar, between the brand and the nav. Two sources, so it is an element, not a loca
   </div>
   <div class="bar-side bar-right">
     <p class="bar-status" role="status"><span class="dot" data-tone="pending" aria-hidden="true"></span>connecting…</p>  <!-- optional -->
-    <button type="button" class="nav-burger" …></button>
+    <button type="button" class="nav-burger" data-nav-toggle aria-label="menu" aria-controls="site-nav" aria-expanded="false">…</button>
     <nav class="site-nav" id="site-nav" aria-label="site">…the ls -l head, the rail, the burger's footer…</nav>
   </div>
 </header>
@@ -159,7 +159,9 @@ segment in the foreground and not a link:
 - It is a named `nav` holding an ordered list, and the current page carries `aria-current="page"`.
   pagr drew the same look as bare spans, so a screen reader heard a run of words with no structure
   and no "you are here". The host and the `/` separators are drawn, not read (the host is
-  aria-hidden, the `/` is generated with empty alt text). The `~` link is named "home".
+  aria-hidden, the `/` is generated with empty alt text). The `~` link is named "home". `.crumbs-host`
+  is a page class, not a system class: the host is a plain span in the muted path, and the class only
+  names it for the page and its tests.
 - **It replaces cockpit's opacity trail**, whose segments sat at .6 and .4 opacity — .4 is under AA
   on text. The path is `--muted-foreground` (≥ 4.67:1 on every surface, measured).
 - **One line, an ellipsis at the end.** The path must not push the bar taller. The clip box is
@@ -378,8 +380,11 @@ full-width document such as the html-doc template; `initMinimap()` refuses on a 
 ## The burger on a phone
 
 Below 48rem `initBurgerNav()`'s burger owns navigation (an outside press and Escape close it; Escape
-returns focus to the burger). Its menu holds the rail's list — ONE list; `.mobile-nav` is only for a
-surface with no rail — and the `.mobile-footer`:
+returns focus to the burger). `initBurgerNav()` finds the burger by `data-nav-toggle` and the menu by the
+id `site-nav` (which the burger's `aria-controls` names); without either, the burger does nothing. Its menu
+holds the rail's list — ONE list; `.mobile-nav` is only for a surface with no rail, and its links are
+`a.mobile-item` rows (44px under a coarse pointer, the `.ls-name` inside lit on hover) — and the
+`.mobile-footer`:
 
 - **`details.mobile-theme` is the burger's accordion for ANY footer menu** — the theme, and on a
   multilingual site the language. `.mf-panel` holds the same `.dropdown-item` rows the footer's menu
@@ -443,7 +448,7 @@ tree. It covers the element and every scroller inside it, so on `html` it is the
 default scrollbar is the one a reader already knows. `references/foundations.md` has why the two
 scrollbar APIs must not be declared together.
 
-## Two chrome.css lines that belong to other references (D1, D9)
+## Two chrome.css lines that belong to other references
 
 - **A sticky table header paints `--tablewrap-fade`**, not always `--background`: a table in a
   `--card` card or a dialog had a band of page colour across its header row. A surface that sets

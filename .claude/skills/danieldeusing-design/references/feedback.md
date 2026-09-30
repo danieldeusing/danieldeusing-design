@@ -9,16 +9,16 @@ Contents:
 
 - Which one — the decision table
 - Colour is `data-tone`, and a tone never leaks into a child
-- `.empty` — which nothing (S1)
-- `.notice` — an outcome, reported where it happened (S2)
-- `.callout` — an annotation where it stands (S3)
-- `.banner` — a property of the whole app (S4)
-- `.state` — a status word with a glyph (S5)
-- `.spinner` and `.loading` — always with words (S6)
-- `.fence` — text a stranger wrote (S7)
-- `.dot` — never the state itself (S8)
-- `.tag` — a word that classifies (T1)
-- `.count` — how many (T2)
+- `.empty` — which nothing
+- `.notice` — an outcome, reported where it happened
+- `.callout` — an annotation where it stands
+- `.banner` — a property of the whole app
+- `.state` — a status word with a glyph
+- `.spinner` and `.loading` — always with words
+- `.fence` — text a stranger wrote
+- `.dot` — never the state itself
+- `.tag` — a word that classifies
+- `.count` — how many
 - Loading the files, tokens-only surfaces, frameworks
 
 ## Which one
@@ -62,7 +62,7 @@ never a style attribute, which a page under `style-src 'self'` refuses. The twel
 `orange` `amber` `lime` `green` `teal` `cyan` `blue` `indigo` `violet` `purple` `pink`; an unknown
 one sets nothing. Which thing gets which hue is the surface's decision. The palette is shared and measured (`--cat-*`, foundations.md).
 
-## `.empty` — which nothing (S1)
+## `.empty` — which nothing
 
 ```html
 <div class="empty"><p class="prompt">ls registry/</p><p>no skills match these filters.</p>
@@ -75,7 +75,7 @@ one sets nothing. Which thing gets which hue is the surface's decision. The pale
 
 **Three states that look identical as a blank panel are three different facts, and each gets its
 own sentence.** The estate used to say "nothing here" for all of them. Cockpit's table engine
-learned to keep them apart first (C56), and configr's catalog filter had to learn it again (I12):
+learned to keep them apart first, and configr's catalog filter had to learn it again:
 
 | the state | say | offer |
 |---|---|---|
@@ -93,7 +93,7 @@ learned to keep them apart first (C56), and configr's catalog filter had to lear
   grid` on the `<td>` itself stops it being a cell.
 - No dashed edge. Dashed is the fence's mark ("this came from outside"), so it is not used for "empty".
 
-## `.notice` — an outcome, reported where it happened (S2)
+## `.notice` — an outcome, reported where it happened
 
 ```html
 <!-- the region is rendered EMPTY with the view; when the install finishes, the notice goes into it -->
@@ -171,7 +171,7 @@ click it:
    next candidate is tried.
 3. removes the notice.
 
-## `.callout` — an annotation where it stands (S3)
+## `.callout` — an annotation where it stands
 
 ```html
 <aside class="callout" data-tone="warning">
@@ -197,7 +197,7 @@ both jobs 186 times, which is why a form result and a standing explanation looke
   in the page and fill it on submit without an accent rule pointing at nothing in the meantime.
 - `.eli5` stays the one **marked** callout (components.md).
 
-## `.banner` — a property of the whole app (S4)
+## `.banner` — a property of the whole app
 
 ```html
 <div class="banner bleed-rail" role="alert">
@@ -205,7 +205,7 @@ both jobs 186 times, which is why a form result and a standing explanation looke
   <ul class="banner-list"><li>netmon: adguard unreachable <a href="/netmon/">fix →</a></li>…</ul>
 </div>
 <div class="bar-stack">                               <!-- chrome.css: the sticky layer -->
-  <div class="banner" role="status"><p class="banner-title">control is frozen</p>…</div>
+  <div role="status"><div class="banner"><p class="banner-title">control is frozen</p>…</div></div>
   <header class="bar">…</header>
 </div>
 ```
@@ -218,14 +218,17 @@ and add `.bleed-rail` so it spans the `ls -l` rail's reserved gutter like the he
 - Items in a `.banner-list` are divided by a faint rule in the banner's own colour, because three
   wrapped alerts separated by space alone read as one paragraph. Links are underlined and never wrap.
 - **A banner that must stay in view goes first inside `.bar-stack`, the header's sticky layer
-  (chrome.md, WP3). Never two siblings sticking at top 0**: they do not stack, they overlap, and the
+  (`chrome.md`). Never two siblings sticking at top 0**: they do not stack, they overlap, and the
   header disappears under the banner the moment the page scrolls. The stack is the sticky element
   and it bleeds past the rail itself, so a banner inside it takes no `.bleed-rail` of its own.
 - `role="alert"` for an alarm, `role="status"` for information: a frozen control plane is a state,
-  not an alarm, so it is a status (S4). **Render it only when there is something to say.** An empty
-  banner is still a red strip.
+  not an alarm, so it is a status. **The two mount as the notices above do.** An alarm banner arrives
+  with its words and `role="alert"` on it. A status banner's `role="status"` region is in the page from
+  the first render, empty, and the `.banner` is put into it when there is news. The region is a plain
+  `div`, not the banner: an empty `.banner` is still a red strip, so the banner itself is rendered only
+  when there is something to say, and it carries no role of its own inside the region.
 
-## `.state` — a status word with a glyph (S5)
+## `.state` — a status word with a glyph
 
 ```html
 <span class="state" data-state="ok">passed</span>
@@ -248,7 +251,7 @@ screen reader would hear "check mark passed", and the page and the state would h
 The glyph's shape is what lets a column be scanned in grey, because ✓ and ✗ differ in shape, not
 only in hue. In a cell it never wraps. As a `<p>` it is an inline error line that does wrap.
 
-## `.spinner` and `.loading` — always with words (S6)
+## `.spinner` and `.loading` — always with words
 
 ```html
 <!-- in the page from the first render: the row may carry the role itself -->
@@ -278,7 +281,7 @@ Every exit path replaces the loading row: rows, the empty state, or the failure.
 leave it spinning. A failure is an alert, so when the row sat in a status region the row leaves it
 and the failure is mounted beside the region, never inside it.
 
-## `.fence` — text a stranger wrote (S7)
+## `.fence` — text a stranger wrote
 
 ```html
 <figure class="fence">
@@ -301,7 +304,7 @@ labelled at **both** ends. Where it starts and where it stops are then never a j
   is information.
 - It never scrolls inside a box and it does not split across printed pages.
 
-## `.dot` — never the state itself (S8)
+## `.dot` — never the state itself
 
 ```html
 <span class="dot dot--pulse" data-tone="success" aria-hidden="true"></span> live
@@ -318,7 +321,7 @@ that changes is `role="status"`. With no `data-tone` the dot takes the colour of
   is). A ring in the page colour cuts it out of the host's edge.
 - `.dd-dot` is a different thing and stays: it is the theme indicator.
 
-## `.tag` — a word that classifies (T1)
+## `.tag` — a word that classifies
 
 ```html
 <span class="tag" data-tone="success">installed</span>
@@ -328,7 +331,7 @@ that changes is `role="status"`. With no `data-tone` the dot takes the colour of
 ```
 
 **Border-only: the word in the colour, a 50% edge of the same colour, no fill.** seedr and configr
-both settled on this (R81). A filled chip in every row of a twenty-row table is a column of loud boxes.
+both settled on this. A filled chip in every row of a twenty-row table is a column of loud boxes.
 
 | modifier | means | reach for it when |
 |---|---|---|
@@ -341,18 +344,18 @@ both settled on this (R81). A filled chip in every row of a twenty-row table is 
 | `--icon` | icon only, a square with a 12% tint | `role="img"` and an `aria-label` are mandatory |
 | `--bracket` | the terminal's own `[ live ]`, no box | pagr's status; add `.glow` to light it |
 
-- **Modifiers compose**, and the border style is a second axis a reader can use in grey (D10):
+- **Modifiers compose**, and the border style is a second axis a reader can use in grey:
   dashed means it does not count, dotted means off. `tag--dashed tag--strong` in `--pending` is
   "timed out". There is no `--dotted`: dotted means off, `--off` is the only thing that draws it,
   and an off tag stays dotted whatever else it carries.
-- **Opacity is never an axis.** `--off` replaced it (R85): opacity dims the word below AA and makes
+- **Opacity is never an axis.** `--off` replaced it: opacity dims the word below AA and makes
   the tag look broken rather than off. The one thing here below full opacity is a disabled
   `button.tag`, which is a control's state, not a tag's meaning.
 - **An icon** is `data-icon` on the tag or a `.ico` child, drawn at the small glyph size. The word
   stays the meaning.
 - **Never type the brackets** of `--bracket`, because the stylesheet draws them with empty alt text.
   A screen reader hears "live".
-- **A tip is `data-tip`, with no marker and no cursor change** (R86). You find it by hovering. It
+- **A tip is `data-tip`, with no marker and no cursor change**. You find it by hovering. It
   never repeats the accessible name: `tooltip.js` sets `aria-describedby`, so the same words would be
   read twice. Say something the name does not, or leave the tip off.
 - **`button.tag`** is a tag that *does* something, such as opening the forge's settings. It keeps the
@@ -362,7 +365,7 @@ both settled on this (R81). A filled chip in every row of a twenty-row table is 
 - Tags sit on a line of text centred on its x-height (`vertical-align: middle`), so tags with and
   without a glyph line up.
 
-## `.count` — how many (T2)
+## `.count` — how many
 
 ```html
 skills <span class="count">12</span>
@@ -370,7 +373,7 @@ skills <span class="count">12</span>
   <span class="count count--overlay" aria-hidden="true">3</span></button>
 ```
 
-- **Square** (R83). Every source drew a pill and there is no pill in this estate. It uses tabular
+- **Square**. Every source drew a pill and there is no pill in this estate. It uses tabular
   figures, so a count ticking from 9 to 10 widens by a whole digit and never jitters.
 - Muted by default. `data-tone` colours it.
 - **`--overlay` is filled and hidden.** It sits on the host's corner (the host is `position:

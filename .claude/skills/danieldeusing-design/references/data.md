@@ -15,15 +15,15 @@ below whole; nothing in it leans on `base.css`, which is why the tab bar moved h
 
 Contents:
 
-- An instant is `formatStamp()`, an age is `formatAgo()` — in the viewer's zone (D5)
-- The `when` cell: how long ago, over the exact stamp (D4)
-- A chart is drawn at the size it is shown (D6, D7)
-- One tab row, one engine: `.tabs` and `initTabs()` (D8)
-- The ticker strip: push a row, register a refresher (D9)
-- A state is a `.tag`: cockpit's vocabulary (D10)
+- An instant is `formatStamp()`, an age is `formatAgo()` — in the viewer's zone
+- The `when` cell: how long ago, over the exact stamp
+- A chart is drawn at the size it is shown
+- One tab row, one engine: `.tabs` and `initTabs()`
+- The ticker strip: push a row, register a refresher
+- A state is a `.tag`: cockpit's vocabulary
 - Forced colours and print
 
-## An instant is `formatStamp()`, an age is `formatAgo()` — in the viewer's zone (D5)
+## An instant is `formatStamp()`, an age is `formatAgo()` — in the viewer's zone
 
 ```js
 import { formatStamp, formatAgo, formatDuration, stampParts } from "@danieldeusing/design/runtime/time";
@@ -70,7 +70,7 @@ updated") is not an instant: it keeps the surface's locale format in a `<time da
 
 The five are pure and touch no DOM, so a framework app imports them and renders the same strings.
 
-## The `when` cell: how long ago, over the exact stamp (D4)
+## The `when` cell: how long ago, over the exact stamp
 
 ```js
 import { whenHtml, initRelativeTimes } from "@danieldeusing/design/runtime/time";
@@ -104,7 +104,7 @@ renders
 - An unparseable value renders as a bare `<span class="when-exact">` holding the raw text: visible
   and debuggable. Nothing renders nothing.
 
-## A chart is drawn at the size it is shown (D6, D7)
+## A chart is drawn at the size it is shown
 
 ```html
 <figure class="chart">
@@ -206,7 +206,7 @@ position. So list the series in the order they were passed.
 </ul>
 ```
 
-## One tab row, one engine: `.tabs` and `initTabs()` (D8)
+## One tab row, one engine: `.tabs` and `initTabs()`
 
 ```html
 <div class="tabs" role="tablist" aria-label="review sections" data-tabs-hash>
@@ -269,10 +269,10 @@ followed the hash, which one opened an ancestor, which one told a lazy panel it 
   does not describe an element with its own name, so it is not announced twice. Anywhere else, a tip
   that repeats the name is left off.
 - 44px under a coarse pointer and on a phone: tabs are these pages' primary navigation.
-- A filter over a card grid is not a tab. It is a filter dropdown, `<select data-filter>` (M5), or a
-  set of chips (M8).
+- A filter over a card grid is not a tab. It is a filter dropdown, `<select data-filter>`, or a
+  set of chips.
 
-## The ticker strip: push a row, register a refresher (D9)
+## The ticker strip: push a row, register a refresher
 
 ```html
 <div class="tickstrip" id="tickers" data-label="pollers"></div>
@@ -322,9 +322,13 @@ deliberately not a live region: it changes every second. `renderTickStrip(mount,
 mount (an element or its id) directly, for a page that keeps its own list. `hint` is the row's
 `data-tip`: what the poller does, never its name again.
 
-## A state is a `.tag`: cockpit's vocabulary (D10)
+**The dot draws its own glyph.** `.tick-dot` paints ●, ✕ or ○ from the row's `tick--*` class, in CSS,
+with empty alternative text. The cell holds only the visually hidden state word; a renderer of its own
+that types a glyph into `.tick-dot` shows two.
 
-There is no state CSS here. A state is `.tag` (T1): a tone, and modifiers along four fixed axes, so
+## A state is a `.tag`: cockpit's vocabulary
+
+There is no state CSS here. A state is `.tag`: a tone, and modifiers along four fixed axes, so
 the look is the system's across the estate:
 
 - **tone** (`data-tone`): what kind of state it is;

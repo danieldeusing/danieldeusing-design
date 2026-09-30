@@ -150,6 +150,9 @@ await check("the 1 s clock re-renders from memory: the row now reads stale, its 
 await check("...by PATCHING: the same table, the same row and the same cells — a tip open over the row survives",
   () => evaluate(`document.querySelector("#tickers table") === keep.table && row("ok") === keep.row && Array.from(row("ok").cells).every((c, i) => c === keep.cells[i])`));
 await check("...and a hint that went away takes its data-tip with it", () => evaluate(`!row("ok").hasAttribute("data-tip")`));
+// chrome.css draws the dot as `.tick-dot::before` (0.60.0), so a glyph typed into the cell shows twice.
+await check("...and after the patch every .tick-dot still holds its state WORD alone: the runtime types no ●/✕/○ into the cell",
+  () => evaluate(`Array.from(document.querySelectorAll("#tickers tr[data-key] .tick-dot")).every((c) => c.childNodes.length === 1 && /^(ok|running|stale|never)$/.test(c.textContent))`), dump);
 // esc() writes an apostrophe as &#39; and innerHTML reads it back as a bare apostrophe, so comparing the
 // two serialisations said "changed" on every tick and rebuilt the figures once a second.
 await evaluate(`window.__ddTicks.push({ mount: "tickers", key: "ok", order: 1, label: "ok poller", lastAt: ago(200), intervalMs: 60000,

@@ -175,10 +175,9 @@ function dataRows(table) {
  * Hand-rolling a second picker beside the system's is how five copies of `.cfg-sel`
  * happened.
  *
- * The label WRAPS the select and carries no aria-label, on purpose: that is the branch
- * of initSelects()'s naming that makes the trigger announce the label AND the current
- * value ("rows, 20"), the way a native select does. An aria-label here would replace
- * the whole name and drop the value from it.
+ * The label WRAPS the select and carries no aria-label: initSelects() names the trigger
+ * with the label's own words, "rows", and the trigger's text is its value, "20" — "rows,
+ * combobox, 20", the way a native select is announced.
  */
 function buildBar(instance) {
   const bar = document.createElement("div");
@@ -279,8 +278,23 @@ function turnOff(button, on) {
   else if (!on && button.hasAttribute("aria-disabled")) button.removeAttribute("aria-disabled");
 }
 
+/*
+ * A MOVED TABLE TAKES ITS PAGER WITH IT, and a removed one takes it out. The instance is the table
+ * node's, so a page that appends the table (or its wrapper) somewhere else keeps its page and its size;
+ * the bar is put back directly after the wrapper wherever that is now. A table taken out of the
+ * document leaves no bar standing where it was, and gets it back if it is inserted again.
+ */
+function rehome(instance) {
+  const anchor = instance.table.closest(".tablewrap") || instance.table;
+  if (instance.table.isConnected && anchor.nextElementSibling !== instance.bar) anchor.after(instance.bar);
+}
+
 function enhance(table) {
-  if (enhanced.has(table)) return;
+  const known = enhanced.get(table);
+  if (known) {
+    rehome(known);
+    return;
+  }
 
   const id = table.dataset.tableId;
   if (!id) {
@@ -349,12 +363,16 @@ export function initTablePagination(root = document) {
   // Same reasoning as initSelects(): cockpit rebuilds whole panels out of innerHTML on
   // a poll, so a pager that only enhanced what existed at load would work until the
   // first refresh and then quietly stop.
+  const tablesIn = (node) => (node.tagName === "TABLE" ? [node] : node.querySelectorAll("table"));
   documentObserver = new MutationObserver((records) => {
     for (const record of records) {
+      for (const node of record.removedNodes) {
+        if (node.nodeType !== 1) continue;
+        for (const table of tablesIn(node)) if (!table.isConnected) enhanced.get(table)?.bar.remove();
+      }
       for (const node of record.addedNodes) {
         if (node.nodeType !== 1) continue;
-        if (node.tagName === "TABLE") enhance(node);
-        else for (const table of node.querySelectorAll("table")) enhance(table);
+        for (const table of tablesIn(node)) enhance(table);
       }
     }
   });

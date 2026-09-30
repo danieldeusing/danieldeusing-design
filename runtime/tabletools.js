@@ -728,6 +728,11 @@ const boundBoxes = new WeakSet();
 // rendered between a neighbour and its count would otherwise take that count, and the two would
 // re-assert their own text over each other's for ever — measured, a renderer that never answered.
 const countOwners = new WeakMap();
+// The counts this file made, as against one a renderer drew and the engine adopted: only its own goes
+// with a table that leaves for good.
+const madeCounts = new WeakSet();
+// A retired instance's view, keyed by its table node, for the node coming back somewhere else.
+const carried = new WeakMap();
 
 /* The box the table search reads. A box the page drew is bound once and given the query in force. */
 function useSearchBox(inst, input) {
@@ -777,11 +782,23 @@ function ownBarLost(inst) {
     "patcher matching by position rebuilds the table in its place on every render.");
 }
 
+/*
+ * A MOVED TABLE TAKES ITS BAR AND ITS COUNT WITH IT. A page that appends the table (or its wrapper) into
+ * another container keeps the node, so this instance and the reader's view — sort, filters, search, the
+ * pager's page — stay; what was left behind is the bar before the old position and the count after it,
+ * saying things about a table that is no longer there. So both are placed against where the table IS:
+ * the bar directly before the wrapper, the count directly after it (after the pager, when there is one),
+ * and the new parent is watched from then on.
+ */
 function ensureChrome(inst) {
   const table = inst.table;
   if (inst.ownBar && inst.ownBarParent && !inst.ownBar.isConnected) ownBarLost(inst);
-  if (!table.isConnected) return;
   const anchor = table.closest(".tablewrap") || table;
+  if (anchor.parentElement && anchor.parentElement !== inst.chromeParent) {
+    inst.chromeParent = anchor.parentElement;
+    inst.chrome.observe(inst.chromeParent, { childList: true });
+  }
+  if (!table.isConnected) return;
 
   if (inst.wantsSearch) {
     const pageBar = pageBarOf(anchor);
@@ -806,7 +823,7 @@ function ensureChrome(inst) {
         bar = inst.ownBar;
       }
       if (!bar.contains(inst.searchField)) bar.prepend(inst.searchField);
-      if (!bar.isConnected) {
+      if (bar.nextElementSibling !== anchor) {
         anchor.before(bar);
         if (bar === inst.ownBar) inst.ownBarParent = bar.parentElement;
       }
@@ -817,9 +834,11 @@ function ensureChrome(inst) {
     }
   }
 
-  if (!inst.count || !inst.count.isConnected) {
-    let at = anchor;
-    if (at.nextElementSibling && at.nextElementSibling.classList.contains("table-pager")) at = at.nextElementSibling;
+  let at = anchor;
+  if (at.nextElementSibling && at.nextElementSibling.classList.contains("table-pager")) at = at.nextElementSibling;
+  if (inst.count && inst.count.isConnected) {
+    if (at.nextElementSibling !== inst.count) at.after(inst.count);
+  } else {
     const next = at.nextElementSibling;
     const free = next && next.matches("p.result-count[role=status][data-table-count]") && (countOwners.get(next) || inst) === inst;
     let count = free ? next : inst.count;
@@ -828,6 +847,7 @@ function ensureChrome(inst) {
       count.className = "result-count";
       count.setAttribute("role", "status");
       count.setAttribute("data-table-count", "");
+      madeCounts.add(count);
     }
     if (!count.isConnected) at.after(count);
     if (count !== inst.count) {
@@ -857,6 +877,11 @@ function retire(inst) {
   clearTimeout(inst.countTimer);
   instances.delete(inst.table);
   if (inst.count) countOwners.delete(inst.count);
+  // The node may come back elsewhere (a page that detaches a table and inserts it later): it comes back
+  // with the view the reader left it in, not only what was saved — a table without an id saves nothing.
+  carried.set(inst.table, { identity: inst.identity, view: inst.view });
+  // Gone, not renewed in place: the count this file made would go on standing where the table was.
+  if (!inst.table.isConnected && madeCounts.has(inst.count)) inst.count.remove();
   /*
    * THE ROWS GO BACK FIRST. A filter DETACHES what it withholds, so the body holds only what this
    * instance chose to show — and the next instance reads the body as the whole table. Measured: an
@@ -954,7 +979,9 @@ function enhance(table) {
     sortSticky: table.getAttribute("data-sort-sticky") !== "off",
   };
   instances.set(table, inst);
-  inst.view = restore(inst);
+  const kept = carried.get(table);
+  carried.delete(table);
+  inst.view = kept && kept.identity === inst.identity ? kept.view : restore(inst);
   warnShared(inst);
   watchFocus(inst, table);
 
@@ -996,7 +1023,6 @@ function enhance(table) {
     if (inst.ownBar && inst.ownBarParent && !inst.ownBar.isConnected && !wholesale) ownBarLost(inst);
     retire(inst);
   });
-  if (anchor.parentElement) inst.chrome.observe(anchor.parentElement, { childList: true });
   ensureChrome(inst);
 
   // snapshot() builds the header controls itself when they are absent, and it

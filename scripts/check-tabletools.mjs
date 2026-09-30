@@ -707,6 +707,69 @@ await check("...and a repaint is not a patcher rebuilding the table: no contract
   () => evaluate(`JSON.stringify(window.warned)`));
 await evaluate(`document.getElementById("later").replaceChildren(); window.warned = []; null`);
 
+/* ── 0.61.0 · a table MOVED keeps one bar, one pager, one count, and the reader's view ─────────────────
+   A page that appends an engine table (or its wrapper) into another container left the bar, the pager
+   and the count where the table had been — saying things about nothing — and when the node came back
+   after a detach, a second count beside the first. The state is compared before and after the move:
+   the rows shown, the sort, the search, the page and what the count says must all be the same. */
+await evaluate(`window.initTablePagination(document.getElementById("later")); null`);
+const MOVE_ROWS = Array.from({ length: 60 }, (_, i) => `<tr><td>r${String(i).padStart(2, "0")}</td><td>${i % 3 ? "x" : "y"}</td></tr>`).join("");
+const moveTable = (id) => `<div class="tablewrap"><table data-table-tools${id ? ` data-table-id="${id}"` : ""} aria-label="moved"><thead><tr>` +
+  `<th data-col="n">n</th><th data-col="k" data-filter="pick">k</th></tr></thead><tbody>${MOVE_ROWS}</tbody></table></div>`;
+// No fixed wait: each step waits for what it expects (the count speaks 400 ms after the last apply),
+// and gives up after 3 s so a run that never gets there reports the state it did reach.
+const move = (id, how) => evaluate(`(async () => {
+  const until = async (ok) => { const end = performance.now() + 3000;
+    while (!ok() && performance.now() < end) await new Promise((r) => requestAnimationFrame(r)); };
+  const yieldTask = () => new Promise((r) => setTimeout(r, 0));
+  localStorage.clear(); window.warned = [];
+  const from = document.getElementById("mount"), to = document.getElementById("later");
+  to.replaceChildren();
+  from.innerHTML = ${JSON.stringify(moveTable(id))};
+  await new Promise((r) => setTimeout(r, 50));
+  const t = from.querySelector("table");
+  t.querySelector('th[data-col="n"] .tbl-sort').click();
+  const box = from.querySelector("search.filter-bar input"); box.value = "r"; box.dispatchEvent(new Event("input", { bubbles: true }));
+  [...t.querySelectorAll('th[data-col="k"] .dropdown-item')].find((b) => b.textContent === "x").click();
+  from.querySelector(".table-pager-nav button:last-child")?.click();
+  const counted = () => /hidden by the filters/.test(document.querySelector("p.result-count")?.textContent || "");
+  await until(counted);
+  const state = () => ({ shown: [...t.tBodies[0].rows].filter((r) => !r.hidden).map((r) => r.cells[0].textContent).join(),
+    sort: t.querySelector('th[data-col="n"]').getAttribute("aria-sort"), search: document.querySelector("search.filter-bar input")?.value,
+    page: document.querySelector(".table-pager-status")?.textContent ?? null, count: document.querySelector("p.result-count")?.textContent });
+  const before = state();
+  const wrap = t.closest(".tablewrap");
+  if (${JSON.stringify(how)} === "append") to.appendChild(wrap);
+  else if (${JSON.stringify(how)} === "detach") { wrap.remove(); await yieldTask(); to.appendChild(wrap); }
+  else wrap.remove();
+  await yieldTask();
+  const one = (sel) => document.querySelectorAll(sel).length === 1 && document.querySelector(sel).parentElement === to;
+  if (${JSON.stringify(how)} === "remove") await until(() => !document.querySelector("p.result-count, .table-pager, search.filter-bar"));
+  else await until(() => one("p.result-count") && one("search.filter-bar") && counted());
+  const all = (sel) => [...document.querySelectorAll(sel)].map((n) => n.parentElement.id);
+  return JSON.stringify({ bars: all("search.filter-bar"), pagers: all(".table-pager"), counts: all("p.result-count"),
+    order: [...to.children].map((n) => n.matches("search") ? "bar" : n.className), left: from.children.length,
+    same: JSON.stringify(state()) === JSON.stringify(before), before, after: state(),
+    warned: window.warned.filter((w) => w.includes("data-table-bar")).length });
+})()`);
+const paged = (m) => m.bars.join() === "later" && m.pagers.join() === "later" && m.counts.join() === "later" &&
+  m.order.join() === "bar,tablewrap,table-pager,result-count" && m.left === 0 && m.same && m.warned === 0;
+const mv1 = JSON.parse(await move("mv", "append"));
+await check("0.61.0 — a paged engine table APPENDED into another container: one bar, one pager, one count, all there, in order; sort, search, filter, page and count as they were",
+  async () => paged(mv1) && mv1.before.page === "21–40 of 40", JSON.stringify(mv1));
+const mv2 = JSON.parse(await move("mv", "detach"));
+await check("0.61.0 — the same table DETACHED and inserted there a moment later: still one of each, and the same view",
+  async () => paged(mv2), JSON.stringify(mv2));
+const mv3 = JSON.parse(await move("", "detach"));
+await check("0.61.0 — ...and without a data-table-id, which remembers nothing, the view still comes back with the node",
+  async () => mv3.bars.join() === "later" && mv3.counts.join() === "later" && mv3.pagers.length === 0 &&
+    mv3.order.join() === "bar,tablewrap,result-count" && mv3.left === 0 && mv3.same && /hidden by the filters/.test(mv3.after.count),
+  JSON.stringify(mv3));
+const mv4 = JSON.parse(await move("mv", "remove"));
+await check("0.61.0 — a table REMOVED for good takes its bar, its pager and its count with it",
+  async () => mv4.bars.length === 0 && mv4.pagers.length === 0 && mv4.counts.length === 0 && mv4.left === 0 && mv4.warned === 0, JSON.stringify(mv4));
+await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); window.warned = []; null`);
+
 const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
 const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
   .find((path) => path && existsSync(path));
@@ -870,11 +933,13 @@ const shared = await answered(evaluate(`(async () => {
   const box = [...later.querySelectorAll("search.filter-bar")].find((b) => b.getAttribute("aria-label") === "search second").querySelector("input");
   box.value = "p"; box.dispatchEvent(new Event("input", { bubbles: true }));
   await new Promise((r) => setTimeout(r, 600));
-  const counts = [...later.querySelectorAll("p.result-count[role=status]")];
-  return JSON.stringify({ counts: counts.map((c) => c.textContent), afterSecond: counts[0].previousElementSibling.getAttribute("aria-label") });
+  // Each count by the table it follows: since 0.61.0 the first table's count is put back after the
+  // first table rather than left under the second, which would print the first's result there.
+  return JSON.stringify(Object.fromEntries([...later.querySelectorAll("p.result-count[role=status]")]
+    .map((c) => [c.previousElementSibling.getAttribute("aria-label"), c.textContent])));
 })()`), 5000);
-await check("fix round 1 — a table drawn between a neighbour and its count makes its own count, and the two say their own things", async () =>
-  shared === JSON.stringify({ counts: ["1 of 2 runs — 1 hidden by the filters", ""], afterSecond: "second" }), shared);
+await check("fix round 1 — a table drawn between a neighbour and its count makes its own count, and each says its own thing under its own table", async () =>
+  shared === JSON.stringify({ first: "", second: "1 of 2 runs — 1 hidden by the filters" }), shared);
 
 browser.close();
 server.close();

@@ -108,10 +108,16 @@ let wired = false;
 let sizes = null;
 
 // Every piece of chrome on the page NOW, including one mounted after the first call (a route that
-// renders its own toolbar): observing an element twice is a no-op, so this is safe to repeat.
+// renders its own toolbar). Each element once: observing one again restarts its observation, which
+// delivers a fresh callback and a fresh measurement for nothing.
+const watched = new WeakSet();
 function watchSizes() {
   if (!sizes) return;
-  for (const el of document.querySelectorAll(CHROME)) sizes.observe(el);
+  for (const el of document.querySelectorAll(CHROME)) {
+    if (watched.has(el)) continue;
+    watched.add(el);
+    sizes.observe(el);
+  }
 }
 
 export function initLsNav() {

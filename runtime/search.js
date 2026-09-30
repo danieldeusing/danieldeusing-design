@@ -38,8 +38,9 @@ function sync(field) {
   const input = inputOf(field);
   const clear = clearOf(field);
   if (!input || !clear) return;
-  clear.hidden = !input.value;
-  clear.disabled = input.disabled;
+  // Written only when it changes: a second initSearchFields() must not wake every attribute observer.
+  if (clear.hidden !== !input.value) clear.hidden = !input.value;
+  if (clear.disabled !== input.disabled) clear.disabled = input.disabled;
 }
 
 function settle(field) {

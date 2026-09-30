@@ -56,10 +56,35 @@ function nameOf(el) {
   return node?.tagName === "IMG" ? "zoom image" : "zoom diagram";
 }
 
+/*
+ * ONE VIEW FOR THE PAGE, however many calls wire openers: it was built per call, so a page calling
+ * this for every figure it rendered grew one more <dialog> (and ten listeners) with each call.
+ */
+let openView = null;
+
 export function initDiagramZoom(selector = ".diagram") {
   const diagrams = Array.from(document.querySelectorAll(selector));
   if (!diagrams.length) return;
+  openView ??= viewer();
+  const open = openView;
 
+  for (const d of diagrams) {
+    // A marker of its own, not the class: an author may write `.dgm-zoomable` in the markup, and
+    // that opener still needs its role, its keys and its click.
+    if ("dgmWired" in d.dataset) continue;
+    d.dataset.dgmWired = "";
+    d.classList.add("dgm-zoomable");
+    d.setAttribute("role", "button");
+    d.setAttribute("tabindex", "0");
+    if (!d.hasAttribute("aria-label")) d.setAttribute("aria-label", nameOf(d));
+    d.addEventListener("click", () => open(d));
+    d.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(d); }
+    });
+  }
+}
+
+function viewer() {
   let view, stage, art;
   let scale = 1, tx = 0, ty = 0, moved = false, pressedStage = false;
   const pointers = new Map(); // pointerId -> { x, y }, while a finger or the mouse is down
@@ -183,7 +208,8 @@ export function initDiagramZoom(selector = ".diagram") {
   const open = (source) => {
     const node = source.querySelector("svg, img, canvas");
     if (!node) return;
-    if (!view) build();
+    // Built on first use, and again if a page re-render took it out of <body>.
+    if (!view?.isConnected) build();
     // Measure the ORIGINAL while it is still laid out. The clone needs a definite
     // pixel size: a mermaid svg is sized by `width="100%"` plus an inline
     // max-width, and both resolve against a parent — dropping them to "let it
@@ -211,18 +237,5 @@ export function initDiagramZoom(selector = ".diagram") {
     requestAnimationFrame(fit);
   };
 
-  for (const d of diagrams) {
-    // A marker of its own, not the class: an author may write `.dgm-zoomable` in the markup, and
-    // that opener still needs its role, its keys and its click.
-    if ("dgmWired" in d.dataset) continue;
-    d.dataset.dgmWired = "";
-    d.classList.add("dgm-zoomable");
-    d.setAttribute("role", "button");
-    d.setAttribute("tabindex", "0");
-    if (!d.hasAttribute("aria-label")) d.setAttribute("aria-label", nameOf(d));
-    d.addEventListener("click", () => open(d));
-    d.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(d); }
-    });
-  }
+  return open;
 }

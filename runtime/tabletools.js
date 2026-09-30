@@ -989,10 +989,10 @@ function enhance(table) {
 
   /*
    * `data-table-search="off"` — for a page whose OWN search is richer than this
-   * one can be. The contacts book searches a haystack built from descriptions
-   * and conversation summaries, none of which is in a cell; replacing it with a
-   * box that only sees rendered text would silently stop finding a thing that
-   * was said. Two search boxes over one table is worse than either.
+   * one can be: one that asks its server, say, over records the table does not
+   * hold. A box that only sees the rows in the body would silently stop finding
+   * what the page's search finds. Two search boxes over one table is worse than
+   * either.
    *
    * The per-column filters, the sort and the view bar are unaffected — this
    * turns off the built-in box only, and the bar then never claims a search.

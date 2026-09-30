@@ -459,7 +459,8 @@ the pager slices exactly the matching set and needs to know nothing about filter
 
 - **The search finds what no column prints.** A row's `data-search-text` is matched with its text,
   so a review id or a job id needs no second box. `data-table-search="off"` is still there for a page
-  whose search cannot be expressed per row (the contacts book searches conversation summaries).
+  whose search cannot be expressed per row — one that asks its server, say, over records the table
+  does not hold.
 - **The page's bar is used, not duplicated.** A `<search class="filter-bar" data-table-bar>` directly
   before the table's wrapper gets the search FIRST in it; the page's `.filter-bar-spacer` and its one
   action stay. Without one, the engine builds the bar (a `.filter-bar` + `.search-field`, `filters.md`).

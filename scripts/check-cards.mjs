@@ -871,7 +871,7 @@ await check("the demo page shows every element and state the spec names", () => 
    ".card-terminal .value-filter", ".card-terminal .btn-icon[aria-pressed]",
    ".stat-grid", ".stat-tile[data-state='idle']", ".stat-tile[data-state='action']", ".stat-tile[data-state='broken']",
    ".stat-tile[data-state='unknown']", ".stat-tile[data-tone]", "div.stat-tile a.stat-cta", ".stat-tile .ico--xl",
-   ".panel .panel-head .ico", ".panel-actions .btn-icon", ".panel-foot .filter-bar-spacer", ".panel-head--eyebrow", ".panel-body--flush",
+   ".panel .panel-head .ico", ".panel-actions .btn-icon", ".panel-foot .panel-actions .btn-icon", ".panel-head--eyebrow", ".panel-body--flush",
    ".panel-head .disclosure-btn[aria-expanded='true']", ".panel-body[hidden]", ".panel--mark .panel-mark", ".panel--mark .panel-main",
    ".card-terminal--flush > .row-list--loose", ".list-row-desc", ".list-row-meta .tag",
    ".row-list--select .list-row[aria-current='true']", ".row-list--select .list-row[aria-selected='true']", ".list-row:disabled",

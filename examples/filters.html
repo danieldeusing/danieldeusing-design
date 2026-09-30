@@ -38,7 +38,10 @@
       .lede { color: var(--muted-foreground); max-width: 70ch; margin: 0.25rem 0 1rem; }
       .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; }
       .state { display: grid; gap: 0.35rem; justify-items: start; }
-      .state > .label { color: var(--muted-foreground); }
+      .state > .label, .states .label { color: var(--muted-foreground); }
+      /* A gallery of states, one bar per state: the label leads, the control sits on the right. */
+      .states { display: grid; gap: 0.5rem; max-inline-size: 40rem; }
+      .states > .filter-bar { margin: 0; }
       .demo-list { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr)); }
       .demo-card { position: relative; display: grid; gap: 0.4rem; }
       .demo-card h3 { font-size: var(--fs-base); margin: 0; }
@@ -80,14 +83,13 @@
       <!-- ── M7 the composition, live ───────────────────────────────────────────── -->
       <section class="demo" id="browse">
         <p class="prompt">ls ~/skills</p>
-        <p class="lede">The whole bar, in its order — search → spacer → filters → sort → separator → actions — driving a list. Type to see the pending line; pick a filter, click a tag on a card, remove a chip.</p>
+        <p class="lede">The whole bar, in its order — search → filters → sort → separator → actions — driving a list. The search leads on the left; everything else sits on the right, at every width. Type to see the pending line; pick a filter, click a tag on a card, remove a chip.</p>
         <search class="filter-bar" aria-label="skills">
           <div class="search-field" id="q-field">
             <input type="search" id="q" aria-label="search skills" placeholder="search…"
                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore />
             <button type="button" class="search-clear" aria-label="clear search" hidden></button>
           </div>
-          <span class="filter-bar-spacer"></span>
           <select data-filter aria-label="type" id="f-type">
             <option value="">all</option><option value="skill">skill</option><option value="agent">agent</option>
             <option value="command">command</option><option value="hook">hook</option><option value="mcp">mcp</option>
@@ -122,10 +124,19 @@
               <input type="search" aria-label="search hosts" placeholder="search…" autocomplete="off" spellcheck="false" data-1p-ignore />
               <button type="button" class="search-clear" aria-label="clear search" hidden></button>
             </div>
-            <span class="filter-bar-spacer"></span>
             <select data-filter aria-label="role"><option value="">all</option><option value="edge">edge</option><option value="compute">compute</option></select>
           </search>
           <ul class="sticky-rows" id="sticky-rows"></ul>
+        </div>
+      </section>
+
+      <!-- ── M7 with no search: a heading leads ──────────────────────────────────── -->
+      <section class="demo">
+        <p class="prompt">man filter-bar --no-search</p>
+        <p class="lede">A row of filters with no search is still a <code>.filter-bar</code>, and its controls are still on the right. A heading, or a label marked <code>.filter-bar-lead</code>, may lead it — cockpit's stats picker, which always has a repository.</p>
+        <div class="filter-bar" id="no-search">
+          <h3>merge rate</h3>
+          <select data-filter aria-label="repository"><option value="vu3">poi/vu3</option><option value="infra">dd/infra</option><option value="design">dd/design</option></select>
         </div>
       </section>
 
@@ -151,17 +162,19 @@
       <!-- ── M5 filter dropdown states (+ C8) ───────────────────────────────────── -->
       <section class="demo">
         <p class="prompt">man filter-dropdown</p>
-        <div class="row">
-          <div class="state"><span class="label">at rest: names the facet</span>
+        <div class="states">
+          <div class="filter-bar"><span class="label filter-bar-lead">at rest: names the facet</span>
             <select data-filter aria-label="scope"><option value="">all</option><option value="user">user</option><option value="project">project</option></select></div>
-          <div class="state"><span class="label">filtering: names the value</span>
+          <div class="filter-bar"><span class="label filter-bar-lead">filtering: names the value, and the × clears it</span>
             <select data-filter aria-label="agent"><option value="">all</option><option value="claude" selected>claude</option><option value="codex">codex</option></select></div>
-          <div class="state"><span class="label">required picker: no "all", no clear</span>
+          <div class="filter-bar"><span class="label filter-bar-lead">required picker: no "all", no clear</span>
             <select data-filter aria-label="repository"><option value="vu3">poi/vu3</option><option value="infra">dd/infra</option></select></div>
-          <div class="state"><span class="label">disabled</span>
+          <div class="filter-bar"><span class="label filter-bar-lead">disabled</span>
             <select data-filter aria-label="host" disabled><option value="">all</option><option value="ddmini" selected>ddmini</option></select></div>
-          <div class="state"><span class="label">long list: a search row</span>
+          <div class="filter-bar"><span class="label filter-bar-lead">long list: a search row</span>
             <select data-filter aria-label="model" id="f-model"></select></div>
+        </div>
+        <div class="row demo-mt-075">
           <div class="state"><span class="label">option icons · invalid</span>
             <select aria-label="kind" aria-invalid="true" aria-describedby="kind-err"><option data-icon="file">skill</option><option data-icon="folder">plugin</option><option data-icon="star">favourite</option></select>
             <p class="field-error" id="kind-err">pick a kind this list can show</p></div>
@@ -171,12 +184,12 @@
       <!-- ── M6 sort ─────────────────────────────────────────────────────────────── -->
       <section class="demo">
         <p class="prompt">man sort-ctl</p>
-        <div class="row">
-          <div class="state"><span class="label">ascending</span>
+        <div class="states">
+          <div class="filter-bar"><span class="label filter-bar-lead">ascending</span>
             <div class="sort-ctl btn-group" role="group" aria-label="sort"><button type="button" class="sort-dir" data-dir="asc" aria-label="sort descending"></button><select data-sort aria-label="sort by"><option>name</option><option>updated</option></select></div></div>
-          <div class="state"><span class="label">descending</span>
+          <div class="filter-bar"><span class="label filter-bar-lead">descending</span>
             <div class="sort-ctl btn-group" role="group" aria-label="sort"><button type="button" class="sort-dir" data-dir="desc" aria-label="sort ascending"></button><select data-sort aria-label="sort by"><option>updated</option><option>name</option></select></div></div>
-          <div class="state"><span class="label">disabled arrow</span>
+          <div class="filter-bar"><span class="label filter-bar-lead">disabled arrow</span>
             <div class="sort-ctl btn-group" role="group" aria-label="sort"><button type="button" class="sort-dir" data-dir="asc" aria-label="sort descending" disabled></button><select data-sort aria-label="sort by" disabled><option>name</option></select></div></div>
         </div>
       </section>
@@ -184,22 +197,24 @@
       <!-- ── M8 chips ────────────────────────────────────────────────────────────── -->
       <section class="demo">
         <p class="prompt">man chip</p>
-        <p class="lede">A multi-select filter: each chip toggles, <code>all</code> clears the set and is pressed when none is.</p>
-        <div class="chip-set" role="group" aria-label="tags" id="tags">
-          <button type="button" class="chip" aria-pressed="true">all</button>
-          <button type="button" class="chip" aria-pressed="false">#agents <span class="chip-count">12</span></button>
-          <button type="button" class="chip" aria-pressed="false">#design <span class="chip-count">7</span></button>
-          <button type="button" class="chip" aria-pressed="false">#infra <span class="chip-count">31</span></button>
+        <p class="lede">A multi-select filter: each chip toggles, and a pressed one carries the × that removes it. <code>all</code> (<code>data-all</code>) clears the set, is pressed when none is, and has no ×. In a bar, the chips wrap against the right edge.</p>
+        <div class="filter-bar" id="tags-bar">
+          <div class="chip-set" role="group" aria-label="tags" id="tags">
+            <button type="button" class="chip" aria-pressed="true" data-all>all</button>
+            <button type="button" class="chip" aria-pressed="false">#agents <span class="chip-count">12</span></button>
+            <button type="button" class="chip" aria-pressed="false">#design <span class="chip-count">7</span></button>
+            <button type="button" class="chip" aria-pressed="false">#infra <span class="chip-count">31</span></button>
+          </div>
         </div>
-        <div class="row demo-mt-075">
-          <div class="state"><span class="label">identity (--chip-accent)</span>
+        <div class="states">
+          <div class="filter-bar"><span class="label filter-bar-lead">identity (--chip-accent)</span>
             <div class="chip-set" role="group" aria-label="hosts">
               <button type="button" class="chip demo-chip-info" aria-pressed="true">ddmini</button>
               <button type="button" class="chip demo-chip-pending" aria-pressed="false">ddstudio</button>
             </div></div>
-          <div class="state"><span class="label">a link chip (current page)</span>
+          <div class="filter-bar"><span class="label filter-bar-lead">a link chip (current page)</span>
             <div class="chip-set"><a class="chip" href="#top" aria-current="page">#agents</a><a class="chip" href="#top">#design</a></div></div>
-          <div class="state"><span class="label">disabled</span>
+          <div class="filter-bar"><span class="label filter-bar-lead">disabled</span>
             <div class="chip-set"><button type="button" class="chip" aria-pressed="false" disabled>#archived</button></div></div>
         </div>
       </section>

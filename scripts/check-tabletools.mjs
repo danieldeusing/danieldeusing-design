@@ -312,12 +312,34 @@ await check("...and its text as before: \"review\" finds the two rows that carry
 /* ── the page's own bar, with its one action ────────────────────────────────────────────────────── */
 
 await evaluate(`localStorage.clear(); window.build({ before:
-  '<search class="filter-bar" data-table-bar aria-label="runs"><span class="filter-bar-spacer"></span><button type="button" id="new-run">new run</button></search>' }); null`);
-await check("D2 — a <search class=\"filter-bar\" data-table-bar> before the table is USED: the search goes first in it, its spacer and action stay", async () =>
+  '<search class="filter-bar" data-table-bar aria-label="runs"><button type="button" id="new-run">new run</button></search>' }); null`);
+await check("D2 — a <search class=\"filter-bar\" data-table-bar> before the table is USED: the search goes first in it, its action stays", async () =>
   evaluate(`(() => { const bars = document.querySelectorAll("#mount search.filter-bar");
     const kids = [...bars[0].children].map((c) => c.className || c.id);
-    return bars.length === 1 && kids.join() === "search-field,filter-bar-spacer,new-run" && bars[0].getAttribute("aria-label") === "runs"; })()`),
+    return bars.length === 1 && kids.join() === "search-field,new-run" && bars[0].getAttribute("aria-label") === "runs"; })()`),
   async () => evaluate(`JSON.stringify([...document.querySelectorAll("#mount search")].map((b) => [...b.children].map((c) => c.className || c.id)))`));
+
+// 0.62.0: the bar needs no spacer. Under the real filters.css the engine's search is flush with the
+// bar's left edge and the page's one action flush with its right, with nothing drawn between them —
+// at a desktop width and a phone's, where the search takes the first row and the action wraps under it.
+const barEdges = () => evaluate(`(async () => {
+  if (!document.getElementById("fx-bar-css")) {
+    const links = ["tokens", "filters"].map((f) => Object.assign(document.createElement("link"), { rel: "stylesheet", href: "/src/" + f + ".css" }));
+    links[0].id = "fx-bar-css";
+    document.head.append(...links);
+    await Promise.all(links.map((l) => new Promise((ok) => { l.onload = ok; l.onerror = ok; })));
+  }
+  const bar = document.querySelector("#mount search.filter-bar"), b = bar.getBoundingClientRect();
+  const search = bar.querySelector(".search-field").getBoundingClientRect(), action = document.getElementById("new-run").getBoundingClientRect();
+  return { width: innerWidth, kids: bar.children.length, left: search.left - b.left, right: b.right - action.right }; })()`);
+for (const width of [1280, 375]) {
+  await send("Emulation.setDeviceMetricsOverride", { width, height: 800, deviceScaleFactor: 1, mobile: false });
+  const edges = await barEdges();
+  await check(`0.62.0 — at ${width}px the engine's search is flush left in the page's bar and its action flush right, two children and no spacer`,
+    () => edges.kids === 2 && Math.abs(edges.left) <= 1 && Math.abs(edges.right) <= 1, JSON.stringify(edges));
+}
+await send("Emulation.clearDeviceMetricsOverride");
+await evaluate(`for (const l of document.querySelectorAll('link[href="/src/tokens.css"], link[href="/src/filters.css"]')) l.remove(); null`);
 
 /* ── the count: silent at rest, settled, after the pager ────────────────────────────────────────── */
 
@@ -499,8 +521,8 @@ await check("fix round 1 — Enter on a filter's badge clears it, and focus land
    engine adopts them: an input[type=search][data-table-search] in the bar, a p.result-count[role=status]
    [data-table-count] after the table. */
 
-const BAR = '<search class="filter-bar" data-table-bar aria-label="runs"><span class="filter-bar-spacer"></span><button type="button" id="new-run">new run</button></search>';
-const THEIR_BAR = '<search class="filter-bar" data-table-bar aria-label="runs"><div class="search-field"><input type="search" data-table-search aria-label="search runs"><button type="button" class="search-clear" aria-label="clear the search" hidden></button></div><span class="filter-bar-spacer"></span></search>';
+const BAR = '<search class="filter-bar" data-table-bar aria-label="runs"><button type="button" id="new-run">new run</button></search>';
+const THEIR_BAR = '<search class="filter-bar" data-table-bar aria-label="runs"><div class="search-field"><input type="search" data-table-search aria-label="search runs"><button type="button" class="search-clear" aria-label="clear the search" hidden></button></div></search>';
 const THEIR_COUNT = '<p class="result-count" role="status" data-table-count></p>';
 const chromeNow = () => evaluate("JSON.stringify(window.chromeState())");
 const WHOLE = JSON.stringify({ bars: 1, boxes: 1, first: true, value: "a", counts: 1, count: "2 of 3 runs — 1 hidden by the filters", countAfterTable: true, rows: "ada,grace" });
@@ -838,7 +860,7 @@ if (!DOM_PATCH) {
   // the rows the old instance held are not put back on top of it.
   // A page bar first, so the patch lines up: the SAME table node is patched, and retire() runs over a body
   // the renderer has rewritten.
-  const PAGE_BAR = '<search class="filter-bar" data-table-bar><span class="filter-bar-spacer"></span></search>';
+  const PAGE_BAR = '<search class="filter-bar" data-table-bar></search>';
   await evaluate(`localStorage.clear(); document.getElementById("later").innerHTML = ${JSON.stringify(PAGE_BAR + labelled('aria-label="runs (8)"', 8))};
     window.keepTable = document.querySelector("#later table"); null`);
   await sleep(100);
@@ -860,7 +882,7 @@ if (!DOM_PATCH) {
   // every poll, and the engine says so once. With the page's bar, the same table node survives and the
   // engine says nothing. A page that simply clears its mount is not warned either.
   const WRAPPED = (id) => `<div class="tablewrap"><table data-table-tools data-table-id="${id}" aria-label="${id}"><thead><tr><th data-col="v">v</th></tr></thead><tbody>${rowsOf(4)}</tbody></table></div>`;
-  const H1_BAR = '<search class="filter-bar" data-table-bar><span class="filter-bar-spacer"></span></search>';
+  const H1_BAR = '<search class="filter-bar" data-table-bar></search>';
   const barWarnings = () => evaluate(`JSON.stringify(window.warned.filter((w) => w.includes("data-table-bar")))`);
   const threePolls = (source) => evaluate(`(async () => { for (let i = 0; i < 3; i += 1) {
     window.cockpitPatch(document.getElementById("later"), ${JSON.stringify("SOURCE")}.replace("SOURCE", source)); await new Promise((r) => setTimeout(r, 150)); } })()`.replace("source", JSON.stringify(source)));

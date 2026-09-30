@@ -394,10 +394,17 @@
 
 /* ── M7 · .filter-bar ───────────────────────────────────────────────────────────────────────────
    configr's RegistryBrowser and seedr's Browse arrived at the same order without comparing notes,
-   and the order is the rule: search → spacer → filters → sort → separator → actions. The search
-   is where the eye starts, the spacer pushes everything that narrows the list to the far edge,
-   and actions — refresh, add — come last and apart, because they do something rather than choose
-   something.
+   and the order is the rule: search → filters → sort → separator → actions. The search is where
+   the eye starts; actions — refresh, add — come last and apart, because they do something rather
+   than choose something.
+
+   THE LEAD IS LEFT, EVERYTHING ELSE IS RIGHT, AT EVERY WIDTH (0.62.0). Daniel, 2026-09-30: "Filters,
+   sort and so on are always right aligned. Search input field always left aligned." The bar packs
+   its children against the end edge, and its LEAD takes the free space after itself: a
+   `.search-field`, a heading, or anything marked `.filter-bar-lead` (a label that is not a heading).
+   A bar with no lead has every control on the right. Until 0.62.0 a `.filter-bar-spacer` did the
+   pushing, and a page that forgot it got its filters on the left beside the search; there is
+   nothing to forget now. `findMisplacedFilters()` (runtime/rhythm.js) measures the rule on a page.
 
    `--sticky` pins the bar under a page's header (`--sticky-top`) and is OPAQUE: configr blurred
    what scrolled under it, which is a translucent surface text has to be read through. */
@@ -405,14 +412,20 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
   margin-block-end: 1rem;
+}
+.filter-bar > :is(.search-field, h2, h3, h4, h5, h6, .filter-bar-lead) {
+  margin-block: 0;
+  margin-inline-end: auto;
 }
 .filter-bar > .search-field {
   flex: 1 1 14rem;
   max-inline-size: 24rem;
 }
-.filter-bar-spacer { flex: 1; }
+/* A long tag list wraps against the right edge too, not back to the left of its own box. */
+.filter-bar > .chip-set { justify-content: flex-end; }
 /* The separator is chrome.css's `.sep`, redrawn whole here: a bar on a surface without chrome.css
    still shows where the actions begin. */
 .filter-bar > .sep {
@@ -427,14 +440,15 @@
   padding-block: 0.5rem;
   background: var(--background);
 }
-/* A phone has no room for a spacer: the search takes the whole first row and the filters wrap
-   under it, left-aligned where a thumb can reach them. */
+/* On a phone the search takes the whole first row and the controls wrap under it, RIGHT-aligned
+   like everywhere else. Until 0.62.0 they went left "where a thumb can reach them"; Daniel's rule
+   is that filters are always on the right, and one bar that changes sides with the width is two
+   places to look. */
 @media (max-width: 40rem) {
   .filter-bar > .search-field {
     flex-basis: 100%;
     max-inline-size: none;
   }
-  .filter-bar-spacer { display: none; }
 }
 
 /* ── M8 · .chip / .chip-set — a multi-select filter ─────────────────────────────────────────────
@@ -521,6 +535,11 @@
   color: var(--primary);
   border-color: var(--primary);
 }
+/* A PRESSED CHIP CARRIES THE × TOO (0.62.0), drawn the same way: pressing it again removes that
+   filter, and Daniel's rule is that an active filter shows the x that removes it. Not the chip marked
+   `data-all` — the "all" chip resets the set, and pressing it again removes nothing. A link chip on
+   `aria-current="page"` navigates rather than toggles, so it gets none either. */
+.chip[aria-pressed="true"]:not([data-all])::after,
 .chip--remove::after {
   content: "";
   flex: none;
@@ -716,6 +735,7 @@
   .sort-dir,
   .load-more > button,
   .search-field[data-pending]::after,
+  .chip[aria-pressed="true"]:not([data-all])::after,
   .chip--remove::after {
     display: none !important;
   }

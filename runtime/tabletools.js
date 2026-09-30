@@ -62,7 +62,8 @@
  *     what no column prints (a review id, a job id) without a second box.
  *   · THE PAGE'S OWN BAR. A `<search class="filter-bar" data-table-bar>` directly before the
  *     table's wrapper is used, not duplicated: the search goes FIRST in it, and whatever the page
- *     put there (a `.filter-bar-spacer` and its one action) stays.
+ *     put there (its one action) stays. The bar puts the search on the left and the rest on the
+ *     right (filters.css, 0.62.0), so nothing is drawn to push them apart.
  *   · THE COUNT. A `p.result-count[role=status]` after the wrapper (and after the pager) says
  *     "7 of 55 runs — 48 hidden by the filters" while rows are withheld, and NOTHING at rest: the
  *     pager already states the total. It is written 400 ms after the last apply, so it announces

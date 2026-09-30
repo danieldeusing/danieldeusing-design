@@ -155,7 +155,10 @@ dialog.dialog--fit { inline-size: max-content; max-inline-size: 90vw; }
 }
 
 /* Controls between the head and the body — a search, a switch, a count — that must stay put while
-   the body scrolls under them (the logs drawer's toolbar is the reason it exists). */
+   the body scrolls under them (the logs drawer's toolbar is the reason it exists).
+   A toolbar that filters is also a `.filter-bar` (0.62.0): the search leads on the left and the
+   filters, the count and the steppers sit on the right, as in every other bar. The bar's own bottom
+   margin goes — the toolbar's rule is its edge, and the body starts right under it. */
 .dialog-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -165,6 +168,7 @@ dialog.dialog--fit { inline-size: max-content; max-inline-size: 90vw; }
   padding: 0.5rem 1.5rem;
   border-block-end: 1px solid var(--border);
 }
+.dialog-toolbar.filter-bar { margin-block-end: 0; }
 
 /* The body is the one part that scrolls: the head and the foot stay on screen however long the
    content gets, so the X and the commit button are always one press away. `min-block-size: 0` is

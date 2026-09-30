@@ -145,6 +145,16 @@ inventory; they name an element, not a section of this file.
 - **Lucide's licence travels into the minified bundle.** The minifier stripped every comment, the
   `/*!` licence included; it keeps `/*!` comments now (0 copies before, 1 after).
 
+### Docs
+
+- **`examples/style-guide.html` is removed.** It predated the release: its own header and footer
+  instead of the chrome, a theme picker with an inline `<svg>`, a `title=` tooltip, a card about the
+  wide-screen scaling 0.56.0 removed, and a local `.chip` and `.meta` that the new system classes
+  collapsed. A new surface starts from `templates/page-chrome.html`; `examples/` shows every
+  component, one reference per page, with no inline `style` attribute.
+- **The README** is rewritten against the current package: the pin rule, the stylesheets, the
+  runtime, the tokens and the repository layout.
+
 ### Checks
 
 Twenty-two suites are new (`check-cards`, `-charts`, `-chrome`, `-components`, `-content`,

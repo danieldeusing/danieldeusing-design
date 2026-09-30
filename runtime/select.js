@@ -242,6 +242,14 @@ function nameTrigger(instance) {
     const element =
       (select.id && document.querySelector(`label[for="${CSS.escape(select.id)}"]`)) ||
       select.closest("label");
+    if (element && !element.id && "ariaLabelledByElements" in trigger) {
+      // The page's <label> is the page's: an id written onto it is an attribute its renderer never
+      // draws, so a patcher matching by id could never find that label again — it rebuilt the rest
+      // of the mount around a new one, and the trigger's aria-labelledby named a node that was gone.
+      // Element reflection names the trigger by the node itself, and writes nothing on the label.
+      trigger.ariaLabelledByElements = [element, trigger];
+      return;
+    }
     if (element) {
       if (!element.id) element.id = `${instance.id}-label`;
       labelId = element.id;

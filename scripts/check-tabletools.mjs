@@ -751,6 +751,35 @@ if (!DOM_PATCH) {
   const clearWarned = await barWarnings();
   await check("...and a page that fills its mount with a different table, then clears it, is not warned", async () => JSON.parse(clearWarned).length === 0, clearWarned);
   await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
+  // S3: a select named by a <label for> the renderer draws WITHOUT an id. An id written onto that label
+  // is an attribute no markup carries, so the patcher, matching by id, never found the label again: it
+  // built a new one and rebuilt the rest of the mount after it (the table among it), and the trigger's
+  // aria-labelledby named a node that was gone. The name is read from the accessibility tree.
+  await send("Accessibility.enable");
+  await send("DOM.enable");
+  const triggerName = async () => {
+    const { root: doc } = await send("DOM.getDocument", { depth: 0 });
+    const { nodeId } = await send("DOM.querySelector", { nodeId: doc.nodeId, selector: "#later .select-trigger" });
+    const { nodes } = await send("Accessibility.getPartialAXTree", { nodeId, fetchRelatives: false });
+    return nodes[0]?.name?.value ?? null;
+  };
+  const S3 = (n) => '<label for="s3-lines">lines</label> <select id="s3-lines"><option>50</option><option selected>200</option></select>' + H1_BAR +
+    '<table data-table-tools data-table-id="s3-runs" aria-label="s3 runs"><thead><tr><th data-col="v">v</th></tr></thead><tbody>' + rowsOf(n) + '</tbody></table>';
+  await evaluate(`(async () => { localStorage.clear(); const later = document.getElementById("later"); later.innerHTML = ${JSON.stringify(S3(4))};
+    (await import("/runtime/select.js")).initSelects(later); })()`);
+  await sleep(150);
+  await evaluate(`window.keepTable = document.querySelector("#later table"); window.keepLabel = document.querySelector("#later label"); null`);
+  const s3 = [];
+  for (let i = 0; i < 7; i += 1) {
+    await evaluate(`window.cockpitPatch(document.getElementById("later"), ${JSON.stringify("SOURCE")}); null`.replace('"SOURCE"', JSON.stringify(S3(4 + (i % 2)))));
+    await sleep(150);
+    s3.push({ name: await triggerName(), ...(await evaluate(`({ table: document.querySelector("#later table") === window.keepTable,
+      label: document.querySelector("#later label") === window.keepLabel && !window.keepLabel.id })`)) });
+  }
+  await check("S3 — 7 cockpitPatch polls over a select whose <label> has no id: the label is never given one, the same table node survives every poll, and the trigger keeps its name",
+    async () => s3.every((p) => p.table && p.label && /^lines\b/.test(p.name || "")), JSON.stringify(s3));
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
 }
 
 /* ── fix round 1 · a count belongs to one table ────────────────────────────────────────────────────

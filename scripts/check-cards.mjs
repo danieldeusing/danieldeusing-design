@@ -861,7 +861,7 @@ await check("the demo page shows every element and state the spec names", () => 
    ".stat-tile[data-state='unknown']", ".stat-tile[data-tone]", "div.stat-tile a.stat-cta", ".stat-tile .ico--xl",
    ".panel .panel-head .ico", ".panel-actions .btn-icon", ".panel-foot .filter-bar-spacer", ".panel-head--eyebrow", ".panel-body--flush",
    ".panel-head .disclosure-btn[aria-expanded='true']", ".panel-body[hidden]", ".panel--mark .panel-mark", ".panel--mark .panel-main",
-   ".card-terminal--flush > .row-list--loose", ".row-list--ruled[style*='--row-lead-w']", ".list-row-desc", ".list-row-meta .tag",
+   ".card-terminal--flush > .row-list--loose", ".list-row-desc", ".list-row-meta .tag",
    ".row-list--select .list-row[aria-current='true']", ".row-list--select .list-row[aria-selected='true']", ".list-row:disabled",
    ".list-row[aria-current='page']", ".list-row[aria-label*='opens']",
    ".entry-list--ruled .entry .card-link", ".entry .value-filter", ".entry--wide", ".entry--narrow .entry-lead--accent", ".entry--keep",
@@ -872,7 +872,10 @@ await check("the demo page shows every element and state the spec names", () => 
    ".pane-collapsed--end", ".split:not(:has(.splitter)) > .split-pane + .split-pane",
    ".clamp[data-clamped]", ".clamp:not([data-clamped])", ".section-head .btn-icon[aria-expanded='false']",
    ".console .console-dots", ".console .console-status .dot--pulse", ".console-line--current", ".console-body mark"]
-  .filter((sel) => !document.querySelector(sel)).map((sel) => "missing on the demo page: " + sel)`));
+  .filter((sel) => !document.querySelector(sel)).map((sel) => "missing on the demo page: " + sel)
+  // --row-lead-w is read COMPUTED: the demo sets it from a stylesheet, not an inline style attribute.
+  .concat([...document.querySelectorAll(".row-list--ruled")].some((l) => getComputedStyle(l).getPropertyValue("--row-lead-w").trim())
+    ? [] : ["missing on the demo page: a .row-list--ruled with a --row-lead-w"])`));
 
 await check("every tree and listbox on the demo is ONE tab stop, and every item is focusable (APG, a navigation tree included)", () => evaluate(`
   [...document.querySelectorAll('[role="tree"], [role="listbox"]')].flatMap((tree) => {

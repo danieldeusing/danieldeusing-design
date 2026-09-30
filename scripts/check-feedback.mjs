@@ -668,7 +668,8 @@ await check("feedback.md's examples follow the same rule, show a failed result b
   const docs = blocks.map((html) => new DOMParser().parseFromString(html, "text/html"));
   const problems = docs.flatMap((doc) => ${ROLES}(doc));
   for (const b of docs.flatMap((doc) => [...doc.querySelectorAll(".banner")]))
-    if (/frozen/.test(b.textContent) && b.getAttribute("role") !== "status") problems.push("the frozen banner has role=" + b.getAttribute("role") + ", wants status");
+    // In a role=status region, its own or one that was already there (the ruling puts it inside one).
+    if (/frozen/.test(b.textContent) && !b.closest("[role='status']")) problems.push("the frozen banner has role=" + b.getAttribute("role") + " and sits in no role=status region");
   const failedResult = docs.some((doc) => [...doc.querySelectorAll(".notice--lg[role='alert']")]
     .some((n) => !n.parentElement.closest("[role='status'], [role='alert']")));
   if (!failedResult) problems.push("no failed result (a --lg notice with role=alert) is shown beside its status slot");

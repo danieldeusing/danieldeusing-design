@@ -1127,7 +1127,8 @@ export function resetTableView(table) {
 
 /**
  * Give every `<table data-table-tools>` a search box, per-column sort and filter
- * controls in its header, and a bar naming whatever is currently in force.
+ * controls in its header, and a badge naming the value on each filtering column.
+ * `data-table-id` is optional here and keys the remembered view.
  *
  * Markup contract: `<th data-col="key">` on each column that participates.
  * Optional: `data-filter="pick"` for a value list instead of a text box,

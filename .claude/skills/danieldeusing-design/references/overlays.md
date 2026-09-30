@@ -423,6 +423,13 @@ read name "refresh catalog", description "refresh catalog".
   and takes back only that token, so a select trigger pointing at its `.field-error` keeps it while
   the tip shows and after it goes.
 
+### No tip on a column header (Daniel, 2026-08-21, confirmed 2026-09-29)
+
+**A `<th>` carries no `data-tip`.** A header already holds the sort button, the filter and the
+badge, and a tip there sits over the controls a reader is reaching for. Explain a column where it
+is read instead: in the cell's own tip, in a `.field-desc` or note above the table, or in a clearer
+header word.
+
 ### There is no marker — discovery is by hover (0.45.0, Daniel)
 
 **Write the tip and nothing else. A `data-tip` host renders no glyph, no underline, no dotted

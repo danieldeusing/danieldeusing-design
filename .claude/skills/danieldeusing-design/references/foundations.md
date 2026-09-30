@@ -277,12 +277,15 @@ sibling rules (`p + .tablewrap`), and a page that paints itself from JS puts eve
 mount `<div>`, so the two blocks were never siblings and nothing spaced them. `base.css` now keeps
 **.6rem** above a block when it follows another one:
 
-- **as siblings**, inside a container that flows as a column of blocks — an unclassed `<div>`, a
-  `section`, `article`, `main`, `.wrap`, `.content`, a tab panel, a fold's, a dialog's or a panel's
-  body. Never inside a class-carrying `<div>`: that is a grid or a flex row with a gap of its own,
-  and a margin there adds to the gap and drops one item of a row below its neighbours;
+- **as siblings** (two callouts are two notes);
 - **after a mount** (an unclassed `<div>` or a tab panel that holds something);
 - **as the first thing in a mount** that follows something.
+
+All three only inside a container that flows as a column of blocks: an unclassed, unstyled `<div>`,
+a `section`, `article`, `main`, `.wrap`, `.content`, a tab panel, a fold's, a dialog's or a panel's
+body. **Never inside a class-carrying `<div>`, and never inside an element with a `style`
+attribute**: those are grids and flex rows with a gap of their own, and a margin there adds to the
+gap and drops one item of a row below its neighbours (a table beside a label sat 9.6px low).
 
 The blocks are `STACKED_BLOCKS` in `runtime/rhythm.js`: `.callout` `.notice` `.fence` `.filter-bar`
 `.tablewrap` `table` `pre` `.code-block` `.cmd` `.legend` `.chart` `.tabs` `details.fold` `.card-grid`
@@ -291,8 +294,17 @@ changes, and the rules weigh nothing: any margin a page writes wins.
 
 **Flush on purpose is said out loud.** A run of folds is one list, each fold drawing its own rule, so
 `details.fold + details.fold` stays flush. Anything else a page wants flush carries **`data-flush`**
-on the lower block. The one shape the rule cannot read is a grid whose items are unclassed `<div>`s
-(the margin stays inside the second item): give those items a class.
+on the lower block.
+
+**What the rule does not cover**, by design, because it would have to guess (`findFlushBlocks()`
+below finds every one of them on a rendered page):
+
+- **an empty mount between two blocks** — a slot that renders nothing is skipped, so it does not push
+  the page down, and the blocks on either side of it can touch;
+- **a classed mount** — `<div class="rules">` reads as a layout, not a mount;
+- **a mount two deep** — `<div><div><p class="callout">`: only one level of wrapping is read;
+- **a grid or flex row whose items are unclassed `<div>`s** — the margin stays inside the second item.
+  Give those items a class.
 
 **The check.** `findFlushBlocks(root = document)` (runtime, `rhythm.js`) returns every pair of
 rendered blocks from that list, neither inside the other, overlapping horizontally, with 0px between

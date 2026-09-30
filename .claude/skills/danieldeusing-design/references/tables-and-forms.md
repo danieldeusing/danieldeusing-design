@@ -7,7 +7,7 @@ component vocabulary".
 
 Contents:
 
-- A `td` is `--foreground` (0.61.0), and the Tailwind-typography trapdoor it closes
+- A table is `--foreground` (0.61.0), and the Tailwind-typography trapdoor it closes
 - Authoring a plain table: column widths and cell content
 - A dashboard table is `table.dense`: the cell vocabulary, row states, a phone (0.60.0)
 - Pairs: `table.kv` and `dl.kv` (0.60.0)
@@ -17,9 +17,10 @@ Contents:
 - A table gets a search, a filter and a sort (0.29.0)
 - `.field-row`: a settings panel is a two-column table
 
-## A `td` is `--foreground` (0.61.0), and the Tailwind-typography trapdoor it closes
+## A table is `--foreground` (0.61.0), and the Tailwind-typography trapdoor it closes
 
-**Since 0.61.0 every `td` is `--foreground`** (Daniel: table text is foreground, not muted grey), with
+**Since 0.61.0 a `table` is `--foreground`** (Daniel: table text is foreground, not muted grey), so its
+cells inherit it unless their row, body or the cell itself says otherwise, with
 the quiet helpers inside a cell reading at full strength too; the rule and its exceptions are in
 `data.md`, "Table body text is `--foreground`". The history below is why a cell that inherits its
 colour was never safe.

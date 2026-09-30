@@ -1055,6 +1055,13 @@ await check("below 48rem: panes stack, splitters inside the split go, the strip 
   W.expect("#fx-collapsed", "", "flex-direction", { is: "row" }), W.expect("#fx-collapsed", "", "height", "2rem"),
   W.expect("#fx-collapsed", "", "border-bottom-width", { is: "1px" }), W.expect("#fx-collapsed", "", "border-right-width", { is: "0px" }),
   W.expect("#fx-collapsed-label", "", "writing-mode", { is: "horizontal-tb" })].filter(Boolean)`));
+// THE DEMO ITSELF FITS A PHONE. It rendered 435px wide at 375: two rows carried every tone's tag in one
+// nowrap meta slot and a console status a sentence long. A fresh load, so no injected fixture counts.
+await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+await load();
+await check("the cards demo does not scroll sideways at 375px (435px wide on 0.60.0)", () => evaluate(`(() => {
+  const w = document.scrollingElement.scrollWidth, cw = document.documentElement.clientWidth;
+  return w <= cw ? [] : ["the page is " + w + "px wide in a " + cw + "px viewport"]; })()`));
 await send("Emulation.clearDeviceMetricsOverride");
 
 /* ── 3. tokens.css + cards.css only: the same computed values, focus rings, and `hidden` ──────── */

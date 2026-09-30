@@ -125,7 +125,7 @@ const CANDIDATES = [
   "p-6", "px-3", "border", "border-primary", "outline-none", "leading-9", "text-2xl", "flex",
   "rounded-xs", "rounded-2xl", "rounded-full", "text-cat-teal", "border-control-edge",
   "shadow-float", "shadow-modal", "transition-colors", "hidden", "text-fs-display",
-  "rounded", "text-primary", "text-destructive",
+  "rounded", "text-primary", "text-destructive", "text-warning", "text-muted-foreground",
 ];
 // The last line is a consumer overriding a token from its own utilities layer. It must NOT win:
 // tokens.css is unlayered, and only a layered tokens.css would lose to it.
@@ -167,6 +167,8 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8">
 <div id="modal" class="shadow-modal">modal</div>
 <a id="fade" class="transition-colors" href="#">fade</a>
 <footer id="status" class="status flex">status</footer>
+<div class="text-muted-foreground"><table><tbody class="text-warning"><tr><td id="tw-tbody-td">stale</td></tr></tbody>
+<tbody><tr class="text-destructive"><td id="tw-tr-td">refused</td></tr><tr><td id="tw-td">plain</td></tr></tbody></table></div>
 <span id="probe"></span>
 </body></html>`;
 
@@ -291,6 +293,12 @@ for (const [id, name, pair] of [["tw-doclink", "--primary", ".doc-link.text-prim
   ["tw-prompt", "--destructive", ".prompt.text-destructive"], ["tw-ghost", "--destructive", ".btn-terminal--ghost.text-destructive"]]) {
   check(`in a Tailwind app, ${pair} takes the utility's colour (the same markup as the bundle)`,
     (await style(id, "color")) === (await token(name)), `${await style(id, "color")} vs ${await token(name)}`);
+}
+// Table text is --foreground (data.css, D0), set on the TABLE so a colour on a row or a body still
+// reaches its cells. On 0.61.0's first cut it sat on every `td`, and a utility on the row lost to it.
+for (const [id, name, what] of [["tw-td", "--foreground", "a cell of a table inside a text-muted-foreground box"],
+  ["tw-tr-td", "--destructive", "a cell of a text-destructive row"], ["tw-tbody-td", "--warning", "a cell of a text-warning tbody"]]) {
+  check(`in a Tailwind app, ${what} is ${name}`, (await style(id, "color")) === (await token(name)), `${await style(id, "color")} vs ${await token(name)}`);
 }
 check("`rounded-full` stays a circle — it is not a theme step and a dot needs it",
   (await style("r-full", "borderTopLeftRadius")) !== "0px", await style("r-full", "borderTopLeftRadius"));

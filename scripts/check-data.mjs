@@ -913,20 +913,23 @@ await evaluate(`(() => {
   const link = document.createElement("link");
   link.rel = "stylesheet"; link.href = "/src/utilities.css"; link.id = "fx-d0-utilities";
   const own = document.createElement("style");
-  own.textContent = ".muted { color: var(--muted-foreground); } .fx-quiet { color: var(--muted-foreground); }";
+  own.textContent = ".muted { color: var(--muted-foreground); } .fx-quiet { color: var(--muted-foreground); } .fx-stale { color: var(--warning); }";
   document.head.append(link, own);
   s.innerHTML = '<div class="fx-quiet"><table id="fx-ink"><thead><tr><th>state</th><th>what</th><th>when</th></tr></thead><tbody>' +
     '<tr><td id="fx-ink-td">text</td><td><span class="muted" id="fx-ink-muted">not reported</span> <span class="text-muted-foreground" id="fx-ink-util">lap 2</span></td>' +
     '<td class="text-muted-foreground" id="fx-ink-tdutil"><span class="when"><span class="when-ago">3 min ago</span><span class="when-exact" id="fx-ink-exact">2026-09-30 09:00</span></span></td></tr>' +
     '<tr><td><span class="tag" data-tone="destructive" id="fx-ink-tag">failed</span> <a href="#top" id="fx-ink-link">log</a></td><td></td><td></td></tr>' +
     '<tr aria-disabled="true"><td>off</td><td id="fx-ink-off"><span class="muted" id="fx-ink-off-muted">paused</span></td><td></td></tr>' +
+    '<tr class="text-destructive"><td id="fx-ink-tr">refused</td><td><span class="muted" id="fx-ink-tr-muted">by policy</span> <a href="#top" id="fx-ink-tr-link">log</a></td><td></td></tr>' +
+    '</tbody><tbody class="fx-stale"><tr><td id="fx-ink-tbody">stale</td><td></td><td></td></tr>' +
     '</tbody></table></div><p><a href="#top" id="fx-ink-link-out">log</a> <span class="when"><span class="when-exact" id="fx-exact-alone">2026-09-30 09:00</span></span></p>';
   document.querySelector("main").append(s); })(); null`);
 await until(`document.getElementById("fx-d0-utilities").sheet`, "utilities.css to load");
 const ink = () => evaluate(`Object.fromEntries(["fx-ink-td", "fx-ink-muted", "fx-ink-util", "fx-ink-tdutil", "fx-ink-exact", "fx-ink-tag", "fx-ink-link",
-  "fx-ink-link-out", "fx-ink-off", "fx-ink-off-muted", "fx-exact-alone"].map((id) => [id, getComputedStyle(document.getElementById(id)).color])
+  "fx-ink-link-out", "fx-ink-off", "fx-ink-off-muted", "fx-exact-alone",
+  "fx-ink-tr", "fx-ink-tr-muted", "fx-ink-tr-link", "fx-ink-tbody"].map((id) => [id, getComputedStyle(document.getElementById(id)).color])
   .concat([["th", getComputedStyle(document.querySelector("#fx-ink thead th")).color], ["fg", M.tok("var(--foreground)")], ["muted", M.tok("var(--muted-foreground)")],
-    ["destructive", M.tok("var(--destructive)")]]))`);
+    ["destructive", M.tok("var(--destructive)")], ["warning", M.tok("var(--warning)")]]))`);
 for (const t of THEMES) {
   await theme(t);
   const c = await ink();
@@ -936,6 +939,8 @@ for (const t of THEMES) {
     () => c.th === c.muted && c["fx-ink-tag"] === c.destructive && c["fx-ink-link"] === c["fx-ink-link-out"], c);
   await check(`D0 ${t}: a row dimmed as a state stays dim, helpers inside it too; the stamp outside a table keeps its muted default`,
     () => c["fx-ink-off"] === c.muted && c["fx-ink-off-muted"] === c.muted && c["fx-exact-alone"] === c.muted, c);
+  await check(`D0 ${t}: a colour set on a ROW or a BODY reaches its cells — a .text-destructive row (its helpers and links too) and a tbody coloured by the page`,
+    () => ["fx-ink-tr", "fx-ink-tr-muted", "fx-ink-tr-link"].every((id) => c[id] === c.destructive) && c["fx-ink-tbody"] === c.warning, c);
 }
 await theme("warm");
 
@@ -988,9 +993,27 @@ for (const width of [1280, 375]) {
 await check("the data demo itself has no flush pair of stacked blocks, at 1280 and at 375", () => demoFlush.length === 0, demoFlush);
 await check("base.css spaces exactly the blocks runtime/rhythm.js checks (one list, written twice)", async () => {
   const { STACKED_BLOCKS } = await import(join(root, "runtime/rhythm.js"));
-  const rule = readFileSync(join(root, "src/base.css"), "utf8").match(/\.panel-body\) > :is\(([^)]*)\)/);
+  const rule = readFileSync(join(root, "src/base.css"), "utf8").match(/\.panel-body\):not\(\[style\]\) > :is\(([^)]*)\)/);
   return rule && rule[1].split(",").map((x) => x.trim()).join(",") === STACKED_BLOCKS.join(",");
 });
+
+// THE RULE STAYS OUT OF A LAYOUT ROW. A class-carrying <div> or one with a `style` is a flex or grid
+// row with its own gap, where a top margin drops one item below its neighbours. On 0.61.0's first cut
+// a table after a label in a classed flex row sat 9.6px low (shape 2), and so did the second of two
+// callouts in an unclassed <div style="display:flex"> (shape 1).
+await open("theme=warm");
+const rows = await evaluate(`(() => {
+  const st = document.createElement("style"); st.textContent = ".fx-row { display: flex; gap: 8px; align-items: flex-start; }"; document.head.append(st);
+  const s = document.createElement("section");
+  s.innerHTML = '<div class="fx-row"><div id="fx-row-label">label</div><table id="fx-row-table"><tbody><tr><td>x</td></tr></tbody></table></div>' +
+    '<div style="display: flex; gap: 8px; align-items: flex-start"><p class="callout" id="fx-flex-a">a</p><p class="callout" id="fx-flex-b">b</p></div>';
+  document.querySelector("main").append(s);
+  const top = (id) => document.getElementById(id).getBoundingClientRect().top;
+  return { labelVsTable: top("fx-row-table") - top("fx-row-label"), calloutVsCallout: top("fx-flex-b") - top("fx-flex-a") }; })()`);
+await check("shape 2 stays out of a classed flex row: a table beside a label keeps the row's top (9.6px low on the first cut)",
+  () => Math.abs(rows.labelVsTable) < 0.1, rows);
+await check("shape 1 stays out of an unclassed <div style=\"display: flex\">: two callouts in it share a top",
+  () => Math.abs(rows.calloutVsCallout) < 0.1, rows);
 
 /* ── inline code in a table cell keeps its word on a phone (0.61.0) ─────────────────────────────────
    `overflow-wrap: anywhere` shrank the code column's min-content to one character: at 375px a

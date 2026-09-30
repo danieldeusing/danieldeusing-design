@@ -26,23 +26,28 @@
 
 /* ── TABLE BODY TEXT IS --foreground (Daniel, 2026-09-30) ─────────────────────────────────── (D0)
    "Table text in all activity tables should be foreground, not muted grey." A cell is the data a
-   reader came for, so every `td` reads at full strength whatever it sits in: a table inside a muted
-   container (a card's description, a callout, a field's help) no longer inherits the grey. The
+   reader came for, so a TABLE reads at full strength whatever it sits in: a table inside a muted
+   container (a card's description, a callout, a field's help) no longer inherits the grey.
+   ON THE TABLE, NOT ON THE CELL. A `td { color }` would also override the colour a cell inherits
+   from its own row or body — cockpit's `tr.ev-refused` (destructive), a `<tr class="text-destructive">`,
+   a dimmed `tr.row-dim`, a `tbody.stale` — and all of them lost their colour. Set on the table, the
+   foreground is inherited like any colour, so a row or a body that says otherwise wins. The
    helpers a surface uses to quieten a cell's words read at full strength too: the common `.muted`,
    `.text-muted-foreground`, and the system's own quiet cell part, the `when` cell's exact stamp.
    Inside a cell they take `inherit`, not --foreground, so a row the page has dimmed as a STATE
    keeps its dimmed words. Cockpit shipped this first (portal.css, `table.act`); it holds for every
    table now, the base table, `.dense` and `.kv` alike.
 
-   WHAT KEEPS ITS COLOUR is colour that MEANS something, and none of it is touched here, because each
-   sets its own `color` on its own element: a tone, a tag, a state word, a link, a failure, `.kv`'s
-   label. A row that cannot be acted on (`tr[aria-disabled]`, below) and a surface's own row dimming
-   (cockpit's `.srcrow:not(.srcrow-on) td`) out-rank these on weight, on purpose. Header cells are
-   chrome and keep their muted treatment.
+   WHAT KEEPS ITS COLOUR: anything that sets its own `color` — a tone, a tag, a state word, `.kv`'s
+   label — and a colour set on a row, a body or a cell (a failure row, a row that cannot be acted on,
+   `tr[aria-disabled]` below, cockpit's `.srcrow:not(.srcrow-on) td`), except that a cell carrying
+   `.muted` or `.text-muted-foreground` itself is --foreground. A bare link in a cell has no colour of
+   its own and follows the cell. Header cells are chrome and keep their muted treatment.
 
-   In a Tailwind app a `text-muted-foreground` utility on a cell sits in the utilities layer and
-   wins: there it is a decision somebody wrote down, not a grey the cell inherited. */
-td,
+   In a Tailwind app the `text-muted-foreground` utility sits in the utilities layer and wins over
+   all of this, on a cell or anything inside one: there it is a decision somebody wrote down, not a
+   grey the cell inherited. */
+table,
 td:is(.muted, .text-muted-foreground) { color: var(--foreground); }
 td :is(.muted, .text-muted-foreground, .when-exact) { color: inherit; }
 

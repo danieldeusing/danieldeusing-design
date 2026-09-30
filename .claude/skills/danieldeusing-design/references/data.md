@@ -28,23 +28,33 @@ Contents:
 
 > *"Table text in all activity tables should be foreground, not muted grey."* (2026-09-30)
 
-A cell is the data a reader came for, so **every `td` is `--foreground`** (`data.css`, D0), whatever
-container the table sits in: a table inside a card's description, a callout or a field's help no
-longer inherits the grey. That covers the base table, `table.dense` and `table.kv` alike.
+A cell is the data a reader came for, so **a `table` is `--foreground`** (`data.css`, D0), whatever
+container it sits in: a table inside a card's description, a callout or a field's help no longer
+inherits the grey. That covers the base table, `table.dense` and `table.kv` alike.
 
-- **The quiet helpers read at full strength inside a cell**: `.muted`, `.text-muted-foreground` (on
-  the cell or on anything in it) and the `when` cell's exact stamp. Do not reach for them to quieten
-  a column; a column that is secondary is a narrower column or a later one, not a greyer one.
-- **Colour that means something stays**, because it is set on its own element: a `data-tone`, a
-  `.tag`, a `.state` word, a link, a failure, `table.kv`'s `--primary` label, the stacked table's
-  column label.
+**On the table, not on the cell** (fixed before 0.61.0 shipped). A first cut put it on every `td`, and
+that overrode the colour a cell inherits from its own row or body: cockpit's `tr.ev-refused`
+(destructive), a `<tr class="text-destructive">`, a dimmed `tr.row-dim` and a `tbody.stale` all lost
+theirs. Set on the table, the foreground is inherited like any colour, so a row or a body that says
+otherwise wins.
+
+- **The quiet helpers read at the cell's colour**: `.muted`, `.text-muted-foreground` and the `when`
+  cell's exact stamp inside a cell take the cell's colour, and a cell that itself carries `.muted` or
+  `.text-muted-foreground` is `--foreground`. Do not reach for them to quieten a column; a column that
+  is secondary is a narrower column or a later one, not a greyer one.
+- **Colour that means something stays**: anything that sets its own colour (a `data-tone`, a `.tag`,
+  a `.state` word, `table.kv`'s `--primary` label, the stacked table's column label), and a colour set
+  on a row, a `tbody` or a cell. A bare link in a cell has no colour of its own and follows the cell.
 - **Header cells are chrome** and keep `--muted-foreground`, 600.
 - **A row dimmed as a STATE stays dim**, helpers inside it included: `tr[aria-disabled="true"]`, or a
-  surface's own row rule (cockpit's `.srcrow:not(.srcrow-on) td`). Those out-rank the cell rule on
-  weight, and inside a cell the helpers take `inherit` rather than `--foreground` for exactly this.
-- **Tailwind**: a `text-muted-foreground` utility on a cell sits in the utilities layer and wins.
-  There it is a decision somebody wrote, not a grey the cell inherited; do not write it.
-- `scripts/check-data.mjs` (D0) measures a table inside a muted container on all four themes.
+  surface's own row rule (cockpit's `.srcrow:not(.srcrow-on) td`), and inside a cell the helpers take
+  `inherit` rather than `--foreground` for exactly this.
+- **Tailwind**: the `text-muted-foreground` utility sits in the utilities layer and stays muted
+  anywhere in a cell, on the cell or inside it. There it is a decision somebody wrote, not a grey the
+  cell inherited; do not write it.
+- `scripts/check-data.mjs` (D0) measures a table inside a muted container, a coloured row and a
+  coloured `tbody` on all four themes; `check-tailwind-layers.mjs` measures the same through a real
+  Tailwind compile.
 
 ## An instant is `formatStamp()`, an age is `formatAgo()` — in the viewer's zone
 

@@ -425,8 +425,16 @@ await check("fix round 2 — an open pick panel stays on its summary while the p
   opened.open && opened.inWrap && moves.page.y > opened.y && moves.down.top > moves.page.top && moves.sideways.left < moves.down.left &&
     Object.values(moves).every((m) => m.open && Math.abs(m.dx - opened.dx) <= 1 && Math.abs(m.dy - opened.dy) <= 1), JSON.stringify({ opened, moves }));
 const wheelAt = await evaluate(`(() => { const r = document.querySelector("#scroll-wrap").getBoundingClientRect(); return [r.left + 20, r.top + r.height / 2]; })()`);
-await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: wheelAt[0], y: wheelAt[1], deltaX: -4000, deltaY: 0 });
-await sleep(500);
+// The wheel is the compositor's to deliver: on a loaded Linux runner it had not landed 500ms later
+// (scrollLeft still 1332, so the panel was rightly still open). Wait for the scroll itself, then give
+// the page's scroll handler two frames to answer. A wheel that never lands is left to the check to report.
+const wheelAway = async () => {
+  await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: wheelAt[0], y: wheelAt[1], deltaX: -4000, deltaY: 0 });
+  await until(`document.querySelector("#scroll-wrap").scrollLeft === 0`, "the wheel to scroll the wrapper back").catch(() => {});
+  await evaluate("new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))))");
+  await sleep(100);
+};
+await wheelAway();
 const away = await attach();
 await check("fix round 2 — wheeled back until its column is out of the wrapper, the panel is closed, and focus has not moved", async () =>
   away.left === 0 && !away.inWrap && !away.open && (await evaluate("document.activeElement === window.focusedBefore")), JSON.stringify(away));
@@ -438,8 +446,7 @@ await evaluate(`document.querySelector("#scroll-wrap th[data-col=state] .tbl-fil
 await sleep(200);
 await evaluate(`document.querySelector("#scroll-wrap th[data-col=state] .dropdown-item").focus(); null`);
 const itemFocused = await evaluate(`document.activeElement.matches("#scroll-wrap .dropdown-item")`);
-await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: wheelAt[0], y: wheelAt[1], deltaX: -4000, deltaY: 0 });
-await sleep(500);
+await wheelAway();
 const stranded = await evaluate(`JSON.stringify({ open: document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter").open,
   focus: document.activeElement === document.querySelector("#scroll-wrap th[data-col=state] .tbl-filter > summary") ? "summary" : document.activeElement.tagName })`);
 await check("fix round 3 — focus on a panel item when the reader wheels the column away: the panel closes and focus lands on its summary", () =>
@@ -744,6 +751,16 @@ await check(`fix round 1 — a keyboard-focused sort button and badge take the h
 for (const scheme of ["light", "dark"]) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-color-scheme", value: scheme }] });
   await until("matchMedia('(forced-colors: active)').matches", "forced colours");
+  // CHROME KEEPS A COLLAPSED BORDER'S OLD COLOUR across a palette switch, sometimes. On the Linux runner
+  // image the dark pass painted every table rule in the LIGHT palette's CanvasText (black on black),
+  // while getComputedStyle said 2px white: 0px of ink, in roughly two runs of three under load, never on
+  // a Mac. Neither a wait, a repaint, a relayout nor re-entering the palette cleared it; rebuilding the
+  // collapsed borders did. A page opened in a palette never has the old one, so each table rebuilds
+  // them here, as a page opened in this palette would.
+  await evaluate(`(async () => { const tables = [...document.querySelectorAll("table")];
+    for (const t of tables) t.style.borderCollapse = "separate";
+    await new Promise((r) => requestAnimationFrame(() => r()));
+    for (const t of tables) t.style.borderCollapse = ""; })()`);
   await settle();
   console.log(`forced colours, ${scheme} palette (Canvas / CanvasText / Highlight / HighlightText / GrayText): ${await evaluate(
     `["Canvas", "CanvasText", "Highlight", "HighlightText", "GrayText"].map(M.tok).join(" / ")`)}`);

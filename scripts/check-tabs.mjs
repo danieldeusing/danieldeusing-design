@@ -68,8 +68,11 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8">
   window.events = [];
   // Whether each key's default action (scrolling the page, for Home/End and the arrows) was cancelled.
   // Read on window, which hears a keydown after the document listener that handles it.
+  // Alt+← IS the browser's back on Linux and Windows, and the entry behind this one is another
+  // document: the page the next checks read was gone. So once the row's choice is recorded, the
+  // harness cancels an Alt key itself, and the page stays put on every host.
   window.keys = [];
-  addEventListener("keydown", (event) => window.keys.push(event.key + ":" + event.defaultPrevented));
+  addEventListener("keydown", (event) => { window.keys.push(event.key + ":" + event.defaultPrevented); if (event.altKey) event.preventDefault(); });
   document.addEventListener("tab-activated", (event) => window.events.push(
     event.target.id + ">" + (event.detail && event.detail.panel ? event.detail.panel.id : "none") + (event.bubbles ? "" : "(no-bubble)")));
   window.initTabs = initTabs;

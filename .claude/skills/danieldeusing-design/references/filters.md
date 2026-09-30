@@ -71,14 +71,13 @@ a filter, and this is what it is set to". Each use goes to the control that says
 | turn one thing on or off (`follow`, `hide handled`) | `<button type="button" role="switch" aria-checked="false" class="switch">follow</button>` (`controls.md`) |
 | an action that was filed as a filter (`select all pending`) | `.btn-terminal.btn-terminal--ghost.btn-terminal--compact` |
 | pick SEVERAL values (pagr's tags, cockpit's host and tag pills) | `.chip-set` of `button.chip[aria-pressed]` |
-| push the filters to the far edge of a row | `.filter-bar-spacer` inside a `.filter-bar` |
+| lead a filter row that has no search | a heading, or `.filter-bar-lead`, first in the `.filter-bar` |
 
 ## The bar they sit in — `.filter-bar`
 
 ```html
 <search class="filter-bar">
   <div class="search-field">…</div>
-  <span class="filter-bar-spacer"></span>
   <select data-filter aria-label="type">…</select>
   <select data-filter aria-label="source">…</select>
   <div class="sort-ctl btn-group" role="group" aria-label="sort">…</div>
@@ -87,19 +86,63 @@ a filter, and this is what it is set to". Each use goes to the control that says
 </search>
 ```
 
-**The order is the rule: search → spacer → filters → sort → separator → actions.** configr's
+**The order is the rule: search → filters → sort → separator → actions.** configr's
 RegistryBrowser and seedr's Browse arrived at it without comparing notes. The search is where the
-eye starts; the spacer pushes everything that narrows the list to the far edge; actions — refresh,
-add — come last and apart, because they do something rather than choose something.
+eye starts; actions — refresh, add — come last and apart, because they do something rather than
+choose something.
 
+**The search is on the left, everything else on the right, at every width (0.62.0).** Daniel,
+2026-09-30: *"Filters, sort and so on are always right aligned. Search input field always left
+aligned. Active filters have colored text and there must be the 'x' icon to remove the filter (only
+not if one filter must always be set)."* The bar packs its children against its end edge, and its
+**lead** takes the free space after itself. The lead is a `.search-field`, a heading `h2`–`h6`, or
+anything marked `.filter-bar-lead` (a label that is not a heading, such as a `<p>` or a `<span>`).
+Write the lead first.
+
+```html
+<!-- no search: a heading leads, the required picker sits on the right (cockpit's stats) -->
+<div class="filter-bar">
+  <h3>merge rate</h3>
+  <select data-filter aria-label="repository"><option value="vu3">poi/vu3</option>…</select>
+</div>
+```
+
+- **A row of filters with no search is still a `.filter-bar`**, and its controls are still on the
+  right. A bar with no lead at all has every control on the right.
+- **There is no spacer.** `.filter-bar-spacer` is removed in 0.62.0: delete the element, the bar
+  right-aligns without it.
+- A `.chip-set` in a bar wraps its chips against the right edge too.
 - The search field takes `flex: 1 1 14rem`, capped at `24rem`. Below `40rem` it takes the whole first
-  row, the spacer disappears, and the filters wrap under it where a thumb can reach them.
+  row, and the controls wrap under it, still right-aligned.
+- **A dialog's toolbar that filters is a `.filter-bar` as well**: `<div class="dialog-toolbar
+  filter-bar">`, the search first, then the filters and switches, then the count and the steppers.
+  The logs drawer is the example (`overlays.md`).
 - `<search>` is the landmark (or `role="search"` on a `<div>`). **Label it when a page has more than
   one**: `<search class="filter-bar" aria-label="skills">`.
 - `.filter-bar--sticky` pins the bar under a page's header — set `--sticky-top` to the header's
   height — on an OPAQUE `--background`. configr blurred what scrolled under its bar; text read
   through a translucent surface is not something this estate does.
 - It sets no height of its own: every control in it is `--control-h` (28px), so the row lines up.
+
+**Check a page with `findMisplacedFilters()`** (runtime, `rhythm.js`), in a browser test, the way
+`findFlushBlocks()` checks the block rhythm. It returns `[{ element, reason }]`, empty when the page
+keeps the rule:
+
+| reason | what it found |
+|---|---|
+| `outside-filter-bar` | a `.filter-dd`, an un-enhanced `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no `.filter-bar` around it. A table header (`th`) and a `.dropdown-panel` are exempt; a dialog is not |
+| `lead-not-left` | a bar's lead whose left edge is not the bar's left content edge |
+| `controls-not-right` | on one visual row of a bar, the right-most control does not end at the bar's right content edge |
+| `active-unmarked` | an optional filter holding a value without `data-active="true"` on its trigger or with its × hidden — the page set the value and the runtime never heard (dispatch `change` on the select) |
+| `required-clearable` | a required filter (no empty option) showing a × |
+
+```js
+const { findMisplacedFilters } = await import("/runtime/rhythm.js"); // or the pinned CDN barrel
+const wrong = findMisplacedFilters().map(({ element, reason }) => `${reason}: ${element.className}`);
+```
+
+What is not rendered (`display: none` on it or an ancestor, a closed dialog, zero size,
+`visibility: hidden`) is skipped, so run it in each state that shows a bar.
 
 ## A search box — `.search-field` and `initSearchFields()`
 
@@ -320,7 +363,7 @@ enhanced select: no funnel, no clear.
 
 ```html
 <div class="chip-set" role="group" aria-label="tags">
-  <button type="button" class="chip" aria-pressed="true">all</button>
+  <button type="button" class="chip" aria-pressed="true" data-all>all</button>
   <button type="button" class="chip" aria-pressed="false">#agents <span class="chip-count">12</span></button>
 </div>
 ```
@@ -331,6 +374,11 @@ cockpit's said "on" by colour alone.
 
 - **The page owns the behaviour**: each chip toggles; the `all` chip clears the set and is pressed
   when nothing else is; OR within one set, AND across sets.
+- **A pressed chip carries an ×** (0.62.0), drawn by the stylesheet from `aria-pressed="true"`:
+  pressing it again removes that filter. **Mark the "all" chip `data-all`** — it resets the set, so
+  it never draws one. A link chip on `aria-current="page"` navigates, and draws none either.
+- **A `.segmented` choice and a `.switch` get no ×.** A segmented control always has exactly one
+  value, like a required picker, so there is nothing to clear. Flipping a switch back is its clear.
 - **An identity chip** — a host, a tag, a person, a netmon series — sets `--chip-accent` to one of the
   categorical `--cat-*` colours; hover and pressed then take that hue instead of `--primary`.
 - **A chip that is a link** (pagr's static tag pages) is `<a class="chip" href>`, and the current one

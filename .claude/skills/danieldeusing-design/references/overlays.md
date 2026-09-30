@@ -46,7 +46,7 @@ Escape to a build-free page for free. configr had rebuilt all three by hand.
     <!-- optional header actions: .btn-icon -->
     <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close"></button>
   </header>
-  <div class="dialog-toolbar">…</div>                  <!-- optional -->
+  <div class="dialog-toolbar filter-bar">…</div>       <!-- optional; filter-bar when it filters -->
   <div class="dialog-body">…</div>
   <footer class="dialog-foot form-actions">
     <p class="form-status" role="status"></p>
@@ -119,7 +119,7 @@ Rules for the markup:
 |---|---|
 | `.dialog-head` | `[back] title [actions] [X]` on one row, `1rem 1.5rem`, a `--border` rule under it. It never shrinks. |
 | `.dialog-title` | an `h2`, `--fs-xl` (configr's 18px title on the heading step), one line, cut with an ellipsis rather than pushing the X out |
-| `.dialog-toolbar` | controls that stay put while the body scrolls under them — a search, a switch, a count |
+| `.dialog-toolbar` | controls that stay put while the body scrolls under them — a search, a switch, a count. One that filters is also a `.filter-bar` (0.62.0): the search first, on the left, and everything else on the right (`filters.md`) |
 | `.dialog-body` | the one part that scrolls, so the X and the commit button are always one press away. `--flush` drops its inset for a `.split`, a `.console` or a card grid. |
 | `.dialog-foot` | on `.form-actions`, pinned under the body with a `--border` rule above it |
 | `.dialog-section` | a new part of the body; the second one starts `1.5rem` down |
@@ -262,10 +262,11 @@ confirmation (that is `--confirm`, which Escape cancels) and not for news (that 
     <h2 class="dialog-title" id="logs-t">logs — <span class="text-primary">ddstudio</span> / dd-infra-cockpit</h2>
     <button type="button" class="btn-icon dialog-close" data-icon="x" data-dialog-close aria-label="close logs"></button>
   </header>
-  <div class="dialog-toolbar">
+  <div class="dialog-toolbar filter-bar">
+    <div class="search-field">…</div>
     <select aria-label="lines">…</select>
     <button type="button" role="switch" aria-checked="true" class="switch">follow</button>
-    <div class="search-field">…</div><span class="match-count">3/17</span>
+    <span class="match-count">3/17</span>
     <button type="button" class="btn-icon" data-icon="arrow-up" aria-label="previous match"></button>
     <button type="button" class="btn-icon" data-icon="arrow-down" aria-label="next match"></button>
     <button type="button" class="btn-icon" data-icon="download" aria-label="download the log"></button>

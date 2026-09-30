@@ -169,7 +169,7 @@ only the shape of the choice changed.
 | turns one thing on or off — `follow`, `hide handled` | `<button type="button" role="switch" aria-checked="false" class="switch">` | `controls.md` |
 | picks several — tags, hosts | a `.chip-set` of `button.chip[aria-pressed]` | `filters.md` |
 | was never a filter — `select all pending`, `clear selection` | `.btn-terminal.btn-terminal--ghost.btn-terminal--compact` | above |
-| pushes a control to the right of a filter row | `.filter-bar-spacer` inside `.filter-bar` | `filters.md` |
+| leads a filter row that has no search | a heading, or `.filter-bar-lead`, first in the `.filter-bar` | `filters.md` |
 
 Never re-create `.filter-ctl` locally, and never answer "this filter looks too quiet" with a
 button — that is the loop 0.58.0 and 0.59.0 recorded. Netmon's own range, preset and series chips

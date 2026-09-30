@@ -215,7 +215,7 @@ transparent, rule-less entity cards move to. **A container: no hover, no focus o
 | `.panel-head--eyebrow` | the title in eyebrow type — studio's pane heads and explorer strips |
 | `.panel-actions` | at the head's end: `.btn-icon`s, a `.segmented`, a select |
 | `.panel-body` | padded by `--card-pad`; `.panel-body--flush` runs a tree, a row list, a table or code edge to edge |
-| `.panel-foot` | the head mirrored, ruled above; a `.filter-bar-spacer` pushes what follows to the end |
+| `.panel-foot` | the head mirrored, ruled above; a `.panel-actions` in it sits at the end, as in the head |
 
 - **Fixed height**: give the panel a `block-size` (or make it a `.split-pane`) and only the body
   scrolls; the head and the foot stay put.

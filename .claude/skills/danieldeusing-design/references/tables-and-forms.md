@@ -473,7 +473,6 @@ the pager slices exactly the matching set and needs to know nothing about filter
 
 ```html
 <search class="filter-bar" data-table-bar aria-label="runs">
-  <span class="filter-bar-spacer"></span>
   <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">new run</button>
 </search>
 <div class="tablewrap">
@@ -490,8 +489,8 @@ the pager slices exactly the matching set and needs to know nothing about filter
   whose search cannot be expressed per row — one that asks its server, say, over records the table
   does not hold.
 - **The page's bar is used, not duplicated.** A `<search class="filter-bar" data-table-bar>` directly
-  before the table's wrapper gets the search FIRST in it; the page's `.filter-bar-spacer` and its one
-  action stay. Without one, the engine builds the bar (a `.filter-bar` + `.search-field`, `filters.md`).
+  before the table's wrapper gets the search FIRST in it, on the left; the page's one action stays,
+  on the right (the bar right-aligns everything but its lead). Without one, the engine builds the bar (a `.filter-bar` + `.search-field`, `filters.md`).
 - **The box and the count survive a re-render.** Neither is in the page's markup, so a renderer that
   patches the whole mount takes both; the engine puts the same nodes back, the box holding the query.
   A patching renderer (cockpit's `cockpitPatch`) should draw them itself instead, and the engine adopts
@@ -501,7 +500,7 @@ the pager slices exactly the matching set and needs to know nothing about filter
   <search class="filter-bar" data-table-bar aria-label="runs">
     <div class="search-field"><input type="search" data-table-search aria-label="search runs">
       <button type="button" class="search-clear" aria-label="clear the search" hidden></button></div>
-    <span class="filter-bar-spacer"></span>…
+    …
   </search>
   <div class="tablewrap"><table data-table-tools …>…</table></div>
   <p class="result-count" role="status" data-table-count></p>

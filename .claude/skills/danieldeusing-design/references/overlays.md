@@ -423,6 +423,42 @@ read name "refresh catalog", description "refresh catalog".
   and takes back only that token, so a select trigger pointing at its `.field-error` keeps it while
   the tip shows and after it goes.
 
+### Toned segments — `data-tip-parts` (0.61.0, Daniel)
+
+A tip can colour a segment: a size read as "+210 −109 · 319 lines", with "+210" green and "−109" red.
+Write the tip twice — once as plain text, once as parts:
+
+```html
+<span data-tip="+210 −109 · 319 lines"
+      data-tip-parts='[{"text": "+210", "tone": "success"}, " ", {"text": "−109", "tone": "destructive"}, " · 319 lines"]'>M</span>
+```
+
+- **`data-tip` stays the tip.** It is required (the runtime finds tips by it), it is the fallback, and
+  it is **all a screen reader hears**: while parts are shown the panel is labelled with `data-tip`,
+  so the anchor's description is exactly that text. The parts are visual only.
+- **So the two must say the same words.** Build both from the same values in the renderer. The
+  runtime compares their text with runs of whitespace collapsed and `console.warn`s once for an
+  element whose parts say something else — it still shows the parts.
+- **`data-tip-parts` is a JSON array.** An item is a string (untoned) or `{"text": "…", "tone": "…"}`.
+  The tone is a word from the fixed set `data-tone` takes everywhere — `primary`, `success`,
+  `warning`, `destructive`, `info`, `pending`, `muted` — and anything else renders untoned. It is
+  set as `data-tone` on a span; it never becomes a class or a style, and every text goes in by
+  `textContent`. **Never build markup for a tip**: there is no HTML path, by design.
+- **JSON that does not parse, a non-array, or an item that is neither a string nor `{text}` shows
+  `data-tip` instead**, with one `console.warn` per element (not per hover).
+- **The row rules still apply across parts.** Rows are cut from the joined text, so ` · `, a line
+  break, `key<TAB>value` and a `(parenthetical)` behave exactly as in a plain tip, whichever segment
+  they sit in. In the example, "+210 −109" is the first row (bold, both counts toned) and
+  "319 lines" the second.
+- **Contrast is the panel's job.** `tooltip.css` paints `#ddtip [data-tone]` in `--tone`, and every
+  tone stands at least 4.5:1 on `--popover` in all four themes (`check-overlays.mjs` measures it; the
+  lowest is `muted` on warm, 4.84:1). In forced colours a segment loses its hue and keeps its words.
+- **A renderer that patches the open tip's anchor updates the panel.** When `cockpitPatch` (or any
+  patcher) rewrites `data-tip` or `data-tip-parts` on the element whose tip is showing, the panel
+  re-renders in place; removing `data-tip` closes it. Before 0.61.0 an open tip kept the text it
+  opened with, for `data-tip` as well. The anchor also keeps its `aria-describedby` token when a
+  patcher strips attributes its markup does not carry.
+
 ### No tip on a column header (Daniel, 2026-08-21, confirmed 2026-09-29)
 
 **A `<th>` carries no `data-tip`.** A header already holds the sort button, the filter and the

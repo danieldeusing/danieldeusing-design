@@ -20,6 +20,8 @@
  *     (`returnValue`, reset on every open), a stack of two, [autofocus], naming, the alert, and a
  *     committing footer that nothing may dismiss;
  *   · the tooltip: the panel, the top layer, Escape, suppression, and a tip that repeats the name;
+ *   · toned tip segments (data-tip-parts): toned rows, hostile text and tones, broken JSON, the dev
+ *     warnings, a cockpitPatch rewriting the open tip, and each tone's contrast on the panel;
  *   · the context menu's keyboard, placement, width and outside press;
  *   · the zoom view: a named opener, a modal view, keys, a pan that does not close it, a canvas;
  *   · the files on a TOKENS-ONLY page (`?bare`): the same box and the same face as with every
@@ -659,7 +661,10 @@ try {
     { what: "an action row at rest (text) — the stated row's pair", floor: 4.5, state: "menu:0", el: ITEM(1), crop: "text", paint: "text" },
     { what: "the stated row under the keys (text)", floor: 4.5, state: "menu:3", el: STATED, crop: "text", paint: "text" },
     { what: "the stated row under the keys: its focus ring", floor: 3, state: "menu:3", el: STATED, crop: "ring", paint: "ring" },
+    { what: "a toned tip segment, +210 (text) — it may lose its hue, never its words", floor: 4.5, state: "tip:tip-parts", el: `__o.tip().querySelector('[data-tone="success"]')`, crop: "text", paint: "text" },
+    { what: "a toned tip segment, −109 (text)", floor: 4.5, state: "tip:tip-parts", el: `__o.tip().querySelector('[data-tone="destructive"]')`, crop: "text", paint: "text" },
   ];
+  const sceneMissing = new Set();
   const CROP = { inner: (e) => `__o.inner(${e})`, ring: (e) => `__o.ringBand(${e})`, text: (e) => `__o.textBox(${e})` };
   const PAINT = {
     glyph: (e) => `getComputedStyle(${e}, "::before").backgroundColor`, fill: (e) => `getComputedStyle(${e}).backgroundColor`,
@@ -670,6 +675,8 @@ try {
     const [kind, arg] = state.split(":");
     if (kind === "dlg") {
       await evaluate(`(() => { __o.$("${arg}").showModal(); document.activeElement?.blur?.(); })()`);
+    } else if (kind === "tip") {
+      await evaluate(`${T(arg)}.focus(); null`); // focusin shows the tip synchronously
     } else if (kind === "tab") {
       await evaluate(`${T(arg)}.click(); null`); // the runtime focuses the dialog; one Tab reaches its X
       await key("Tab");
@@ -691,13 +698,17 @@ try {
       const boxes = new Map();
       const shownOf = new Map();
       for (const sc of group) {
-        const { box, paint } = await evaluate(`({ box: ${CROP[sc.crop](sc.el)}, paint: ${PAINT[sc.paint](sc.el)} })`);
+        // A scene whose element is not there is reported, not thrown: a throw here would end the suite.
+        let got;
+        try { got = await evaluate(`({ box: ${CROP[sc.crop](sc.el)}, paint: ${PAINT[sc.paint](sc.el)} })`); }
+        catch (error) { sceneMissing.add(`${sc.what}: ${error.message.split("\n")[0]}`); continue; }
+        const { box, paint } = got;
         boxes.set(sc, box);
         shownOf.set(sc, shot);
         onShot(sc, shot, box, paint);
       }
       if (!removal) continue;
-      const els = [...new Set(group.map((sc) => sc.el))];
+      const els = [...new Set(group.filter((sc) => boxes.has(sc)).map((sc) => sc.el))];
       const focused = await evaluate(`[${els.join(", ")}].map((n) => n === document.activeElement)`);
       for (const e of els.filter((_, i) => !focused[i]).concat(els.filter((_, i) => focused[i]))) {
         await evaluate(`${e}.style.setProperty("visibility", "hidden", "important"); null`);
@@ -716,6 +727,8 @@ try {
   await shootScenes((sc, shot, box, paint) => {
     if (!holdsColour(shot, box, paint)) misses.push(`${sc.what}: no ${paint} in ${JSON.stringify(box)}`);
   });
+  await check("every scene's element is on the page (a toned tip segment exists only where data-tip-parts renders)",
+    sceneMissing.size === 0, [...sceneMissing].join("; "));
   await check("every crop lands on its element: in normal colours each holds the colour its element paints there",
     misses.length === 0, misses.join("; "));
 
@@ -1112,6 +1125,136 @@ try {
   await check("a description the page wrote survives the tip: both ids while it shows, exactly the page's once it goes",
     errWhile.shown && errWhile.attr === "x4-err-msg ddtip" && errAfter === "x4-err-msg", { errWhile, errAfter });
 
+  /* ── toned segments: data-tip-parts (0.61.0) ───────────────────────────────────────────────────
+     Every tip here is shown by focus (show() runs synchronously in focusin) and every later state is
+     waited for as a CONDITION, never a fixed time. Hostile input goes in through the attributes, as a
+     renderer would write it. */
+  section("tooltip — toned segments, data-tip-parts (0.61.0)");
+  await reset();
+  await evaluate(`(() => {
+    window.__warns = [];
+    const warn = console.warn.bind(console);
+    console.warn = (...a) => { window.__warns.push(String(a[0])); warn(...a); };
+    window.__waitFor = async (fn, ms = 2000) => {
+      const end = performance.now() + ms;
+      while (performance.now() < end) { try { const v = fn(); if (v) return v; } catch {} await new Promise((r) => requestAnimationFrame(r)); }
+      return fn();
+    };
+    // The panel as rows of [text, tone] runs: a text node is [text, null], a toned span [text, tone].
+    window.__runs = () => [...__o.tip().children].map((row) => [...row.childNodes]
+      .flatMap((n) => (n.classList?.contains("ddtip-k") || n.classList?.contains("ddtip-v") ? [...n.childNodes] : [n]))
+      .map((n) => [n.textContent, n.nodeType === 1 ? n.getAttribute("data-tone") : null]));
+    window.__showTip = (el) => { document.activeElement?.blur?.(); el.focus(); return __o.tipShown(); };
+    window.__tp = (id, tip, parts) => {
+      document.getElementById(id)?.remove();
+      const b = document.createElement("span");
+      b.id = id; b.tabIndex = 0; b.textContent = id;
+      b.setAttribute("data-tip", tip);
+      b.setAttribute("data-tip-parts", parts);
+      document.querySelector("main").prepend(b);
+      return b;
+    };
+  })(); null`);
+  const runsAre = (runs, want) => JSON.stringify(runs) === JSON.stringify(want);
+
+  const sizeTip = await evaluate(`(() => { const el = ${T("tip-parts")}, shown = __showTip(el);
+    return { shown, runs: __runs(), label: __o.tip().getAttribute("aria-label"), tip: el.getAttribute("data-tip"),
+      colours: [...__o.tip().querySelectorAll("[data-tone]")].map((s) => [s.dataset.tone, __o.same(getComputedStyle(s).color, __o.resolve("var(--" + s.dataset.tone + ")"))]) }; })()`);
+  await check("the size tip renders its parts toned: +210 success and −109 destructive on one row, then 319 lines, then 12 files",
+    () => sizeTip.shown && runsAre(sizeTip.runs, [[["+210", "success"], [" ", null], ["−109", "destructive"]], [["319 lines", null]], [["12 files", null]]]), sizeTip);
+  await check("...each toned span is painted in its tone (tooltip.css), not in the panel's ink",
+    () => sizeTip.colours.length === 2 && sizeTip.colours.every(([, same]) => same), sizeTip.colours);
+  await check("...and a screen reader hears data-tip only: the panel is labelled with it, and the anchor's description IS it",
+    async () => sizeTip.label === sizeTip.tip && (await axOf('[data-t="tip-parts"]')).description === sizeTip.tip,
+    async () => ({ label: sizeTip.label, ax: await axOf('[data-t="tip-parts"]') }));
+  await check("a plain tip after it: no label left on the panel, no tone in it",
+    () => evaluate(`__showTip(${T("tip-card")}) && !__o.tip().hasAttribute("aria-label") && !__o.tip().querySelector("[data-tone]")`));
+  const rowsTip = await evaluate(`(() => { __showTip(__tp("tp-rows", "effort\\txhigh · (from the forge)", JSON.stringify(["eff", { text: "ort\\tx", tone: "warning" }, "high · (from the forge)"]))); return { runs: __runs(), cls: [...__o.tip().children].map((r) => r.className) }; })()`);
+  await check("a segment may straddle a key/value tab and the separators still work: a key/value row, then an aside",
+    () => runsAre(rowsTip.runs, [[["eff", null], ["ort", "warning"], ["x", "warning"], ["high", null]], [["(from the forge)", null]]])
+      && runsAre(rowsTip.cls, ["ddtip-row", "ddtip-line ddtip-aside"]), rowsTip);
+
+  const hostile = await evaluate(`(async () => { window.__xss = 0;
+    __showTip(__tp("tp-text", "<img src=x onerror=window.__xss=1> ok", JSON.stringify([{ text: "<img src=x onerror=window.__xss=1>", tone: "warning" }, " ok"])));
+    // an <img> parsed from markup would fire its error on the next tasks; give it two frames to
+    await __waitFor(() => window.__xss !== 0 || __o.tip().querySelector("img"), 100);
+    return { img: __o.tip().querySelectorAll("img").length, xss: window.__xss, runs: __runs() }; })()`);
+  await check("a hostile text stays text: no <img> in the panel, no handler ran, the words shown as written, still toned",
+    () => hostile.img === 0 && hostile.xss === 0 && runsAre(hostile.runs, [[["<img src=x onerror=window.__xss=1>", "warning"], [" ok", null]]]), hostile);
+  const badTone = await evaluate(`(() => { window.__xss = 0;
+    __showTip(__tp("tp-tone", "a b c", JSON.stringify([{ text: "a", tone: 'x" onmouseover="window.__xss=2' }, " ", { text: "b", tone: "success; color:red" }, " ", { text: "c", tone: "constructor" }])));
+    const all = [...__o.tip().querySelectorAll("*")];
+    return { toned: __o.tip().querySelectorAll("[data-tone]").length, attrs: [...new Set(all.flatMap((n) => [...n.attributes].map((a) => a.name)))],
+      red: all.some((n) => getComputedStyle(n).color === "rgb(255, 0, 0)"), runs: __runs() }; })()`);
+  await check("a hostile or unknown tone is ignored: the segment renders untoned, no attribute but class in the panel, nothing red",
+    () => badTone.toned === 0 && badTone.attrs.every((a) => a === "class") && !badTone.red
+      && runsAre(badTone.runs, [[["a", null], [" ", null], ["b", null], [" ", null], ["c", null]]]), badTone);
+
+  const broken = await evaluate(`(() => { window.__warns.length = 0; const out = {};
+    for (const [id, parts] of [["tp-json", '[{"text": "+1", "tone": "success"'], ["tp-obj", '{"text": "+1", "tone": "success"}'], ["tp-item", '[{"tone": "success"}, 3]']]) {
+      const b = __tp(id, "falls · back", parts);
+      out[id] = [];
+      for (let i = 0; i < 3; i += 1) out[id].push(__showTip(b) && JSON.stringify(__runs()));
+    }
+    return { out, warns: window.__warns.slice() }; })()`);
+  const fellBack = JSON.stringify([[["falls", null]], [["back", null]]]);
+  await check("broken JSON, a non-array and a malformed item each fall back to data-tip, on every hover",
+    () => Object.values(broken.out).every((shows) => shows.length === 3 && shows.every((s) => s === fellBack)), broken.out);
+  await check("...with ONE console.warn per element across three hovers each, naming data-tip-parts",
+    () => broken.warns.length === 3 && broken.warns.every((w) => w.includes("data-tip-parts")), broken.warns);
+  const mismatch = await evaluate(`(() => { window.__warns.length = 0;
+    const same = __tp("tp-same", "+1  −2 ·   3 lines", JSON.stringify([{ text: "+1", tone: "success" }, " ", { text: "−2", tone: "destructive" }, " · 3 lines"]));
+    const diff = __tp("tp-diff", "+1 −2 · 3 lines", JSON.stringify([{ text: "+1", tone: "success" }, " · 4 lines"]));
+    for (let i = 0; i < 3; i += 1) { __showTip(same); __showTip(diff); }
+    return { warns: window.__warns.slice(), toned: JSON.stringify(__runs()) }; })()`);
+  await check("parts that say something other than data-tip warn once in dev (whitespace aside) and still render",
+    () => mismatch.warns.length === 1 && /does not say what data-tip says/.test(mismatch.warns[0]) && mismatch.toned.includes('"success"'), mismatch);
+
+  // A PATCHER REWRITING THE OPEN TIP'S ANCHOR. cockpit's cockpitPatch writes attributes into the node
+  // that is already there, so the hovered element is the same node before and after.
+  const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
+  const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
+    .find((path) => path && existsSync(path));
+  if (!DOM_PATCH) {
+    console.log("check-overlays: the dom-patch checks SKIPPED — no danieldeusing-infra checkout beside this one (set DD_COCKPIT_DOM_PATCH).");
+    if (process.env.DD_REQUIRE_COCKPIT_DOM_PATCH === "1") {
+      await check("DD_REQUIRE_COCKPIT_DOM_PATCH=1: the real dom-patch.js was found and driven", false, "no danieldeusing-infra checkout beside this one and no DD_COCKPIT_DOM_PATCH");
+    }
+  } else {
+    console.log(`dom-patch: ${DOM_PATCH}`);
+    await evaluate(readFileSync(DOM_PATCH, "utf8") + "; null");
+    const cell = (tip, parts) => `<span id="tp-patched" tabindex="0" data-tip="${tip}"${parts ? ` data-tip-parts='${JSON.stringify(parts)}'` : ""}>size</span>`;
+    const patched = await evaluate(`(async () => {
+      document.getElementById("tp-mount")?.remove();
+      const mount = document.createElement("p"); mount.id = "tp-mount"; document.querySelector("main").prepend(mount);
+      cockpitPatch(mount, ${JSON.stringify(cell("+1 −2 · 3 lines", [{ text: "+1", tone: "success" }, " ", { text: "−2", tone: "destructive" }, " · 3 lines"]))});
+      const el = document.getElementById("tp-patched"); __showTip(el);
+      const before = JSON.stringify(__runs());
+      cockpitPatch(mount, ${JSON.stringify(cell("+40 −7 · 47 lines", [{ text: "+40", tone: "success" }, " ", { text: "−7", tone: "destructive" }, " · 47 lines"]))});
+      const parts = await __waitFor(() => __o.tip().textContent.includes("+40") && JSON.stringify(__runs()));
+      const sameNode = document.getElementById("tp-patched") === el;
+      cockpitPatch(mount, ${JSON.stringify(cell("no size · the diff could not be read", null))});
+      const plain = await __waitFor(() => __o.tip().textContent.includes("no size") && JSON.stringify(__runs()));
+      const label = __o.tip().getAttribute("aria-label");
+      const shown = __o.tipShown(), anchored = el.getAttribute("aria-describedby");
+      mount.remove();
+      return { before, parts, plain, sameNode, label, shown, anchored };
+    })()`);
+    await check("cockpitPatch rewrites data-tip-parts on the OPEN tip's anchor (same node): the panel shows the new parts, toned",
+      () => patched.sameNode && patched.shown && patched.parts === JSON.stringify([[["+40", "success"], [" ", null], ["−7", "destructive"]], [["47 lines", null]]]), patched);
+    await check("...and a patch that drops the parts and changes data-tip shows the new data-tip, untoned and unlabelled",
+      () => patched.plain === JSON.stringify([[["no size", null]], [["the diff could not be read", null]]]) && patched.label === null, patched);
+    await check("...and the anchor keeps its description through the patches (the patcher strips every attribute its markup lacks, ddtip's token included)",
+      () => patched.anchored === "ddtip", patched);
+  }
+
+  const toneSource = readFileSync(join(root, "src/tokens.css"), "utf8");
+  const cssTones = [...toneSource.matchAll(/^\[data-tone="([a-z]+)"\]\s*\{\s*--tone:/gm)].map((m) => m[1]).sort();
+  const jsTones = (/const TONES = new Set\(\[([^\]]*)\]\)/.exec(readFileSync(join(root, "runtime/tooltip.js"), "utf8"))?.[1] ?? "")
+    .split(",").map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean).sort();
+  await check("the runtime's tone set is exactly tokens.css's data-tone map", () => cssTones.length >= 7 && JSON.stringify(cssTones) === JSON.stringify(jsTones), { cssTones, jsTones });
+  await evaluate(`document.querySelectorAll('[id^="tp-"]').forEach((n) => n.remove()); document.activeElement?.blur?.(); null`);
+
   /* ── the context menu ──────────────────────────────────────────────────────────────────────── */
   section("context menu — the keyboard (page code on attachMenuKeys + positionPopup)");
   await reset();
@@ -1408,6 +1551,19 @@ try {
     const low = THEMES.flatMap((t) => Object.entries(themes[t]).filter(([, v]) => v < floor).map(([s, v]) => `${t}/${s} ${v}`));
     await check(`contrast >= ${floor}:1 on 4 themes x 3 surfaces — ${name}`, low.length === 0, low.join(", "));
   }
+  // Each tone as PAINTED in the panel: the span's computed ink on the panel's computed fill.
+  const toneRatios = {};
+  for (const theme of THEMES) {
+    await evaluate(`document.documentElement.dataset.theme = "${theme}"; null`);
+    toneRatios[theme] = await evaluate(`(() => { document.activeElement?.blur?.(); ${T("tip-tones")}.focus(); const t = __o.tip(), bg = __o.parse(getComputedStyle(t).backgroundColor);
+      return Object.fromEntries([...t.querySelectorAll("[data-tone]")].map((s) => [s.dataset.tone, Math.round(__o.ratio(__o.over(__o.parse(getComputedStyle(s).color), bg), bg) * 100) / 100])); })()`);
+  }
+  await evaluate(`document.activeElement?.blur?.(); document.documentElement.dataset.theme = "warm"; null`);
+  const toneLow = THEMES.flatMap((t) => Object.entries(toneRatios[t]).filter(([, v]) => v < 4.5).map(([k, v]) => `${t}/${k} ${v}`));
+  await check("contrast >= 4.5:1 on 4 themes — every tone of a tip segment, painted on the tooltip's own surface",
+    THEMES.every((t) => Object.keys(toneRatios[t]).length === 7) && toneLow.length === 0, toneLow.join(", ") || toneRatios);
+  console.log("\n| tip segment tone on --popover | " + THEMES.join(" | ") + " |\n|---|---|---|---|---|");
+  for (const tone of Object.keys(toneRatios.warm)) console.log(`| ${tone} | ${THEMES.map((t) => toneRatios[t][tone].toFixed(2)).join(" | ")} |`);
   console.log("\n| pairing | floor | warm | green | mono | paper |\n|---|---:|---|---|---|---|");
   for (const [name, { kind, themes }] of table) {
     const cell = (t) => { const v = Object.values(themes[t]); return new Set(v).size === 1 ? v[0].toFixed(2) : v.map((x) => x.toFixed(2)).join(" / "); };

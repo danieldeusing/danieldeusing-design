@@ -3,6 +3,8 @@
  *
  * Markup contract:
  *   <span data-tip="Explanation shown on hover">metric</span>
+ *   <span data-tip="+210 −109" data-tip-parts='[{"text":"+210","tone":"success"}," ",{"text":"−109","tone":"destructive"}]'>M</span>
+ *     (0.61.0: toned segments. data-tip stays the tip and what a screen reader hears — see renderTip.)
  *
  * THIS REPLACES THE NATIVE `title`, AND THAT IS THE POINT. A `title` is the browser's tooltip: it
  * appears after roughly a second of hovering, is unstyled, cannot be reached by keyboard on most
@@ -29,6 +31,11 @@
  */
 let installed = false;
 
+// The tone vocabulary, as tokens.css maps it (`[data-tone="…"] { --tone: … }`). A tone in
+// data-tip-parts outside this set renders untoned; check-overlays holds the two lists equal.
+const TONES = new Set(["primary", "success", "warning", "destructive", "info", "pending", "muted"]);
+const TIP_ATTRS = ["data-tip", "data-tip-parts"];
+
 export function initTooltips() {
   // A module flag, not only the id: the panel can be inside a <dialog> that a page has since
   // removed, and a second call must not build a second panel with a second set of listeners.
@@ -40,6 +47,12 @@ export function initTooltips() {
   document.body.appendChild(tip);
 
   let anchor = null;
+  const warned = new WeakSet();
+  const warnOnce = (el, message, detail) => {
+    if (warned.has(el)) return;
+    warned.add(el);
+    console.warn(`initTooltips: ${message}`, detail, el);
+  };
 
   // A TOOLTIP MUST NEVER COVER AN OPEN SELECT (Daniel, screenshot 2026-08-15).
   //
@@ -127,7 +140,7 @@ export function initTooltips() {
     // this module's history (below) is what happens when writes during a hover are not idempotent.
     const host = el.closest("dialog[open]") ?? document.body;
     if (tip.parentNode !== host) host.appendChild(tip);
-    renderTip(el.getAttribute("data-tip"));
+    renderTip(el);
     tip.style.display = "grid";
     place();
   }
@@ -153,32 +166,98 @@ export function initTooltips() {
   //
   // Built with textContent per node, never innerHTML: a tip routinely carries a model name or a
   // branch an agent chose, and this component must not be the one that renders it as markup.
-  function renderTip(text) {
+  //
+  // TONED SEGMENTS (0.61.0). `data-tip-parts` is the same tip as a JSON array of segments — a
+  // string, or `{"text": "+210", "tone": "success"}` — so "+210 −109 · 319 lines" can show the
+  // counts green and red. The rows above are cut from the JOINED text and each row then takes the
+  // slices of the segments it spans, so ` · `, `\t` and `(aside)` work exactly as in a plain tip and
+  // a separator may sit inside a segment or between two. A tone is a word from the fixed set and
+  // lands in `data-tone` (tokens.css maps it to `--tone`, tooltip.css paints it); anything else is
+  // untoned and never reaches a class or a style. Text still goes in by textContent only.
+  //
+  // `data-tip` stays the tip: it is the fallback and it is what a screen reader hears — the panel
+  // is labelled with it while parts are shown (see renderTip), so the tones are visual only.
+  function renderTip(el) {
     tip.replaceChildren();
-    const lines = String(text == null ? "" : text)
-      .split("\n")
-      .flatMap((line) => line.split(" · "))
-      .map((line) => line.trim())
-      .filter(Boolean);
+    const text = el.getAttribute("data-tip") ?? "";
+    const parts = partsOf(el, text);
+    const segments = parts ?? [{ text, tone: null }];
+    if (!parts) tip.removeAttribute("aria-label");
+    else if (tip.getAttribute("aria-label") !== text) tip.setAttribute("aria-label", text);
+    const joined = segments.map((s) => s.text).join("");
 
-    for (const line of lines) {
+    // [a, b) of `joined` into `node`: a text node per untoned slice, a span per toned one.
+    const fill = (node, a, b) => {
+      [a, b] = trim(a, b);
+      let at = 0;
+      for (const { text: part, tone } of segments) {
+        const from = Math.max(a, at), to = Math.min(b, at + part.length);
+        if (from < to) {
+          const slice = part.slice(from - at, to - at);
+          if (tone) {
+            const span = document.createElement("span");
+            span.setAttribute("data-tone", tone);
+            span.textContent = slice;
+            node.appendChild(span);
+          } else node.appendChild(document.createTextNode(slice));
+        }
+        at += part.length;
+      }
+      return node;
+    };
+    const trim = (a, b) => {
+      while (a < b && /\s/.test(joined[a])) a += 1;
+      while (b > a && /\s/.test(joined[b - 1])) b -= 1;
+      return [a, b];
+    };
+
+    const lines = [];
+    let start = 0;
+    for (const m of joined.matchAll(/\n| · /g)) {
+      lines.push(trim(start, m.index));
+      start = m.index + m[0].length;
+    }
+    lines.push(trim(start, joined.length));
+    for (const [a, b] of lines) {
+      if (a === b) continue;
       const row = document.createElement("div");
-      const tab = line.indexOf("\t");
-      if (tab !== -1) {
+      const tab = joined.indexOf("\t", a);
+      if (tab !== -1 && tab < b) {
         row.className = "ddtip-row";
         const k = document.createElement("span");
         k.className = "ddtip-k";
-        k.textContent = line.slice(0, tab).trim();
         const v = document.createElement("span");
         v.className = "ddtip-v";
-        v.textContent = line.slice(tab + 1).trim();
-        row.append(k, v);
+        row.append(fill(k, a, tab), fill(v, tab + 1, b));
       } else {
-        row.className = line.startsWith("(") ? "ddtip-line ddtip-aside" : "ddtip-line";
-        row.textContent = line;
+        row.className = joined[a] === "(" ? "ddtip-line ddtip-aside" : "ddtip-line";
+        fill(row, a, b);
       }
       tip.appendChild(row);
     }
+  }
+
+  // The parts, or null for "render data-tip". Broken JSON, a non-array or an item that is neither a
+  // string nor `{text: string}` falls back whole — half a tip rendered from a broken list would say
+  // something neither attribute says. Each such element is warned about ONCE, not on every hover,
+  // and so is a list whose text is not what `data-tip` says (a screen reader hears only data-tip).
+  function partsOf(el, text) {
+    const raw = el.getAttribute("data-tip-parts");
+    if (raw == null) return null;
+    let list;
+    try { list = JSON.parse(raw); } catch { list = null; }
+    const ok = Array.isArray(list) && list.every((p) => typeof p === "string" || typeof p?.text === "string");
+    if (!ok) {
+      warnOnce(el, "data-tip-parts is not a JSON array of strings and {text, tone} objects — showing data-tip instead", raw);
+      return null;
+    }
+    const segments = list.map((p) => (typeof p === "string" ? { text: p, tone: null }
+      : { text: p.text, tone: TONES.has(p.tone) ? p.tone : null }));
+    const flat = (s) => s.replace(/\s+/g, " ").trim();
+    if (flat(segments.map((s) => s.text).join("")) !== flat(text)) {
+      warnOnce(el, "data-tip-parts does not say what data-tip says — a screen reader hears only data-tip", { parts: raw, tip: text });
+    }
+    return segments;
   }
 
   // WHERE THE PANEL GOES. Split out of show() so a scroll can re-place a tooltip that is already
@@ -412,6 +491,18 @@ export function initTooltips() {
       // a dropdown's panel is already in the DOM; what ARRIVES is the `open` attribute — and for a
       // popup this module has no selector for (a framework's menu button), `aria-expanded`
       if (record.type === "attributes") {
+        // A RENDERER THAT PATCHES THE OPEN TIP'S ANCHOR (cockpit's cockpitPatch writes attributes
+        // into the node that is already there) changes what the panel must say. show() returns early
+        // for the anchor it has, so without this the panel went on showing the text from the hover.
+        if (record.target === anchor && TIP_ATTRS.includes(record.attributeName)) {
+          if (!anchor.hasAttribute("data-tip")) { hide(); return; }
+          renderTip(anchor);
+          if (showing()) place();
+          continue;
+        }
+        // The same patcher removes every attribute its markup does not carry, and the anchor's
+        // `ddtip` token is one: the tip stayed on screen and a screen reader lost it. Put it back.
+        if (record.target === anchor && record.attributeName === "aria-describedby") { describe(anchor); continue; }
         if (record.target.matches?.(`details.dropdown[open], ${OPEN_POPUP}`)) { hide(); return; }
         continue;
       }
@@ -420,5 +511,5 @@ export function initTooltips() {
         if (node.matches?.(".select-panel") || node.querySelector?.(".select-panel")) { hide(); return; }
       }
     }
-  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "aria-expanded"] });
+  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "aria-expanded", "aria-describedby", ...TIP_ATTRS] });
 }

@@ -176,11 +176,26 @@ const evaluate = async (expression) => {
 // suite while every underlying assertion was fine.
 const saw = (hits, what) => hits.some((h) => h.startsWith(what + "@") || h === what);
 
+/*
+ * A check takes a THUNK (a value still works). A thunk that throws is a FAIL naming the error and the
+ * suite goes on; whatever still escapes — an assertion evaluated before check() is entered — is caught
+ * at the bottom and reported against the last check that finished, never as a bare stack.
+ */
 let failures = 0;
-const check = (label, condition, detail) => {
-  if (condition) { console.log(`PASS  ${label}`); return; }
+let lastLabel = "(none yet)";
+const check = async (label, test, detail) => {
+  let ok;
+  let info = detail;
+  try {
+    ok = typeof test === "function" ? await test() : test;
+  } catch (error) {
+    ok = false;
+    info = `threw: ${String(error?.message ?? error).split("\n")[0]}`;
+  }
+  lastLabel = label;
+  if (ok) { console.log(`PASS  ${label}`); return; }
   failures += 1;
-  console.log(`FAIL  ${label}${detail == null ? "" : `\n        ${JSON.stringify(detail)}`}`);
+  console.log(`FAIL  ${label}${info == null ? "" : `\n        ${typeof info === "string" ? info : JSON.stringify(info)}`}`);
 };
 
 // Scroll the column into view exactly as a reader does, then click it with a REAL press/release.
@@ -215,140 +230,145 @@ const clickById = async (id) => {
 // even that does not click, the dispatch is not reaching the page and nothing below can be read as
 // a verdict on the runtime. Reported as a SKIP rather than a failure, because a check that fails
 // in both the fixed and the broken state proves nothing and would be edited away.
-const sanity = await clickById("outside");
-if (!saw(sanity.hits, "click:outside")) {
-  console.log("check-tooltip-click: SKIPPED — synthetic clicks are not reaching this browser.");
-  console.log(`  baseline control outside any scroller produced: ${JSON.stringify(sanity.hits)}`);
-  console.log("  The runtime cannot be judged from that, so this reports nothing rather than a verdict.");
-  shutdown();
-  process.exit(process.env.DD_REQUIRE_BROWSER === "1" ? 1 : 0);
+try {
+  const sanity = await clickById("outside");
+  if (!saw(sanity.hits, "click:outside")) {
+    console.log("check-tooltip-click: SKIPPED — synthetic clicks are not reaching this browser.");
+    console.log(`  baseline control outside any scroller produced: ${JSON.stringify(sanity.hits)}`);
+    console.log("  The runtime cannot be judged from that, so this reports nothing rather than a verdict.");
+    shutdown();
+    process.exit(process.env.DD_REQUIRE_BROWSER === "1" ? 1 : 0);
+  }
+  console.log("PASS  synthetic clicks reach this browser (baseline outside any scroller)");
+
+  const outsideTipped = await clickById("outsidetip");
+  await check("a TOOLTIPPED control outside a scroller clicks",
+    () => saw(outsideTipped.hits, "click:outsidetip"), outsideTipped.hits);
+
+  // THE TOOLTIP MUST STILL BE A TOOLTIP. The fix separates hiding the panel from releasing the
+  // anchor, and the way to get that wrong is a panel that stops coming back.
+  const behaviour = await evaluate(`(async () => {
+    const tip = document.getElementById("ddtip");
+    const el = document.getElementById("outsidetip");
+    const other = document.getElementById("outside");
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const snap = () => ({ disp: getComputedStyle(tip).display, aria: el.getAttribute("aria-describedby") });
+
+    el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await sleep(30);
+    const hovering = snap();
+
+    other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await sleep(30);
+    const left = snap();
+
+    // hover again, then PRESS: the panel goes, the anchor keeps its description
+    el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await sleep(30);
+    el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    await sleep(30);
+    const pressed = snap();
+
+    // and it comes back on a fresh hover
+    other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await sleep(30);
+    el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await sleep(30);
+    const again = snap();
+    return { hovering, left, pressed, again, text: tip.textContent.slice(0, 24) };
+  })()`);
+  await check("hovering a [data-tip] shows the panel and describes the anchor",
+    () => behaviour.hovering.disp !== "none" && behaviour.hovering.aria === "ddtip", behaviour);
+  await check("leaving it hides the panel AND releases the description",
+    () => behaviour.left.disp === "none" && behaviour.left.aria === null, behaviour);
+  await check("pressing hides the panel but does NOT strip the anchor's aria mid-gesture",
+    () => behaviour.pressed.disp === "none" && behaviour.pressed.aria === "ddtip", behaviour);
+  await check("...and the tooltip comes back on a fresh hover, so the press did not kill it",
+    () => behaviour.again.disp !== "none" && behaviour.again.aria === "ddtip", behaviour);
+
+  // The park still has to MEASURE, or the fix trades a dead button for a misplaced panel.
+  const placement = await evaluate(`(() => {
+    const el = document.getElementById("tipped");
+    el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    const tip = document.getElementById("ddtip");
+    const t = tip.getBoundingClientRect(), r = el.getBoundingClientRect();
+    // what the panel measures with nothing constraining it, computed the same way show() must
+    // Measure the REAL panel parked off-screen and put it back. A clone matches none of the #ddtip
+    // rules, so it measured its own content and the comparison meant nothing.
+    const keepL = tip.style.left, keepT = tip.style.top;
+    tip.style.left = "0px"; tip.style.top = "-9999px";
+    const unconstrainedW = Math.round(tip.getBoundingClientRect().width);
+    tip.style.left = keepL; tip.style.top = keepT;
+    return { unconstrainedW, tipW: Math.round(t.width), tipH: Math.round(t.height),
+             tipL: Math.round(t.left), tipT: Math.round(t.top),
+             anchorBottom: Math.round(r.bottom), viewportW: window.innerWidth,
+             parkedTop: tip.style.top, display: getComputedStyle(tip).display };
+  })()`);
+  // DERIVED, not hardcoded: the rendered width is max-width plus padding and border, and pinning
+  // the sum here would fail the day someone changes the padding for reasons unrelated to this bug.
+  await check("the panel is measured at its full unconstrained width, not squeezed by where it last sat",
+    () => placement.tipW === placement.unconstrainedW, placement);
+  await check("...and is placed below its anchor, inside the viewport",
+    () => placement.tipT >= placement.anchorBottom && placement.tipL >= 0
+      && placement.tipL + placement.tipW <= placement.viewportW, placement);
+
+  // INSIDE A MODAL DIALOG: the panel moves into the dialog on hover, and the control still clicks.
+  await evaluate(`(() => { document.getElementById("ddtip").style.display = "none"; document.getElementById("dlg").showModal(); })()`);
+  const inDialog = await clickById("indialog");
+  await check("a TOOLTIPPED control inside a modal dialog clicks — the move into the dialog is not a write that costs the click",
+    () => saw(inDialog.hits, "click:indialog"), inDialog.hits);
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: inDialog.box.x + 1, y: inDialog.box.y });
+  await evaluate(`document.getElementById("indialog").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }))`);
+  const layer = await evaluate(`(() => {
+    const tip = document.getElementById("ddtip"), dlg = document.getElementById("dlg");
+    // hover it fresh: leave, then enter, so show() runs for this anchor
+    document.getElementById("outside").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    document.getElementById("indialog").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    tip.style.pointerEvents = "auto";
+    const r = tip.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    tip.style.pointerEvents = "";
+    return { inDialog: tip.parentElement === dlg, shown: getComputedStyle(tip).display !== "none" && r.width > 0,
+             onTop: !!hit && (hit === tip || tip.contains(hit)), hit: hit && (hit.id || hit.nodeName) };
+  })()`);
+  await check("...its tip is appended to the dialog and is really on top (the hit test finds the panel, not the dialog)",
+    () => layer.inDialog && layer.shown && layer.onTop, layer);
+  await evaluate(`document.getElementById("dlg").close()`);
+
+  // THE SPECIFIC REGRESSION, on the source as well as in the browser. Comments stripped first: this
+  // file explains the defect at length and every explanation contains the words being matched.
+  const source = readFileSync(join(root, "runtime/tooltip.js"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  await check("pointerdown hides the PANEL and does not touch the anchor's aria",
+    () => /addEventListener\("pointerdown",\s*hidePanel\s*,\s*true\)/.test(source),
+    source.match(/addEventListener\("pointerdown"[^\n]*/g));
+  // The other half is behaviour, counted: every aria-describedby write on the anchor, across a hover
+  // the browser re-fires five times (as it does on a live-refreshing table), a leave, and further
+  // hovers elsewhere. (It was a regex over the source until 0.60.0, when the attribute became a token
+  // list and the one-liners it matched were rewritten.)
+  const writes = await evaluate(`(async () => {
+    const el = document.getElementById("outsidetip"), other = document.getElementById("outside");
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await sleep(30);
+    const count = { set: 0, remove: 0 };
+    const set = el.setAttribute, remove = el.removeAttribute;
+    el.setAttribute = function (name, value) { if (name === "aria-describedby") count.set += 1; return set.call(this, name, value); };
+    el.removeAttribute = function (name) { if (name === "aria-describedby") count.remove += 1; return remove.call(this, name); };
+    for (let i = 0; i < 5; i += 1) { el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); await sleep(10); }
+    const whileHovered = { ...count };
+    for (let i = 0; i < 3; i += 1) { other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); await sleep(10); }
+    delete el.setAttribute; delete el.removeAttribute;
+    return { whileHovered, total: count };
+  })()`);
+  await check("...and the aria association is written only when it would change (one write across five re-fired hovers)",
+    () => writes.whileHovered.set === 1 && writes.whileHovered.remove === 0, writes);
+  await check("...and removed only when it is actually set (one removal across three leaves)",
+    () => writes.total.set === 1 && writes.total.remove === 1, writes);
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL  the suite threw after "${lastLabel}": ${String(error?.message ?? error).split("\n")[0]}`);
 }
-console.log("PASS  synthetic clicks reach this browser (baseline outside any scroller)");
-
-const outsideTipped = await clickById("outsidetip");
-check("a TOOLTIPPED control outside a scroller clicks",
-  saw(outsideTipped.hits, "click:outsidetip"), outsideTipped.hits);
-
-// THE TOOLTIP MUST STILL BE A TOOLTIP. The fix separates hiding the panel from releasing the
-// anchor, and the way to get that wrong is a panel that stops coming back.
-const behaviour = await evaluate(`(async () => {
-  const tip = document.getElementById("ddtip");
-  const el = document.getElementById("outsidetip");
-  const other = document.getElementById("outside");
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const snap = () => ({ disp: getComputedStyle(tip).display, aria: el.getAttribute("aria-describedby") });
-
-  el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  await sleep(30);
-  const hovering = snap();
-
-  other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  await sleep(30);
-  const left = snap();
-
-  // hover again, then PRESS: the panel goes, the anchor keeps its description
-  el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  await sleep(30);
-  el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-  await sleep(30);
-  const pressed = snap();
-
-  // and it comes back on a fresh hover
-  other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  await sleep(30);
-  el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  await sleep(30);
-  const again = snap();
-  return { hovering, left, pressed, again, text: tip.textContent.slice(0, 24) };
-})()`);
-check("hovering a [data-tip] shows the panel and describes the anchor",
-  behaviour.hovering.disp !== "none" && behaviour.hovering.aria === "ddtip", behaviour);
-check("leaving it hides the panel AND releases the description",
-  behaviour.left.disp === "none" && behaviour.left.aria === null, behaviour);
-check("pressing hides the panel but does NOT strip the anchor's aria mid-gesture",
-  behaviour.pressed.disp === "none" && behaviour.pressed.aria === "ddtip", behaviour);
-check("...and the tooltip comes back on a fresh hover, so the press did not kill it",
-  behaviour.again.disp !== "none" && behaviour.again.aria === "ddtip", behaviour);
-
-// The park still has to MEASURE, or the fix trades a dead button for a misplaced panel.
-const placement = await evaluate(`(() => {
-  const el = document.getElementById("tipped");
-  el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  const tip = document.getElementById("ddtip");
-  const t = tip.getBoundingClientRect(), r = el.getBoundingClientRect();
-  // what the panel measures with nothing constraining it, computed the same way show() must
-  // Measure the REAL panel parked off-screen and put it back. A clone matches none of the #ddtip
-  // rules, so it measured its own content and the comparison meant nothing.
-  const keepL = tip.style.left, keepT = tip.style.top;
-  tip.style.left = "0px"; tip.style.top = "-9999px";
-  const unconstrainedW = Math.round(tip.getBoundingClientRect().width);
-  tip.style.left = keepL; tip.style.top = keepT;
-  return { unconstrainedW, tipW: Math.round(t.width), tipH: Math.round(t.height),
-           tipL: Math.round(t.left), tipT: Math.round(t.top),
-           anchorBottom: Math.round(r.bottom), viewportW: window.innerWidth,
-           parkedTop: tip.style.top, display: getComputedStyle(tip).display };
-})()`);
-// DERIVED, not hardcoded: the rendered width is max-width plus padding and border, and pinning
-// the sum here would fail the day someone changes the padding for reasons unrelated to this bug.
-check("the panel is measured at its full unconstrained width, not squeezed by where it last sat",
-  placement.tipW === placement.unconstrainedW, placement);
-check("...and is placed below its anchor, inside the viewport",
-  placement.tipT >= placement.anchorBottom && placement.tipL >= 0
-    && placement.tipL + placement.tipW <= placement.viewportW, placement);
-
-// INSIDE A MODAL DIALOG: the panel moves into the dialog on hover, and the control still clicks.
-await evaluate(`(() => { document.getElementById("ddtip").style.display = "none"; document.getElementById("dlg").showModal(); })()`);
-const inDialog = await clickById("indialog");
-check("a TOOLTIPPED control inside a modal dialog clicks — the move into the dialog is not a write that costs the click",
-  saw(inDialog.hits, "click:indialog"), inDialog.hits);
-await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: inDialog.box.x + 1, y: inDialog.box.y });
-await evaluate(`document.getElementById("indialog").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }))`);
-const layer = await evaluate(`(() => {
-  const tip = document.getElementById("ddtip"), dlg = document.getElementById("dlg");
-  // hover it fresh: leave, then enter, so show() runs for this anchor
-  document.getElementById("outside").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  document.getElementById("indialog").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  tip.style.pointerEvents = "auto";
-  const r = tip.getBoundingClientRect();
-  const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-  tip.style.pointerEvents = "";
-  return { inDialog: tip.parentElement === dlg, shown: getComputedStyle(tip).display !== "none" && r.width > 0,
-           onTop: !!hit && (hit === tip || tip.contains(hit)), hit: hit && (hit.id || hit.nodeName) };
-})()`);
-check("...its tip is appended to the dialog and is really on top (the hit test finds the panel, not the dialog)",
-  layer.inDialog && layer.shown && layer.onTop, layer);
-await evaluate(`document.getElementById("dlg").close()`);
-
-// THE SPECIFIC REGRESSION, on the source as well as in the browser. Comments stripped first: this
-// file explains the defect at length and every explanation contains the words being matched.
-const source = readFileSync(join(root, "runtime/tooltip.js"), "utf8")
-  .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-check("pointerdown hides the PANEL and does not touch the anchor's aria",
-  /addEventListener\("pointerdown",\s*hidePanel\s*,\s*true\)/.test(source),
-  source.match(/addEventListener\("pointerdown"[^\n]*/g));
-// The other half is behaviour, counted: every aria-describedby write on the anchor, across a hover
-// the browser re-fires five times (as it does on a live-refreshing table), a leave, and further
-// hovers elsewhere. (It was a regex over the source until 0.60.0, when the attribute became a token
-// list and the one-liners it matched were rewritten.)
-const writes = await evaluate(`(async () => {
-  const el = document.getElementById("outsidetip"), other = document.getElementById("outside");
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-  await sleep(30);
-  const count = { set: 0, remove: 0 };
-  const set = el.setAttribute, remove = el.removeAttribute;
-  el.setAttribute = function (name, value) { if (name === "aria-describedby") count.set += 1; return set.call(this, name, value); };
-  el.removeAttribute = function (name) { if (name === "aria-describedby") count.remove += 1; return remove.call(this, name); };
-  for (let i = 0; i < 5; i += 1) { el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); await sleep(10); }
-  const whileHovered = { ...count };
-  for (let i = 0; i < 3; i += 1) { other.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); await sleep(10); }
-  delete el.setAttribute; delete el.removeAttribute;
-  return { whileHovered, total: count };
-})()`);
-check("...and the aria association is written only when it would change (one write across five re-fired hovers)",
-  writes.whileHovered.set === 1 && writes.whileHovered.remove === 0, writes);
-check("...and removed only when it is actually set (one removal across three leaves)",
-  writes.total.set === 1 && writes.total.remove === 1, writes);
 
 console.log(failures
   ? `\n\x1b[31m-- check-tooltip-click: ${failures} FAILED --\x1b[0m`

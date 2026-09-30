@@ -167,7 +167,7 @@
 
       <section id="tooltips">
         <h2>tooltip</h2>
-        <p class="lede">Hover or focus. Escape hides a tip and nothing else. No tip while a list is open, or on a control whose own popup is open.</p>
+        <p class="lede">Hover or focus. Escape hides a tip and nothing else. No tip while a list is open, or on a control whose own popup is open. <code>data-tip-parts</code> tones a segment (<em>size</em>, <em>tones</em>); <code>data-tip</code> says the same words and is what a screen reader hears.</p>
         <div class="surfaces">
           <div class="surface" data-surface="background">
             <p class="surface-cap">--background</p>
@@ -183,12 +183,14 @@
               <span tabindex="0" data-t="tip-card" data-tip="dd-infra-cockpit · up 3 days · ddstudio">cockpit</span>
               <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" data-t="tip-button" data-tip="re-reads every host now, not at the next poll">refresh</button>
               <button type="button" class="btn-icon" data-icon="download" aria-label="download the log" data-t="tip-icon" data-tip="the last 1 000 lines · as plain text"></button>
+              <span tabindex="0" data-t="tip-parts" data-tip="+210 −109 · 319 lines · 12 files" data-tip-parts='[{"text": "+210", "tone": "success"}, " ", {"text": "−109", "tone": "destructive"}, " · 319 lines · 12 files"]'>size</span>
             </div>
           </div>
           <div class="surface" data-surface="muted">
             <p class="surface-cap">--muted</p>
             <div class="row">
               <span tabindex="0" data-t="tip-muted" data-tip="poi/vu3 · 12 open reviews">poi/vu3</span>
+              <span tabindex="0" data-t="tip-tones" data-tip="tones: primary success warning destructive info pending muted" data-tip-parts='["tones: ", {"text": "primary", "tone": "primary"}, " ", {"text": "success", "tone": "success"}, " ", {"text": "warning", "tone": "warning"}, " ", {"text": "destructive", "tone": "destructive"}, " ", {"text": "info", "tone": "info"}, " ", {"text": "pending", "tone": "pending"}, " ", {"text": "muted", "tone": "muted"}]'>tones</span>
             </div>
           </div>
         </div>

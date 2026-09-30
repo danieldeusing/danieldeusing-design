@@ -9203,6 +9203,13 @@ dialog.dgm-overlay::backdrop {
 #ddtip .ddtip-k { color: var(--muted-foreground); }
 #ddtip .ddtip-v { font-variant-numeric: tabular-nums; }
 
+/* ── toned segments (0.61.0) ──
+   `data-tip-parts` renders a segment as `<span data-tone="success">`; tokens.css turns the word into
+   `--tone`, and this is the one rule that paints it. Every tone stands >= 4.5:1 on --popover in all
+   four themes (check-overlays measures it). In forced colours the palette repaints the ink as
+   CanvasText: the segment loses its hue and keeps its words, which data-tip says anyway. */
+#ddtip [data-tone] { color: var(--tone); }
+
 /* A tip is a screen affordance. print.css hides it too; this file says so itself because a
    tokens-only app loads this file and never that one. */
 @media print {

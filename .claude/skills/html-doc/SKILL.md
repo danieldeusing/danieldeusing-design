@@ -55,8 +55,8 @@ already carries two, and if you cannot write the sentence you do not have an exc
 
    ```html
    <link rel="stylesheet"
-     href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.61.0/dist/danieldeusing-design.min.css"
-     onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.61.0.min.css'" />
+     href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.61.1/dist/danieldeusing-design.min.css"
+     onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.61.1.min.css'" />
    ```
 
    **Copy the version from `templates/documentation.html`, never from this line.** The example

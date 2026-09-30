@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.61.1 (2026-09-30)
+
+### Fixed
+
+- **Prose in a `table.kv` no longer breaks inside a word** beside a long code value. The cells were
+  `overflow-wrap: anywhere`, which lets a word break while the table is sized, so every prose cell
+  could shrink to one character; once 0.61.0 kept inline code whole in a cell, a row with a long code
+  value took the width and the prose beside it broke mid-word ("exists (producti|on)" on a docs page
+  1280px wide, 107 words cut on a phone). A `table.kv` cell is now `overflow-wrap: break-word`: a long
+  URL or path still breaks, but only where it cannot fit its line. A token wider than the whole table
+  widens it, and the `.tablewrap` scrolls it (`initTableScroll()`). `dl.kv` keeps `anywhere`: its
+  value column is sized by the free space, never by its content, so it cannot squeeze the prose.
+- Every current-version pin (README, the html-doc skill, the documentation and error-page templates)
+  moves to 0.61.1.
+
 ## 0.61.0 (2026-09-30)
 
 ### Tables read at full strength, blocks keep their gap, and tooltips can carry colour

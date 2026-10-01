@@ -9,7 +9,7 @@ description: >-
   webpage", "write this workflow up as a single HTML file", or wants a shareable
   standalone .html doc with the terminal look. Also for a report or write-up of an
   investigation, analysis or review that others will read ("write a report",
-  "write it up with screenshots and proofs", "explain it ELI5"). Produces ONE .html file that needs
+  "write it up with screenshots and proofs", "explain it ELI5"). Not for a write-up in the VU3 workspace — vu3-agent-kit's vu3-html-doc does those in the Columbus look. Produces ONE .html file that needs
   no build step and opens directly in a browser, and can optionally be published to the
   password-protected docs.danieldeusing.de by moving it into the danieldeusing-docs repo and
   pushing (the push is the deploy). Also use when the user says "publish this doc", "put this
@@ -46,9 +46,11 @@ already carries two, and if you cannot write the sentence you do not have an exc
    relevant files so the documentation reflects what the thing actually does — don't invent.
 
 2. **Load the template:** `templates/documentation.html`, in this skill's own repo —
-   `/Users/daniel/Work/danieldeusing/danieldeusing-design/templates/documentation.html` on
-   Daniel's machines, `../../../templates/documentation.html` relative to this file anywhere
-   else. There is deliberately **no second copy** bundled with the skill: two copies drifted
+   `~/Work/danieldeusing/danieldeusing-design/templates/documentation.html`, the clone path on
+   Daniel's machines and in the vu3-agent-kit install guide. Elsewhere it is
+   `../../../templates/documentation.html` from this file's *real* path (`readlink -f` it first:
+   reached through a `~/.claude/skills/` symlink, or as a copy in `~/.copilot/skills/`, the
+   relative path points nowhere). There is deliberately **no second copy** bundled with the skill: two copies drifted
    apart the moment the template changed, which is why the skill now ships inside the repo it
    documents.
 

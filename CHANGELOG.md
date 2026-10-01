@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.62.3 (2026-10-01)
 
 ### Added
 
@@ -53,6 +53,40 @@ All notable changes to this project are documented here. The format follows
   it) stands after it, past any pager or count the moved table left there. A table that lands after
   those leavings adopts the bar through them instead of drawing a second. A page's box keeps driving
   its table when the table is detached and inserted again.
+- **CI runs check-tailwind-layers' Tailwind half, and a skip there fails.** Neither workflow had
+  `@tailwindcss/node`, so the half that compiles the shipped entry and reads the cascade in a browser
+  only ever ran on macOS. Both workflows now borrow `@tailwindcss/node@4.3.3` into `$RUNNER_TEMP` the
+  way they borrow lucide-react, and the suite step sets `DD_TAILWIND_NODE` and `DD_REQUIRE_TAILWIND=1`.
+  `check-release-gate.mjs` fails a workflow step that lacks either flag, an install that is not an
+  exact version or lacks `--ignore-scripts`, a flag pointing outside the directory its install writes
+  to, and ci.yml and release.yml borrowing different versions.
+- **check-integration needs no network for the template's diagram.** The section that proves
+  `templates/documentation.html` draws its mermaid diagram failed whenever jsDelivr did. With
+  `DD_MERMAID` set to an installed mermaid (the workflows borrow `mermaid@11.16.0`), the browser
+  answers the template's own import from that copy and refuses every other jsDelivr request; the
+  installed version must be the one the template pins. check-release-gate requires the flag and the
+  pinned install in both workflows. Unset, the section still uses the CDN.
+- **A console status can no longer push the page sideways.** `.console-status` is `white-space:
+  nowrap` in a `.console-bar` flex row, so a status longer than a word (cards.md used to suggest
+  "paused — scroll to the bottom to resume") could not shrink and widened the bar, and the page with
+  it: `examples/cards.html` measured 343px at 320px for that reason. The status now has
+  `min-inline-size: 0` and `overflow: hidden`, so it clips inside its bar when it does not fit and is
+  untouched when it does (every box of every console on `cards.html` is the same rectangle at 320,
+  375 and 1280). cards.md now says the status is one short word (`live`, `paused`, `ended`) and puts
+  the "scroll to resume" hint on the jump-to-newest button's `data-tip`; the example's status is
+  `paused`. check-cards asserts no sideways scroll at 320px and 375px, and that a sentence-long status
+  does not widen the page. The `dist/` bundles change by that one rule.
+- **No example page scrolls sideways at 320px or 375px, and a suite says so for every page.**
+  `check-filters.mjs`, which already sweeps every file in `examples/`, now fails a page whose
+  `scrollWidth` exceeds its viewport at either width and names the elements that overflow the page
+  itself (an element inside its own scrolling wrapper, or inside a closed `<details>`, is not
+  counted); a page with no viewport meta, which would lay out at 980px and pass vacuously, fails
+  too. It found three pages, all examples at fault: `chrome.html` (336px: the
+  `.bar--app` title strip is a fixed-width desktop specimen, so its frame now scrolls),
+  `components.html` (332px: its page header's wordmark and nav did not fit one line, so the
+  wordmark is now "components") and `controls.html` (372px: `.demo-matrix` was `minmax(22rem, 1fr)`, now
+  `minmax(min(22rem, 100%), 1fr)`). `data.html`, `filters.html` and `icons.html` had wide elements
+  but no overflow: a `.tablewrap`, the page's own `overflow-x: auto` table, and closed menus.
 
 Consumers: nothing has to change in markup. A renderer that patches an engine table's rows in place
 (cockpit's `cockpitTable`) should set `data-table-rows` on the table with every paint. A page that

@@ -2153,6 +2153,36 @@ for (const page of pages) {
 await check(`examples: the sweep opened the dialogs and measured their filter bars (${dialogBars} rendered; overlays' two toolbars at two widths is 4)`,
   () => dialogBars >= 4);
 
+// NO EXAMPLE PAGE SCROLLS SIDEWAYS ON A PHONE, at 320 (the narrowest the system supports) and 375. The
+// verdict is the page's own scrollWidth against its viewport; an element past the right edge inside
+// its OWN scrolling or clipping wrapper (a .tablewrap, a <pre>, a diagram) is the documented pattern
+// and is not what fails. The offenders named are the outermost elements that overflow the page itself,
+// skipping what is not drawn (the content of a closed <details>, a fixed element).
+const OVERFLOW = `(() => {
+  const cw = document.documentElement.clientWidth, sw = document.scrollingElement.scrollWidth;
+  const inOwnScroller = (el) => { for (let n = el.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+    const r = n.getBoundingClientRect();
+    if (getComputedStyle(n).overflowX !== "visible" && r.right <= cw + 0.5) return true; } return false; };
+  const past = [...document.body.querySelectorAll("*")].filter((el) => el.getClientRects().length && getComputedStyle(el).position !== "fixed"
+    && getComputedStyle(el).visibility !== "hidden" && !(el.parentElement?.closest("details:not([open])") && !el.closest("summary"))
+    && el.getBoundingClientRect().right > cw + 0.5 && !inOwnScroller(el));
+  const name = (el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\\s+/).join(".") : "") + " (right edge " + Math.round(el.getBoundingClientRect().right) + ")";
+  return { sw, cw, offenders: past.filter((el) => !past.some((o) => o !== el && o.contains(el))).slice(0, 4).map(name) };
+})()`;
+for (const page of pages) {
+  const wrong = [];
+  for (const width of [320, 375]) {
+    await send("Emulation.setDeviceMetricsOverride", { width, height: 800, deviceScaleFactor: 1, mobile: true });
+    await open(`/examples/${page}`, "true");
+    await sleep(250);
+    const { sw, cw, offenders } = await evaluate(OVERFLOW);
+    // A page with no viewport meta lays out at 980 whatever is emulated, and then "fits" trivially.
+    if (cw !== width) wrong.push(`${width}px: the viewport is ${cw}px wide, not ${width}: the page has no <meta name="viewport"> and this measured nothing`);
+    if (sw > cw) wrong.push(`${width}px: the page is ${sw}px wide in a ${cw}px viewport; overflowing the page itself: ${offenders.join(", ") || "(none found)"}`);
+  }
+  await check(`examples/${page}: the page does not scroll sideways at 320px or 375px`, () => wrong.length === 0, () => wrong.join(" | "));
+}
+
 /* ═══ 0.62.1 — a dialog's toolbar sits on its body, and the two layouts the filter rule missed ════
    Cockpit's logs drawer, twice. Its fixed form was flagged by findFlushBlocks(): overlays.css draws
    `.dialog-toolbar.filter-bar` flush on the body on purpose, and the drawer had to mark its console

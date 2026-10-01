@@ -1056,12 +1056,26 @@ await check("below 48rem: panes stack, splitters inside the split go, the strip 
   W.expect("#fx-collapsed", "", "border-bottom-width", { is: "1px" }), W.expect("#fx-collapsed", "", "border-right-width", { is: "0px" }),
   W.expect("#fx-collapsed-label", "", "writing-mode", { is: "horizontal-tb" })].filter(Boolean)`));
 // THE DEMO ITSELF FITS A PHONE. It rendered 435px wide at 375: two rows carried every tone's tag in one
-// nowrap meta slot and a console status a sentence long. A fresh load, so no injected fixture counts.
-await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
-await load();
-await check("the cards demo does not scroll sideways at 375px (435px wide on 0.60.0)", () => evaluate(`(() => {
+// nowrap meta slot and a console status a sentence long. At 320 (the narrowest phone the system
+// supports) it was still 343px, for the same reason. A fresh load each time, so no injected fixture counts.
+const WIDE = `(() => {
   const w = document.scrollingElement.scrollWidth, cw = document.documentElement.clientWidth;
-  return w <= cw ? [] : ["the page is " + w + "px wide in a " + cw + "px viewport"]; })()`));
+  const wide = [...document.body.querySelectorAll("*")].filter((el) => el.getBoundingClientRect().right > cw + 0.5)
+    .slice(0, 3).map((el) => el.tagName.toLowerCase() + (typeof el.className === "string" && el.className ? "." + el.className : "")).join(", ");
+  return w <= cw ? [] : ["the page is " + w + "px wide in a " + cw + "px viewport (first wide elements: " + wide + ")"]; })()`;
+for (const [width, was] of [[375, "435px wide on 0.60.0"], [320, "343px wide on 0.62.2"]]) {
+  await send("Emulation.setDeviceMetricsOverride", { width, height: 812, deviceScaleFactor: 1, mobile: true });
+  await load();
+  await check(`the cards demo does not scroll sideways at ${width}px (${was})`, () => evaluate(WIDE));
+}
+// ...and a status a CONSUMER makes a sentence long must not push the page either: the status shrinks
+// below its text and clips (it was a nowrap flex item that could not, 424px wide at 320 with this one).
+await send("Emulation.setDeviceMetricsOverride", { width: 320, height: 812, deviceScaleFactor: 1, mobile: true });
+await load();
+await evaluate(`document.querySelector(".console-status").lastChild.textContent = "paused \u2014 scroll to the bottom to resume"; null`);
+await check("a console status a sentence long does not widen the page at 320px (it clips inside its bar)", () => evaluate(`(() => {
+  const st = document.querySelector(".console-status");
+  return [...${WIDE}, ...(st.scrollWidth > st.clientWidth ? [] : ["the status was not actually clipped: the test sentence fits"])]; })()`));
 await send("Emulation.clearDeviceMetricsOverride");
 
 /* ── 3. tokens.css + cards.css only: the same computed values, focus rings, and `hidden` ──────── */

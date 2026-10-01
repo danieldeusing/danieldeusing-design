@@ -29,6 +29,20 @@ jobs:
       - name: Borrow lucide-react 0.559.0 for check-icons
         run: npm install --no-save --no-package-lock --ignore-scripts --prefix "$RUNNER_TEMP/lucide" lucide-react@0.559.0
 
+      # check-tailwind-layers' browser half compiles the shipped entry with a real Tailwind and reads
+      # the result in a browser. The package installs nothing, so the compiler is borrowed the same
+      # way (exact version; it pulls tailwindcss at the same number), and the suite's step sets
+      # DD_REQUIRE_TAILWIND so a runner that cannot find it fails instead of skipping.
+      - name: Borrow @tailwindcss/node 4.3.3 for check-tailwind-layers
+        run: npm install --no-save --no-package-lock --ignore-scripts --prefix "$RUNNER_TEMP/tailwind" @tailwindcss/node@4.3.3
+
+      # check-integration draws templates/documentation.html's diagram with mermaid. The template
+      # loads it from jsDelivr; the suite loads this copy instead (same version as the template's
+      # import, which the suite compares) and blocks cdn.jsdelivr.net in its browser, so a CDN
+      # outage cannot fail a release and a CDN-only pass is impossible.
+      - name: Borrow mermaid 11.16.0 for check-integration
+        run: npm install --no-save --no-package-lock --ignore-scripts --prefix "$RUNNER_TEMP/mermaid" mermaid@11.16.0
+
       # EVERY scripts/check-*.mjs, and none may skip (check-release-gate.mjs fails a suite that is
       # missing here or in release.yml, or a flag missing from its step):
       #   DD_REQUIRE_BROWSER     a DOM suite with no browser exits 0 with SKIPPED; this makes it a failure
@@ -37,14 +51,19 @@ jobs:
       #   DD_REQUIRE_COCKPIT_DOM_PATCH  the suites that drive the runtime under cockpit's patcher must
       #                          find it: CI has no infra checkout, so DD_COCKPIT_DOM_PATCH points at the
       #                          vendored copy in scripts/fixtures (its header names the commit)
-      # check-tailwind-layers' browser half still skips loudly here (no Tailwind compiler on the
-      # runner); its static half, which fails an unlayered import, runs.
+      #   DD_REQUIRE_TAILWIND    check-tailwind-layers' browser half must find the Tailwind compiler
+      #                          (DD_TAILWIND_NODE, borrowed above), not skip
+      #   DD_MERMAID             check-integration draws the template's diagram from this copy of mermaid,
+      #                          with jsDelivr blocked, so the check needs no network
       - name: Every suite
         env:
           DD_REQUIRE_BROWSER: "1"
           DD_FORBID_STANDINS: "1"
           DD_REQUIRE_LUCIDE: "1"
           DD_LUCIDE_REACT: ${{ runner.temp }}/lucide/node_modules/lucide-react
+          DD_REQUIRE_TAILWIND: "1"
+          DD_TAILWIND_NODE: ${{ runner.temp }}/tailwind/node_modules/@tailwindcss/node
+          DD_MERMAID: ${{ runner.temp }}/mermaid/node_modules/mermaid
           DD_COCKPIT_DOM_PATCH: ${{ github.workspace }}/scripts/fixtures/cockpit-dom-patch.js
           DD_REQUIRE_COCKPIT_DOM_PATCH: "1"
         run: |

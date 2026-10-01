@@ -2225,6 +2225,49 @@ const second = await inDialog("fx-second", ".dialog-toolbar", "#second-console")
 await check("0.62.1 findFlushBlocks: only the body's FIRST drawn block may sit on the toolbar — a later one pulled up onto it is reported",
   () => near(second.edge, 0, 0.5) && second.flush.includes("second-tb / second-console"), JSON.stringify(second));
 
+/* ═══ 0.62.2 — a search's row is found through plain wrappers ═════════════════════════════════════
+   0.62.1 walked up from a search through .search-field, <label> and .filter-bar-lead only, so a search
+   in an unclassed <div> or <span>, with a switch and a picker beside that wrapper, was not judged. The
+   walk now also passes a wrapper that draws nothing but the search's own chain (the search, its clear,
+   a <label> of words). A wrapper holding another control ends it, and so does the root. */
+await evaluate(`(() => {
+  const at = document.createElement("div");
+  at.id = "fx-0622";
+  at.innerHTML = \`
+  <div class="row" id="w-row"><div><span class="search-field"><input type="search" aria-label="in a div"></span></div>
+    <select aria-label="lines" id="w-sel"><option>200</option><option>all</option></select>
+    <button type="button" class="switch" role="switch" aria-checked="false" id="w-sw">follow</button></div>
+  <div class="row" id="s-row"><span><label for="s-q">find</label><span class="search-field"><input type="search" id="s-q">
+    <button type="button" class="search-clear" aria-label="clear search"></button></span><button type="button" class="switch" role="switch" aria-checked="false" hidden>hidden</button></span>
+    <button type="button" class="switch" role="switch" aria-checked="false" id="s-sw">wrap</button></div>
+  <div class="row" id="m-row"><div id="m-wrap"><span class="search-field"><input type="search" aria-label="with a button"></span>
+    <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="m-btn">go</button></div>
+    <select aria-label="beside a full wrapper" id="m-sel"><option>a</option></select>
+    <button type="button" class="switch" role="switch" aria-checked="false" id="m-sw">x</button></div>
+  <div class="row" id="l-row"><div><span class="search-field"><input type="search" aria-label="with a labelled picker"></span>
+    <label>lines <select id="l-sel"><option>200</option><option>all</option></select></label></div>
+    <button type="button" class="switch" role="switch" aria-checked="false" id="l-sw">x</button></div>
+  <form id="f-form">
+    <div><label for="f-q">search</label><span class="search-field"><input type="search" id="f-q"></span></div>
+    <div><label for="f-sel">kind</label><select id="f-sel"><option>skill</option><option>agent</option></select></div>
+    <div><button type="button" class="switch" role="switch" aria-checked="false" id="f-sw">notify me</button></div>
+  </form>\`;
+  document.querySelector("main").append(at); })(); null`);
+await sleep(150);
+const drawn = (ids) => evaluate(`${JSON.stringify(ids)}.every((id) => document.getElementById(id).getClientRects().length > 0)`);
+const wrapped = await misplaced(`document.getElementById("fx-0622")`);
+await check("0.62.2 findMisplacedFilters: a search in an unclassed <div>, or a <span> holding its label words, its clear and a HIDDEN switch, has a row — the select and switches beside the wrapper are reported",
+  () => ["w-sel", "w-sw", "s-sw"].every((id) => wrapped.includes("outside-filter-bar " + id)), JSON.stringify(wrapped));
+await check("0.62.2 findMisplacedFilters: a wrapper holding the search AND another control (a button, a <label> with a picker) ends the walk — nothing above it is reported, the labelled picker in it is",
+  async () => (await drawn(["m-btn", "m-sel", "m-sw", "l-sel", "l-sw"])) && !wrapped.some((r) => /m-|l-sw/.test(r)) &&
+    wrapped.includes("outside-filter-bar l-sel"), JSON.stringify(wrapped));
+await check("0.62.2 findMisplacedFilters: a form with the search in one row and a select and a switch in the next rows reports nothing",
+  async () => (await drawn(["f-q", "f-sel", "f-sw"])) && !wrapped.some((r) => /f-/.test(r)), JSON.stringify(wrapped));
+await check("0.62.2 findMisplacedFilters: nothing else in the fixture is reported (four findings)", () => wrapped.length === 4, JSON.stringify(wrapped));
+const atRoot = await misplaced(`document.querySelector("#w-row > div")`);
+await check("0.62.2 findMisplacedFilters: called on the wrapper itself, the walk stops at the root — the controls outside it are not reported",
+  () => atRoot.length === 0, JSON.stringify(atRoot));
+
 await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
 
 console.log(failures

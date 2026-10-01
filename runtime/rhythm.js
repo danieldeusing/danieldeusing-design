@@ -84,6 +84,11 @@ export function findFlushBlocks(root = document, { blocks = STACKED_BLOCKS, tole
 const FILTER_CONTROLS = ".filter-dd, select[data-filter], .sort-ctl, .chip-set";
 const SEARCH = '.search-field, input[type="search"]';
 const SEARCH_WRAP = ".search-field, label, .filter-bar-lead";
+const A_CONTROL = "input, select, textarea, button, .segmented, .chip-set, .sort-ctl, .filter-dd";
+// A plain wrapper is part of the search's chain when everything it draws is that chain (its clear sits
+// inside the .search-field) or a <label> of words with no control in it.
+const holdsOnlyTheSearch = (wrapper, chain) => [...wrapper.children].every((child) => child === chain || !rendered(child) ||
+  (child.matches("label") && !child.querySelector(A_CONTROL)));
 const BAR_LEAD = 'input[type="search"], .search-field, h2, h3, h4, h5, h6, .filter-bar-lead';
 
 /**
@@ -97,10 +102,13 @@ const BAR_LEAD = 'input[type="search"], .search-field, h2, h3, h4, h5, h6, .filt
  *                         Also (0.62.1) a `.switch` or a `select` of any kind in a search's ROW with
  *                         no `.filter-bar` around it: the row is the element that lays the search out,
  *                         reached up through its `.search-field`, `<label>` or `.filter-bar-lead`, and
- *                         the control is a child of that row or inside a `<label>` that is. A toggle
- *                         or a picker beside a search is a filter toolbar whether the page says so or
- *                         not. Anywhere else a `.switch`, a plain `select` or a `.segmented` is not
- *                         judged: each is a setting in a form as often as a filter.
+ *                         (0.62.2) through any plain wrapper that draws nothing but that chain — the
+ *                         search with its clear, a `<label>` of words; a wrapper holding anything else, or
+ *                         `root`, ends the walk. The control is a child of that row or inside a
+ *                         `<label>` that is. A toggle or a picker beside a search is a filter toolbar
+ *                         whether the page says so or not. Anywhere else a `.switch`, a plain
+ *                         `select` or a `.segmented` is not judged: each is a setting in a form as
+ *                         often as a filter.
  *   "toolbar-not-filter-bar"  a `.dialog-toolbar` holding a rendered search or filter control (a
  *                         `.filter-dd`, a `select`, a `.switch`, a `.segmented`, a `.chip-set`, a
  *                         `.sort-ctl`) outside a `.dropdown-panel`, that is not also a `.filter-bar`
@@ -134,7 +142,7 @@ export function findMisplacedFilters(root = document, { tolerance = 1 } = {}) {
   for (const search of root.querySelectorAll(SEARCH)) {
     if (!rendered(search)) continue;
     let node = search;
-    while (node.parentElement?.matches(SEARCH_WRAP)) node = node.parentElement;
+    for (let up = node.parentElement; up && up !== root && (up.matches(SEARCH_WRAP) || holdsOnlyTheSearch(up, node)); up = up.parentElement) node = up;
     if (node.parentElement) rows.add(node.parentElement);
   }
   // A switch or a plain select in that row, as a child of it or inside a <label> that is.

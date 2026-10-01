@@ -467,7 +467,16 @@ says which it is. It is derived from the view's *deviation from the table's defa
 from "was this restored", so it cannot go stale while the filter is still in force.
 
 It composes with the pager (0.22.0): filtered-out rows are detached from the tbody, so
-the pager slices exactly the matching set and needs to know nothing about filtering.
+the pager slices exactly the matching set and needs to know nothing about filtering. A filter pass
+moves only the rows whose visibility changes (0.62.3): narrowing removes the rows that leave,
+clearing inserts the ones that come back, and the rows already showing stay where they are.
+
+**A page may write into a row the engine is showing** (0.62.3) — `cell.textContent`, a text node, a
+`data-value` — and it is an update of that row: the filter is applied again over the whole set,
+withheld rows included. The body is read as the new set only when a row was added, removed or
+moved in it, which is what a renderer that redraws the rows does. The one case that cannot be told
+apart: a renderer that rewrites the body in place with exactly as many rows as are showing keeps the
+withheld rows it no longer has until a later render changes the row count or the page resets.
 
 ### What the engine does besides (0.60.0 — cockpit's table, moved into the system)
 
@@ -554,10 +563,14 @@ the pager slices exactly the matching set and needs to know nothing about filter
   filter by its badge leaves focus on that column's filter summary.
 - **A table rendered later is enhanced when it arrives**: call `initTableTools()` once at startup.
 - **A moved table takes its bar, its pager and its count with it (0.61.0).** Append the table or its
-  `.tablewrap` somewhere else and the engine's bar goes directly before it, the pager and the count
-  directly after it, with the sort, filters, search and page the reader had. A table detached and
+  `.tablewrap` somewhere else and its bar goes directly before it — the engine's own, or since 0.62.3
+  the page's `data-table-bar` it adopted, with the page's box and action in it, unless the new place
+  has a page bar of its own — the pager and the count directly after it, with the sort, filters, search and page the reader had. A table detached and
   inserted again later comes back with that view too, with or without a `data-table-id`; a table
   removed for good leaves no count or pager where it stood.
+- **A pager survives a patched mount (0.62.3).** The pager is in no renderer's markup, so a patcher that
+  re-renders the whole mount (cockpitTable's shell: bar, wrapper, count) puts the count's markup in its
+  place; the same pager goes back after the wrapper, on the page the reader was on.
 - **A renderer that re-renders the header gets the engine's parts back.** `aria-sort`, `.is-filtered`,
   the controls, the badge and `aria-checked` are the engine's; a patcher (cockpit's `cockpitPatch`)
   that writes the header's markup removes them, and the engine puts the same nodes back. Its

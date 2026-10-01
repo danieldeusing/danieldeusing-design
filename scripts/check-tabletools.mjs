@@ -796,7 +796,111 @@ await check("0.61.0 — a table REMOVED for good takes its bar, its pager and it
   async () => mv4.bars.length === 0 && mv4.pagers.length === 0 && mv4.counts.length === 0 && mv4.left === 0 && mv4.warned === 0, JSON.stringify(mv4));
 await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); window.warned = []; null`);
 
-const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
+/* ── 0.62.3 · a page bar the engine adopted moves with its table ───────────────────────────────────────
+   0.61.0 moved the engine's own bar and left a page-drawn `search[data-table-bar]` where it stood: the
+   page's action stayed behind, and the engine drew a second bar (and a second box) at the new place. An
+   adopted count already travelled; the adopted bar now does the same, whether the engine's box is in it
+   or the page drew its own. */
+const PAGE_BAR_MOVE = (own) => `<search class="filter-bar" data-table-bar aria-label="moved">${own
+  ? '<div class="search-field"><input type="search" data-table-search aria-label="search moved"><button type="button" class="search-clear" aria-label="clear the search" hidden></button></div>' : ""}` +
+  `<button type="button" id="bar-action">new run</button></search>${moveTable("mvbar")}`;
+const moveBar = (own, how) => evaluate(`(async () => {
+  const until = async (ok) => { const end = performance.now() + 3000;
+    while (!ok() && performance.now() < end) await new Promise((r) => requestAnimationFrame(r)); };
+  localStorage.clear();
+  const from = document.getElementById("mount"), to = document.getElementById("later");
+  to.replaceChildren();
+  from.innerHTML = ${JSON.stringify(PAGE_BAR_MOVE(own))};
+  await new Promise((r) => setTimeout(r, 50));
+  const bar = from.querySelector("search"), box = bar.querySelector("input");
+  box.value = "r1"; box.dispatchEvent(new Event("input", { bubbles: true }));
+  await until(() => /hidden by the filters/.test(document.querySelector("p.result-count")?.textContent || ""));
+  const wrap = from.querySelector(".tablewrap");
+  if (${JSON.stringify(how)} === "append") to.appendChild(wrap);
+  else { wrap.remove(); await new Promise((r) => setTimeout(r, 0)); to.appendChild(wrap); }
+  await until(() => to.firstElementChild === bar && document.querySelectorAll("search.filter-bar").length === 1);
+  await new Promise((r) => setTimeout(r, 50));
+  const t = to.querySelector("table");
+  const query = to.querySelector("search input")?.value;
+  // The box still drives this table after the move: a new query narrows it.
+  const moved = to.querySelector("search input"); moved.value = "r2"; moved.dispatchEvent(new Event("input", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50)); // the pager re-windows the new set from its observer
+  const retyped = [...t.tBodies[0].rows].filter((r) => !r.hidden).map((r) => r.cells[0].textContent).join();
+  return JSON.stringify({ query, retyped, left: [...from.children].map((n) => n.tagName), order: [...to.children].map((n) => n.matches("search") ? "bar" : n.className),
+    sameBar: to.querySelector("search") === bar, bars: document.querySelectorAll("search.filter-bar").length,
+    boxes: document.querySelectorAll('search input[type="search"]').length,
+    action: !!to.querySelector("search #bar-action"), shown: [...t.tBodies[0].rows].filter((r) => !r.hidden).length });
+})()`);
+for (const own of [false, true]) {
+  for (const how of ["append", "detach"]) {
+    const m = JSON.parse(await moveBar(own, how));
+    await check(`0.62.3 — a page-drawn bar ${own ? "holding its own box" : "the engine put its box in"}, its table ${how === "append" ? "APPENDED" : "DETACHED and re-inserted"} elsewhere: the same bar goes with it, one bar and one box in the document, the query and the action in it`,
+      () => m.left.length === 0 && m.order.join() === "bar,tablewrap,table-pager,result-count" && m.sameBar && m.bars === 1 && m.boxes === 1 &&
+        m.query === "r1" && m.action && m.shown === 10 && m.retyped === "r20,r21,r22,r23,r24,r25,r26,r27,r28,r29", JSON.stringify(m));
+  }
+}
+await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
+
+/* ── 0.62.3 · a page writing into a visible cell of a filtered table keeps the rows the filter withholds ─
+   The observer answered a write inside the body by reading the rows back FROM the body — which, under a
+   filter, holds only what the filter let through, so every withheld row was gone from the set for good.
+   The body is still the engine's own output when no row moved, so the set is the one the engine holds,
+   and the write is an update of the row it landed in. Three shapes of write, each with no pager. */
+for (const [how, write] of [
+  ["cell.textContent =", 'cell.textContent = "core!"'],
+  ["a text node's data", 'cell.firstChild.data = "core!"'],
+  ["a data-value", 'cell.setAttribute("data-value", "core!")'],
+]) {
+  await evaluate(`localStorage.clear(); window.build(); window.setFilter("name", "a"); null`);
+  await sleep(50);
+  const narrowed = (await evaluate("window.order()")).join();
+  await evaluate(`(() => { const cell = document.querySelector("#mount tbody tr").cells[1]; ${write}; })(); null`);
+  await sleep(50);
+  await evaluate(`window.setFilter("name", ""); null`);
+  await sleep(50);
+  const back = (await evaluate("window.order()")).join();
+  await check(`0.62.3 — ${how} written into a visible cell of a filtered table: clearing the filter brings every withheld row back`,
+    () => narrowed === "ada,grace" && back === "ada,grace,linus", JSON.stringify({ narrowed, back }));
+}
+// ...and a write that takes a row OUT of the filter is applied as an update of that row: it leaves, and
+// comes back with the others when the filter is cleared.
+await evaluate(`localStorage.clear(); window.build(); window.setFilter("name", "a"); null`);
+await sleep(50);
+await evaluate(`document.querySelector("#mount tbody tr").cells[0].textContent = "bob"; null`);
+await sleep(50);
+const updated = (await evaluate("window.order()")).join();
+await evaluate(`window.setFilter("name", ""); null`);
+await sleep(50);
+const updatedBack = (await evaluate("window.order()")).join();
+await check("0.62.3 — ...and a write that makes a visible row stop matching takes that row out, and clearing the filter brings all three back",
+  () => updated === "grace" && updatedBack === "bob,grace,linus", JSON.stringify({ updated, updatedBack }));
+
+/* ── 0.62.3 · a filter pass moves only the rows whose visibility changes ───────────────────────────────
+   Every pass re-appended every kept row: clearing a narrow filter on the family contacts book moved all
+   of them, measured 580 ms against 490 ms at 4x CPU throttle. Counted here by the childList records on
+   the tbody, taken synchronously: a pick filter applies inside its click. 500 rows, 50 of them "core". */
+await evaluate(`localStorage.clear(); window.build({ id: "big",
+  rows: Array.from({ length: 500 }, (_, i) => ["r" + String(i).padStart(3, "0"), i % 10 ? "ops" : "core", String(i)]) }); null`);
+await sleep(100);
+const rowMoves = (label) => evaluate(`(() => { const body = document.querySelector("#mount tbody");
+  const o = new MutationObserver(() => {}); o.observe(body, { childList: true });
+  window.pick("team", ${JSON.stringify(label)});
+  const records = o.takeRecords(); o.disconnect();
+  const count = (key) => records.reduce((n, r) => n + [...r[key]].filter((x) => x.nodeName === "TR").length, 0);
+  return JSON.stringify({ added: count("addedNodes"), removed: count("removedNodes"), rows: body.rows.length }); })()`);
+const narrowMoves = JSON.parse(await rowMoves("core"));
+await sleep(50);
+const clearMoves = JSON.parse(await rowMoves("all"));
+await check("0.62.3 — narrowing 500 rows to 50 removes the 450 that leave and moves none of the 50 that stay",
+  () => narrowMoves.added === 0 && narrowMoves.removed === 450 && narrowMoves.rows === 50, JSON.stringify(narrowMoves));
+await check("...and clearing it inserts the 450 that come back and moves none of the 50 already there",
+  () => clearMoves.added === 450 && clearMoves.removed === 0 && clearMoves.rows === 500, JSON.stringify(clearMoves));
+await check("...in the table's order: r000 … r499",
+  async () => (await evaluate(`[...document.querySelectorAll("#mount tbody tr")].map((r) => r.cells[0].textContent).join()`)) ===
+    Array.from({ length: 500 }, (_, i) => "r" + String(i).padStart(3, "0")).join());
+await evaluate(`document.getElementById("mount").replaceChildren(); null`);
+
+const parents =(dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
 const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
   .find((path) => path && existsSync(path));
 if (!DOM_PATCH) {
@@ -911,6 +1015,39 @@ if (!DOM_PATCH) {
   await sleep(100);
   const clearWarned = await barWarnings();
   await check("...and a page that fills its mount with a different table, then clears it, is not warned", async () => JSON.parse(clearWarned).length === 0, clearWarned);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
+  // 0.62.3: the pager under a patched mount. cockpitTable's mountShell draws the bar, the wrapper and the
+  // count; the pager sits between the wrapper and the count and is in no renderer's markup, so a patch of
+  // the whole mount matched the count's markup against it, replaced it with a fresh count and the pager
+  // was gone for good. Page 2 of 45 rows, then the mount patched as the shell draws it, then the tbody
+  // patched as a poll does (46 rows): the same pager, bar and table, one count after the pager, page 2.
+  const SHELL = (n) => '<search class="filter-bar" data-table-bar aria-label="runs"><div class="search-field"><input type="search" data-table-search aria-label="search runs" autocomplete="off" data-1p-ignore spellcheck="false">' +
+    '<button type="button" class="search-clear" aria-label="clear the search" hidden></button></div></search>' +
+    '<div class="tablewrap"><table class="act" data-table-tools data-table-unit="runs" data-table-id="c-shell" data-sort-key="v"><thead><tr><th data-col="v">v</th></tr></thead><tbody>' +
+    Array.from({ length: n }, (_, i) => `<tr><td>L${String(i + 1).padStart(2, "0")}</td></tr>`).join("") + "</tbody></table></div>" +
+    '<p class="result-count" role="status" data-table-count></p>';
+  const shellState = () => evaluate(`JSON.stringify({ order: [...document.getElementById("later").children].map((n) => n.matches("search") ? "bar" : n.className),
+    same: document.querySelector("#later .table-pager") === window.keepPager && document.querySelector("#later search") === window.keepBar && document.querySelector("#later table") === window.keepTable,
+    status: (document.querySelector("#later .table-pager-status") || {}).textContent || null,
+    shown: [...document.querySelectorAll("#later tbody tr")].filter((r) => !r.hidden).length })`);
+  await evaluate(`localStorage.clear(); document.getElementById("later").innerHTML = ${JSON.stringify(SHELL(45))}; null`);
+  await sleep(100);
+  await evaluate(`document.querySelector("#later .table-pager-nav button:last-child").click();
+    window.keepPager = document.querySelector("#later .table-pager"); window.keepBar = document.querySelector("#later search"); window.keepTable = document.querySelector("#later table"); null`);
+  await sleep(100);
+  const shellBefore = await shellState();
+  await evaluate(`window.cockpitPatch(document.querySelector("#later tbody"), ${JSON.stringify(SHELL(46).replace(/^.*<tbody>|<\/tbody>.*$/g, ""))}); null`);
+  await sleep(200);
+  const shellBody = await shellState();
+  await evaluate(`window.cockpitPatch(document.getElementById("later"), ${JSON.stringify(SHELL(46))}); null`);
+  await sleep(200);
+  const shellMount = await shellState();
+  const WHOLE_SHELL = (status) => JSON.stringify({ order: ["bar", "tablewrap", "table-pager", "result-count"], same: true, status, shown: 20 });
+  await check("0.62.3 — a cockpitTable mount on page 2, its tbody patched by a poll (46 rows, cockpitTable's own path): the same pager, bar and table, still page 2",
+    () => shellBefore === WHOLE_SHELL("21–40 of 45") && shellBody === WHOLE_SHELL("21–40 of 46"), JSON.stringify({ before: shellBefore, body: shellBody }));
+  await check("...and the whole mount patched as mountShell draws it: the same pager, bar and table, one count after the pager, still page 2",
+    () => shellMount === WHOLE_SHELL("21–40 of 46"), shellMount);
   await evaluate(`document.getElementById("later").replaceChildren(); null`);
 
   // S3: a select named by a <label for> the renderer draws WITHOUT an id. An id written onto that label

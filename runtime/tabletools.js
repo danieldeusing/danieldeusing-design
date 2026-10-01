@@ -363,11 +363,8 @@ export function applyTableView(table) {
    * excluded from matching and from the sort, and simply follows its parent
    * wherever the parent lands. A child whose parent is filtered out goes with it.
    */
-  const frag = document.createDocumentFragment();
-  for (const row of keep) {
-    frag.appendChild(row);
-    for (const child of inst.childrenOf.get(row) || []) frag.appendChild(child);
-  }
+  const want = [];
+  for (const row of keep) want.push(row, ...(inst.childrenOf.get(row) || []));
   for (const row of drop) {
     for (const child of inst.childrenOf.get(row) || []) child.remove();
     row.remove();
@@ -375,8 +372,19 @@ export function applyTableView(table) {
   const placeholder = keep.length ? null : placeholderRow(inst);
   if (inst.placeholder && inst.placeholder !== placeholder) inst.placeholder.remove();
   inst.placeholder = placeholder;
-  if (placeholder) frag.appendChild(placeholder);
-  body.appendChild(frag);
+  if (placeholder) want.push(placeholder);
+  /*
+   * ONLY A ROW OUT OF PLACE MOVES (0.62.3). This used to append every kept row again on every pass,
+   * so clearing a narrow filter on the contacts book moved all of them (580 ms against 490 ms at 4x
+   * CPU throttle). One walk down the body: a row already where it belongs is passed over, any other
+   * is inserted there. Narrowing removes the rows that leave and moves none; clearing inserts the
+   * rows that come back and moves none; a pass that changes nothing writes nothing.
+   */
+  let cursor = body.firstElementChild;
+  for (const row of want) {
+    if (row === cursor) cursor = cursor.nextElementSibling;
+    else body.insertBefore(row, cursor);
+  }
   // What we just wrote, so the observer can tell OUR output from a real
   // re-render. A synchronous "applying" flag cannot: MutationObserver delivers
   // asynchronously, so the flag is already back to false when the callback
@@ -646,11 +654,29 @@ function buildHeaderControls(inst) {
  * <tr>s after the first repaint and quietly filter nothing, and its header
  * controls would be gone with the <thead> that carried them.
  */
+/*
+ * BUT ONLY FROM THE BODY WHEN THE BODY IS NO LONGER WHAT THIS FILE WROTE (0.62.3). A filter detaches
+ * the rows it withholds, so a body still holding exactly the rows this file last put there (`lastWritten`,
+ * the same nodes in the same order) is the filtered view, not the table: read from it, every withheld row
+ * left the set for good. That is what a page writing `cell.textContent` into a visible row did, and a
+ * renderer replacing the <thead>. So while the body is ours, the rows are the ones held here — withheld
+ * included, in the order they were read — and a write inside one is an update of that row.
+ *
+ * The cost, accepted: a renderer that rewrites the body IN PLACE with exactly as many rows as are
+ * showing (its new set happens to be the size of the filtered one) moves no row and is read the same
+ * way, so the rows it no longer has stay held, withheld, until a re-render changes the row count or the
+ * page resets. A renderer whose set differs in size from what is showing adds or removes a row, and is
+ * read from the body as before.
+ */
+const sameRows = (body, rows) => body.rows.length === rows.length && rows.every((row, i) => body.rows[i] === row);
+
 function snapshot(inst) {
   const body = inst.table.tBodies[0];
   if (!body) return;
   // A placeholder is this file's own stand-in for no rows, never data.
-  const rows = [...body.rows].filter((row) => !row.hasAttribute(PLACEHOLDER));
+  const rows = sameRows(body, inst.lastWritten)
+    ? inst.allRows.flatMap((row) => [row, ...(inst.childrenOf.get(row) || [])])
+    : [...body.rows].filter((row) => !row.hasAttribute(PLACEHOLDER));
   inst.childrenOf = new Map();
   inst.allRows = [];
   const byKey = new Map();
@@ -724,7 +750,9 @@ const pageBarOf = (anchor) => {
   return before && before.matches("search.filter-bar[data-table-bar]") ? before : null;
 };
 
-const boundBoxes = new WeakSet();
+// Which instance a box speaks for. A page's box outlives the instance that first adopted it — a table
+// detached and inserted again is a new instance — so its listener asks here rather than closing over one.
+const boxOwners = new WeakMap();
 // Which table a count speaks for. A count another table already holds is never adopted: a table
 // rendered between a neighbour and its count would otherwise take that count, and the two would
 // re-assert their own text over each other's for ever — measured, a renderer that never answered.
@@ -735,16 +763,29 @@ const madeCounts = new WeakSet();
 // A retired instance's view, keyed by its table node, for the node coming back somewhere else.
 const carried = new WeakMap();
 
-/* The box the table search reads. A box the page drew is bound once and given the query in force. */
+/* The box the table search reads. A box is bound once, and given the query in force by each instance it serves. */
 function useSearchBox(inst, input) {
   inst.searchInput = input;
-  if (boundBoxes.has(input)) return;
-  boundBoxes.add(input);
+  if (boxOwners.get(input) === inst) return;
+  const bound = boxOwners.has(input);
+  boxOwners.set(input, inst);
   setSearchValue(input, inst.view.search || "");
+  if (bound) return;
   input.addEventListener("input", () => {
-    inst.view.search = input.value.trim().toLowerCase();
-    save(inst); applyTableView(inst.table);
+    const owner = boxOwners.get(input);
+    if (owner.retired) return;
+    owner.view.search = input.value.trim().toLowerCase();
+    save(owner); applyTableView(owner.table);
   });
+}
+
+/* The page bar this table adopted, unless another engine table now stands directly after it and takes it. */
+function barToBring(inst) {
+  const bar = inst.bar || inst.carriedBar;
+  if (!bar || !bar.isConnected) return null;
+  const next = bar.nextElementSibling;
+  const other = next && (next.matches("table") ? next : next.matches(".tablewrap") ? next.querySelector(":scope > table") : null);
+  return other && other !== inst.table && other.hasAttribute("data-table-tools") ? null : bar;
 }
 
 /*
@@ -790,6 +831,11 @@ function ownBarLost(inst) {
  * saying things about a table that is no longer there. So both are placed against where the table IS:
  * the bar directly before the wrapper, the count directly after it (after the pager, when there is one),
  * and the new parent is watched from then on.
+ *
+ * The bar is the engine's own or the page's `data-table-bar` it adopted (0.62.3): an adopted bar goes as
+ * an adopted count always did. Left behind, it held the page's action and, when the page drew it, a box
+ * still searching this table, while the engine drew a second bar at the new place. Not when the new place
+ * has a page bar of its own, and not when another engine table now stands directly after it.
  */
 function ensureChrome(inst) {
   const table = inst.table;
@@ -802,7 +848,11 @@ function ensureChrome(inst) {
   if (!table.isConnected) return;
 
   if (inst.wantsSearch) {
-    const pageBar = pageBarOf(anchor);
+    let pageBar = pageBarOf(anchor);
+    if (!pageBar) {
+      pageBar = barToBring(inst);
+      if (pageBar) anchor.before(pageBar);
+    }
     const theirs = pageBar && pageBar.querySelector('input[type="search"][data-table-search]');
     if (theirs) {
       useSearchBox(inst, theirs);
@@ -880,7 +930,7 @@ function retire(inst) {
   if (inst.count) countOwners.delete(inst.count);
   // The node may come back elsewhere (a page that detaches a table and inserts it later): it comes back
   // with the view the reader left it in, not only what was saved — a table without an id saves nothing.
-  carried.set(inst.table, { identity: inst.identity, view: inst.view });
+  carried.set(inst.table, { identity: inst.identity, view: inst.view, bar: inst.bar });
   // Gone, not renewed in place: the count this file made would go on standing where the table was.
   if (!inst.table.isConnected && madeCounts.has(inst.count)) inst.count.remove();
   /*
@@ -892,7 +942,7 @@ function retire(inst) {
    * placeholder goes, before anything reads the body again.
    */
   const body = inst.table.tBodies[0];
-  const untouched = !!body && body.rows.length === inst.lastWritten.length && inst.lastWritten.every((row, i) => body.rows[i] === row);
+  const untouched = !!body && sameRows(body, inst.lastWritten);
   if (inst.placeholder && inst.placeholder.hasAttribute(PLACEHOLDER)) inst.placeholder.remove();
   if (untouched) {
     const frag = document.createDocumentFragment();
@@ -982,7 +1032,9 @@ function enhance(table) {
   instances.set(table, inst);
   const kept = carried.get(table);
   carried.delete(table);
-  inst.view = kept && kept.identity === inst.identity ? kept.view : restore(inst);
+  const same = kept && kept.identity === inst.identity;
+  inst.view = same ? kept.view : restore(inst);
+  inst.carriedBar = same ? kept.bar : null;
   warnShared(inst);
   watchFocus(inst, table);
 
@@ -1051,9 +1103,7 @@ function enhance(table) {
     if (renewed(inst)) return;
     const body = table.tBodies[0];
     if (!body) return;
-    const now = body.rows;
-    const last = inst.lastWritten || [];
-    const moved = !(now.length === last.length && last.every((row, i) => now[i] === row));
+    const moved = !sameRows(body, inst.lastWritten);
 
     /*
      * A PATCHING RENDERER REWRITES A ROW WITHOUT MOVING IT, and neither the identity
@@ -1082,10 +1132,11 @@ function enhance(table) {
      * but is not the body is, by construction, somebody else's write. That is what
      * keeps this from re-entering on its own output.
      *
-     * BUT NOT EVERY OTHER WRITER IS A RENDERER, and the answer to one costs rows. A
-     * rewrite is answered with snapshot(), which reads the set from the BODY — and the
-     * body holds only what the filter let through, so every row it withholds is dropped
-     * from the set for good. The pager writes `hidden` on the rows it pages, a tooltip
+     * BUT NOT EVERY OTHER WRITER IS A RENDERER. Until 0.62.3 a rewrite was answered
+     * with snapshot() reading the set from the BODY — which holds only what the filter
+     * let through, so every row it withheld was dropped from the set for good. Since
+     * then a body no row has moved in is read from the rows held here (see snapshot()),
+     * and the list below saves only the work. The pager writes `hidden` on the rows it pages, a tooltip
      * writes `aria-describedby` on the cell it describes, a copy button its
      * `data-state`: none of them changes a value, and each of them took the withheld
      * rows with it. Found on cockpit /links; measured in check-tabletools: a pick
@@ -1158,23 +1209,14 @@ function enhance(table) {
 export function resetTableView(table) {
   const inst = instances.get(table);
   if (!inst) return;
-  // RE-READ THE ROWS, BUT ONLY IF THE PAGE ACTUALLY REDREW THEM. A page with its own clear-all
+  // RE-READ THE ROWS FROM THE PAGE ONLY IF IT ACTUALLY REDREW THEM. A page with its own clear-all
   // typically re-renders as part of it, so the rows held from the last apply can be detached nodes
   // by the time this is called. Appending those on top of the ones the page just drew DUPLICATES
   // the table: cockpit's container list went from 27 rows to 54 on a single click of "clear all".
-  //
-  // Snapshotting UNCONDITIONALLY has the opposite failure, and it is worse because it is silent: a
-  // filter removes its non-matching rows from the DOM rather than hiding them, so a reset called
-  // without a re-render adopts the component's OWN filtered output as the full set and the rows it
-  // withheld are gone for good. "Put the table back" would then be the one action that destroys it.
-  //
-  // `lastWritten` tells them apart — it is what this component put in the body, and it is the same
-  // signal the MutationObserver uses to know its own output from a real re-render.
-  const body = table.tBodies[0];
-  const stillOurs = body && inst.lastWritten &&
-    body.rows.length === inst.lastWritten.length &&
-    inst.lastWritten.every((row, i) => body.rows[i] === row);
-  if (!stillOurs) snapshot(inst);
+  // Without a re-render the body is this component's own filtered output, and reading it as the
+  // full set would make "put the table back" the one action that destroys it. snapshot() tells the
+  // two apart by `lastWritten`, as the MutationObserver does.
+  snapshot(inst);
   inst.view = defaults(inst);
   if (inst.searchInput) setSearchValue(inst.searchInput, "");
   for (const col of inst.columns) if (col.filterInput) setSearchValue(col.filterInput, "");

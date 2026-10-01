@@ -61,6 +61,8 @@ export const DEFAULT_PAGE_SIZE = 20;
 
 const STORE_PREFIX = "table-rows:";
 const enhanced = new WeakMap();
+// The instance a bar belongs to, so a bar taken out from beside a table still in the document is put back.
+const owners = new WeakMap();
 let documentObserver = null;
 
 /* ── the pure core ────────────────────────────────────────────────────────────────
@@ -283,6 +285,12 @@ function turnOff(button, on) {
  * node's, so a page that appends the table (or its wrapper) somewhere else keeps its page and its size;
  * the bar is put back directly after the wrapper wherever that is now. A table taken out of the
  * document leaves no bar standing where it was, and gets it back if it is inserted again.
+ *
+ * A BAR TAKEN FROM A TABLE THAT STAYED comes back too (0.62.3). The bar is in no renderer's markup, so a
+ * patcher that re-renders the table's whole mount (cockpit's `cockpitPatch` over cockpitTable's shell —
+ * bar, wrapper, count) matches the count's markup against the bar, puts a fresh count in its place and
+ * the pager was gone for good, its rows still paged with no way to turn the page. The same node goes
+ * back, so the page, the size and the picker stay.
  */
 function rehome(instance) {
   const anchor = instance.table.closest(".tablewrap") || instance.table;
@@ -312,6 +320,7 @@ function enhance(table) {
   const instance = { table, id, size: storedSize(id), page: 1 };
   enhanced.set(table, instance);
   buildBar(instance);
+  owners.set(instance.bar, instance);
 
   // After the scroll wrapper, never inside it: `.tablewrap` scrolls horizontally, and a
   // pager parked in there slides out of reach on exactly the wide tables that need it.
@@ -368,6 +377,8 @@ export function initTablePagination(root = document) {
     for (const record of records) {
       for (const node of record.removedNodes) {
         if (node.nodeType !== 1) continue;
+        const owner = owners.get(node);
+        if (owner) rehome(owner);
         for (const table of tablesIn(node)) if (!table.isConnected) enhanced.get(table)?.bar.remove();
       }
       for (const node of record.addedNodes) {

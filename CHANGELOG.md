@@ -4,6 +4,40 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- **A page writing into a visible cell of a filtered table no longer loses the rows the filter
+  withholds.** The table engine answered a write inside the body by reading the rows back from the
+  body, which under a filter holds only what the filter let through, so `cell.textContent = …`, a
+  text node's `data` or a `data-value` on a showing row dropped every withheld row for good; clearing
+  the filter brought back only the rows that had been showing. A renderer replacing the `<thead>`
+  did the same. While the body still holds exactly the rows the engine last wrote, the engine now
+  keeps its own set, withheld rows included, and treats the write as an update of that row: the view
+  is applied again, so a row the write takes out of the filter leaves and comes back with the others.
+  The body is read as the new set only when a row was added, removed or moved in it. The cost: a
+  renderer that rewrites the body in place with exactly as many rows as are showing keeps the
+  withheld rows it no longer has until a later render changes the row count or the page resets.
+- **A filter pass moves only the rows whose visibility changes.** Every pass appended every kept row
+  again: narrowing 500 rows to 50 removed 500 rows and re-inserted 50, and clearing it moved all 500.
+  Now narrowing removes the 450 that leave and clearing inserts the 450 that come back; the 50 already
+  showing are not touched, and a pass that changes nothing writes nothing.
+- **A table's pager survives a patcher re-rendering its mount.** cockpitTable's shell (bar, wrapper,
+  count) re-rendered through `cockpitPatch` matched the count's markup against the pager, which is in
+  no renderer's markup, and the pager was gone for good while its rows stayed paged. The same pager is
+  put back after the wrapper, on the same page. A poll that patches only the tbody (cockpitTable's own
+  path) already kept it.
+- **A page-drawn bar the engine adopted moves with its table.** 0.61.0 moved the engine's own bar and
+  left a page's `search[data-table-bar]` where it stood; the engine then drew a second bar, and a
+  second box, at the new place, and a box the page drew went on searching the moved table from the
+  old one. The adopted bar now goes directly before the table, as an adopted count already did,
+  unless the new place has a page bar of its own or another engine table stands after it. A page's
+  box keeps driving its table when the table is detached and inserted again.
+
+Consumers: nothing to change in markup. A page that moves an engine table and relied on its own bar
+staying behind now sees the bar go with the table; move the bar back, or give the new place a bar.
+
 ## 0.62.2 (2026-09-30)
 
 ### Fixed

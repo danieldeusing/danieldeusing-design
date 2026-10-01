@@ -140,7 +140,7 @@ keeps the rule:
 
 | reason | what it found |
 |---|---|
-| `outside-filter-bar` | a `.filter-dd`, an un-enhanced `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no `.filter-bar` around it. A table header (`th`) and a `.dropdown-panel` are exempt; a dialog is not. A `.chip-set` of `.chip--remove` chips is a list of values (cockpit's author lists), not a filter, and is not judged. Since 0.62.1 also a `.switch` or any `select` in a drawn search's ROW with no `.filter-bar` around them: the row is the element that lays the search out (up through its `.search-field`, `<label>` or `.filter-bar-lead`), and the control is its child or sits in a `<label>` that is. A toggle or a picker beside a search is a filter toolbar whether the page says so or not |
+| `outside-filter-bar` | a `.filter-dd`, an un-enhanced `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no `.filter-bar` around it. A table header (`th`) and a `.dropdown-panel` are exempt; a dialog is not. A `.chip-set` of `.chip--remove` chips is a list of values (cockpit's author lists), not a filter, and is not judged. Since 0.62.1 also a `.switch` or any `select` in a drawn search's ROW with no `.filter-bar` around them: the row is the element that lays the search out (up through its `.search-field`, `<label>` or `.filter-bar-lead`, and since 0.62.2 through any plain `<div>` or `<span>` that draws only the search and `<label>` words; a wrapper holding another control, or the `root`, ends the walk), and the control is its child or sits in a `<label>` that is. A toggle or a picker beside a search is a filter toolbar whether the page says so or not |
 | `toolbar-not-filter-bar` | (0.62.1) a `.dialog-toolbar` holding a drawn search or filter control (a `.filter-dd`, any `select`, a `.switch`, a `.segmented`, a `.chip-set`, a `.sort-ctl`) outside a `.dropdown-panel`, that is not also a `.filter-bar`. Cockpit's old logs drawer was exactly this, and passed 0.62.0 |
 | `lead-not-left` | a lead after a control in its row, or a row's first lead whose left edge is not the bar's left content edge. A run of leads (a prompt label, then the search) is fine |
 | `controls-not-right` | on one visual row of a bar, the right-most control does not end at the bar's right content edge |
@@ -171,7 +171,9 @@ a form as often as a filter — so a page puts filter toggles that are not besid
 
 seedr's input, redrawn: a magnifier inside the start of the box, a clear button inside its end, 2rem
 of padding on each side so text never runs under either. The box is `--control-h` tall on the
-`--control-edge`, which turns `--primary` on hover and on focus.
+`--control-edge`, which turns `--primary` on hover and on focus. Since 0.62.2 that height is its own
+padding and line height, derived from the token as on every field, not only its `min-block-size` floor
+(a fixed `.3rem` made it 27.19px without the floor).
 
 **`initSearchFields()` owns three things, and the page owns the rest.** Call it once; it is
 delegated, so a field rendered later needs nothing.

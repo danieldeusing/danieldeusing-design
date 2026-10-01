@@ -4,6 +4,36 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.62.2 (2026-09-30)
+
+### Fixed
+
+- **The search box is `--control-h` tall from its own metrics.** `.search-field > input[type=search]`
+  had a fixed `padding: .3rem 2rem`; without its `min-block-size` floor it measured 27.19px (33.5px
+  against a 35px token at a 20px root), so only the floor made it 28px. Its block padding is now what
+  `--control-h` leaves after one `--lh-tight` line and the two 1px edges, the same calc as every field
+  and compact button in components.css. The floor stays and guards no font fallback (the line height
+  is declared; a fallback face measures the same); it only rounds Chrome's 1/64px layout up to 28px.
+  Nothing moves at the default font: every `.search-field` box on every example page, at 1280 and
+  375 in all four themes, is the same rectangle before and after.
+- **`findMisplacedFilters()` finds a search's row through plain wrappers.** Its walk from a drawn
+  search went up through `.search-field`, `<label>` and `.filter-bar-lead` only, so a search in an
+  unclassed `<div>` or `<span>`, with a `.switch` or a `select` beside that wrapper, was not judged.
+  It now also passes any element that draws nothing but the search's chain and `<label>`s of words. A
+  wrapper holding another control ends the walk, and so does `root`. A `.switch` or `select` anywhere
+  else is still not judged: a form with the search in one row and a select in the next reports
+  nothing. The exemptions and the drawn-only rule are unchanged.
+
+### Changed
+
+- The components demo's two "one toolbar row" filter bars use a real `.search-field`; the page's
+  height check refused one until the fix above.
+- Every current-version pin (README, the html-doc skill, the documentation and error-page
+  templates) moves to 0.62.2.
+
+Consumers: nothing to change, unless a page wraps its search in a plain `<div>` or `<span>` beside
+filter controls outside a `.filter-bar`; such a page is now reported (`outside-filter-bar`).
+
 ## 0.62.1 (2026-09-30)
 
 ### Fixed

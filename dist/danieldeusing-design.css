@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.62.1 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.62.2 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -5820,7 +5820,14 @@ p.state { display: flex; white-space: normal; }
 
    The input is `type="search"`, so it is a searchbox to assistive technology and the phone
    keyboard offers "search"; the browser's own cancel glyph is hidden because the field draws its
-   own, and two × in one box is one too many. */
+   own, and two × in one box is one too many.
+
+   THE BOX IS THE TOKEN (0.62.2). The block padding is what --control-h leaves after one --lh-tight
+   line and the two 1px edges, as on every field and compact button in components.css, so the box is
+   28px from its own metrics. Until 0.62.1 it was a fixed .3rem and measured 27.19px; only the
+   min-block-size floor lifted it. The floor stays, as on every other field, but it guards no font:
+   the line height is declared, so a fallback face measures the same (checked with monospace, Times,
+   Zapfino and a missing font). It only rounds Chrome's 1/64px layout, 27.97px, up to 28. */
 .search-field {
   position: relative;
   display: flex;
@@ -5844,7 +5851,7 @@ p.state { display: flex; white-space: normal; }
   box-sizing: border-box;
   min-block-size: var(--control-h);
   margin: 0;
-  padding: 0.3rem 2rem;
+  padding: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2) 2rem;
   font: inherit;
   font-size: var(--fs-base);
   line-height: var(--lh-tight);

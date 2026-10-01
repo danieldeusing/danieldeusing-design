@@ -287,8 +287,9 @@ cockpit never had one.
 
 The console sits flush under the toolbar, and that is the design: `findFlushBlocks()` does not report
 a dialog's toolbar over its body (0.62.1), so the console carries no `data-flush`.
-`findMisplacedFilters()` reports the toolbar as `toolbar-not-filter-bar` if it drops `filter-bar`,
-and a lines picker or `follow` beside the search as `outside-filter-bar` (`filters.md`).
+Cockpit's old drawer (a plain `.dialog-toolbar`, the lines picker in a `<label>`, `follow` beside
+the search) is reported three times by `findMisplacedFilters()`: the toolbar as
+`toolbar-not-filter-bar`, the picker and the switch as `outside-filter-bar` (`filters.md`).
 
 ## A popup opened inside a dialog goes into the dialog
 

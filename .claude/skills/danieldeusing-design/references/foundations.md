@@ -309,8 +309,8 @@ below finds every one of them on a rendered page):
 **The check.** `findFlushBlocks(root = document)` (runtime, `rhythm.js`) returns every pair of
 rendered blocks from that list, neither inside the other, overlapping horizontally, with 0px between
 their border boxes — honouring the same two exceptions, plus one the stylesheet draws on purpose: a
-dialog's `.dialog-toolbar` over the `.dialog-body` after it, or over that body's first block (the
-toolbar's rule is the edge; 0.62.1). Only inside a dialog. A page-level browser check calls it and
+dialog's `.dialog-toolbar` over the first drawn block of the `.dialog-body` after it (the toolbar's
+rule is the edge; hidden elements in between do not count; 0.62.1). Only inside a dialog. A page-level browser check calls it and
 fails on a non-empty answer:
 
 ```js

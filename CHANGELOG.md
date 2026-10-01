@@ -13,25 +13,34 @@ All notable changes to this project are documented here. The format follows
   edge), but `.filter-bar` is a stacked block, so the toolbar over the first block in the body — the
   logs drawer's `.console`, a table — was reported at 0px. Cockpit's logs drawer marked its console
   `data-flush` to pass, and the reference drawer in the skill would have been flagged. A
-  `.dialog-toolbar` over the `.dialog-body` that follows it, or over that body's first block, is now
-  not a pair. Only inside a dialog: the same markup anywhere else is still judged.
+  `.dialog-toolbar` over the `.dialog-body` that follows it, or over that body's first drawn block,
+  is now not a pair; a hidden element between the two, or a hidden block at the top of the body, does
+  not break that. Only inside a dialog: the same markup anywhere else is still judged, and so is a
+  later block in the body that ends up on the toolbar.
 - **`findMisplacedFilters()` sees the layout cockpit's old logs drawer had.** Its toolbar was a
-  plain `.dialog-toolbar`, its lines picker a plain `<select>` and its `follow` switch sat beside the
-  search, and 0.62.0 judged none of the three.
+  plain `.dialog-toolbar`, its lines picker a plain `<select>` inside a `<label>`, and its `follow`
+  switch sat in the search's row; 0.62.0 judged none of the three, and 0.62.1 reports all three (the
+  drawer's real markup is a fixture in `check-filters`).
 
 ### Changed
 
-- **`toolbar-not-filter-bar`**, a new reason: a `.dialog-toolbar` holding a search or a filter
+- **`toolbar-not-filter-bar`**, a new reason: a `.dialog-toolbar` holding a drawn search or filter
   control (a `.filter-dd`, any `select`, a `.switch`, a `.segmented`, a `.chip-set`, a `.sort-ctl`)
-  that is not also a `.filter-bar`.
-- **`outside-filter-bar` also reports a `.switch` or any `select` beside a search** — a sibling of a
-  `.search-field` or a bare `input[type=search]` — with no `.filter-bar` around them: a toggle or a
-  picker next to a search is a filter toolbar whether the page says so or not. Anywhere else a
-  `.switch` or a plain `select` is still not judged; both are settings in forms. The table header,
-  `.dropdown-panel` and value-list exemptions and the rendered-only rule are unchanged.
+  outside a `.dropdown-panel`, that is not also a `.filter-bar`. A toolbar of actions with a hidden
+  picker, or a switch in its menu, is not reported.
+- **`outside-filter-bar` also reports a `.switch` or any `select` in a search's row** with no
+  `.filter-bar` around them. The row is the element that lays the drawn search out, reached up
+  through its `.search-field`, `<label>` or `.filter-bar-lead`; the control is a child of it, or
+  inside a `<label>` that is. A toggle or a picker next to a search is a filter toolbar whether the
+  page says so or not. Anywhere else a `.switch` or a plain `select` is still not judged; both are
+  settings in forms. The table header, `.dropdown-panel` and value-list exemptions and the
+  rendered-only rule are unchanged.
 - The components demo's two "one toolbar row" examples put a picker beside a search, so they are
-  `.filter-bar`s now; the example sweep runs `findFlushBlocks()` beside `findMisplacedFilters()` on
-  every page and dialog, and finds nothing.
+  `.filter-bar`s now, with a `select[data-filter]` (an empty "all" option). Their search stays a bare
+  `input[type=search]`, which still leads the bar: a `.search-field`'s input is 27.19px tall without
+  its `min-block-size` floor, which that page's height check refuses, and that is a CSS fix for a
+  later release. The third row renames a thing and is not a filter bar. The example sweep runs
+  `findFlushBlocks()` beside `findMisplacedFilters()` on every page and dialog, and finds nothing.
 - No CSS changes. Every current-version pin (README, the html-doc skill, the documentation and
   error-page templates) moves to 0.62.1.
 

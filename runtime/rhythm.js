@@ -16,10 +16,11 @@
  * TWO EXCEPTIONS, the same two the stylesheet makes: a fold after a fold (a run of folds is one list,
  * each fold drawing its own rule), and a lower block that carries `data-flush` — the page's word that
  * this one sits flush on purpose. Anything else a page wants flush says so with that attribute.
- * And one the stylesheet draws on purpose (0.62.1): a dialog's `.dialog-toolbar` over the
- * `.dialog-body` that follows it, or over the first block in that body — the toolbar's rule is its
- * edge and the body starts right under it (overlays.css). Only in a dialog: the same toolbar markup
- * anywhere else is judged like any other block.
+ * And one the stylesheet draws on purpose (0.62.1): a dialog's `.dialog-toolbar` over the first
+ * drawn block of the `.dialog-body` that follows it (hidden elements in between do not count) — the
+ * toolbar's rule is its edge and the body starts right under it (overlays.css). Only in a dialog: the
+ * same toolbar markup anywhere else is judged like any other block, and so is a later block in the
+ * body that ends up on the toolbar.
  *
  * findMisplacedFilters() is the same kind of check for Daniel's filter rule (0.62.0): "Filters, sort
  * and so on are always right aligned. Search input field always left aligned. Active filters have
@@ -37,10 +38,20 @@ export const STACKED_BLOCKS = [
 
 const FLUSH_PAIRS = [["details.fold", "details.fold"]];
 
+// Drawn, and seen: display none (and every hidden ancestor) is a zero box, visibility hidden is not.
+const rendered = (el) => {
+  const box = el.getBoundingClientRect();
+  return box.width > 0 && box.height > 0 && getComputedStyle(el).visibility !== "hidden";
+};
+
 // The toolbar's own bottom rule is the edge between it and its dialog's body, so nothing goes between.
+// Siblings that are not drawn (a hidden notice) do not separate them, and neither do hidden blocks at
+// the top of the body: the body starts at its first block that is drawn.
 const onItsDialogBody = (upper, lower, selector) => {
-  const body = upper.matches(".dialog-toolbar") && upper.closest("dialog, .dialog") ? upper.nextElementSibling : null;
-  return !!body?.matches(".dialog-body") && (lower === body || !!body.querySelector(selector)?.contains(lower));
+  if (!upper.matches(".dialog-toolbar") || !upper.closest("dialog, .dialog")) return false;
+  let body = upper.nextElementSibling;
+  while (body && !body.matches(".dialog-body") && !rendered(body)) body = body.nextElementSibling;
+  return !!body?.matches(".dialog-body") && !![...body.querySelectorAll(selector)].find(rendered)?.contains(lower);
 };
 
 /**
@@ -72,13 +83,8 @@ export function findFlushBlocks(root = document, { blocks = STACKED_BLOCKS, tole
 
 const FILTER_CONTROLS = ".filter-dd, select[data-filter], .sort-ctl, .chip-set";
 const SEARCH = '.search-field, input[type="search"]';
+const SEARCH_WRAP = ".search-field, label, .filter-bar-lead";
 const BAR_LEAD = 'input[type="search"], .search-field, h2, h3, h4, h5, h6, .filter-bar-lead';
-
-// Drawn, and seen: display none (and every hidden ancestor) is a zero box, visibility hidden is not.
-const rendered = (el) => {
-  const box = el.getBoundingClientRect();
-  return box.width > 0 && box.height > 0 && getComputedStyle(el).visibility !== "hidden";
-};
 
 /**
  * Every filter control under `root` that breaks the filter rule, as `[{ element, reason }]`:
@@ -88,15 +94,17 @@ const rendered = (el) => {
  *                         header (`th`) and a `.dropdown-panel` keep their own controls; a dialog
  *                         does not — its toolbar is a `.filter-bar` too. A `.chip-set` of
  *                         `.chip--remove` chips is a list of values, not a filter, and is not judged.
- *                         Also (0.62.1) a `.switch` or a `select` of any kind that sits beside a
- *                         search — a sibling of a `.search-field` or a bare `input[type=search]` —
- *                         with no `.filter-bar` around it: a toggle or a picker next to a search is a
- *                         filter toolbar whether the page says so or not. Anywhere else a `.switch`,
- *                         a plain `select` or a `.segmented` is not judged: each is a setting in a
- *                         form as often as a filter.
- *   "toolbar-not-filter-bar"  a `.dialog-toolbar` holding a search or any filter control (a
+ *                         Also (0.62.1) a `.switch` or a `select` of any kind in a search's ROW with
+ *                         no `.filter-bar` around it: the row is the element that lays the search out,
+ *                         reached up through its `.search-field`, `<label>` or `.filter-bar-lead`, and
+ *                         the control is a child of that row or inside a `<label>` that is. A toggle
+ *                         or a picker beside a search is a filter toolbar whether the page says so or
+ *                         not. Anywhere else a `.switch`, a plain `select` or a `.segmented` is not
+ *                         judged: each is a setting in a form as often as a filter.
+ *   "toolbar-not-filter-bar"  a `.dialog-toolbar` holding a rendered search or filter control (a
  *                         `.filter-dd`, a `select`, a `.switch`, a `.segmented`, a `.chip-set`, a
- *                         `.sort-ctl`) that is not also a `.filter-bar` (0.62.1). `element` is the toolbar.
+ *                         `.sort-ctl`) outside a `.dropdown-panel`, that is not also a `.filter-bar`
+ *                         (0.62.1). `element` is the toolbar.
  *   "lead-not-left"       a bar's lead (a search input or `.search-field`, a heading h2–h6, a
  *                         `.filter-bar-lead`) that is not in the run of leads a row starts with, or
  *                         the first lead of a row whose left edge is not the bar's left content edge.
@@ -121,13 +129,28 @@ export function findMisplacedFilters(root = document, { tolerance = 1 } = {}) {
     if (!rendered(el) || el.closest(".filter-bar, th, .dropdown-panel") || el.matches(".chip-set:has(> .chip--remove)")) continue;
     report(el, "outside-filter-bar");
   }
-  for (const el of root.querySelectorAll(".switch, select:not([data-filter])")) {
-    const unit = el.parentElement?.matches(".select-field") ? el.parentElement : el; // what the runtime put in its place
-    if (!rendered(el) || el.closest(".filter-bar, th, .dropdown-panel")) continue;
-    if ([...(unit.parentElement?.children || [])].some((c) => c.matches(SEARCH) && rendered(c))) report(el, "outside-filter-bar");
+  // A search's ROW: up from the search through what wraps it, to the element that lays it out.
+  const rows = new Set();
+  for (const search of root.querySelectorAll(SEARCH)) {
+    if (!rendered(search)) continue;
+    let node = search;
+    while (node.parentElement?.matches(SEARCH_WRAP)) node = node.parentElement;
+    if (node.parentElement) rows.add(node.parentElement);
   }
+  // A switch or a plain select in that row, as a child of it or inside a <label> that is.
+  const judged = new Set();
+  for (const row of rows) {
+    for (const el of row.querySelectorAll(".switch, select:not([data-filter])")) {
+      let unit = el.parentElement?.matches(".select-field") ? el.parentElement : el; // what the runtime put in its place
+      if (unit.parentElement !== row && unit.parentElement?.matches("label")) unit = unit.parentElement;
+      if (unit.parentElement !== row || judged.has(el) || !rendered(el) || el.closest(".filter-bar, th, .dropdown-panel")) continue;
+      judged.add(el);
+      report(el, "outside-filter-bar");
+    }
+  }
+  const IN_TOOLBAR = `${SEARCH}, ${FILTER_CONTROLS}, select, .switch, .segmented`;
   for (const bar of root.querySelectorAll(".dialog-toolbar:not(.filter-bar)")) {
-    if (rendered(bar) && bar.querySelector(`${SEARCH}, ${FILTER_CONTROLS}, select, .switch, .segmented`)) report(bar, "toolbar-not-filter-bar");
+    if ([...bar.querySelectorAll(IN_TOOLBAR)].some((el) => rendered(el) && !el.closest(".dropdown-panel"))) report(bar, "toolbar-not-filter-bar");
   }
 
   // ponytail: left-to-right only; an RTL bar would mirror both edges.

@@ -2091,10 +2091,18 @@ await evaluate(`(() => {
   <dialog class="dialog dialog--drawer" id="fx-old" aria-label="old drawer">
     <header class="dialog-head"><h2 class="dialog-title">logs</h2></header>
     <div class="dialog-toolbar" id="old-tb">
-      <select aria-label="lines" id="old-lines"><option>200 lines</option><option>all</option></select>
-      <button type="button" class="switch" role="switch" aria-checked="true" id="old-follow">follow</button>
-      <span class="search-field"><input type="search" aria-label="search the log" id="old-q"></span>
-      <span class="match-count">3/17</span>
+      <label>lines
+        <select id="log-lines"><option>50</option><option selected>200</option><option>1000</option><option>5000</option></select>
+      </label>
+      <button type="button" class="switch" role="switch" id="log-follow" aria-checked="false">follow</button>
+      <div class="search-field">
+        <input id="log-search" type="search" aria-label="search the log" placeholder="search logs…" autocomplete="off" spellcheck="false" />
+        <button type="button" class="search-clear" aria-label="clear the log search" hidden></button>
+      </div>
+      <span class="match-count" id="log-matches"></span>
+      <button type="button" class="btn-icon" data-icon="arrow-up" id="log-prev" aria-label="previous match"></button>
+      <button type="button" class="btn-icon" data-icon="arrow-down" id="log-next" aria-label="next match"></button>
+      <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="log-download">download</button>
     </div>
     <div class="dialog-body dialog-body--flush"><div class="console console--fill" id="old-console"><div class="console-body">line</div></div></div>
   </dialog>
@@ -2114,6 +2122,39 @@ await evaluate(`(() => {
     <div class="filter-bar" id="out-bar" style="margin-block-end: 0"><span class="search-field"><input type="search" aria-label="bar"></span></div>
     <table id="out-table-2"><tbody><tr><td>b</td></tr></tbody></table>
   </section>
+  <div id="fx-rows">
+    <div id="row-lead"><div class="filter-bar-lead"><div class="search-field"><input type="search" aria-label="lead"></div></div>
+      <select aria-label="in a lead's row" id="row-lead-sel"><option>a</option></select><button type="button" class="switch" role="switch" aria-checked="false" id="row-lead-sw">x</button></div>
+    <div id="row-label"><label>find <input type="search" aria-label="label"></label><select aria-label="in a label's row" id="row-label-sel"><option>a</option></select></div>
+    <div id="row-hidden-search"><div class="search-field" hidden><input type="search" aria-label="hidden"></div>
+      <button type="button" class="switch" role="switch" aria-checked="false" id="row-hs-sw">x</button></div>
+    <div id="row-hidden-ctl"><div class="search-field"><input type="search" aria-label="shown"></div>
+      <select aria-label="hidden" id="row-hc-sel" hidden><option>a</option></select><button type="button" class="switch" role="switch" aria-checked="false" id="row-hc-sw" hidden>x</button></div>
+    <table><thead><tr><th id="row-th"><input type="search" aria-label="th"><button type="button" class="switch" role="switch" aria-checked="false" id="row-th-sw">x</button>
+      <select aria-label="th" id="row-th-sel"><option>a</option></select></th></tr></thead></table>
+    <details class="dropdown" open><summary>menu</summary><div class="dropdown-panel" id="row-panel"><input type="search" aria-label="panel">
+      <button type="button" class="switch" role="switch" aria-checked="false" id="row-panel-sw">x</button><select aria-label="panel" id="row-panel-sel"><option>a</option></select></div></details>
+  </div>
+  <dialog class="dialog" id="fx-actions" aria-label="actions toolbar">
+    <header class="dialog-head"><h2 class="dialog-title">actions</h2></header>
+    <div class="dialog-toolbar" id="act-tb"><button type="button" class="btn-terminal btn-terminal--compact">run</button>
+      <select hidden aria-label="hidden"><option>a</option></select><button type="button" class="switch" role="switch" aria-checked="false" hidden>hidden</button>
+      <details class="dropdown" open><summary>more</summary><ul class="dropdown-panel"><li><button type="button" class="switch" role="switch" aria-checked="false" id="act-wrap">wrap</button></li></ul></details></div>
+    <div class="dialog-toolbar" id="act-tb-hidden" hidden><select aria-label="in a hidden toolbar"><option>a</option></select></div>
+    <div class="dialog-body">body</div>
+  </dialog>
+  <dialog class="dialog dialog--drawer" id="fx-gap" aria-label="hidden things between">
+    <header class="dialog-head"><h2 class="dialog-title">logs</h2></header>
+    <div class="dialog-toolbar filter-bar" id="gap-tb"><span class="search-field"><input type="search" aria-label="gap"></span></div>
+    <p class="notice" hidden>stale</p>
+    <div class="dialog-body dialog-body--flush"><div class="callout" hidden>error</div><div class="console console--fill" id="gap-console"><div class="console-body">line</div></div></div>
+  </dialog>
+  <dialog class="dialog dialog--drawer" id="fx-second" aria-label="a later block on the toolbar">
+    <header class="dialog-head"><h2 class="dialog-title">logs</h2></header>
+    <div class="dialog-toolbar filter-bar" id="second-tb"><span class="search-field"><input type="search" aria-label="second"></span></div>
+    <div class="dialog-body dialog-body--flush"><p class="callout" id="second-first" style="block-size: 40px; margin: 0">first</p>
+      <div class="console" id="second-console" style="margin-block-start: -40px">pulled up onto the toolbar</div></div>
+  </dialog>
   <form id="fx-form">
     <p><button type="button" class="switch" role="switch" aria-checked="false" id="form-switch">notify me</button></p>
     <p><button type="button" class="switch" role="switch" aria-checked="false" id="form-switch-2">digest</button>
@@ -2143,14 +2184,32 @@ const outside = await flushPairs(`document.getElementById("fx-out")`);
 await check("0.62.1 findFlushBlocks: the same toolbar and body OUTSIDE a dialog are still a flush pair, and so is a margin-less bar over a table",
   () => outside.some((p) => p.startsWith("out-tb / ")) && outside.some((p) => p.startsWith("out-bar / ")), JSON.stringify(outside));
 const old = await inDialog("fx-old", ".dialog-toolbar", ".console");
-await check("0.62.1 findMisplacedFilters: the old cockpit drawer — a plain .dialog-toolbar is \"toolbar-not-filter-bar\", and its select and switch beside the search are \"outside-filter-bar\"",
-  () => old.wrapped && sameSet(old.misplaced, ["toolbar-not-filter-bar old-tb", "outside-filter-bar old-lines", "outside-filter-bar old-follow"]), JSON.stringify(old));
+await check("0.62.1 findMisplacedFilters: the REAL old cockpit drawer (cockpit d92176e^, its lines picker in a <label>) — the plain .dialog-toolbar is \"toolbar-not-filter-bar\", and its select and switch in the search's row are \"outside-filter-bar\"",
+  () => old.wrapped && sameSet(old.misplaced, ["toolbar-not-filter-bar old-tb", "outside-filter-bar log-lines", "outside-filter-bar log-follow"]), JSON.stringify(old));
 const fixed = await inDialog("fx-new", ".dialog-toolbar", ".console");
 await check("0.62.1 findMisplacedFilters: the fixed drawer (dialog-toolbar filter-bar, the search first) — nothing, and no flush pair",
   () => fixed.drawn && fixed.wrapped && fixed.misplaced.length === 0 && fixed.flush.length === 0, JSON.stringify(fixed));
 const form = await misplaced(`document.getElementById("fx-form")`);
 await check("0.62.1 findMisplacedFilters: a .switch and a select in a form with no search beside them are settings, not filters — not reported",
   async () => form.length === 0 && (await evaluate(`["form-switch", "form-switch-2", "form-sel"].every((id) => document.getElementById(id).getClientRects().length > 0)`)), JSON.stringify(form));
+const rowsFound = await misplaced(`document.getElementById("fx-rows")`);
+await check("0.62.1 findMisplacedFilters: a search inside a .filter-bar-lead or a <label> still has a row — the select and switch beside it are reported",
+  () => ["row-lead-sel", "row-lead-sw", "row-label-sel"].every((id) => rowsFound.includes("outside-filter-bar " + id)), JSON.stringify(rowsFound));
+await check("0.62.1 findMisplacedFilters: a HIDDEN search has no row, and a hidden select or switch beside a shown search is not judged",
+  () => rowsFound.includes("outside-filter-bar row-lead-sel") && !rowsFound.some((r) => /row-hs-|row-hc-/.test(r)), JSON.stringify(rowsFound));
+await check("0.62.1 findMisplacedFilters: a search with a switch and a select in a th, or in an open .dropdown-panel, is exempt — nothing else in the fixture is reported",
+  async () => rowsFound.length === 3 && !rowsFound.some((r) => /row-th|row-panel/.test(r)) &&
+    (await evaluate(`["row-th-sw", "row-panel-sw"].every((id) => document.getElementById(id).getClientRects().length > 0)`)), JSON.stringify(rowsFound));
+const actions = await inDialog("fx-actions", ".dialog-toolbar", ".dialog-body");
+await check("0.62.1 findMisplacedFilters: a toolbar of actions with a hidden select and switch and a switch in its open .dropdown-panel, and a hidden toolbar holding a select — none is \"toolbar-not-filter-bar\"",
+  async () => actions.drawn && actions.misplaced.length === 0 && (await evaluate(`(() => { const d = document.getElementById("fx-actions"); d.showModal();
+    const shown = document.getElementById("act-wrap").getClientRects().length > 0; d.close(); return shown; })()`)), JSON.stringify(actions));
+const gap = await inDialog("fx-gap", ".dialog-toolbar", ".console");
+await check("0.62.1 findFlushBlocks: a hidden notice between the toolbar and the body, and a hidden callout above the console, do not break the exemption",
+  () => gap.drawn && near(gap.edge, 0, 0.5) && gap.flush.length === 0, JSON.stringify(gap));
+const second = await inDialog("fx-second", ".dialog-toolbar", "#second-console");
+await check("0.62.1 findFlushBlocks: only the body's FIRST drawn block may sit on the toolbar — a later one pulled up onto it is reported",
+  () => near(second.edge, 0, 0.5) && second.flush.includes("second-tb / second-console"), JSON.stringify(second));
 
 await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
 

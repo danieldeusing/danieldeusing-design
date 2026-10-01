@@ -22,8 +22,8 @@
     <!-- The package's own order, deliberately WITHOUT reset.css: every interactive class on this
          page has to render right without one (house rule 4), and a missing `font: inherit` shows
          up here as a 13px system font. chrome.css is here for header.bar and .visually-hidden,
-         icons.css for `.ico`, filters.css for the two search toolbars' `.filter-bar` (a search beside
-         a picker is a filter bar, findMisplacedFilters() 0.62.1). -->
+         icons.css for `.ico`, filters.css for the two search toolbars, which are filter bars (a search
+         beside a picker is one, findMisplacedFilters() 0.62.1). -->
     <link rel="stylesheet" href="../src/tokens.css" />
     <link rel="stylesheet" href="../src/base.css" />
     <link rel="stylesheet" href="../src/components.css" />
@@ -133,20 +133,24 @@
           <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="btn-toggle-busy">press to go busy for 2s</button>
           <span class="demo-note">busy: <code>aria-busy="true"</code> + <code>aria-disabled="true"</code> — focus stays, full strength</span>
         </div>
-        <p class="demo-note">One toolbar row on each surface — every control is <code>--control-h</code> tall:</p>
-        <!-- Computed by the page from its own controls, on load and on every theme change. -->
+        <p class="demo-note">One toolbar row on each surface — every control is <code>--control-h</code> tall. The two with a
+          search are filter bars (the search left, the rest right); the third renames a thing, a form row, not a filter:</p>
+        <!-- Computed by the page from its own controls, on load and on every theme change.
+             The two search rows keep a bare input[type=search] (it still leads a .filter-bar): a
+             .search-field's input is 27.19px tall once its min-block-size floor is removed, which this
+             check refuses. That is filters.css's to fix, not this page's. -->
         <p class="demo-note" id="height-check" role="status">height check: not run</p>
         <div class="demo-surfaces">
           <div class="demo-surface" data-s="background"><div class="filter-bar demo-m-0">
             <input type="search" aria-label="search skills" placeholder="search…" />
-            <select aria-label="type"><option>all types</option><option>skill</option><option>agent</option></select>
+            <select data-filter aria-label="type"><option value="">all types</option><option>skill</option><option>agent</option></select>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">refresh</button>
             <button type="button" class="btn-terminal btn-terminal--compact">publish</button>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove selection"></button>
           </div></div>
           <div class="demo-surface" data-s="card"><div class="filter-bar demo-m-0">
             <input type="search" aria-label="search skills" placeholder="search…" />
-            <select aria-label="type"><option>all types</option><option>skill</option></select>
+            <select data-filter aria-label="type"><option value="">all types</option><option>skill</option></select>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success">approve</button>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger">deny</button>
           </div></div>

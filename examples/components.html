@@ -22,12 +22,14 @@
     <!-- The package's own order, deliberately WITHOUT reset.css: every interactive class on this
          page has to render right without one (house rule 4), and a missing `font: inherit` shows
          up here as a 13px system font. chrome.css is here for header.bar and .visually-hidden,
-         icons.css for `.ico`. -->
+         icons.css for `.ico`, filters.css for the two search toolbars' `.filter-bar` (a search beside
+         a picker is a filter bar, findMisplacedFilters() 0.62.1). -->
     <link rel="stylesheet" href="../src/tokens.css" />
     <link rel="stylesheet" href="../src/base.css" />
     <link rel="stylesheet" href="../src/components.css" />
     <link rel="stylesheet" href="../src/chrome.css" />
     <link rel="stylesheet" href="../src/icons.css" />
+    <link rel="stylesheet" href="../src/filters.css" />
 
 
     <style>
@@ -135,14 +137,14 @@
         <!-- Computed by the page from its own controls, on load and on every theme change. -->
         <p class="demo-note" id="height-check" role="status">height check: not run</p>
         <div class="demo-surfaces">
-          <div class="demo-surface" data-s="background"><div class="demo-row demo-m-0">
+          <div class="demo-surface" data-s="background"><div class="filter-bar demo-m-0">
             <input type="search" aria-label="search skills" placeholder="search…" />
             <select aria-label="type"><option>all types</option><option>skill</option><option>agent</option></select>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">refresh</button>
             <button type="button" class="btn-terminal btn-terminal--compact">publish</button>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove selection"></button>
           </div></div>
-          <div class="demo-surface" data-s="card"><div class="demo-row demo-m-0">
+          <div class="demo-surface" data-s="card"><div class="filter-bar demo-m-0">
             <input type="search" aria-label="search skills" placeholder="search…" />
             <select aria-label="type"><option>all types</option><option>skill</option></select>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success">approve</button>

@@ -1890,6 +1890,11 @@ const MISPLACED = (root) => `(async () => { const { findMisplacedFilters } = awa
     (element.id || element.querySelector("[id]")?.id || element.tagName.toLowerCase() + "." + [...element.classList].join("."))).sort(); })()`;
 // A throw here becomes a reason the checks below fail on, never an abort (an old runtime has no function).
 const misplaced = (root = "document") => evaluate(MISPLACED(root)).catch((error) => [`threw: ${String(error.message).split("\n")[0]}`]);
+// findFlushBlocks(), named the same way: "upper / lower".
+const FLUSH = (root) => `(async () => { const { findFlushBlocks } = await import("/runtime/rhythm.js");
+  const name = (el) => el.id || el.dataset.t || el.tagName.toLowerCase() + "." + [...el.classList].join(".");
+  return findFlushBlocks(${root}).map(({ upper, lower }) => name(upper) + " / " + name(lower)).sort(); })()`;
+const flushPairs = (root = "document") => evaluate(FLUSH(root)).catch((error) => [`threw: ${String(error.message).split("\n")[0]}`]);
 const sameSet = (got, want) => JSON.stringify([...got].sort()) === JSON.stringify([...want].sort());
 
 await open("/main");
@@ -2048,12 +2053,13 @@ for (const page of pages) {
     await sleep(150);
     measured += await evaluate(COUNT("document"));
     wrong.push(...(await misplaced()).map((r) => `${width}: ${r}`));
+    wrong.push(...(await flushPairs()).map((r) => `${width}: flush ${r}`));
     wrong.push(...(await evaluate(`document.querySelectorAll(".filter-bar-spacer").length ? ["a .filter-bar-spacer"] : []`)).map((r) => `${width}: ${r}`));
     const dialogs = await evaluate(`document.querySelectorAll("dialog").length`);
     for (let i = 0; i < dialogs; i += 1) {
       const found = await evaluate(`(async () => { const d = document.querySelectorAll("dialog")[${i}]; if (!d.open) d.showModal();
         await new Promise((r) => setTimeout(r, 50));
-        const out = await ${MISPLACED("d")}, bars = [...d.querySelectorAll(".filter-bar")].filter((e) => e.getClientRects().length).length;
+        const out = [...await ${MISPLACED("d")}, ...(await ${FLUSH("d")}).map((r) => "flush " + r)], bars = [...d.querySelectorAll(".filter-bar")].filter((e) => e.getClientRects().length).length;
         const n = ${COUNT("d")}; d.close(); return { bars, n, out: out.map((r) => (d.id || "dialog " + ${i}) + ": " + r) }; })()`)
         .catch((error) => ({ bars: 0, n: 0, out: [`dialog ${i} threw: ${String(error.message).split("\n")[0]}`] }));
       dialogBars += found.bars;
@@ -2061,11 +2067,91 @@ for (const page of pages) {
       wrong.push(...found.out.map((r) => `${width}: ${r}`));
     }
   }
-  await check(`examples/${page}: findMisplacedFilters() finds nothing at 1280 and 375, dialogs opened, and no .filter-bar-spacer (${measured} rendered bars and controls measured)`,
+  await check(`examples/${page}: findMisplacedFilters() and findFlushBlocks() find nothing at 1280 and 375, dialogs opened, and no .filter-bar-spacer (${measured} rendered bars and controls measured)`,
     () => wrong.length === 0, () => wrong.join(" | "));
 }
 await check(`examples: the sweep opened the dialogs and measured their filter bars (${dialogBars} rendered; overlays' two toolbars at two widths is 4)`,
   () => dialogBars >= 4);
+
+/* ═══ 0.62.1 — a dialog's toolbar sits on its body, and the two layouts the filter rule missed ════
+   Cockpit's logs drawer, twice. Its fixed form was flagged by findFlushBlocks(): overlays.css draws
+   `.dialog-toolbar.filter-bar` flush on the body on purpose, and the drawer had to mark its console
+   `data-flush` to pass. Its old form passed findMisplacedFilters(): a plain `.dialog-toolbar`, a plain
+   `<select>` and a `.switch` beside the search, none of which the function judged. The reference
+   drawer is lifted from overlays.md itself, so the skill's own markup is what is measured. */
+
+const reference = readFileSync(join(root, ".claude/skills/danieldeusing-design/references/overlays.md"), "utf8")
+  .split("## A drawer")[1]?.match(/```html\n([\s\S]*?)```/)?.[1] ?? "";
+await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+await open("/examples/overlays.html", `!!document.querySelector("#logs .select-field")`);
+await evaluate(`(() => {
+  const at = document.createElement("div");
+  at.id = "fx-0621";
+  at.innerHTML = ${JSON.stringify(reference.replace(/id="logs"/, 'id="ref-logs"').replace(/logs-t/g, "ref-logs-t"))} + \`
+  <dialog class="dialog dialog--drawer" id="fx-old" aria-label="old drawer">
+    <header class="dialog-head"><h2 class="dialog-title">logs</h2></header>
+    <div class="dialog-toolbar" id="old-tb">
+      <select aria-label="lines" id="old-lines"><option>200 lines</option><option>all</option></select>
+      <button type="button" class="switch" role="switch" aria-checked="true" id="old-follow">follow</button>
+      <span class="search-field"><input type="search" aria-label="search the log" id="old-q"></span>
+      <span class="match-count">3/17</span>
+    </div>
+    <div class="dialog-body dialog-body--flush"><div class="console console--fill" id="old-console"><div class="console-body">line</div></div></div>
+  </dialog>
+  <dialog class="dialog dialog--drawer" id="fx-new" aria-label="fixed drawer">
+    <header class="dialog-head"><h2 class="dialog-title">logs</h2></header>
+    <div class="dialog-toolbar filter-bar" id="new-tb">
+      <span class="search-field"><input type="search" aria-label="search the log"></span>
+      <select aria-label="lines" id="new-lines"><option>200 lines</option><option>all</option></select>
+      <button type="button" class="switch" role="switch" aria-checked="true" id="new-follow">follow</button>
+      <span class="match-count">3/17</span>
+    </div>
+    <div class="dialog-body dialog-body--flush"><div class="console console--fill" id="new-console"><div class="console-body">line</div></div></div>
+  </dialog>
+  <section id="fx-out" style="display: block">
+    <div class="dialog-toolbar filter-bar" id="out-tb"><span class="search-field"><input type="search" aria-label="out"></span></div>
+    <div class="dialog-body dialog-body--flush"><table id="out-table"><tbody><tr><td>a</td></tr></tbody></table></div>
+    <div class="filter-bar" id="out-bar" style="margin-block-end: 0"><span class="search-field"><input type="search" aria-label="bar"></span></div>
+    <table id="out-table-2"><tbody><tr><td>b</td></tr></tbody></table>
+  </section>
+  <form id="fx-form">
+    <p><button type="button" class="switch" role="switch" aria-checked="false" id="form-switch">notify me</button></p>
+    <p><button type="button" class="switch" role="switch" aria-checked="false" id="form-switch-2">digest</button>
+      <select aria-label="interval" id="form-sel"><option>daily</option><option>weekly</option></select>
+      <input type="text" aria-label="name"></p>
+  </form>\`;
+  document.querySelector("main").append(at); })(); null`);
+await sleep(150);
+// Open one dialog, measure both functions inside it and the toolbar-to-content edge, close it.
+const inDialog = (id, toolbar, content) => evaluate(`(async () => { const d = document.getElementById(${JSON.stringify(id)}); d.showModal();
+  await new Promise((r) => setTimeout(r, 50));
+  const tb = d.querySelector(${JSON.stringify(toolbar)}), c = d.querySelector(${JSON.stringify(content)});
+  const out = { misplaced: await ${MISPLACED("d")}, flush: await ${FLUSH("d")},
+    edge: tb && c ? c.getBoundingClientRect().top - tb.getBoundingClientRect().bottom : null,
+    drawn: !!tb && !!c && tb.getClientRects().length > 0 && c.getClientRects().length > 0, wrapped: !!d.querySelector("select")?.closest(".select-field") };
+  d.close(); return out; })()`).catch((error) => ({ misplaced: [`threw: ${String(error.message).split("\n")[0]}`], flush: [], edge: null, drawn: false }));
+
+const ref = await inDialog("ref-logs", ".dialog-toolbar", ".console");
+await check("0.62.1 reference drawer (overlays.md): its toolbar sits ON the console (0px) and findFlushBlocks() reports nothing, with no data-flush",
+  () => reference.includes("dialog-toolbar filter-bar") && !reference.includes("data-flush") && ref.drawn && near(ref.edge, 0, 0.5) &&
+    ref.flush.length === 0 && ref.misplaced.length === 0, JSON.stringify(ref));
+const drawer = await inDialog("logs", ".dialog-toolbar", ".console");
+await check("0.62.1 examples/overlays.html: the logs drawer's toolbar sits on its console (0px), no flush pair, and the page carries no data-flush",
+  async () => drawer.drawn && near(drawer.edge, 0, 0.5) && drawer.flush.length === 0 &&
+    (await evaluate(`document.querySelectorAll("[data-flush]").length`)) === 0, JSON.stringify(drawer));
+const outside = await flushPairs(`document.getElementById("fx-out")`);
+await check("0.62.1 findFlushBlocks: the same toolbar and body OUTSIDE a dialog are still a flush pair, and so is a margin-less bar over a table",
+  () => outside.some((p) => p.startsWith("out-tb / ")) && outside.some((p) => p.startsWith("out-bar / ")), JSON.stringify(outside));
+const old = await inDialog("fx-old", ".dialog-toolbar", ".console");
+await check("0.62.1 findMisplacedFilters: the old cockpit drawer — a plain .dialog-toolbar is \"toolbar-not-filter-bar\", and its select and switch beside the search are \"outside-filter-bar\"",
+  () => old.wrapped && sameSet(old.misplaced, ["toolbar-not-filter-bar old-tb", "outside-filter-bar old-lines", "outside-filter-bar old-follow"]), JSON.stringify(old));
+const fixed = await inDialog("fx-new", ".dialog-toolbar", ".console");
+await check("0.62.1 findMisplacedFilters: the fixed drawer (dialog-toolbar filter-bar, the search first) — nothing, and no flush pair",
+  () => fixed.drawn && fixed.wrapped && fixed.misplaced.length === 0 && fixed.flush.length === 0, JSON.stringify(fixed));
+const form = await misplaced(`document.getElementById("fx-form")`);
+await check("0.62.1 findMisplacedFilters: a .switch and a select in a form with no search beside them are settings, not filters — not reported",
+  async () => form.length === 0 && (await evaluate(`["form-switch", "form-switch-2", "form-sel"].every((id) => document.getElementById(id).getClientRects().length > 0)`)), JSON.stringify(form));
+
 await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
 
 console.log(failures

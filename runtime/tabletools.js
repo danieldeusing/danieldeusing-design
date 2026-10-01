@@ -908,12 +908,8 @@ function ensureChrome(inst) {
         keepingFocus(bar, () => anchor.before(bar));
         if (bar === inst.ownBar) inst.ownBarParent = bar.parentElement;
       }
-      const caret = inst.carriedCaret;
+      if (inst.carriedCaret) giveFocusBack(inst.searchBox, inst.carriedCaret);
       inst.carriedCaret = null;
-      if (caret && (!document.activeElement || document.activeElement === document.body)) {
-        inst.searchBox.focus({ preventScroll: true });
-        inst.searchBox.setSelectionRange(...caret);
-      }
     }
     if (pageBar && pageBar !== inst.bar) {
       inst.bar = pageBar;
@@ -967,9 +963,17 @@ function retire(inst) {
   // The node may come back elsewhere (a page that detaches a table and inserts it later): it comes back
   // with the view the reader left it in, not only what was saved — a table without an id saves nothing.
   // The engine's box goes below, and a reader typing in it would be left on <body>: where its caret was goes
-  // with the view, for the box drawn when the node comes back.
+  // with the view, for the box drawn when the node comes back — until the reader does anything at all. A
+  // click on nothing also leaves focus on <body>, and a box that took focus after it would turn the next
+  // Space into a query.
   const box = inst.searchField && document.activeElement === inst.searchBox ? inst.searchBox : null;
-  carried.set(inst.table, { identity: inst.identity, view: inst.view, bar: inst.bar, caret: box && [box.selectionStart, box.selectionEnd] });
+  const entry = { identity: inst.identity, view: inst.view, bar: inst.bar, caret: box && [box.selectionStart, box.selectionEnd] };
+  carried.set(inst.table, entry);
+  if (entry.caret) {
+    const done = new AbortController();
+    const drop = () => { entry.caret = null; done.abort(); };
+    for (const type of ["pointerdown", "keydown", "focusin"]) document.addEventListener(type, drop, { capture: true, signal: done.signal });
+  }
   // Gone, not renewed in place: the count this file made would go on standing where the table was.
   if (!inst.table.isConnected && madeCounts.has(inst.count)) inst.count.remove();
   /*
@@ -1034,9 +1038,25 @@ function watchFocus(inst, root) {
   });
 }
 function restoreFocus(inst) {
-  const node = inst.lastFocus;
-  const lost = !document.activeElement || document.activeElement === document.body;
-  if (lost && node && node.isConnected && document.activeElement !== node) node.focus({ preventScroll: true });
+  if (inst.lastFocus && focusLost()) giveFocusBack(inst.lastFocus);
+}
+const focusLost = () => !document.activeElement || document.activeElement === document.body;
+
+/*
+ * FOCUS GOES BACK ONCE THE MOVES HAVE LANDED (0.62.4). focus() lays the page out, and in the middle of a
+ * move that layout is of a page that is half moved: a table's bar already at its new place, its count or
+ * pager still at the old one. Scroll anchoring (Chromium, Firefox) takes the focused box as its anchor in
+ * that state and holds it there when the rest lands — measured, a bar under a mount the count had not
+ * left yet carried the 0.6rem block gap, and the page scrolled 10px when the count went. So focus is given
+ * back in a microtask: after this observer batch, the pager's moves included, and before anything paints.
+ * Only to a node still in the document, and only while focus is on <body> — what else took it keeps it.
+ */
+function giveFocusBack(node, caret) {
+  queueMicrotask(() => {
+    if (!node.isConnected || !focusLost()) return;
+    node.focus({ preventScroll: true });
+    if (caret) node.setSelectionRange(...caret);
+  });
 }
 
 /*
@@ -1048,7 +1068,7 @@ function restoreFocus(inst) {
 function keepingFocus(node, move) {
   const held = node.contains(document.activeElement) ? document.activeElement : null;
   move();
-  if (held && document.activeElement !== held) held.focus({ preventScroll: true });
+  if (held && document.activeElement !== held) giveFocusBack(held);
 }
 
 /* true when the node is no longer this instance's table — it has been handed to a fresh one. */

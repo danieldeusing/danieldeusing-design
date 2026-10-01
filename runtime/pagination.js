@@ -402,7 +402,12 @@ export function initTablePagination(root = document) {
         if (node.nodeType !== 1) continue;
         const owner = owners.get(node);
         if (owner) rehome(owner);
-        for (const table of tablesIn(node)) if (!table.isConnected) enhanced.get(table)?.bar.remove();
+        for (const table of tablesIn(node)) {
+          const gone = !table.isConnected && enhanced.get(table);
+          // The bar leaves with its table, and so does what held focus in it: a reader on <body> when the table
+          // returns may have clicked on nothing since, and is not pulled into the pager.
+          if (gone) { gone.bar.remove(); gone.lastFocus = null; }
+        }
       }
       for (const node of record.addedNodes) {
         if (node.nodeType !== 1) continue;

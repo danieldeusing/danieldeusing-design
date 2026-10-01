@@ -144,7 +144,17 @@ const ORDER = `<!doctype html><html><head><meta charset="utf-8"><link rel="style
 <script>for (const f of location.search.slice(1).split(",")) document.write('<link rel="stylesheet" href="/src/' + f + '.css">');<\/script></head>
 <body><details class="dropdown tbl-filter" open><summary aria-label="filter name"></summary>
 <div class="dropdown-panel dropdown-panel--down tbl-filter-panel">panel</div></details></body></html>`;
-const server = await serve(root, { "/__tabletools.html": HARNESS, "/__tabletools-order.html": ORDER });
+// The scroll-anchoring case needs the design stylesheet (its scroll-padding and block gaps) and a tall page;
+// the harness above has neither, on purpose, so it gets a page of its own.
+const ANCHOR = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/dist/danieldeusing-design.css"></head><body>
+<main class="wrap"><label>outside <input id="outside" type="text"></label><div style="height:1500px"></div>
+<div id="mount"></div><div id="other"></div><div style="height:1500px"></div></main>
+<script type="module">
+import { initTableTools } from "/runtime/tabletools.js";
+import { initTablePagination } from "/runtime/pagination.js";
+initTablePagination(); initTableTools(); window.ready = true;
+<\/script></body></html>`;
+const server = await serve(root, { "/__tabletools.html": HARNESS, "/__tabletools-order.html": ORDER, "/__tabletools-anchor.html": ANCHOR });
 const browser = await launch("tabletools");
 const { evaluate, until, navigate, send } = browser;
 await navigate(`${server.origin}/__tabletools.html`);
@@ -852,39 +862,123 @@ const moveBarFocus = (own, how, target) => evaluate(`(async () => {
   const from = document.getElementById("mount"), to = document.getElementById("later");
   to.replaceChildren();
   from.innerHTML = ${JSON.stringify("SOURCE")};
-  const spacer = document.createElement("div"); spacer.style.height = "3000px"; to.before(spacer);
-  const outside = document.createElement("input"); document.body.prepend(outside);
+  // A tall page with the table in the middle of the viewport: at the top of a page, a shift scroll anchoring
+  // makes cannot happen, and a check that starts there cannot see one.
+  const above = document.createElement("div"); above.style.height = "2000px"; from.before(above);
+  const below = document.createElement("div"); below.style.height = "3000px"; to.after(below);
+  const outside = document.createElement("input"); from.before(outside);
   await new Promise((r) => setTimeout(r, 50));
   const box = from.querySelector("search input");
-  box.value = "r12"; box.dispatchEvent(new Event("input", { bubbles: true }));
   const held = ${target};
   held.focus({ preventScroll: true });
-  if (held === box) box.setSelectionRange(2, 2);
-  window.scrollTo(0, 0);
+  if (held === box) { box.value = "ab"; box.dispatchEvent(new Event("input", { bubbles: true })); box.setSelectionRange(1, 1); }
+  await new Promise((r) => setTimeout(r, 500));
+  const table = from.querySelector("table");
+  window.scrollTo({ top: table.getBoundingClientRect().top + scrollY + table.offsetHeight / 2 - innerHeight / 2, behavior: "instant" });
+  const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await frames();
+  const y = scrollY, top = held.getBoundingClientRect().top;
   const wrap = from.querySelector(".tablewrap");
   if (${JSON.stringify(how)} === "append") to.appendChild(wrap);
   else { wrap.remove(); await new Promise((r) => setTimeout(r, 0)); to.appendChild(wrap); }
   await new Promise((r) => setTimeout(r, 100));
+  await frames();
   // The box is the one in the bar NOW: a detached table is retired, and the engine's box goes with it.
   const now = held === box ? to.querySelector("search input") : held;
   const out = { moved: to.firstElementChild?.matches("search[data-table-bar]") ?? false,
     focus: document.activeElement === now ? "same" : document.activeElement.tagName,
-    caret: held === box ? now.selectionStart + "," + now.selectionEnd : null, scrolled: scrollY };
-  spacer.remove(); outside.remove();
+    caret: held === box ? now.selectionStart + "," + now.selectionEnd : null,
+    shift: scrollY - y, onScreen: Math.round(now.getBoundingClientRect().top - top) };
+  above.remove(); below.remove(); outside.remove();
   return JSON.stringify(out);
 })()`.replace('"SOURCE"', JSON.stringify(PAGE_BAR_MOVE(own))));
 for (const [own, what, target, caret] of [
-  [true, "the page's own box, caret mid-word", "box", "2,2"],
-  [false, "the box the engine put in the page's bar", "box", "2,2"],
+  [true, "the page's own box, caret mid-word", "box", "1,1"],
+  [false, "the box the engine put in the page's bar", "box", "1,1"],
   [true, "the page's action button", 'from.querySelector("#bar-action")', null],
   [true, "an input OUTSIDE the table (it must be left alone)", "outside", null],
 ]) {
   for (const how of ["append", "detach"]) {
     const f = await moveBarFocus(own, how, target);
-    await check(`0.62.4 — focus on ${what}, its table ${how === "append" ? "APPENDED" : "DETACHED and re-inserted"} elsewhere: focus stays on it${caret ? ", the caret where it was" : ""}, the page not scrolled`,
-      () => f === JSON.stringify({ moved: true, focus: "same", caret, scrolled: 0 }), f);
+    await check(`0.62.4 — focus on ${what}, its table in mid-screen ${how === "append" ? "APPENDED" : "DETACHED and re-inserted"} elsewhere: focus stays on it${caret ? ", the caret where it was" : ""}, the page not scrolled and the control not moved on screen`,
+      () => f === JSON.stringify({ moved: true, focus: "same", caret, shift: 0, onScreen: 0 }), f);
   }
 }
+await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
+
+/* ── 0.62.4 fix round 1 · focus given back only while nothing else has happened ──────────────────────────
+   A table detached with focus in its box or its pager comes back with that focus — unless the reader did
+   something in between. A click on nothing leaves focus on <body> exactly as the removal did, so <body>
+   alone cannot tell them apart: the box that took focus after it turned the next Space into a query. Each
+   case: focus, detach, then what happens between (a real mouse click on blank page, a script focusing an
+   input above the table, a script focusing an input inside an iframe — which fires no event in this
+   document), 400 ms, the table put back. Where focus ends up, and what a real Space does then. */
+const clickBlank = async () => {
+  const at = JSON.parse(await evaluate(`JSON.stringify({ x: innerWidth - 5, y: innerHeight - 5, tag: document.elementFromPoint(innerWidth - 5, innerHeight - 5)?.tagName })`));
+  if (!["BODY", "HTML"].includes(at.tag)) throw new Error("the blank point is on " + at.tag);
+  for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: at.x, y: at.y, button: "left", clickCount: 1 });
+};
+const space = async () => {
+  const key = { key: " ", code: "Space", windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 };
+  await send("Input.dispatchKeyEvent", { type: "keyDown", text: " ", ...key });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", ...key });
+};
+const detachReturn = async (kind, between) => {
+  await evaluate(`(async () => {
+    localStorage.clear();
+    const from = document.getElementById("mount");
+    document.getElementById("later").replaceChildren();
+    from.innerHTML = ${JSON.stringify(moveTable("stale"))};
+    const outside = document.createElement("input"); outside.id = "outside"; document.body.prepend(outside);
+    const frame = document.createElement("iframe"); frame.id = "frame"; frame.srcdoc = "<input>"; document.body.prepend(frame);
+    await new Promise((r) => frame.addEventListener("load", r, { once: true }));
+    await new Promise((r) => setTimeout(r, 50));
+    const box = from.querySelector("search input");
+    box.value = "r"; box.dispatchEvent(new Event("input", { bubbles: true }));
+    const held = ${JSON.stringify(kind)} === "box" ? box : from.querySelector(".table-pager-nav button:last-child");
+    held.focus({ preventScroll: true });
+    if (held === box) box.setSelectionRange(1, 1);
+    window.staleWrap = from.querySelector(".tablewrap");
+    window.staleWrap.remove();
+  })()`);
+  await sleep(50);
+  await between();
+  await sleep(400);
+  const out = JSON.parse(await evaluate(`(async () => {
+    const from = document.getElementById("mount");
+    from.appendChild(window.staleWrap);
+    await new Promise((r) => setTimeout(r, 100));
+    const box = from.querySelector("search input"), next = from.querySelector(".table-pager-nav button:last-child");
+    const a = document.activeElement;
+    return JSON.stringify({ focus: a === box ? "box" : a === next ? "next" : a.id || a.tagName });
+  })()`));
+  await space();
+  await sleep(50);
+  out.box = await evaluate(`document.querySelector("#mount search input").value`);
+  await evaluate(`document.getElementById("outside").remove(); document.getElementById("frame").remove(); null`);
+  return JSON.stringify(out);
+};
+const BETWEEN = {
+  "a real click on blank page": clickBlank,
+  "a script focusing an input above the table": () => evaluate(`document.getElementById("outside").focus(); null`),
+  "a script focusing an input inside an iframe": () => evaluate(`document.getElementById("frame").contentDocument.querySelector("input").focus(); null`),
+};
+for (const [how, between] of Object.entries(BETWEEN)) {
+  const focus = how.includes("blank") ? "BODY" : how.includes("iframe") ? "frame" : "outside";
+  const b = await detachReturn("box", between);
+  await check(`0.62.4 — focus in the engine's box, the table detached, ${how}, the table back 400 ms later: focus stays put, and Space does not type into the box`,
+    () => b === JSON.stringify({ focus, box: "r" }), b);
+  if (!how.includes("blank")) continue;
+  const p = await detachReturn("pager", between);
+  await check(`0.62.4 — focus on "next →", the table detached, ${how}, the table back 400 ms later: focus stays on <body>, not on the pager`,
+    () => p === JSON.stringify({ focus: "BODY", box: "r" }), p);
+}
+// ...and with nothing in between, the box does take the focus back, with its caret. The pager does not: it
+// leaves the document with its table, and what held focus in it is forgotten then.
+const nothing = async () => {};
+const boxBack = await detachReturn("box", nothing);
+await check("0.62.4 — ...while with nothing in between, the box takes the focus back and its caret (Space types into it)",
+  () => boxBack === JSON.stringify({ focus: "box", box: "r " }), boxBack);
 await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
 
 /* ── 0.62.3 · a page writing into a visible cell of a filtered table keeps the rows the filter withholds ─
@@ -1018,6 +1112,27 @@ const twoBars = await evaluate(`(async () => {
 })()`);
 await check("0.62.4 — two tables, each after its own page bar; the first one's wrapper moves to a stash: C keeps its bar, A takes its own, no engine bar is drawn",
   () => twoBars === JSON.stringify({ mount: ["PB(pbC)", "T(pbC)", "pager(pbC)", "count(pbC)"], stash: ["PB(pbA)", "T(pbA)", "pager(pbA)", "count(pbA)"] }), twoBars);
+await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
+
+/* ── 0.62.4 fix round 1 · the page's action keeps focus when a NEW table adopts the page bar ───────────────
+   One task moves table A out and appends table B after the page bar; A's pager and count still stand between
+   them, so B moves the bar it adopted down to its own wrapper. The reader was on the page's action. */
+const swapFocus = await evaluate(`(async () => {
+  localStorage.clear();
+  const mount = document.getElementById("mount"), stash = document.getElementById("later");
+  stash.replaceChildren();
+  mount.innerHTML = '<search class="filter-bar" data-table-bar aria-label="sf"><button type="button" id="sf-action">act</button></search>' + ${JSON.stringify(swapWrap("sfA"))};
+  await new Promise((r) => setTimeout(r, 50));
+  const action = document.getElementById("sf-action"); action.focus({ preventScroll: true });
+  stash.append(mount.querySelector(".tablewrap"));
+  mount.insertAdjacentHTML("beforeend", ${JSON.stringify(swapWrap("sfB"))});
+  await new Promise((r) => setTimeout(r, 150));
+  const bar = action.parentElement;
+  return JSON.stringify({ focus: document.activeElement === action ? "action" : document.activeElement.tagName,
+    barBeforeB: bar.nextElementSibling?.querySelector("table")?.getAttribute("data-table-id") ?? null });
+})()`);
+await check("0.62.4 — table B adopts the page bar and moves it down past A's leavings: focus on the page's action stays on it",
+  () => swapFocus === JSON.stringify({ focus: "action", barBeforeB: "sfB" }), swapFocus);
 await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
 
 /* ── 0.62.3 · data-table-rows is read only in the task that writes it ──────────────────────────────────────
@@ -1254,6 +1369,48 @@ if (!DOM_PATCH) {
   const blurred = await pagerFocus('later.querySelector(".table-pager-nav button:last-child")', true);
   await check("...and focus the reader took OFF \"next →\" before the patch is not pulled back onto it",
     () => blurred === JSON.stringify({ focus: "BODY", caret: null, scrolled: 0, status: "21–40 of 46" }), blurred);
+
+  // ...nor focus a script moved elsewhere in the SAME task as the patch, before the pager went back.
+  const sameTask = await evaluate(`(async () => {
+    localStorage.clear();
+    const later = document.getElementById("later");
+    later.innerHTML = ${JSON.stringify(SHELL(45))};
+    const outside = document.createElement("input"); document.body.prepend(outside);
+    await new Promise((r) => setTimeout(r, 100));
+    const next = later.querySelector(".table-pager-nav button:last-child");
+    next.click(); next.focus({ preventScroll: true });
+    await new Promise((r) => setTimeout(r, 50));
+    window.cockpitPatch(later, ${JSON.stringify(SHELL(46))});
+    outside.focus({ preventScroll: true });
+    await new Promise((r) => setTimeout(r, 200));
+    const focus = document.activeElement === outside ? "outside" : document.activeElement === next ? "next" : document.activeElement.tagName;
+    outside.remove();
+    return focus;
+  })()`);
+  await check("...nor focus moved to an input outside the table in the same task as the patch: it stays there", () => sameTask === "outside", sameTask);
+
+  // A patch that leaves one page hides the pager, and a hidden button holds no focus: focus is on <body>,
+  // and when a later patch brings the second page back, the pager does not take it.
+  const shrunk = await evaluate(`(async () => {
+    localStorage.clear();
+    const later = document.getElementById("later");
+    later.innerHTML = ${JSON.stringify(SHELL(45))};
+    await new Promise((r) => setTimeout(r, 100));
+    const next = later.querySelector(".table-pager-nav button:last-child");
+    next.click(); next.focus({ preventScroll: true });
+    await new Promise((r) => setTimeout(r, 50));
+    window.cockpitPatch(later, ${JSON.stringify(SHELL(15))});
+    await new Promise((r) => setTimeout(r, 200));
+    const pager = later.querySelector(".table-pager");
+    const out = { hidden: !!pager?.hidden, focus: document.activeElement.tagName };
+    window.cockpitPatch(later, ${JSON.stringify(SHELL(45))});
+    await new Promise((r) => setTimeout(r, 200));
+    out.shown = !later.querySelector(".table-pager").hidden;
+    out.after = document.activeElement.tagName;
+    return JSON.stringify(out);
+  })()`);
+  await check("0.62.4 — focus on \"next →\", a patch down to 15 rows: the pager is hidden and focus is on <body>; a patch back to 45 rows shows it and leaves focus on <body>",
+    () => shrunk === JSON.stringify({ hidden: true, focus: "BODY", shown: true, after: "BODY" }), shrunk);
   await evaluate(`document.getElementById("later").replaceChildren(); null`);
 
   // 0.62.3: rows tied on the sort column hold their places through polls that change nothing. The patcher
@@ -1348,6 +1505,64 @@ const shared = await answered(evaluate(`(async () => {
 })()`), 5000);
 await check("fix round 1 — a table drawn between a neighbour and its count makes its own count, and each says its own thing under its own table", async () =>
   shared === JSON.stringify({ first: "", second: "1 of 2 runs — 1 hidden by the filters" }), shared);
+
+/* ── 0.62.4 fix round 1 · giving focus back does not scroll the page through scroll anchoring ────────────
+   focus() lays the page out. Called in the middle of a move — the bar already at its new place, the count
+   still in the old mount — that layout is of a half-moved page, and Chromium and Firefox anchor the focused
+   box there: the bar in the second mount carried the 0.6rem block gap while the first was not yet empty, and
+   when the count left the page scrolled 10px (1464 to 1454, the box 64 to 74). It needs the design
+   stylesheet, the mount at the top of the viewport (at the scroll-padding edge) and text in the box; the
+   checks above start at the top of a page without a stylesheet and could not see it. The table's wrapper is
+   moved into the next mount in one task, or the whole mount is patched with focus in the pager. */
+await navigate(`${server.origin}/__tabletools-anchor.html`);
+await until("window.ready === true", "the anchoring page");
+if (DOM_PATCH) await evaluate(readFileSync(DOM_PATCH, "utf8") + "; null");
+const ASHELL = (n, pageBox) => '<search class="filter-bar" data-table-bar aria-label="runs">' + (pageBox
+  ? '<div class="search-field"><input type="search" data-table-search aria-label="search runs"><button type="button" class="search-clear" aria-label="clear the search" hidden></button></div>' : "") +
+  '<button type="button" id="a-action">new run</button></search><div class="tablewrap"><table class="act" data-table-tools data-table-unit="runs" data-table-id="a-shell" data-sort-key="v"><thead><tr><th data-col="v">v</th></tr></thead><tbody>' +
+  Array.from({ length: n }, (_, i) => `<tr><td>L${String(i + 1).padStart(2, "0")}</td></tr>`).join("") + "</tbody></table></div>" +
+  '<p class="result-count" role="status" data-table-count></p>';
+const anchored = (source, target, act) => evaluate(`(async () => {
+  localStorage.clear();
+  const mount = document.getElementById("mount"), other = document.getElementById("other");
+  other.replaceChildren();
+  mount.innerHTML = ${JSON.stringify("SOURCE")};
+  await new Promise((r) => setTimeout(r, 150));
+  const settle = async () => { let last = -1, same = 0;
+    while (same < 10) { await new Promise((r) => requestAnimationFrame(r)); if (scrollY === last) same += 1; else { same = 0; last = scrollY; } } };
+  mount.scrollIntoView({ block: "start", behavior: "instant" });
+  await settle();
+  const box = mount.querySelector("search input[type=search]");
+  const held = __TARGET__;
+  held.focus({ preventScroll: true });
+  if (held === box) { box.value = "ab"; box.dispatchEvent(new Event("input", { bubbles: true })); box.setSelectionRange(1, 1); }
+  await settle();
+  const y = scrollY, top = held.getBoundingClientRect().top;
+  __ACT__;
+  await new Promise((r) => setTimeout(r, 200));
+  await settle();
+  const now = held.isConnected ? held : document.querySelector("#other search input[type=search]");
+  return JSON.stringify({ focus: document.activeElement === now, caret: now === held && held !== box ? null : now.selectionStart + "," + now.selectionEnd,
+    shift: Math.round(scrollY - y), onScreen: Math.round(now.getBoundingClientRect().top - top) });
+})()`.replace('"SOURCE"', () => JSON.stringify(source)).replace("__TARGET__", () => target).replace("__ACT__", () => act));
+const MOVE = 'other.appendChild(mount.querySelector(".tablewrap"))';
+for (const [what, source, target] of [
+  ["the page's own box, holding \"ab\" with the caret at 1", ASHELL(25, true), "box"],
+  ["the box the engine put in the page's bar, holding \"ab\" with the caret at 1", ASHELL(25, false), "box"],
+]) {
+  const a = await anchored(source, target, MOVE);
+  await check(`0.62.4 — focus on ${what}, the table's mount at the top of the viewport, its wrapper moved into the next mount: focus and caret kept, the page not scrolled, the box not moved on screen`,
+    () => a === JSON.stringify({ focus: true, caret: "1,1", shift: 0, onScreen: 0 }), a);
+}
+const act = await anchored(ASHELL(25, true), 'mount.querySelector("#a-action")', MOVE);
+await check("0.62.4 — ...and focus on the page's action: kept, the page not scrolled",
+  () => act === JSON.stringify({ focus: true, caret: null, shift: 0, onScreen: 0 }), act);
+if (DOM_PATCH) {
+  const patched = await anchored(ASHELL(45, true), 'mount.querySelector(".table-pager-nav button:last-child")',
+    `mount.querySelector(".table-pager-nav button:last-child").click(); await new Promise((r) => setTimeout(r, 50)); window.cockpitPatch(mount, ${JSON.stringify(ASHELL(46, true))})`);
+  await check("0.62.4 — focus on \"next →\" of the mount at the top of the viewport, the mount patched by cockpitPatch: focus kept, the page not scrolled",
+    () => patched === JSON.stringify({ focus: true, caret: null, shift: 0, onScreen: 0 }), patched);
+}
 
 /* ── 0.61.0 · the filter panel's box does not depend on which stylesheet loads last ──────────────────
    `.dropdown-panel` (components.css) and `.tbl-filter-panel` (data.css) were one class each, so the

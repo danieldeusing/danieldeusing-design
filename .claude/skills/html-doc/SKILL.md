@@ -47,7 +47,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
 
 2. **Load the template:** `templates/documentation.html`, in this skill's own repo —
    `~/Work/danieldeusing/danieldeusing-design/templates/documentation.html`, the clone path on
-   Daniel's machines and in the vu3-agent-kit install guide. Elsewhere it is
+   Daniel's machines. Elsewhere it is
    `../../../templates/documentation.html` from this file's *real* path (`readlink -f` it first:
    reached through a `~/.claude/skills/` symlink, or as a copy in `~/.copilot/skills/`, the
    relative path points nowhere). There is deliberately **no second copy** bundled with the skill: two copies drifted

@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **`data-table-rows="N"` on an engine table**: the number of rows the renderer wrote into the tbody,
+  not counting detail rows (`data-row-for`), set in the same task as the rows. When it is not the
+  number the engine holds, the engine reads the body as the whole new set, so a renderer that patches
+  rows in place never leaves withheld rows behind (the cost under *Fixed*). Optional; a table without
+  it behaves as before.
+
 ### Fixed
 
 - **A page writing into a visible cell of a filtered table no longer loses the rows the filter
@@ -16,9 +24,16 @@ All notable changes to this project are documented here. The format follows
   did the same. While the body still holds exactly the rows the engine last wrote, the engine now
   keeps its own set, withheld rows included, and treats the write as an update of that row: the view
   is applied again, so a row the write takes out of the filter leaves and comes back with the others.
-  The body is read as the new set only when a row was added, removed or moved in it. The cost: a
-  renderer that rewrites the body in place with exactly as many rows as are showing keeps the
-  withheld rows it no longer has until a later render changes the row count or the page resets.
+  The rows showing keep the order the body has them in, so rows tied on the sort column do not change
+  places when a positional patcher (cockpit's `cockpitPatch`) re-renders unchanged data. The body is
+  read as the new set when a row was added, removed or moved in it, or when the renderer declares a
+  different row count (below).
+- **The cost, for a renderer that does not declare its row count.** One that rewrites the body in
+  place with exactly as many rows as are showing moves no row, and the engine keeps the withheld rows
+  it no longer has. Until a render whose row count differs (at most one poll on a page that polls,
+  indefinitely on one that does not) they are counted ("3 of 10 rows — 7 hidden by the filters"),
+  offered in a pick menu and shown again when the filter is cleared, where a record the renderer
+  wrote into a shown row can appear twice. `resetTableView()` does not clear them.
 - **A filter pass moves only the rows whose visibility changes.** Every pass appended every kept row
   again: narrowing 500 rows to 50 removed 500 rows and re-inserted 50, and clearing it moved all 500.
   Now narrowing removes the 450 that leave and clearing inserts the 450 that come back; the 50 already
@@ -32,10 +47,12 @@ All notable changes to this project are documented here. The format follows
   left a page's `search[data-table-bar]` where it stood; the engine then drew a second bar, and a
   second box, at the new place, and a box the page drew went on searching the moved table from the
   old one. The adopted bar now goes directly before the table, as an adopted count already did,
-  unless the new place has a page bar of its own or another engine table stands after it. A page's
-  box keeps driving its table when the table is detached and inserted again.
+  unless the new place has a page bar of its own or another engine table stands after it (past any
+  pager, count or engine bar between them). A page's box keeps driving its table when the table is
+  detached and inserted again.
 
-Consumers: nothing to change in markup. A page that moves an engine table and relied on its own bar
+Consumers: nothing has to change in markup. A renderer that patches an engine table's rows in place
+(cockpit's `cockpitTable`) should set `data-table-rows` on the table with every paint. A page that moves an engine table and relied on its own bar
 staying behind now sees the bar go with the table; move the bar back, or give the new place a bar.
 
 ## 0.62.2 (2026-09-30)

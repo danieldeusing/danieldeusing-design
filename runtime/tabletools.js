@@ -660,23 +660,44 @@ function buildHeaderControls(inst) {
  * the same nodes in the same order) is the filtered view, not the table: read from it, every withheld row
  * left the set for good. That is what a page writing `cell.textContent` into a visible row did, and a
  * renderer replacing the <thead>. So while the body is ours, the rows are the ones held here — withheld
- * included, in the order they were read — and a write inside one is an update of that row.
+ * included — and a write inside one is an update of that row.
  *
- * The cost, accepted: a renderer that rewrites the body IN PLACE with exactly as many rows as are
- * showing (its new set happens to be the size of the filtered one) moves no row and is read the same
- * way, so the rows it no longer has stay held, withheld, until a re-render changes the row count or the
- * page resets. A renderer whose set differs in size from what is showing adds or removes a row, and is
- * read from the body as before.
+ * THE SHOWN ROWS KEEP THE BODY'S ORDER. A patcher matching by position (cockpit's `cockpitPatch`) moves
+ * CONTENT between row nodes, so the nodes' read order no longer says which record came first: rebuilt in
+ * that order, rows tied on the sort column changed places on polls that changed nothing. So the slots
+ * the shown rows held go to the shown rows in the order the body has them, as reading the body did, and
+ * a withheld row keeps its own slot.
+ *
+ * WHAT IT CANNOT TELL APART, and the cure. A renderer that rewrites the body IN PLACE with exactly as
+ * many rows as are showing moves no row either. Without being told, the rows it no longer has stay held:
+ * withheld, counted in "3 of 10 — 7 hidden", offered in a pick menu, and back on screen when the filter
+ * is cleared, possibly beside the same record written into a shown row. `resetTableView()` keeps them
+ * too. They go at the next render whose row count differs. A renderer says how many rows it wrote with
+ * `data-table-rows` on the table; when that is not the number held here, the body is the set (`fromBody`).
  */
 const sameRows = (body, rows) => body.rows.length === rows.length && rows.every((row, i) => body.rows[i] === row);
 
-function snapshot(inst) {
+/* The renderer's own count of the rows it wrote (`data-table-rows`), when it gives one and it is not what is held. */
+const declaredOtherwise = (inst) => {
+  const declared = inst.table.getAttribute("data-table-rows");
+  return declared !== null && Number(declared) !== inst.allRows.filter((row) => !row.hasAttribute("data-row-for")).length;
+};
+
+function snapshot(inst, fromBody = false) {
   const body = inst.table.tBodies[0];
   if (!body) return;
-  // A placeholder is this file's own stand-in for no rows, never data.
-  const rows = sameRows(body, inst.lastWritten)
-    ? inst.allRows.flatMap((row) => [row, ...(inst.childrenOf.get(row) || [])])
-    : [...body.rows].filter((row) => !row.hasAttribute(PLACEHOLDER));
+  let rows;
+  if (!fromBody && sameRows(body, inst.lastWritten)) {
+    const held = new Set(inst.allRows);
+    const shown = [...body.rows].filter((row) => held.has(row));
+    const inBody = new Set(shown);
+    let k = 0;
+    rows = inst.allRows.map((row) => (inBody.has(row) ? shown[k++] : row))
+      .flatMap((row) => [row, ...(inst.childrenOf.get(row) || [])]);
+  } else {
+    // A placeholder is this file's own stand-in for no rows, never data.
+    rows = [...body.rows].filter((row) => !row.hasAttribute(PLACEHOLDER));
+  }
   inst.childrenOf = new Map();
   inst.allRows = [];
   const byKey = new Map();
@@ -783,7 +804,10 @@ function useSearchBox(inst, input) {
 function barToBring(inst) {
   const bar = inst.bar || inst.carriedBar;
   if (!bar || !bar.isConnected) return null;
-  const next = bar.nextElementSibling;
+  // A pager, a count or an engine's own bar beside it are a table's chrome — this one's leavings, or the
+  // chrome of a table standing after them — not a sign that nothing stands after the bar.
+  let next = bar.nextElementSibling;
+  while (next && next.matches(".table-pager, p.result-count, search.filter-bar:not([data-table-bar])")) next = next.nextElementSibling;
   const other = next && (next.matches("table") ? next : next.matches(".tablewrap") ? next.querySelector(":scope > table") : null);
   return other && other !== inst.table && other.hasAttribute("data-table-tools") ? null : bar;
 }
@@ -1163,8 +1187,10 @@ function enhance(table) {
       rec.target !== body && body.contains(rec.target) &&
       (rec.type === "attributes" ? ROW_READS.has(rec.attributeName) : !relabel(rec.target)));
 
-    if (moved || rewritten) {
-      snapshot(inst);
+    // A renderer that declares how many rows it wrote, and it is not the number held, rewrote the set.
+    const stale = declaredOtherwise(inst);
+    if (moved || rewritten || stale) {
+      snapshot(inst, stale);
       applyTableView(table);
       restoreFocus(inst);
       return;

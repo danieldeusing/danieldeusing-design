@@ -900,7 +900,44 @@ await check("...in the table's order: r000 … r499",
     Array.from({ length: 500 }, (_, i) => "r" + String(i).padStart(3, "0")).join());
 await evaluate(`document.getElementById("mount").replaceChildren(); null`);
 
-const parents =(dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
+/* ── 0.62.3 · a page bar stays with the table that now stands after it ──────────────────────────────────
+   One task moves table A's wrapper out and appends table B's after the page bar. A's own count and pager
+   (and B's own bar, drawn before A's leavings move away) sit between the bar and B: they are a table's
+   chrome, not a sign that nothing stands after the bar. The page bar stays where B is, as in 0.62.2, and A
+   draws a bar of its own where it went. */
+const swapWrap = (id) => `<div class="tablewrap"><table data-table-tools data-table-id="${id}" aria-label="${id}"><thead><tr><th data-col="v">v</th></tr></thead><tbody>` +
+  [1, 2, 3].map((i) => `<tr><td>${id}-${i}</td></tr>`).join("") + "</tbody></table></div>";
+const swapped = await evaluate(`(async () => {
+  localStorage.clear();
+  const mount = document.getElementById("mount"), stash = document.getElementById("later");
+  stash.replaceChildren();
+  mount.innerHTML = '<search class="filter-bar" data-table-bar aria-label="swap"><button type="button" id="swap-action">act</button></search>' + ${JSON.stringify(swapWrap("swapA"))};
+  await new Promise((r) => setTimeout(r, 50));
+  const bar = mount.querySelector("search");
+  stash.append(mount.querySelector(".tablewrap"));
+  mount.insertAdjacentHTML("beforeend", ${JSON.stringify(swapWrap("swapB"))});
+  await new Promise((r) => setTimeout(r, 150));
+  const shown = (id) => [...document.querySelector('table[data-table-id="' + id + '"]').tBodies[0].rows].filter((r) => !r.hasAttribute("data-table-placeholder")).length;
+  return JSON.stringify({ barIn: bar.parentElement.id, action: !!bar.querySelector("#swap-action"),
+    aBar: stash.firstElementChild?.matches("search.filter-bar") && stash.firstElementChild !== bar, b: shown("swapB"), a: shown("swapA") });
+})()`);
+await check("0.62.3 — one task moves table A out and appends table B after the page bar: the bar stays where B is (A's count and pager between them are chrome), and A draws its own",
+  () => swapped === JSON.stringify({ barIn: "mount", action: true, aBar: true, b: 3, a: 3 }), swapped);
+await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
+
+/* ── 0.62.3 · a <thead> replaced under a filter keeps the withheld rows ──────────────────────────────── */
+await evaluate(`localStorage.clear(); window.build(); window.setFilter("name", "a"); null`);
+await sleep(50);
+await evaluate(`(() => { const t = document.querySelector("#mount table"), h = document.createElement("thead");
+  h.innerHTML = '<tr><th data-col="name">name</th><th data-col="team" data-filter="pick">team</th><th data-col="score" data-sort-type="num">score</th></tr>';
+  t.replaceChild(h, t.tHead); })(); null`);
+await sleep(100);
+await evaluate("window.resetTableView(document.querySelector('#mount table')); null");
+const theadBack = (await evaluate("window.order()")).join();
+await check("0.62.3 — a filtered table whose <thead> is replaced, then reset: every row is back", () => theadBack === "ada,grace,linus", theadBack);
+await evaluate(`document.getElementById("mount").replaceChildren(); null`);
+
+const parents = (dir) => { const out = []; while (dirname(dir) !== dir) { dir = dirname(dir); out.push(dir); } return out; };
 const DOM_PATCH = [process.env.DD_COCKPIT_DOM_PATCH, ...parents(root).map((dir) => join(dir, "danieldeusing-infra", "cockpit", "pages", "dom-patch.js"))]
   .find((path) => path && existsSync(path));
 if (!DOM_PATCH) {
@@ -1049,6 +1086,45 @@ if (!DOM_PATCH) {
   await check("...and the whole mount patched as mountShell draws it: the same pager, bar and table, one count after the pager, still page 2",
     () => shellMount === WHOLE_SHELL("21–40 of 46"), shellMount);
   await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
+  // 0.62.3: rows tied on the sort column hold their places through polls that change nothing. The patcher
+  // matches rows by position, so it moves CONTENT between nodes on a sorted table; a set rebuilt in node order
+  // then reshuffled the ties. 30 rows over 3 values, no filter, the same markup patched into the tbody 8 times:
+  // one digit per poll, 1 when the order on screen changed.
+  const tieRows = Array.from({ length: 30 }, (_, i) => ["t" + String(i).padStart(2, "0"), ["a", "b", "c"][i % 3], String(i)]);
+  const tieHtml = tieRows.map((r) => "<tr>" + r.map((v) => "<td>" + v + "</td>").join("") + "</tr>").join("");
+  await evaluate(`localStorage.clear(); window.build({ id: "ties", sortKey: "team", rows: ${JSON.stringify(tieRows)} }); null`);
+  await sleep(100);
+  const ties = await evaluate(`(async () => { let out = "", last = window.order().join();
+    for (let i = 0; i < 8; i += 1) { window.cockpitPatch(document.querySelector("#mount tbody"), ${JSON.stringify(tieHtml)});
+      await new Promise((r) => setTimeout(r, 30)); const now = window.order().join(); out += now === last ? "0" : "1"; last = now; }
+    return out; })()`);
+  await check("0.62.3 — 30 rows tied three ways on the sort column, the same markup patched into the tbody 8 times: the order never changes", () => ties === "00000000", ties);
+
+  // 0.62.3: `data-table-rows`, the renderer's count of the rows it wrote. 10 rows filtered to the 3 "core"
+  // ones; the renderer's set is now 3 records that were withheld, patched by position into the 3 shown
+  // nodes. Declared, the body is the set: 3 rows when the filter is cleared, each once. Undeclared, the
+  // engine cannot tell this from a page editing three cells, and keeps the 7 it holds (the documented ghosts).
+  const declRows = Array.from({ length: 10 }, (_, i) => ["d" + i, i < 3 ? "core" : "ops", String(i)]);
+  const declHtml = declRows.slice(5, 8).map((r) => "<tr>" + r.map((v) => "<td>" + v + "</td>").join("") + "</tr>").join("");
+  const declared = async (attr) => {
+    await evaluate(`localStorage.clear(); window.build({ id: "decl", rows: ${JSON.stringify(declRows)}${attr ? `, attrs: ' data-table-rows="10"'` : ""} }); window.pick("team", "core"); null`);
+    await sleep(50);
+    await evaluate(`(() => { const t = document.querySelector("#mount table"); ${attr ? 't.setAttribute("data-table-rows", "3");' : ""}
+      window.cockpitPatch(t.tBodies[0], ${JSON.stringify(declHtml)}); })(); null`);
+    await sleep(100);
+    await evaluate(`window.pick("team", "all"); null`);
+    await sleep(50);
+    const names = await evaluate("window.order()");
+    return JSON.stringify({ names: names.join(), dupes: names.length - new Set(names).size });
+  };
+  const withAttr = await declared(true);
+  const withoutAttr = await declared(false);
+  await check("0.62.3 — data-table-rows=\"3\" on a renderer's in-place rewrite of 3 shown rows: clearing the filter shows its 3 rows, each once",
+    () => withAttr === JSON.stringify({ names: "d5,d6,d7", dupes: 0 }), withAttr);
+  await check("...and without the attribute the engine keeps the 7 it held, duplicates included — the documented cost",
+    () => JSON.parse(withoutAttr).names.split(",").length === 10 && JSON.parse(withoutAttr).dupes === 3, withoutAttr);
+  await evaluate(`document.getElementById("mount").replaceChildren(); null`);
 
   // S3: a select named by a <label for> the renderer draws WITHOUT an id. An id written onto that label
   // is an attribute no markup carries, so the patcher, matching by id, never found the label again: it

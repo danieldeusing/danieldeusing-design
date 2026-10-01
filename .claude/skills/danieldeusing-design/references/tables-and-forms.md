@@ -473,10 +473,21 @@ clearing inserts the ones that come back, and the rows already showing stay wher
 
 **A page may write into a row the engine is showing** (0.62.3) — `cell.textContent`, a text node, a
 `data-value` — and it is an update of that row: the filter is applied again over the whole set,
-withheld rows included. The body is read as the new set only when a row was added, removed or
-moved in it, which is what a renderer that redraws the rows does. The one case that cannot be told
-apart: a renderer that rewrites the body in place with exactly as many rows as are showing keeps the
-withheld rows it no longer has until a later render changes the row count or the page resets.
+withheld rows included, and the rows showing keep the order the body has them in. The body is read as
+the new set when a row was added, removed or moved in it, which is what a renderer that redraws the
+rows usually does, or when the renderer says it wrote a different number of rows.
+
+**A renderer that patches rows in place declares its row count: `data-table-rows="N"`** on the
+`<table>`, set in the same task as the rows, where N is the number of rows it wrote into the tbody
+not counting detail rows (`data-row-for`). When N is not the number the engine holds, the body is
+read as the whole new set. Without it, one case cannot be told apart from a page editing cells: a
+renderer whose new set has exactly as many rows as are showing rewrites them in place and moves none,
+and the engine keeps the withheld rows it no longer has. Until a render whose row count differs —
+at most one poll on a page that polls, indefinitely on one that does not — those ghosts are counted
+("3 of 10 rows — 7 hidden by the filters"), offered in a pick menu, and shown again when the filter
+is cleared, where a record the renderer wrote into a shown row can then appear twice.
+`resetTableView()` does not clear them. `data-table-rows` is the cure; it is optional, and a table
+without it behaves exactly as described here.
 
 ### What the engine does besides (0.60.0 — cockpit's table, moved into the system)
 

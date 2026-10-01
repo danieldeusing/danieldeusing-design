@@ -118,6 +118,15 @@ bar, between the brand and the nav. Two sources, so it is an element, not a loca
   block reads as a caret waiting for input.
 - `.brand` stays 1rem / 700 on every surface — three sources had three sizes; the system's is the
   estate's existing one.
+- **On a phone the brand gives way; the controls do not** (0.62.4). A wordmark too long for the bar
+  stays on one line and shrinks: `.brand > .glow` ends in an ellipsis, and words written straight in
+  the `.brand` are clipped (bare text has no box an ellipsis can sit on), so write the `.glow` span.
+  Everything beside it gives way first, down to its own min-content (a wrapping nav wraps, a burger
+  keeps its 40px), so a wordmark that fits is never cut. Beside a centre band (a bar with no burger)
+  the band still gives way before the brand. Below 48rem only: on the desktop the ends take equal
+  shares, and no wordmark is that long. The clip spends 0.75rem of padding on the glow and takes it
+  back with a negative margin, so a wordmark that fits is never boxed in WebKit either, which has no
+  `overflow-clip-margin`.
 
 A bar written before the slots (brand, burger and nav as direct children) still lays out: the bar
 is `space-between`, and every slot rule keys on its own class.

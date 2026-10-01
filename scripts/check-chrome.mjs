@@ -253,6 +253,129 @@ await frames(2);
 const phoneBar = await page(`({ flex: T.cs(".bar-side", "flex"), brand: T.rect(".brand").height, bar: T.rect("header.bar").height })`);
 await check("…where the two ends take their own size again, so a hyphenated wordmark stays on one line",
   () => phoneBar.flex === "0 1 auto" && phoneBar.brand < 30, phoneBar);
+
+/* THE BRAND GIVES WAY ON A PHONE (0.62.4). A long wordmark beside the controls made the bar — and the
+   page — wider than a 320px phone (components.html's old 33-character wordmark and its nav: 332px).
+   The wordmark shrinks and truncates; the controls keep their size. Both shapes a page writes: the
+   documented `.bar-side > a.brand > .glow` (an ellipsis), and a `.brand` straight in the bar with its
+   words as bare text (clipped: bare text has no box to take an ellipsis). Then a brand that FITS
+   beside controls that must wrap to fit: the controls give way first and the brand is untouched. */
+const LONG_BRAND = "components.css — 0.60.0 revisions";
+const BAR_B = (brand, nav) => `<header class="bar" id="t-bar-b"><span class="brand glow">${brand}<span class="cursor-block" aria-hidden="true"></span></span>
+  <nav aria-label="t" id="t-nav-b">${nav}</nav></header>`;
+// components.html's own header, as it was when it measured 332px: its nav is a flex row.
+const NAV_B = `<style>#t-nav-b { display: flex; align-items: center; gap: 1rem; }</style>
+  <details class="dropdown"><summary><span class="visually-hidden">theme </span><span class="dd-dot" aria-hidden="true"></span><span>warm</span><span aria-hidden="true">▾</span></summary>
+  <ul class="dropdown-panel dropdown-panel--end"><li><button type="button" class="dropdown-item">warm</button></li></ul></details>
+  <button type="button" class="anim-toggle" aria-pressed="true"><span aria-hidden="true">[x]</span><span>anim</span></button>`;
+// How far the brand's own content reaches, clipped or not: a Range over it, which no overflow hides.
+const REACH = "((el) => { const r = document.createRange(); r.selectNodeContents(el); const b = r.getBoundingClientRect(); return b.right - el.getBoundingClientRect().left; })";
+const barFit = (bar) => `(() => { const h = document.querySelector(${JSON.stringify(bar)}), cs = getComputedStyle(h);
+  const inner = h.getBoundingClientRect().right - parseFloat(cs.paddingRight), kids = [...h.children].filter((k) => k.getClientRects().length);
+  return { sw: document.scrollingElement.scrollWidth, cw: document.documentElement.clientWidth,
+    overhang: +(Math.max(...kids.map((k) => k.getBoundingClientRect().right)) - inner).toFixed(2) }; })()`;
+await load("nobanner", { width: 320, height: 800 });
+const shortSide = await page(`T.rect(".bar-side ~ .bar-side").width`);
+await page(`document.querySelector(".brand .glow").textContent = ${JSON.stringify(LONG_BRAND)}; null`);
+await frames(2);
+const longA = { ...(await page(barFit("header.bar"))), ...(await page(`(() => { const g = T.q("header.bar .brand > .glow");
+  return { side: T.rect(".bar-side ~ .bar-side").width, cut: g.scrollWidth > g.clientWidth, ellipsis: T.cs(g, "textOverflow"), brand: T.rect("header.bar .brand").height }; })()`)) };
+await check(`a ${LONG_BRAND.length}-character wordmark in .bar-side > .brand > .glow at 320: the page does not scroll sideways and the bar's contents stay inside it`,
+  () => longA.sw <= longA.cw && longA.overhang <= 0.5, longA);
+await check("…the wordmark is what gives way, on one line, ending in an ellipsis; the controls keep the width they had beside a short one",
+  () => longA.cut && longA.ellipsis === "ellipsis" && longA.brand < 30 && near(longA.side, shortSide, 0.01), { ...longA, shortSide });
+const inject = (html) => page(`document.getElementById("t-bar-b")?.remove(); document.body.insertAdjacentHTML("afterbegin", ${JSON.stringify(html)}); null`);
+await inject(BAR_B(LONG_BRAND, NAV_B));
+await frames(2);
+const longB = { ...(await page(barFit("#t-bar-b"))), ...(await page(`(() => { const REACH = ${REACH}, b = T.q("#t-bar-b .brand");
+  return { box: b.getBoundingClientRect().width, words: REACH(b), overflow: T.cs(b, "overflowX") }; })()`)) };
+await check(`…and as bare words in a .brand straight in the bar, beside a menu and the anim toggle: the page does not scroll sideways, the bar's contents stay inside it, the wordmark is clipped`,
+  () => longB.sw <= longB.cw && longB.overhang <= 0.5 && longB.words > longB.box + 1 && longB.overflow === "clip", longB);
+await inject(BAR_B("components", NAV_B.replace(/<details[\s\S]*<\/details>/, "").replace("<span>anim</span>", "<span>animation and motion</span>")));
+await frames(2);
+const fitB = await page(`(() => { const REACH = ${REACH}, b = T.q("#t-bar-b .brand"), one = T.q("#t-nav-b .anim-toggle span:last-child");
+  return { brand: b.getBoundingClientRect().width, words: REACH(b), wrapped: one.getBoundingClientRect().height > 1.5 * parseFloat(getComputedStyle(one).fontSize) * 1.3 }; })()`);
+await check("…while a wordmark that fits keeps its whole width beside controls that wrap to fit: they give way first",
+  () => fitB.wrapped && fitB.brand >= fitB.words - 0.01, fitB);
+
+/* THE BAR AT 320, IN THE SHAPES PAGES SHIP (0.62.4, review round 1). What must hold in each: the
+   page never scrolls sideways and nothing overhangs the bar; no control is squashed below its own
+   min-content; a brand that fits stays whole; and if the brand is cut, every control is already at
+   its min-content — nothing else had anything left to give. A control's min-content is measured on
+   a copy of it laid out at `width: min-content` beside it; the overhang counts margins, because the
+   burger leans 0.3rem into the bar's padding on purpose. */
+const JUDGE = (bar, controls) => `(() => { const h = document.querySelector(${JSON.stringify(bar)}), cs = getComputedStyle(h);
+  const inner = h.getBoundingClientRect().right - parseFloat(cs.paddingRight), kids = [...h.children].filter((k) => k.getClientRects().length);
+  const minOf = (el) => { const c = el.cloneNode(true); c.removeAttribute("id"); c.style.cssText += ";position:absolute;visibility:hidden;inline-size:min-content;flex:none";
+    el.after(c); const w = c.getBoundingClientRect().width; c.remove(); return w; };
+  const glow = h.querySelector(".brand > .glow") || h.querySelector(".brand");
+  return { sw: document.scrollingElement.scrollWidth, cw: document.documentElement.clientWidth,
+    overhang: +(Math.max(...kids.map((k) => k.getBoundingClientRect().right + parseFloat(getComputedStyle(k).marginRight))) - inner).toFixed(2),
+    cut: glow.scrollWidth > glow.clientWidth + 0.5,
+    controls: [...h.querySelectorAll(${JSON.stringify(controls)})].filter((k) => k.getClientRects().length)
+      .map((k) => ({ el: k.tagName.toLowerCase() + "." + k.className, w: +k.getBoundingClientRect().width.toFixed(2), min: +minOf(k).toFixed(2) })) }; })()`;
+const holds = (j, { whole } = {}) => j.sw <= j.cw && j.overhang <= 0.5 && j.controls.length > 0
+  && j.controls.every((c) => c.w >= c.min - 0.5) && (!j.cut || j.controls.every((c) => c.w <= c.min + 0.5)) && (whole === undefined || j.cut !== whole);
+const BURGER = `<button type="button" class="nav-burger" aria-label="menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg></button>`;
+const shapes = [
+  ["(a) a wordmark that fits, beside a nav that wraps: the nav wraps, the wordmark stays whole", true,
+    `<header class="bar" id="t-bar-b"><div class="bar-side"><a class="brand" href="#"><span class="glow">danieldeusing-docs</span><span class="cursor-block" aria-hidden="true"></span></a></div>
+     <div class="bar-side"><nav aria-label="t" style="display: flex; flex-wrap: wrap; column-gap: 0.75rem"><a href="#">blog</a><a href="#">about</a><a href="#">rss</a></nav></div></header>`, "#t-bar-b nav"],
+  ["(b) a wordmark beside a search field: nothing overhangs, the field keeps its min-content", undefined,
+    `<header class="bar" id="t-bar-b"><div class="bar-side"><a class="brand" href="#"><span class="glow">danieldeusing</span><span class="cursor-block" aria-hidden="true"></span></a></div>
+     <div class="bar-side"><div class="search-field"><input type="search" aria-label="search" placeholder="search…"></div></div></header>`, "#t-bar-b .search-field"],
+  [`(c) a ${LONG_BRAND.length}-character wordmark and a burger in .bar-side wrappers: the wordmark is cut, the burger keeps its 40px`, false,
+    `<header class="bar" id="t-bar-b"><div class="bar-side"><a class="brand" href="#"><span class="glow">${LONG_BRAND}</span><span class="cursor-block" aria-hidden="true"></span></a></div>
+     <div class="bar-side">${BURGER}</div></header>`, "#t-bar-b .nav-burger"],
+  [`(c) …and as danieldeusing-family writes it, brand and burger straight in the bar`, false,
+    `<header class="bar" id="t-bar-b"><a class="brand" href="#"><span class="glow">${LONG_BRAND}</span><span class="cursor-block" aria-hidden="true"></span></a>${BURGER}</header>`, "#t-bar-b .nav-burger"],
+];
+await load("nobanner", { width: 320, height: 800 });
+for (const [label, whole, html, controls] of shapes) {
+  await inject(html);
+  await frames(2);
+  const j = await page(JUDGE("#t-bar-b", controls));
+  const burger = controls.endsWith("nav-burger") ? j.controls[0]?.w : null;
+  await check(`at 320, ${label}`, () => holds(j, { whole }) && (burger === null || near(burger, 39.59, 0.5)), j);
+}
+
+/* A WORDMARK THAT FITS IS NEVER BOXED. The clip that truncates a long one must leave the glow of a
+   short one alone, in an engine without `overflow-clip-margin` too (WebKit, so every iOS browser):
+   the run takes the property away (`overflow-clip-margin: 0`) and compares the bar's pixels with the
+   same bar unclipped (`overflow: visible`, and none of the padding the clip spends on the glow).
+   They must be identical, on the glowing themes. */
+for (const theme of ["green", "warm"]) {
+  await load("nobanner", { width: 375, height: 800 });
+  for (const [shape, html] of [[".bar-side > .brand > .glow", null],
+    ["words straight in a .brand", BAR_B("components", NAV_B)]]) {
+    if (html) await inject(html);
+    const bar = html ? "#t-bar-b" : "header.bar";
+    await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)};
+      document.head.insertAdjacentHTML("beforeend", "<style id='t-still'>*, *::before, *::after { animation: none !important; transition: none !important; overflow-clip-margin: 0px !important; }</style>"); null`);
+    await frames(3);
+    const box = await page(`(() => { const r = document.querySelector(${JSON.stringify(bar)}).getBoundingClientRect(); return { x: 0, y: r.top, width: 375, height: r.height }; })()`);
+    // The page settles for a while after load (fonts, the rail, observers): a shot counts once the
+    // next one, three frames later, is the same picture.
+    const shot = async () => {
+      let last = null;
+      for (let i = 0; i < 40; i += 1) {
+        const now = (await send("Page.captureScreenshot", { format: "png", clip: { ...box, scale: 1 }, captureBeyondViewport: false })).data;
+        if (now === last) return now;
+        last = now;
+        await frames(3);
+      }
+      throw new Error("the bar never stopped changing");
+    };
+    const clipped = await shot();
+    await page(`document.head.insertAdjacentHTML("beforeend", "<style id='t-open'>header.bar .brand, header.bar .brand > .glow { overflow: visible !important; padding: 0 !important; margin: 0 !important; }</style>"); null`);
+    await frames(3);
+    const open = await shot();
+    await page(`document.getElementById("t-open").remove(); document.getElementById("t-still").remove(); document.getElementById("t-bar-b")?.remove(); null`);
+    await check(`a wordmark that fits (${shape}, ${theme}, 375) paints exactly as it does unclipped, with no overflow-clip-margin to lean on`,
+      () => clipped === open, "the clip cuts the glow");
+  }
+}
+await load("nobanner");
 await load("nobanner");
 const app = await page(`({ h: T.rect("#app-bar").height, pos: T.cs("#app-bar", "position"), pl: T.cs("#app-bar", "paddingLeft"),
   anim: T.cs(".cursor-block--static", "animationName"), status: T.cs(".bar-status", "color"), muted: T.colour("var(--muted-foreground)") })`);

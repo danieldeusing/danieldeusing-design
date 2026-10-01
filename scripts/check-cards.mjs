@@ -911,7 +911,7 @@ await check("no text sits straight in a .panel-head on the demo (it would take t
     .filter((n) => n.nodeType === 3 && n.textContent.trim()).map((n) => "bare text in a panel head: " + n.textContent.trim().slice(0, 30)))`));
 await check("aria-selected on the demo sits only on roles that support it (option, row, gridcell, tab, treeitem)", () => evaluate(`
   [...document.querySelectorAll("[aria-selected]")].filter((el) => !["option", "row", "gridcell", "tab", "treeitem", "columnheader", "rowheader"].includes(el.getAttribute("role")))
-    .map((el) => el.tagName.toLowerCase() + "." + el.className + ' carries aria-selected with role "' + el.getAttribute("role") + '"')`));
+    .map((el) => el.tagName.toLowerCase() + (typeof el.className === "string" && el.className ? "." + el.className : "") + ' carries aria-selected with role "' + el.getAttribute("role") + '"')`));
 await check("no glyph in this file's components carries a colour of its own — it takes its parent's (icons.md)", () => evaluate(`
   [...document.querySelectorAll(":is(.panel-head, .tree-row, .stat-tile, .pane-collapsed, .card-head, .card-foot, .list-row, .console) .ico")]
     .filter((el) => getComputedStyle(el).color !== getComputedStyle(el.parentElement).color || el.style.color)

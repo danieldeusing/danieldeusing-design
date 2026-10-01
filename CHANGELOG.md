@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.62.4 (2026-10-01)
 
 ### Fixed
 
@@ -19,18 +19,78 @@ All notable changes to this project are documented here. The format follows
   document first: focus in the page's box, its action or the engine's box fell to `<body>`. It is
   given back to the same control, without scrolling, and a text box keeps its caret. A table detached
   and inserted again draws a new engine box; that box takes the focus and the caret, unless the reader
-  clicked, pressed a key, scrolled or moved focus in between, or focus is somewhere else when the table returns.
-  A pager whose table leaves the document forgets what held focus in it.
+  clicked, pressed a key, scrolled or moved focus in between, or focus is somewhere else when the
+  table returns. A pager whose table leaves the document forgets what held focus in it.
 - **Giving focus back does not scroll the page.** The focus goes back once every move of the batch
   has landed. Given back halfway, Chromium and Firefox anchored the scroll on the focused box in a
   half-moved page. With the table's mount at the top of the viewport and text in the box, the page
   jumped 10px (the 0.6rem block gap the bar carried while the old mount still held the count).
+- **An open dropdown no longer pushes a phone page sideways or runs off its edge.** A
+  `.dropdown-panel--down` hangs from its `<details>`' left edge, so a menu near the right of a 320px
+  or 375px screen ran past it (components.html: the history menu to 352px at 320, the disclosure
+  panel to 447px at 375) and the page scrolled sideways while it was open. `initDropdowns()` now
+  moves an open panel that crosses either edge of the viewport back inside it, 8px clear, by `left`
+  with its width pinned (a `translate` brought the panel back but left the page scrolling: Chrome kept
+  the old box in the scrollable overflow). The move is written `!important`, so `.ls-panel`'s
+  `left: auto !important` cannot drop the panel to its static place (which widened the page to 378px
+  at 320); it is measured in the panel's own px, so a `transform: scale()` above it is allowed for;
+  a patcher that drops the `style` while the menu is open (cockpit's `cockpitPatch`) has the move
+  written again; and an inline `left`, `right` or `inline-size` the page had on the panel comes back
+  when it closes. A panel that fits is not touched, and a panel placed by script (`position: fixed`,
+  a table header's filter) is left to that script. `.dropdown-panel` is also capped at
+  `max-inline-size: calc(100vw - 16px)`, so a panel wider than the phone is narrowed first. Measured
+  on every example, 145 menus at 320, 375 and 1280: only those two panels moved. Known limit: a moved
+  panel keeps the width it opened with if its content changes while it is open.
+- **A long wordmark no longer widens a phone page: the brand gives way** (below 48rem). The bar does
+  not wrap, so components.html's old 33-character wordmark and its nav made the page 332px wide at
+  320. The wordmark now stays on one line and shrinks: `.brand > .glow` ends in an ellipsis, words
+  written straight in a `.brand` are clipped (bare text has no box to carry one). The clip spends
+  0.75rem of padding on the glow and takes it back with an equal negative margin, so a wordmark that
+  fits is never boxed, in WebKit too, which has no `overflow-clip-margin` (every iOS browser). The
+  controls give way first, down to their own min-content, and the brand only for what is left: a
+  wrapping nav wraps beside a "danieldeusing-docs" that fits, instead of the wordmark becoming "d…".
+  Beside a centre band with no burger the band still gives way first. Every example and template is
+  pixel-identical at 320, 375 and 1280 in all four themes where the wordmark fits; it changed where it
+  did not: chrome.html's `.bar--app` demo at 320 (its contents ran 49px past the bar; now "c…") and
+  components.html at 320 on green and paper (its nav ran 0.86px past the bar's padding).
+- **An icon button keeps its icon's width when squeezed.** reset.css's `svg { max-width: 100% }`
+  makes an inline svg's min-content zero, so a `.nav-burger` beside a long wordmark fell from 40px to
+  its 18px of padding with the icon spilling out (danieldeusing-family's header, in all three
+  engines). `.nav-burger > svg` and `.btn-icon > svg` take `max-inline-size: none`.
+- **filters.html calls `initTableScroll()`.** Under a finger the table-tools table's header buttons
+  grow to 44px and the table is 449px wide; with no `.tablewrap` around it the page scrolled
+  sideways on a touch phone (Chromium widens the layout viewport instead: innerWidth 478 at 375).
 
 ### Checks
 
 - **Two tables, each with its own page bar, the first one moved.** A guard (0.62.3 passes it): a
   `barToBring()` that looked past a page bar as it looks past a pager or a count left the moved table's
   bar in front of its neighbour's and drew an engine bar at the new place; the check fails on that.
+- **check-filters opens every menu, one at a time, and measures every phone width with a finger
+  too.** Every drawn `<details>` (dropdowns, table-header filters, mobile disclosures, folds) and
+  every `.select-trigger`, on the page, behind each burger toggle and in each dialog, at 320 and
+  375 (mouse and touch) and 1280: the page may not get wider than the viewport while one is open and
+  a floating panel must lie inside it. Each page reports how many it opened, and a page holding menus
+  that opened none fails. The closed-page sweep runs under touch as well, asserts
+  `(pointer: coarse)` matches only when touch is emulated, and fails a layout viewport wider than the
+  emulated width. Plus a panel wider than the phone, injected. All fail on 0.62.3.
+- **check-chrome: a 33-character wordmark at 320** in both brand shapes (fits, one line, ellipsis or
+  clip, controls unchanged) and a fitting wordmark beside controls that must wrap (untouched); the
+  bar shapes pages ship, at 320 (a fitting wordmark beside a wrapping nav, beside a search field, and
+  a long one beside a burger in `.bar-side` wrappers and straight in the bar), each judged on: no
+  sideways scroll, no control below its own min-content, a fitting brand whole, a cut brand only once
+  every control is at its min-content; and a fitting wordmark painting exactly as it does unclipped
+  with `overflow-clip-margin` taken away, on green and warm.
+- **check-dropdown: where a moved panel lands, on a 320px page with the real stylesheets** — an
+  `.ls-panel`, a panel with inline styles of its own (restored on close), one under
+  `transform: scale(0.5)`, and one cockpit's patcher strips while it is open.
+- **check-release-gate resolves `.` and `..` before it judges a borrowed path.** `DD_TAILWIND_NODE`,
+  `DD_MERMAID` and `DD_LUCIDE_REACT` were matched by prefix, so
+  `${{ runner.temp }}/tailwind/node_modules/../../elsewhere` passed. The runner's temp directory is
+  now one opaque root and the path is normalised first; a `..` that climbs out fails, and so does a
+  path written `$RUNNER_TEMP/…`, which a step's `env:` does not expand.
+- **check-cards names an SVG element in a diagnostic** instead of printing
+  `[object SVGAnimatedString]` for its class, as the file's `WIDE` helper already did.
 
 ## 0.62.3 (2026-10-01)
 

@@ -2169,19 +2169,130 @@ const OVERFLOW = `(() => {
   const name = (el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\\s+/).join(".") : "") + " (right edge " + Math.round(el.getBoundingClientRect().right) + ")";
   return { sw, cw, offenders: past.filter((el) => !past.some((o) => o !== el && o.contains(el))).slice(0, 4).map(name) };
 })()`;
+// AND ON A TOUCH PHONE (0.62.4). A coarse pointer grows every header sort and filter button to 44px
+// (data.css), so a table that fits under a mouse can be 449px wide under a finger — and Chromium,
+// emulating a touch phone, then WIDENS THE LAYOUT VIEWPORT to the content (innerWidth 478 at 375)
+// rather than scrolling, so scrollWidth and clientWidth agree and the page reads as fitting. Each
+// width is therefore measured twice, with a mouse and with touch; the run asserts the pointer it
+// meant to emulate (`pointer: coarse` matches only under touch), and that innerWidth is the width
+// emulated, which is exactly where the widened viewport shows.
+const phone = async (width, touch, path) => {
+  await send("Emulation.setDeviceMetricsOverride", { width, height: 800, deviceScaleFactor: 1, mobile: width < 768 });
+  await send("Emulation.setTouchEmulationEnabled", touch ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+  await open(path, "true");
+  await sleep(250);
+  const { coarse, iw, cw } = await evaluate(`({ coarse: matchMedia("(pointer: coarse)").matches, iw: innerWidth, cw: document.documentElement.clientWidth })`);
+  const where = `${width}px ${touch ? "touch" : "mouse"}`, wrong = [];
+  if (coarse !== touch) wrong.push(`${where}: (pointer: coarse) is ${coarse}: the pointer was not emulated and this measured nothing`);
+  // A page with no viewport meta lays out at 980 whatever is emulated, and then "fits" trivially.
+  // (A desktop's classic scrollbar takes its 15px out of clientWidth; a phone's overlays the page.)
+  if (width < 768 ? cw !== width : cw > width || cw < width - 20) wrong.push(`${where}: the viewport is ${cw}px wide, not ${width}: the page has no <meta name="viewport"> and this measured nothing`);
+  if (iw !== width) wrong.push(`${where}: the layout viewport widened to ${iw}px to hold the page: it is wider than the ${width}px screen`);
+  return { where, wrong };
+};
 for (const page of pages) {
   const wrong = [];
-  for (const width of [320, 375]) {
-    await send("Emulation.setDeviceMetricsOverride", { width, height: 800, deviceScaleFactor: 1, mobile: true });
-    await open(`/examples/${page}`, "true");
-    await sleep(250);
+  for (const width of [320, 375]) for (const touch of [false, true]) {
+    const at = await phone(width, touch, `/examples/${page}`);
+    wrong.push(...at.wrong);
     const { sw, cw, offenders } = await evaluate(OVERFLOW);
-    // A page with no viewport meta lays out at 980 whatever is emulated, and then "fits" trivially.
-    if (cw !== width) wrong.push(`${width}px: the viewport is ${cw}px wide, not ${width}: the page has no <meta name="viewport"> and this measured nothing`);
-    if (sw > cw) wrong.push(`${width}px: the page is ${sw}px wide in a ${cw}px viewport; overflowing the page itself: ${offenders.join(", ") || "(none found)"}`);
+    if (sw > cw) wrong.push(`${at.where}: the page is ${sw}px wide in a ${cw}px viewport; overflowing the page itself: ${offenders.join(", ") || "(none found)"}`);
   }
-  await check(`examples/${page}: the page does not scroll sideways at 320px or 375px`, () => wrong.length === 0, () => wrong.join(" | "));
+  await check(`examples/${page}: the page does not scroll sideways at 320px or 375px, with a mouse or a finger`, () => wrong.length === 0, () => wrong.join(" | "));
 }
+
+// AN OPEN MENU DOES NOT PUSH THE PAGE SIDEWAYS EITHER (0.62.4). The sweep above measures every menu
+// CLOSED, and a closed panel is not drawn. Here each one is opened, one at a time: every <details>
+// whose summary is drawn (a dropdown, a table header's filter, a mobile disclosure, a fold), every
+// `.select-trigger` (the select-field and filter dropdown listboxes, the sort control's field), on
+// the page, behind each burger toggle, and in each dialog opened. While it is open the page must not
+// be wider than the viewport, and a floating panel must lie inside it: a panel clipped off the edge
+// is as unreadable as a page that scrolls. Each page reports how many it opened and how many the
+// DOM holds, because "nothing wrong" on a page that opened nothing is not a pass.
+const MENUS = `(async () => {
+  const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const shown = (el) => el.getClientRects().length && getComputedStyle(el).visibility !== "hidden";
+  const name = (el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\\s+/).join(".") : "");
+  const cw = () => document.documentElement.clientWidth;
+  const out = [], seen = new Set();
+  let opened = 0;
+  const measure = (what, panel) => {
+    opened += 1;
+    const sw = document.scrollingElement.scrollWidth;
+    if (sw > cw()) out.push(what + ": the page is " + sw + "px wide in a " + cw() + "px viewport while it is open");
+    if (panel === null) { out.push(what + ": no panel showed"); return; }
+    const r = panel?.getBoundingClientRect();
+    if (r && (r.left < -0.5 || r.right > cw() + 0.5)) out.push(what + ": its panel " + name(panel) + " spans " + Math.round(r.left) + " to " + Math.round(r.right) + ", outside the " + cw() + "px viewport");
+  };
+  // The panel of a <details> that floats; an in-flow one (a fold, the mobile footer's) has none, and
+  // only the page width is asked of it.
+  const floating = (d) => [...d.children].find((c) => c.tagName !== "SUMMARY" && /absolute|fixed/.test(getComputedStyle(c).position));
+  const sweep = async (root) => {
+    for (const d of [...root.querySelectorAll("details")]) {
+      const s = d.querySelector(":scope > summary");
+      if (seen.has(d) || !s || !shown(s) || d.open) continue;
+      seen.add(d);
+      s.scrollIntoView({ block: "center", inline: "nearest" });
+      s.click(); await frame();
+      measure("details " + name(d) + " '" + s.textContent.trim().slice(0, 20) + "'", floating(d));
+      d.open = false; await frame();
+    }
+    for (const t of [...root.querySelectorAll(".select-trigger")]) {
+      if (seen.has(t) || !shown(t) || t.disabled) continue;
+      seen.add(t);
+      t.scrollIntoView({ block: "center", inline: "nearest" });
+      t.click(); await frame();
+      const p = [...document.querySelectorAll(".select-panel")].find(shown);
+      measure("select-trigger '" + t.textContent.trim().slice(0, 20) + "'", p || null);
+      if (p) { t.click(); await frame(); }
+    }
+  };
+  await sweep(document);
+  for (const toggle of [...document.querySelectorAll("[data-nav-toggle]")].filter(shown)) {
+    toggle.click(); await frame(); await sweep(document); toggle.click(); await frame();
+  }
+  for (const dialog of [...document.querySelectorAll("dialog")]) {
+    if (!dialog.open) dialog.showModal(); await frame();
+    await sweep(dialog); dialog.close(); await frame();
+  }
+  scrollTo(0, 0);
+  return { out, opened, held: document.querySelectorAll("details, .select-trigger").length };
+})()`;
+for (const page of pages) {
+  const wrong = [], counts = [];
+  for (const [width, touch] of [[320, false], [320, true], [375, false], [375, true], [1280, false]]) {
+    const at = await phone(width, touch, `/examples/${page}`);
+    wrong.push(...at.wrong);
+    const { out, opened, held } = await evaluate(MENUS);
+    counts.push(`${opened} at ${at.where}`);
+    if (held && !opened) wrong.push(`${at.where}: the page holds ${held} menus and the sweep opened none`);
+    wrong.push(...out.map((r) => `${at.where}: ${r}`));
+    // The layout viewport widening while a menu is open is the same overflow, read the touch way.
+    const iw = await evaluate("innerWidth");
+    if (iw !== width) wrong.push(`${at.where}: the layout viewport ended ${iw}px wide after the menus were opened`);
+  }
+  await check(`examples/${page}: no menu opened one at a time pushes the page sideways or runs off the screen at 320 and 375 (mouse and touch) or 1280 (opened ${counts.join(", ")})`,
+    () => wrong.length === 0, () => wrong.join(" | "));
+}
+await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+// A panel WIDER than the phone: shifting it cannot make it fit, so components.css caps its width and
+// the runtime then moves it in. A word no line can break makes the panel as wide as it is.
+await send("Emulation.setDeviceMetricsOverride", { width: 320, height: 800, deviceScaleFactor: 1, mobile: true });
+await open("/examples/components.html", "true");
+const wide = await evaluate(`(async () => {
+  const d = document.createElement("details");
+  d.className = "dropdown";
+  d.innerHTML = '<summary>wide</summary><ul class="dropdown-panel dropdown-panel--down"><li><button type="button" class="dropdown-item">' + "w".repeat(80) + '</button></li></ul>';
+  document.querySelector("main, body").prepend(d);
+  d.querySelector("summary").click();
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const r = d.querySelector(".dropdown-panel").getBoundingClientRect();
+  const out = { left: Math.round(r.left), right: Math.round(r.right), sw: document.scrollingElement.scrollWidth, cw: document.documentElement.clientWidth };
+  d.remove();
+  return out;
+})()`);
+await check("a dropdown panel wider than a 320px phone is capped and moved inside it, and the page does not scroll sideways",
+  () => wide.left >= 0 && wide.right <= wide.cw && wide.sw <= wide.cw, JSON.stringify(wide));
 
 /* ═══ 0.62.1 — a dialog's toolbar sits on its body, and the two layouts the filter rule missed ════
    Cockpit's logs drawer, twice. Its fixed form was flagged by findFlushBlocks(): overlays.css draws

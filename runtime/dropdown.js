@@ -314,6 +314,74 @@ function closeAll(except) {
   }
 }
 
+/*
+ * A PANEL STAYS ON THE SCREEN (0.62.4). components.css places a panel against its <details> — under
+ * it from the left edge (`--down`), or from the right (the default and `--end`) — and only the page
+ * knows where the <details> sits. A `--down` menu near the right edge of a phone ran past it: the
+ * page scrolled sideways and the panel's end was off the screen. Once open, a panel crossing either
+ * edge of the viewport is moved back inside it, `EDGE` px clear, as positionPopup() keeps a list; one
+ * that fits is left exactly where the stylesheet put it, so nothing that fits ever moves. A panel
+ * something else places (`position: fixed`, written inline by positionPopup() for a table header's
+ * filter) is left to that, and this runs a frame after the toggle so that placement has happened.
+ *
+ * Moved by `left`, not `translate`: Chrome kept a translated panel's old box in the page's scrollable
+ * overflow, so the panel came back on screen and the page went on scrolling sideways (measured:
+ * scrollWidth 447 in a 375px viewport with the panel at 182-367). Its width is pinned first, because
+ * an absolute box's shrink-to-fit width depends on its offsets; a panel whose content changes while
+ * it is open keeps that width until it is opened again. The width cap that keeps a panel narrower
+ * than the screen is components.css's.
+ *
+ * Written `!important`, because a stylesheet may pin a side that way (chrome.css's
+ * `.dropdown-panel.ls-panel { left: auto !important }`), and a `left` that loses leaves `right: auto`
+ * to drop the panel to its static place. Whatever the author had inline on those properties is kept
+ * and put back when the panel closes. Measured against the panel's own scale (its rect over its
+ * layout width), which is the root's zoom times any `transform: scale()` above it: a rect is visual
+ * px, `left` is the containing block's own px. And a renderer that patches attributes (cockpit's
+ * `cockpitPatch`) drops a `style` its markup does not carry, so while a moved panel is open its
+ * `style` is watched and the move written again.
+ */
+const EDGE = 8;
+const PLACED = ["left", "right", "inline-size"];
+const moves = new WeakMap(); // panel -> { kept, wrote, observer }
+
+function writeMove(panel, { wrote }) {
+  for (const [prop, value] of Object.entries(wrote))
+    if (panel.style.getPropertyValue(prop) !== value || panel.style.getPropertyPriority(prop) !== "important")
+      panel.style.setProperty(prop, value, "important");
+}
+
+function unmove(panel) {
+  const move = moves.get(panel);
+  if (!move) return;
+  moves.delete(panel);
+  move.observer.disconnect();
+  for (const [prop, value, priority] of move.kept)
+    if (value) panel.style.setProperty(prop, value, priority);
+    else panel.style.removeProperty(prop);
+}
+
+function keepOnScreen(details) {
+  const panel = panelOf(details);
+  if (!panel) return;
+  unmove(panel);
+  if (!details.open) return;
+  const style = getComputedStyle(panel);
+  if (style.position !== "absolute") return;
+  const { left, right, width } = panel.getBoundingClientRect();
+  const dx = left < EDGE ? EDGE - left : Math.min(0, document.documentElement.clientWidth - EDGE - right);
+  const layoutWidth = parseFloat(style.inlineSize);
+  if (!dx || !layoutWidth) return;
+  const scale = width / layoutWidth;
+  const move = {
+    kept: PLACED.map((prop) => [prop, panel.style.getPropertyValue(prop), panel.style.getPropertyPriority(prop)]),
+    wrote: { "inline-size": style.inlineSize, left: `${parseFloat(style.left) + dx / scale}px`, right: "auto" },
+  };
+  move.observer = new MutationObserver(() => writeMove(panel, move));
+  moves.set(panel, move);
+  writeMove(panel, move);
+  move.observer.observe(panel, { attributes: true, attributeFilter: ["style"] });
+}
+
 function onToggle(event) {
   const details = event.target;
   if (!(details instanceof HTMLDetailsElement) || !details.classList.contains("dropdown")) return;
@@ -321,6 +389,8 @@ function onToggle(event) {
   const summary = summaryOf(details);
   if (summary?.hasAttribute("aria-haspopup")) set(summary, "aria-expanded", String(details.open));
   if (details.open) closeAll(details);
+  if (details.open) requestAnimationFrame(() => keepOnScreen(details));
+  else keepOnScreen(details);
 }
 
 /* APG menu button: Enter, Space and ArrowDown open onto the first item, ArrowUp onto the last.
@@ -435,6 +505,7 @@ export function initDropdowns(root = document) {
     document.addEventListener("toggle", onToggle, true);
     document.addEventListener("click", onClick);
     document.addEventListener("keydown", onKeydown);
+    addEventListener("resize", () => { for (const details of document.querySelectorAll("details.dropdown[open]")) keepOnScreen(details); });
     // Attributes too: a renderer that patches attributes (cockpit's cockpitPatch) strips the ones
     // no markup carries — the menu roles, tabindex="-1", the summary's aria-* — and a menu stripped
     // mid-read is a list of loose buttons in the tab order. Re-marking puts back exactly those.

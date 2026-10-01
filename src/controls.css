@@ -91,7 +91,9 @@
   -webkit-mask: var(--ico) center / contain no-repeat;
   mask: var(--ico) center / contain no-repeat;
 }
-.btn-icon > svg { inline-size: var(--icon-size); block-size: var(--icon-size); }
+/* `max-inline-size: none` (0.62.4): reset.css's `max-width: 100%` on every svg makes its min-content
+   zero, so a squeezed icon button had no floor and fell to its border, the icon spilling out. */
+.btn-icon > svg { inline-size: var(--icon-size); block-size: var(--icon-size); max-inline-size: none; }
 
 /* Hover and open are one look: the edge takes the glyph's colour and a 12% wash of it fills the box.
    PRESSED IS NOT THAT LOOK (the lead's ruling on the WP5 review): it is solid, below. A pressed toggle

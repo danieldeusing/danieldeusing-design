@@ -1,4 +1,4 @@
-// VENDORED — danieldeusing-infra cockpit/pages/dom-patch.js at 4547845 (2026-08-21), byte for byte below the
+// VENDORED — danieldeusing-infra cockpit/pages/dom-patch.js at ad44527 (2026-09-30), byte for byte below the
 // marker. The design repo's CI has no infra checkout, and four suites drive the runtime against this
 // patcher (check-dropdown, -tabs, -tabletools, -chrome), so CI points DD_COCKPIT_DOM_PATCH here and
 // sets DD_REQUIRE_COCKPIT_DOM_PATCH=1: that section cannot skip where the release is gated. A local
@@ -33,7 +33,7 @@
 // A CLASSIC SCRIPT, not a module, and loaded in <head> rather than beside portal.js at the end of
 // <body>. Pages call this from their own inline <script> blocks, which run during parse; a
 // deferred module runs after them, so `cockpitPatch` would be undefined at exactly the moment the
-// first render needs it. That is the same trap `__cockpitTicks` works around with a plain array —
+// first render needs it. That is the same trap `__ddTicks` works around with a plain array —
 // here the handshake is "be there first" instead.
 (() => {
   // One reused parser. A <template> rather than a <div> because table fragments are the common
@@ -45,7 +45,14 @@
   // An explicit identity, never a guess. Position is the right answer for a list that is rebuilt
   // in the same order (which is nearly all of them here), so a key is only asked for where a row
   // can genuinely move: `id`, or a `data-key` the markup opts into.
-  const keyOf = (el) => el.id || el.getAttribute("data-key") || null;
+  //
+  // An id the design RUNTIME assigned is not an identity the renderer gave: `initDropdowns()` names
+  // an unnamed menu summary and label `dd-menu-*` (design 0.60.0). Keyed on it, the summary and its
+  // panel matched nothing in the renderer's markup and were rebuilt on every patch, dropping focus
+  // to <body>. So a runtime id is no key; a renderer that re-renders a menu gives the summary and
+  // each `.dropdown-label` ids of its own (components.md).
+  const RUNTIME_ID = /^dd-menu-/;
+  const keyOf = (el) => (el.id && !RUNTIME_ID.test(el.id) ? el.id : null) || el.getAttribute("data-key") || null;
 
   const sameKind = (a, b) => a.nodeType === b.nodeType && (a.nodeType !== 1 || a.tagName === b.tagName);
 
@@ -90,11 +97,20 @@
   // means the patcher descends into it and never walks the wrapper's other children, so the
   // trigger and the open panel are not merely preserved — they are never visited.
   const SELECT_WRAP = "select-field";
-  const wrappedSelect = (el) =>
+  const selectIn = (el) =>
     el && el.nodeType === 1 && el.tagName === "SPAN" && el.classList.contains(SELECT_WRAP) &&
     el.firstElementChild && el.firstElementChild.tagName === "SELECT"
       ? el.firstElementChild
       : null;
+  // …and one more level for a FILTER (design 0.60.0): `select[data-filter]` is enhanced into
+  // `span.filter-dd.btn-group` > `span.select-field` > select + trigger, with the clear button a
+  // sibling of the field. The group is a slot for the select two levels down, exactly as the field
+  // is one level down; without it the stats tab's repository picker was replaced on every patch, and
+  // a patch landing while its list was open took the list with it mid-click.
+  const FILTER_WRAP = "filter-dd";
+  const wrappedSelect = (el) =>
+    selectIn(el) ||
+    (el && el.nodeType === 1 && el.tagName === "SPAN" && el.classList.contains(FILTER_WRAP) ? selectIn(el.firstElementChild) : null);
 
   // `tabindex` and `aria-hidden` on a wrapped select are the RUNTIME's, not the renderer's:
   // `enhance()` sets them to take the real control out of the tab order and hide it from assistive
@@ -109,10 +125,16 @@
   // owns that div in its markup, so without this the loop below would strip the attribute on every
   // poll — the fades would vanish and not come back until the reader happened to scroll or resize,
   // which is precisely when they are least useful.
+  //
+  // A MENU's roles, roving tabindex and popup state are the runtime's too (design 0.60.0), and they
+  // need no exemption here: `initDropdowns()` re-asserts them the moment a patch strips them, which
+  // bin/cockpit-dom-check measures (same nodes, same focus). Its `dd-menu-*` ids are the exception,
+  // because an id is also a KEY to this file.
   const runtimeOwnsAttribute = (el, name) =>
     (el.tagName === "SELECT" && (name === "tabindex" || name === "aria-hidden") &&
       el.parentElement && el.parentElement.classList.contains(SELECT_WRAP)) ||
-    (name === "data-scroll" && el.classList.contains(TABLE_WRAP));
+    (name === "data-scroll" && el.classList.contains(TABLE_WRAP)) ||
+    (name === "id" && RUNTIME_ID.test(el.id));
 
   // The wrapper has no id and no data-key of its own — the runtime sets only a class — so a keyed
   // table (or select) keeps its identity through the wrapper rather than losing it and being
@@ -131,6 +153,13 @@
     if (next.tagName === "SELECT") return wrappedSelect(el) || el;
     return el;
   };
+
+  // The engine's "no rows" / "nothing matches" row (design 0.60.0, `tr[data-table-placeholder]`) is
+  // the RUNTIME's and never a renderer's, so it is never patched into a data row: it is replaced.
+  // Reused, it lost the incoming row — the engine keeps a reference to its placeholder and removes
+  // it on the next apply, by then holding the first row of the poll (bin/cockpit-dom-check 3b: a
+  // table filtered to nothing, polled with a match in first place, showed no match).
+  const isPlaceholderRow = (el) => el.nodeType === 1 && el.tagName === "TR" && el.hasAttribute("data-table-placeholder");
 
   function patchAttributes(oldEl, newEl) {
     for (const { name, value } of newEl.attributes) {
@@ -177,7 +206,7 @@
       if (key) {
         const candidate = keyed.get(key);
         if (candidate && sameKind(slotFor(candidate, next), next)) { match = candidate; keyed.delete(key); }
-      } else if (cursor && sameKind(slotFor(cursor, next), next) && !(cursor.nodeType === 1 && keyOfSlot(cursor))) {
+      } else if (cursor && sameKind(slotFor(cursor, next), next) && !(cursor.nodeType === 1 && keyOfSlot(cursor)) && !isPlaceholderRow(cursor)) {
         match = cursor;
       }
       if (match) {

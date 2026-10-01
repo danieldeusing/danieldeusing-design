@@ -55,6 +55,9 @@ const FLAGS = [
   ["DD_FORBID_STANDINS", /^\s*DD_FORBID_STANDINS:\s*"1"\s*$/m, "a stand-in in force would be a note, not a failure"],
   ["DD_REQUIRE_LUCIDE", /^\s*DD_REQUIRE_LUCIDE:\s*"1"\s*$/m, "check-icons' drawing comparison would skip"],
   ["DD_LUCIDE_REACT", /^\s*DD_LUCIDE_REACT:\s*\S+/m, "a runner has no lucide-react of its own to compare with"],
+  ["DD_REQUIRE_TAILWIND", /^\s*DD_REQUIRE_TAILWIND:\s*"1"\s*$/m, "check-tailwind-layers' browser half would skip on a runner with no Tailwind, and the cascade go unproved"],
+  ["DD_TAILWIND_NODE", /^\s*DD_TAILWIND_NODE:\s*\S+/m, "a runner has no @tailwindcss/node of its own to compile with"],
+  ["DD_MERMAID", /^\s*DD_MERMAID:\s*\S+/m, "check-integration would load mermaid from jsDelivr, and a CDN outage would fail a release"],
   ["DD_REQUIRE_COCKPIT_DOM_PATCH", /^\s*DD_REQUIRE_COCKPIT_DOM_PATCH:\s*"1"\s*$/m, "the cockpit patcher sections would skip"],
   ["DD_COCKPIT_DOM_PATCH", /^\s*DD_COCKPIT_DOM_PATCH:\s*\S+/m, "a runner has no infra checkout to find the patcher in"],
 ];
@@ -78,10 +81,14 @@ const gate = (name, text, required, before = Infinity) => {
     const path = (step.env.match(/^\s*DD_COCKPIT_DOM_PATCH:\s*"?(.*?)"?\s*$/m) || [])[1];
     if (path && !existsSync(path.replace(/^\$\{\{\s*github\.workspace\s*\}\}\//, ""))) fail(`${name}: DD_COCKPIT_DOM_PATCH points at ${path}, which is not in the repository`);
   }
-  // The lucide-react DD_LUCIDE_REACT names is installed by an earlier step of the same job.
-  if (!/npm install[^\n]*--prefix "\$RUNNER_TEMP\/lucide"[^\n]*lucide-react@\d/.test(text.slice(0, Math.min(before, text.length)))) {
-    fail(`${name}: nothing installs lucide-react into $RUNNER_TEMP/lucide for DD_LUCIDE_REACT`);
-  } else pass(`${name}: lucide-react is installed for check-icons before the suites run`);
+  // What each borrowed-package flag names is installed by an earlier step of the same job, at an
+  // exact version, into the directory the flag points at.
+  const earlier = text.slice(0, Math.min(before, text.length));
+  for (const [what, dir, pkg] of [["lucide-react", "lucide", "lucide-react"], ["@tailwindcss/node", "tailwind", "@tailwindcss/node"], ["mermaid", "mermaid", "mermaid"]]) {
+    if (!new RegExp(`npm install[^\\n]*--prefix "\\$RUNNER_TEMP/${dir}"[^\\n]*${pkg}@\\d+\\.\\d+\\.\\d+\\s*$`, "m").test(earlier)) {
+      fail(`${name}: nothing installs ${what} at an exact version into $RUNNER_TEMP/${dir} for its flag`);
+    } else pass(`${name}: ${what} is installed, pinned, before the suites run`);
+  }
 };
 
 // An empty check is not a passing check.

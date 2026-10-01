@@ -32,10 +32,19 @@
  * which is what a release publishes. The init-twice section drives headless Chromium; with none on
  * the machine it skips loudly, and DD_REQUIRE_BROWSER=1 makes that a failure.
  *
+ * MERMAID, WITHOUT THE NETWORK. templates/documentation.html imports mermaid from jsDelivr, and the
+ * section that proves the template draws its diagrams used to fail whenever the CDN did. With
+ * DD_MERMAID set to an installed `mermaid` package (the workflows borrow 11.16.0 into $RUNNER_TEMP
+ * the way they borrow lucide-react), the browser answers every cdn.jsdelivr.net request itself: the
+ * template's own import URL is served from that directory, and any other jsDelivr request is
+ * refused. The template is not edited, so its real import path is what gets exercised, and nothing
+ * can reach the network. The installed version must be the version the template pins. Unset, the
+ * section loads mermaid from the CDN as before (a developer's machine); the workflows set it.
+ *
  *   node scripts/check-integration.mjs
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { CHROME, launch, serve } from "./lib/chromium.mjs";
 
@@ -348,7 +357,8 @@ if (!CHROME) {
   if (process.env.DD_REQUIRE_BROWSER === "1") check("DD_REQUIRE_BROWSER=1: every init is called twice in a browser", () => ["no headless chromium on this machine"]);
 } else {
   // The documentation template as a reader gets it, with its pinned design system served from this
-  // checkout (mermaid still comes from its CDN, as the template loads it).
+  // checkout. Mermaid comes from DD_MERMAID through the browser's own request interception when it
+  // is set (see the header), from the CDN otherwise.
   const DOC_PAGE = read("templates/documentation.html").replaceAll(/https:\/\/cdn\.jsdelivr\.net\/npm\/@danieldeusing\/design@[\d.]+\//g, "/");
   const server = await serve(root, { "/__twice.html": TWICE_PAGE, "/__doc.html": DOC_PAGE });
   const browser = await launch("integration");
@@ -405,13 +415,45 @@ if (!CHROME) {
     // a style at all (measured with 11.16.0: with or without a fallback the diagram fails to parse), so
     // the classDef keeps only the shape and the page colours `.node.warn` from the token. Here: the
     // diagram renders to an <svg>, and its warn node's stroke is --destructive on every theme.
+    const MERMAID_CDN = /^https:\/\/cdn\.jsdelivr\.net\/npm\/mermaid@([\d.]+)\/dist\//;
+    const pinned = read("templates/documentation.html").match(/https:\/\/cdn\.jsdelivr\.net\/npm\/mermaid@([\d.]+)\/dist\/mermaid\.esm\.min\.mjs/)?.[1];
+    const mermaidDir = process.env.DD_MERMAID;
+    const mermaidSeen = { local: 0, refused: [], missing: [] };
+    if (mermaidDir) {
+      const installed = existsSync(join(mermaidDir, "package.json")) ? JSON.parse(readFileSync(join(mermaidDir, "package.json"), "utf8")).version : null;
+      check(`DD_MERMAID is the mermaid the template pins (${pinned})`, () =>
+        installed === pinned ? [] : [`${mermaidDir} holds ${installed ?? "no mermaid package"}, the template imports ${pinned}`]);
+      const MIME = { ".mjs": "text/javascript", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".map": "application/json" };
+      browser.on("Fetch.requestPaused", ({ requestId, request }) => {
+        const m = request.url.match(MERMAID_CDN);
+        const file = m && m[1] === pinned ? normalize(join(mermaidDir, "dist", new URL(request.url).pathname.replace(/^\/npm\/mermaid@[\d.]+\/dist\//, ""))) : null;
+        if (file && file.startsWith(join(mermaidDir, "dist") + sep) && existsSync(file) && statSync(file).isFile()) {
+          mermaidSeen.local += 1;
+          browser.send("Fetch.fulfillRequest", { requestId, responseCode: 200, responseHeaders: [
+            { name: "content-type", value: `${MIME[extname(file)] || "application/octet-stream"}; charset=utf-8` },
+            { name: "access-control-allow-origin", value: "*" }], body: readFileSync(file).toString("base64") });
+        } else {
+          (file ? mermaidSeen.missing : mermaidSeen.refused).push(request.url);
+          browser.send("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" });
+        }
+      });
+      await browser.send("Fetch.enable", { patterns: [{ urlPattern: "https://cdn.jsdelivr.net/*" }] });
+    }
     await browser.send("Page.addScriptToEvaluateOnNewDocument", { source: `try { localStorage.setItem("anim", "off"); } catch {}` });
     await browser.navigate(`${server.origin}/__doc.html`);
     const rendered = await within(browser.evaluate(`(async () => {
       for (let i = 0; i < 200 && !document.querySelector("pre.mermaid[data-processed] svg .node.warn"); i += 1) await new Promise((ok) => setTimeout(ok, 50));
       return !!document.querySelector("pre.mermaid[data-processed] svg .node.warn"); })()`), 20000);
     check("templates/documentation.html: its diagram renders to an <svg> with the warn node in it", () =>
-      rendered === true ? [] : [rendered === false ? "no rendered svg with a .node.warn (did mermaid load from its CDN?)" : String(rendered)]);
+      rendered === true ? [] : [rendered === false ? "no rendered svg with a .node.warn (did mermaid load? DD_MERMAID, or else the CDN)" : String(rendered)]);
+    if (mermaidDir) {
+      // Anything else the page asks jsDelivr for (the webfont) is refused, not failed: the diagram does
+      // not need it, and a refusal is the point. Only a mermaid file the copy lacks is a fault.
+      check("templates/documentation.html: its mermaid came from DD_MERMAID, and every file it asked for was there", () => [
+        ...(mermaidSeen.local ? [] : ["the page never asked for its mermaid import: 0 files served from DD_MERMAID"]),
+        ...mermaidSeen.missing.map((url) => `not in DD_MERMAID/dist: ${url}`)]);
+      console.log(`      ${mermaidSeen.local} mermaid file(s) served from DD_MERMAID; ${mermaidSeen.refused.length} other jsDelivr request(s) refused; none reached the network`);
+    } else console.log("      DD_MERMAID is not set: mermaid is loaded from cdn.jsdelivr.net, so this section needs the network.");
     for (const theme of ["warm", "green", "mono", "paper"]) {
       const got = rendered !== true ? null : await within(browser.evaluate(`(async () => {
         document.documentElement.dataset.theme = ${JSON.stringify(theme)};

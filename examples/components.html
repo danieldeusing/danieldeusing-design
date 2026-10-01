@@ -135,21 +135,18 @@
         </div>
         <p class="demo-note">One toolbar row on each surface — every control is <code>--control-h</code> tall. The two with a
           search are filter bars (the search left, the rest right); the third renames a thing, a form row, not a filter:</p>
-        <!-- Computed by the page from its own controls, on load and on every theme change.
-             The two search rows keep a bare input[type=search] (it still leads a .filter-bar): a
-             .search-field's input is 27.19px tall once its min-block-size floor is removed, which this
-             check refuses. That is filters.css's to fix, not this page's. -->
+        <!-- Computed by the page from its own controls, on load and on every theme change. -->
         <p class="demo-note" id="height-check" role="status">height check: not run</p>
         <div class="demo-surfaces">
           <div class="demo-surface" data-s="background"><div class="filter-bar demo-m-0">
-            <input type="search" aria-label="search skills" placeholder="search…" />
+            <span class="search-field"><input type="search" aria-label="search skills" placeholder="search…" /></span>
             <select data-filter aria-label="type"><option value="">all types</option><option>skill</option><option>agent</option></select>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">refresh</button>
             <button type="button" class="btn-terminal btn-terminal--compact">publish</button>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--destructive" aria-label="remove selection"></button>
           </div></div>
           <div class="demo-surface" data-s="card"><div class="filter-bar demo-m-0">
-            <input type="search" aria-label="search skills" placeholder="search…" />
+            <span class="search-field"><input type="search" aria-label="search skills" placeholder="search…" /></span>
             <select data-filter aria-label="type"><option value="">all types</option><option>skill</option></select>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--success">approve</button>
             <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact btn-terminal--danger">deny</button>

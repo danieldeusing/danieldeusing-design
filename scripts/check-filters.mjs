@@ -1389,6 +1389,20 @@ await park();
 await check("css: the search box, the filter trigger and its clear are --control-h (28px) tall",
   async () => (await h(`"#bq"`)) === 28 && (await h(`triggerOf("bsrc")`)) === 28 && (await h(`clearOf("bsrc")`)) === 28,
   async () => [await h(`"#bq"`), await h(`triggerOf("bsrc")`), await h(`clearOf("bsrc")`)].join("/"));
+// 0.62.2: the search box is the token from its own padding and line height, not from the floor. With
+// `min-block-size: 0` forced on, 0.62.1's fixed .3rem padding measured 27.19px. At a 20px root too,
+// where the token is 35px. 1/32px: Chrome lays out in 1/64px units.
+const natural = () => evaluate(`(() => { const p = document.createElement("div"); p.style.blockSize = "var(--control-h)";
+  document.body.append(p); const want = p.getBoundingClientRect().height; p.remove();
+  const q = $("#bq"); q.style.minBlockSize = "0px"; const got = q.getBoundingClientRect().height; q.style.minBlockSize = "";
+  return [got, want]; })()`);
+const naturalAt = async (px) => {
+  await evaluate(`document.documentElement.style.fontSize = ${JSON.stringify(px)}; null`);
+  try { return await natural(); } finally { await evaluate(`document.documentElement.style.fontSize = ""; null`); }
+};
+await check("css: with min-block-size: 0 forced on, the search box is still --control-h — at the default root (28px) and at a 20px root (35px)",
+  async () => [await naturalAt(""), await naturalAt("20px")].every(([got, want]) => Math.abs(got - want) <= 1 / 32),
+  async () => `got/want ${(await naturalAt("")).join("/")} and ${(await naturalAt("20px")).join("/")}`);
 // A filter is the plain trigger with a funnel, not a second box: whatever block padding components.css
 // derives from --control-h is the filter's too. A padding of its own reaches 28px only through the
 // min-block-size floor, so the height alone cannot see one.

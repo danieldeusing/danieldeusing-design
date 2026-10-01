@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- **CI runs check-tailwind-layers' Tailwind half, and a skip there fails.** Neither workflow had
+  `@tailwindcss/node`, so the half that compiles the shipped entry and reads the cascade in a browser
+  only ever ran on macOS. Both workflows now borrow `@tailwindcss/node@4.3.3` into `$RUNNER_TEMP` the
+  way they borrow lucide-react, and the suite step sets `DD_TAILWIND_NODE` and `DD_REQUIRE_TAILWIND=1`.
+  `check-release-gate.mjs` fails a workflow step that lacks either flag, or whose install is not an
+  exact version.
+- **check-integration needs no network for the template's diagram.** The section that proves
+  `templates/documentation.html` draws its mermaid diagram failed whenever jsDelivr did. With
+  `DD_MERMAID` set to an installed mermaid (the workflows borrow `mermaid@11.16.0`), the browser
+  answers the template's own import from that copy and refuses every other jsDelivr request; the
+  installed version must be the one the template pins. check-release-gate requires the flag and the
+  pinned install in both workflows. Unset, the section still uses the CDN.
+- **`examples/cards.html` no longer scrolls sideways at 320px.** The `K12` console's status read
+  "paused — scroll down to resume", a sentence in a `white-space: nowrap` flex item, which made the
+  page 343px wide. A console status is one word (`live`, `paused`, `ended`), so the example is what
+  changed, not the CSS. check-cards now asserts no sideways scroll at 320px as well as 375px.
+
 ## 0.62.2 (2026-09-30)
 
 ### Fixed

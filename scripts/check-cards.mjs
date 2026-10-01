@@ -1056,12 +1056,18 @@ await check("below 48rem: panes stack, splitters inside the split go, the strip 
   W.expect("#fx-collapsed", "", "border-bottom-width", { is: "1px" }), W.expect("#fx-collapsed", "", "border-right-width", { is: "0px" }),
   W.expect("#fx-collapsed-label", "", "writing-mode", { is: "horizontal-tb" })].filter(Boolean)`));
 // THE DEMO ITSELF FITS A PHONE. It rendered 435px wide at 375: two rows carried every tone's tag in one
-// nowrap meta slot and a console status a sentence long. A fresh load, so no injected fixture counts.
-await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
-await load();
-await check("the cards demo does not scroll sideways at 375px (435px wide on 0.60.0)", () => evaluate(`(() => {
-  const w = document.scrollingElement.scrollWidth, cw = document.documentElement.clientWidth;
-  return w <= cw ? [] : ["the page is " + w + "px wide in a " + cw + "px viewport"]; })()`));
+// nowrap meta slot and a console status a sentence long. At 320 (the narrowest phone the system
+// supports) it was still 343px, for the same reason: a status is one word, and a sentence in a nowrap
+// flex item cannot shrink. A fresh load each time, so no injected fixture counts.
+for (const [width, was] of [[375, "435px wide on 0.60.0"], [320, "343px wide on 0.62.2"]]) {
+  await send("Emulation.setDeviceMetricsOverride", { width, height: 812, deviceScaleFactor: 1, mobile: true });
+  await load();
+  await check(`the cards demo does not scroll sideways at ${width}px (${was})`, () => evaluate(`(() => {
+    const w = document.scrollingElement.scrollWidth, cw = document.documentElement.clientWidth;
+    const wide = [...document.body.querySelectorAll("*")].filter((el) => el.getBoundingClientRect().right > cw + 0.5)
+      .slice(0, 3).map((el) => el.tagName.toLowerCase() + (el.className ? "." + el.className : "")).join(", ");
+    return w <= cw ? [] : ["the page is " + w + "px wide in a " + cw + "px viewport (first wide elements: " + wide + ")"]; })()`));
+}
 await send("Emulation.clearDeviceMetricsOverride");
 
 /* ── 3. tokens.css + cards.css only: the same computed values, focus rings, and `hidden` ──────── */

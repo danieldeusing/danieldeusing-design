@@ -548,7 +548,9 @@ in the window.
 - **Height**: `--console-h` (55vh by default, never under 12rem). A horizontal `.splitter` under the
   console can set it (studio remembers it). `.console--fill` fills its container instead — a drawer,
   a pane; inside a drawer, drop the bar and let the drawer's title name the body.
-- **The status** is a word and a dot: `data-tone="pending"` connecting, `"success"` + `dot--pulse` live,
+- **The status** is one short word and a dot, never a sentence: it does not wrap, and a longer one is
+  clipped at the bar's edge (`min-inline-size: 0`) rather than widening the bar and the page.
+  `data-tone="pending"` connecting, `"success"` + `dot--pulse` live,
   `"muted"` ended, `"destructive"` refused. The word says it too — the colour is never the only signal.
 - **It follows the theme.** cockpit's drawer pinned a near-black log in every theme to protect ANSI
   colours it never parsed, and its highlight pair measured 4.07:1. A search match is `<mark>`.
@@ -556,8 +558,9 @@ in the window.
 ### The behaviour the page implements
 
 - **Follow the bottom** while the reader is within 1.5rem (24px) of it. Scrolling up pauses, and the
-  status says so ("paused — scroll to the bottom to resume"); a "jump to newest"
-  `.btn-terminal.btn-terminal--ghost.btn-terminal--compact` resumes.
+  status says so (`paused`), and a "jump to newest"
+  `.btn-terminal.btn-terminal--ghost.btn-terminal--compact` resumes; the hint ("scroll to the bottom to
+  resume") belongs on that button, as its `data-tip`, not in the status.
 - **Search** sits above the body (a `.search-field` with its match count, in a drawer's toolbar or a
   `.panel-head`); Enter and Shift+Enter move between matches, and the line holding the current one
   carries `.console-line--current`.

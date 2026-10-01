@@ -2176,6 +2176,8 @@ for (const page of pages) {
     await open(`/examples/${page}`, "true");
     await sleep(250);
     const { sw, cw, offenders } = await evaluate(OVERFLOW);
+    // A page with no viewport meta lays out at 980 whatever is emulated, and then "fits" trivially.
+    if (cw !== width) wrong.push(`${width}px: the viewport is ${cw}px wide, not ${width}: the page has no <meta name="viewport"> and this measured nothing`);
     if (sw > cw) wrong.push(`${width}px: the page is ${sw}px wide in a ${cw}px viewport; overflowing the page itself: ${offenders.join(", ") || "(none found)"}`);
   }
   await check(`examples/${page}: the page does not scroll sideways at 320px or 375px`, () => wrong.length === 0, () => wrong.join(" | "));

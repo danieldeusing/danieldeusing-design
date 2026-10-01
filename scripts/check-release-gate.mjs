@@ -62,6 +62,10 @@ const FLAGS = [
   ["DD_COCKPIT_DOM_PATCH", /^\s*DD_COCKPIT_DOM_PATCH:\s*\S+/m, "a runner has no infra checkout to find the patcher in"],
 ];
 
+// The packages the suites borrow: the package, the directory under $RUNNER_TEMP it is installed
+// into, and the flag that points a suite at it.
+const BORROWED = [["lucide-react", "lucide", "DD_LUCIDE_REACT"], ["@tailwindcss/node", "tailwind", "DD_TAILWIND_NODE"], ["mermaid", "mermaid", "DD_MERMAID"]];
+
 const gate = (name, text, required, before = Infinity) => {
   const ran = new Map();
   for (const step of steps(text)) {
@@ -81,21 +85,37 @@ const gate = (name, text, required, before = Infinity) => {
     const path = (step.env.match(/^\s*DD_COCKPIT_DOM_PATCH:\s*"?(.*?)"?\s*$/m) || [])[1];
     if (path && !existsSync(path.replace(/^\$\{\{\s*github\.workspace\s*\}\}\//, ""))) fail(`${name}: DD_COCKPIT_DOM_PATCH points at ${path}, which is not in the repository`);
   }
-  // What each borrowed-package flag names is installed by an earlier step of the same job, at an
-  // exact version, into the directory the flag points at.
-  const earlier = text.slice(0, Math.min(before, text.length));
-  for (const [what, dir, pkg] of [["lucide-react", "lucide", "lucide-react"], ["@tailwindcss/node", "tailwind", "@tailwindcss/node"], ["mermaid", "mermaid", "mermaid"]]) {
-    if (!new RegExp(`npm install[^\\n]*--prefix "\\$RUNNER_TEMP/${dir}"[^\\n]*${pkg}@\\d+\\.\\d+\\.\\d+\\s*$`, "m").test(earlier)) {
-      fail(`${name}: nothing installs ${what} at an exact version into $RUNNER_TEMP/${dir} for its flag`);
-    } else pass(`${name}: ${what} is installed, pinned, before the suites run`);
+  // Each package a suite borrows is installed by an earlier step of the same job: one line that has
+  // `--ignore-scripts` (no lifecycle script of a borrowed package runs on the runner), an exact
+  // x.y.z, and `--prefix "$RUNNER_TEMP/<dir>"`, where <dir> is the directory the suite's flag points
+  // into. The versions are returned, so the two workflows can be compared with each other.
+  const earlier = text.slice(0, Math.min(before, text.length)).split("\n").filter((line) => !/^\s*#/.test(line));
+  const pins = {};
+  for (const [pkg, dir, flag] of BORROWED) {
+    const line = earlier.find((l) => /\bnpm install\b/.test(l) && l.includes(`--prefix "$RUNNER_TEMP/${dir}"`));
+    const version = line?.match(new RegExp(`\\s${pkg.replace(/[/@]/g, "\\$&")}@(\\d+\\.\\d+\\.\\d+)\\s*$`))?.[1];
+    if (!version) fail(`${name}: nothing installs ${pkg} at an exact version into $RUNNER_TEMP/${dir} for ${flag}`);
+    else if (!/\s--ignore-scripts\s/.test(line)) fail(`${name}: the ${pkg} install lacks --ignore-scripts, so its lifecycle scripts would run on the runner`);
+    else { pass(`${name}: ${pkg}@${version} is installed, pinned, without lifecycle scripts, before the suites run`); pins[pkg] = version; }
+    // ...and the flag points into the directory it was installed into, not somewhere else.
+    for (const step of new Set(ran.values())) {
+      const value = (step.env.match(new RegExp(`^\\s*${flag}:\\s*(.+?)\\s*$`, "m")) || [])[1];
+      if (value && !value.startsWith("${{ runner.temp }}/" + dir + "/node_modules/")) fail(`${name}: ${flag} is ${value}, which is not inside the $RUNNER_TEMP/${dir} the install writes to`);
+    }
   }
+  return pins;
 };
 
 // An empty check is not a passing check.
 if (suitesOnDisk.length < 20) throw new Error(`check-release-gate: found ${suitesOnDisk.length} suites in scripts/ — run it from the repository root`);
 console.log(`${suitesOnDisk.length} suites in scripts/`);
-gate("ci.yml", ci, suitesOnDisk.filter((s) => s !== "check-release"));
-gate("release.yml", release, suitesOnDisk, publishAt);
+const ciPins = gate("ci.yml", ci, suitesOnDisk.filter((s) => s !== "check-release"));
+const releasePins = gate("release.yml", release, suitesOnDisk, publishAt);
+// Two copies of what green means must borrow the same versions of what they borrow.
+for (const [pkg] of BORROWED) {
+  if (ciPins[pkg] && releasePins[pkg] && ciPins[pkg] === releasePins[pkg]) pass(`both workflows borrow ${pkg}@${ciPins[pkg]}`);
+  else if (ciPins[pkg] && releasePins[pkg]) fail(`ci.yml borrows ${pkg}@${ciPins[pkg]} and release.yml ${pkg}@${releasePins[pkg]} — the gate and the check run different things`);
+}
 
 // A third copy of the same judgement: the node the suites run on. release.yml needs >= 22 for
 // Trusted Publishing and the DOM suites need >= 22 for a global WebSocket, so a ci.yml pinned

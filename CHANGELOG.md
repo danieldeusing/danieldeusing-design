@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- **A pager keeps keyboard focus through a patch.** A renderer re-rendering a table's mount
+  (cockpit's `cockpitPatch` over cockpitTable's shell) takes the pager out, and the engine puts the
+  same node back after the wrapper (0.62.3); focus on "next →", "← prev" or the rows picker fell to
+  `<body>` meanwhile, so the next Tab started at the top of the page. The control that held it takes
+  it again, on the same page, without scrolling. Focus elsewhere is never moved, and focus the reader
+  took off the pager before the patch is not pulled back. A pager the patch leaves with one page is
+  hidden and can hold no focus; focus then stays where the browser put it.
+- **A page bar the engine moves with its table keeps its focus.** Moving the bar takes it out of the
+  document first: focus in the page's box, its action or the engine's box fell to `<body>`. It is
+  given back to the same control, without scrolling, and a text box keeps its caret. A table detached
+  and inserted again draws a new engine box; that box takes the focus and the caret.
+
+### Checks
+
+- **Two tables, each with its own page bar, the first one moved.** A guard (0.62.3 passes it): a
+  `barToBring()` that looked past a page bar as it looks past a pager or a count left the moved table's
+  bar in front of its neighbour's and drew an engine bar at the new place; the check fails on that.
+
 ## 0.62.3 (2026-10-01)
 
 ### Added

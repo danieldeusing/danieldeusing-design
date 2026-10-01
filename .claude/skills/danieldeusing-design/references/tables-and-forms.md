@@ -581,10 +581,16 @@ without it behaves exactly as described here.
   the page's `data-table-bar` it adopted, with the page's box and action in it, unless the new place
   has a page bar of its own — the pager and the count directly after it, with the sort, filters, search and page the reader had. A table detached and
   inserted again later comes back with that view too, with or without a `data-table-id`; a table
-  removed for good leaves no count or pager where it stood.
+  removed for good leaves no count or pager where it stood. Focus in the bar goes with it (0.62.4): the
+  page's box (with its caret), the page's action, the engine's box — given back without scrolling, and
+  focus anywhere else is not moved. A detached table's engine box is a new one when it returns; it takes
+  the focus and the caret.
 - **A pager survives a patched mount (0.62.3).** The pager is in no renderer's markup, so a patcher that
   re-renders the whole mount (cockpitTable's shell: bar, wrapper, count) puts the count's markup in its
-  place; the same pager goes back after the wrapper, on the page the reader was on.
+  place; the same pager goes back after the wrapper, on the page the reader was on. Since 0.62.4 the
+  focus does too: a reader on "next →" or the rows picker is still on it after the patch, the page not
+  scrolled. A focus the reader took off the pager is not pulled back, and a pager the patch left with
+  one page is hidden and holds no focus.
 - **A renderer that re-renders the header gets the engine's parts back.** `aria-sort`, `.is-filtered`,
   the controls, the badge and `aria-checked` are the engine's; a patcher (cockpit's `cockpitPatch`)
   that writes the header's markup removes them, and the engine puts the same nodes back. Its

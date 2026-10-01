@@ -841,6 +841,52 @@ for (const own of [false, true]) {
 }
 await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
 
+/* ── 0.62.4 · focus in a page bar the engine moves stays where it was ───────────────────────────────────
+   Moving the bar takes it out of the document first, and a focused node taken out drops focus to <body>.
+   The page's box with its caret in the middle of "r12", the box the engine put in the page's bar, the
+   page's action: each keeps focus through the move, with the page not scrolled (the bar lands below the
+   fold). And a focus outside the bar — an input above the table — is left alone. A table DETACHED is
+   retired and the engine's box goes with it; the box drawn when it returns takes the focus and the caret. */
+const moveBarFocus = (own, how, target) => evaluate(`(async () => {
+  localStorage.clear();
+  const from = document.getElementById("mount"), to = document.getElementById("later");
+  to.replaceChildren();
+  from.innerHTML = ${JSON.stringify("SOURCE")};
+  const spacer = document.createElement("div"); spacer.style.height = "3000px"; to.before(spacer);
+  const outside = document.createElement("input"); document.body.prepend(outside);
+  await new Promise((r) => setTimeout(r, 50));
+  const box = from.querySelector("search input");
+  box.value = "r12"; box.dispatchEvent(new Event("input", { bubbles: true }));
+  const held = ${target};
+  held.focus({ preventScroll: true });
+  if (held === box) box.setSelectionRange(2, 2);
+  window.scrollTo(0, 0);
+  const wrap = from.querySelector(".tablewrap");
+  if (${JSON.stringify(how)} === "append") to.appendChild(wrap);
+  else { wrap.remove(); await new Promise((r) => setTimeout(r, 0)); to.appendChild(wrap); }
+  await new Promise((r) => setTimeout(r, 100));
+  // The box is the one in the bar NOW: a detached table is retired, and the engine's box goes with it.
+  const now = held === box ? to.querySelector("search input") : held;
+  const out = { moved: to.firstElementChild?.matches("search[data-table-bar]") ?? false,
+    focus: document.activeElement === now ? "same" : document.activeElement.tagName,
+    caret: held === box ? now.selectionStart + "," + now.selectionEnd : null, scrolled: scrollY };
+  spacer.remove(); outside.remove();
+  return JSON.stringify(out);
+})()`.replace('"SOURCE"', JSON.stringify(PAGE_BAR_MOVE(own))));
+for (const [own, what, target, caret] of [
+  [true, "the page's own box, caret mid-word", "box", "2,2"],
+  [false, "the box the engine put in the page's bar", "box", "2,2"],
+  [true, "the page's action button", 'from.querySelector("#bar-action")', null],
+  [true, "an input OUTSIDE the table (it must be left alone)", "outside", null],
+]) {
+  for (const how of ["append", "detach"]) {
+    const f = await moveBarFocus(own, how, target);
+    await check(`0.62.4 — focus on ${what}, its table ${how === "append" ? "APPENDED" : "DETACHED and re-inserted"} elsewhere: focus stays on it${caret ? ", the caret where it was" : ""}, the page not scrolled`,
+      () => f === JSON.stringify({ moved: true, focus: "same", caret, scrolled: 0 }), f);
+  }
+}
+await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
+
 /* ── 0.62.3 · a page writing into a visible cell of a filtered table keeps the rows the filter withholds ─
    The observer answered a write inside the body by reading the rows back FROM the body — which, under a
    filter, holds only what the filter let through, so every withheld row was gone from the set for good.
@@ -946,6 +992,32 @@ await check("0.62.3 — table A moves away from a neighbour that drew its own en
 const fOff = await neighbour(swapWrap("nbF").replace("data-table-tools", 'data-table-tools data-table-search="off"'));
 await check("0.62.3 — ...and away from a neighbour with data-table-search=\"off\": the page bar goes with A",
   () => JSON.parse(fOff).barWithA && JSON.parse(fOff).mount[0] === "nbF" && !JSON.parse(fOff).mount.includes("PB"), fOff);
+await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
+
+/* ── 0.62.4 · two tables, each with its own page bar, and the first one moves ───────────────────────────
+   A guard, not a fix: 0.62.3 passes it. What A's bar sees after A leaves is C's page bar, then C. A
+   barToBring() that looked past a page bar as it looks past a pager or a count would find C there, an
+   adopter, and leave A's bar in the mount in front of C's — while A drew an engine bar in the stash. Each
+   node is named by the table it serves: a page bar by its aria-label, a pager or a count by the table
+   before it. */
+const twoBars = await evaluate(`(async () => {
+  localStorage.clear();
+  const mount = document.getElementById("mount"), stash = document.getElementById("later");
+  stash.replaceChildren();
+  const pb = (id) => '<search class="filter-bar" data-table-bar aria-label="' + id + '"><button type="button">act ' + id + '</button></search>';
+  mount.innerHTML = pb("pbA") + ${JSON.stringify(swapWrap("pbA"))} + pb("pbC") + ${JSON.stringify(swapWrap("pbC"))};
+  await new Promise((r) => setTimeout(r, 50));
+  stash.append(mount.querySelector('.tablewrap:has(table[data-table-id="pbA"])'));
+  await new Promise((r) => setTimeout(r, 150));
+  const tableBefore = (n) => { let p = n.previousElementSibling; while (p && !p.matches(".tablewrap")) p = p.previousElementSibling;
+    return p?.querySelector("table")?.getAttribute("data-table-id"); };
+  const name = (n) => n.matches("search[data-table-bar]") ? "PB(" + n.getAttribute("aria-label") + ")" : n.matches("search") ? "EB" :
+    n.matches(".tablewrap") ? "T(" + n.querySelector("table").getAttribute("data-table-id") + ")" :
+    n.matches(".table-pager") ? "pager(" + tableBefore(n) + ")" : n.matches("p.result-count") ? "count(" + tableBefore(n) + ")" : n.className;
+  return JSON.stringify({ mount: [...mount.children].map(name), stash: [...stash.children].map(name) });
+})()`);
+await check("0.62.4 — two tables, each after its own page bar; the first one's wrapper moves to a stash: C keeps its bar, A takes its own, no engine bar is drawn",
+  () => twoBars === JSON.stringify({ mount: ["PB(pbC)", "T(pbC)", "pager(pbC)", "count(pbC)"], stash: ["PB(pbA)", "T(pbA)", "pager(pbA)", "count(pbA)"] }), twoBars);
 await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
 
 /* ── 0.62.3 · data-table-rows is read only in the task that writes it ──────────────────────────────────────
@@ -1138,6 +1210,50 @@ if (!DOM_PATCH) {
     () => shellBefore === WHOLE_SHELL("21–40 of 45") && shellBody === WHOLE_SHELL("21–40 of 46"), JSON.stringify({ before: shellBefore, body: shellBody }));
   await check("...and the whole mount patched as mountShell draws it: the same pager, bar and table, one count after the pager, still page 2",
     () => shellMount === WHOLE_SHELL("21–40 of 46"), shellMount);
+  await evaluate(`document.getElementById("later").replaceChildren(); null`);
+
+  // 0.62.4: and the FOCUS in that pager. The patch takes the pager out, which drops a focused control's
+  // focus to <body>; the same node goes back, so the same control takes it again, on the same page, with
+  // the page not scrolled (the pager is below the fold). Focus anywhere else is not moved: the page bar's
+  // box, which the patch matches in place and keeps its caret, and an input above the table.
+  const pagerFocus = (target, blur) => evaluate(`(async () => {
+    localStorage.clear();
+    const later = document.getElementById("later");
+    later.innerHTML = ${JSON.stringify(SHELL(45))};
+    const spacer = document.createElement("div"); spacer.style.height = "3000px"; later.before(spacer);
+    const outside = document.createElement("input"); document.body.prepend(outside);
+    await new Promise((r) => setTimeout(r, 100));
+    later.querySelector(".table-pager-nav button:last-child").click();
+    await new Promise((r) => setTimeout(r, 50));
+    const box = later.querySelector("search input");
+    box.value = "L0";
+    const held = ${target};
+    held.focus({ preventScroll: true });
+    if (held === box) box.setSelectionRange(1, 1);
+    if (${blur}) { held.blur(); await new Promise((r) => setTimeout(r, 0)); } // a reader's blur is a task of its own
+    window.scrollTo(0, 0);
+    window.cockpitPatch(later, ${JSON.stringify(SHELL(46))});
+    await new Promise((r) => setTimeout(r, 200));
+    const out = { focus: document.activeElement === held ? "same" : document.activeElement.tagName,
+      caret: held === box ? box.selectionStart + "," + box.selectionEnd : null, scrolled: scrollY,
+      status: later.querySelector(".table-pager-status")?.textContent ?? null };
+    spacer.remove(); outside.remove();
+    return JSON.stringify(out);
+  })()`);
+  for (const [what, target, caret] of [
+    ["\"next →\"", 'later.querySelector(".table-pager-nav button:last-child")', null],
+    ["\"← prev\"", 'later.querySelector(".table-pager-nav button:first-child")', null],
+    ["the rows picker", 'later.querySelector(".table-pager .select-trigger")', null],
+    ["the page bar's box, caret mid-word (it is not moved)", "box", "1,1"],
+    ["an input OUTSIDE the table (it must be left alone)", "outside", null],
+  ]) {
+    const f = await pagerFocus(target, false);
+    await check(`0.62.4 — focus on ${what}, the whole mount patched by cockpitPatch: focus stays on it${caret ? ", the caret where it was" : ""}, still page 2, the page not scrolled`,
+      () => f === JSON.stringify({ focus: "same", caret, scrolled: 0, status: "21–40 of 46" }), f);
+  }
+  const blurred = await pagerFocus('later.querySelector(".table-pager-nav button:last-child")', true);
+  await check("...and focus the reader took OFF \"next →\" before the patch is not pulled back onto it",
+    () => blurred === JSON.stringify({ focus: "BODY", caret: null, scrolled: 0, status: "21–40 of 46" }), blurred);
   await evaluate(`document.getElementById("later").replaceChildren(); null`);
 
   // 0.62.3: rows tied on the sort column hold their places through polls that change nothing. The patcher

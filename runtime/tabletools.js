@@ -881,7 +881,7 @@ function ensureChrome(inst) {
     let pageBar = pageBarOf(anchor);
     if (!pageBar) {
       pageBar = barToBring(inst);
-      if (pageBar) anchor.before(pageBar);
+      if (pageBar) keepingFocus(pageBar, () => anchor.before(pageBar));
     }
     const theirs = pageBar && pageBar.querySelector('input[type="search"][data-table-search]');
     if (theirs) {
@@ -905,8 +905,14 @@ function ensureChrome(inst) {
       }
       if (!bar.contains(inst.searchField)) bar.prepend(inst.searchField);
       if (bar.nextElementSibling !== anchor) {
-        anchor.before(bar);
+        keepingFocus(bar, () => anchor.before(bar));
         if (bar === inst.ownBar) inst.ownBarParent = bar.parentElement;
+      }
+      const caret = inst.carriedCaret;
+      inst.carriedCaret = null;
+      if (caret && (!document.activeElement || document.activeElement === document.body)) {
+        inst.searchBox.focus({ preventScroll: true });
+        inst.searchBox.setSelectionRange(...caret);
       }
     }
     if (pageBar && pageBar !== inst.bar) {
@@ -960,7 +966,10 @@ function retire(inst) {
   if (inst.count) countOwners.delete(inst.count);
   // The node may come back elsewhere (a page that detaches a table and inserts it later): it comes back
   // with the view the reader left it in, not only what was saved — a table without an id saves nothing.
-  carried.set(inst.table, { identity: inst.identity, view: inst.view, bar: inst.bar });
+  // The engine's box goes below, and a reader typing in it would be left on <body>: where its caret was goes
+  // with the view, for the box drawn when the node comes back.
+  const box = inst.searchField && document.activeElement === inst.searchBox ? inst.searchBox : null;
+  carried.set(inst.table, { identity: inst.identity, view: inst.view, bar: inst.bar, caret: box && [box.selectionStart, box.selectionEnd] });
   // Gone, not renewed in place: the count this file made would go on standing where the table was.
   if (!inst.table.isConnected && madeCounts.has(inst.count)) inst.count.remove();
   /*
@@ -1030,6 +1039,18 @@ function restoreFocus(inst) {
   if (lost && node && node.isConnected && document.activeElement !== node) node.focus({ preventScroll: true });
 }
 
+/*
+ * A BAR THE ENGINE MOVES KEEPS ITS FOCUS (0.62.4). Moving a node takes it out of the document first, and a
+ * focused node taken out drops focus to <body>. watchFocus() covers the engine's own box; a page's bar holds
+ * the page's box and its action, which nothing here watches. So focus inside is read before the move and
+ * given back after it — a text box keeps its caret, which the element holds — and focus outside is left alone.
+ */
+function keepingFocus(node, move) {
+  const held = node.contains(document.activeElement) ? document.activeElement : null;
+  move();
+  if (held && document.activeElement !== held) held.focus({ preventScroll: true });
+}
+
 /* true when the node is no longer this instance's table — it has been handed to a fresh one. */
 function renewed(inst) {
   if (inst.retired) return true;
@@ -1065,6 +1086,7 @@ function enhance(table) {
   const same = kept && kept.identity === inst.identity;
   inst.view = same ? kept.view : restore(inst);
   inst.carriedBar = same ? kept.bar : null;
+  inst.carriedCaret = same ? kept.caret : null;
   warnShared(inst);
   watchFocus(inst, table);
 

@@ -239,6 +239,16 @@ function buildBar(instance) {
     render(instance);
   });
 
+  // What holds focus in the bar, for rehome() below. A blur the reader chose (the node is still in
+  // the document and something else, or nothing, has focus) forgets it; a removal does not.
+  bar.addEventListener("focusin", (event) => { instance.lastFocus = event.target; });
+  bar.addEventListener("focusout", (event) => {
+    const node = event.target;
+    queueMicrotask(() => {
+      if (instance.lastFocus === node && node.isConnected && document.activeElement !== node) instance.lastFocus = null;
+    });
+  });
+
   Object.assign(instance, { bar, status, select, previous, next });
   return bar;
 }
@@ -291,10 +301,23 @@ function turnOff(button, on) {
  * bar, wrapper, count) matches the count's markup against the bar, puts a fresh count in its place and
  * the pager was gone for good, its rows still paged with no way to turn the page. The same node goes
  * back, so the page, the size and the picker stay.
+ *
+ * AND THE FOCUS IN IT (0.62.4). A focused node taken out of the document drops focus to <body>, so a
+ * reader on "next →" whose table was re-rendered by a poll found the next Tab starting from the top of
+ * the page. The same node goes back, so the same control takes focus again, on the same page, without
+ * scrolling. Only when focus was in the bar when it left and nothing has taken it since: a reader who
+ * focused something else is never pulled back. A pager the patch left with one page is hidden and can
+ * hold no focus; focus then stays where the browser put it.
  */
 function rehome(instance) {
   const anchor = instance.table.closest(".tablewrap") || instance.table;
-  if (instance.table.isConnected && anchor.nextElementSibling !== instance.bar) anchor.after(instance.bar);
+  if (!instance.table.isConnected || anchor.nextElementSibling === instance.bar) return;
+  anchor.after(instance.bar);
+  const node = instance.lastFocus;
+  const lost = !document.activeElement || document.activeElement === document.body;
+  if (!node || !lost || !instance.bar.contains(node)) return;
+  node.focus({ preventScroll: true });
+  if (document.activeElement !== node) instance.lastFocus = null;
 }
 
 function enhance(table) {

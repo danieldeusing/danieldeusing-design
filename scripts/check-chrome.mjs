@@ -163,16 +163,16 @@ const evaluate = async (expression) => {
  * One page load per scenario, each from a clean store: the rail and the anim toggle PERSIST their
  * state, and a scenario inheriting the last one's "off" would be asserting the wrong page.
  */
-async function load(query = "", { width = 1440, height = 900, coarse = false, forced = false, scheme = "light", print = false, keep = false } = {}) {
+async function load(query = "", { width = 1440, height = 900, coarse = false, forced = false, scheme = "light", print = false, keep = false, motion = "no-preference", dsf = 1 } = {}) {
   if (!keep) await evaluate("try { localStorage.clear() } catch {} null").catch(() => {});
   // A phone width is emulated AS a phone: its scrollbars overlay the page instead of taking 15px
   // of a 375px viewport, which would measure a narrower phone than any real one.
-  await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 768 });
+  await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: dsf, mobile: width < 768 });
   await send("Emulation.setTouchEmulationEnabled", coarse ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
   await send("Emulation.setEmulatedMedia", {
     media: print ? "print" : "",
     features: [{ name: "forced-colors", value: forced ? "active" : "none" }, { name: "prefers-color-scheme", value: scheme },
-      { name: "prefers-reduced-motion", value: "no-preference" }],
+      { name: "prefers-reduced-motion", value: motion }],
   });
   const loaded = next("Page.loadEventFired");
   await send("Page.navigate", { url: BASE + (query ? `?${query}` : "") });
@@ -343,15 +343,28 @@ for (const [label, whole, html, controls] of shapes) {
    short one alone, in an engine without `overflow-clip-margin` too (WebKit, so every iOS browser):
    the run takes the property away (`overflow-clip-margin: 0`) and compares the bar's pixels with the
    same bar unclipped (`overflow: visible`, and none of the padding the clip spends on the glow).
-   They must be identical, on the glowing themes. */
-for (const theme of ["green", "warm"]) {
-  await load("nobanner", { width: 375, height: 800 });
-  for (const [shape, html] of [[".bar-side > .brand > .glow", null],
-    ["words straight in a .brand", BAR_B("components", NAV_B)]]) {
+   They must be identical, on the glowing themes, at one and two device pixels to the CSS pixel, and
+   with reduced motion: the CRT overlay drawn otherwise hides the glow's last faint tail, and a clip
+   0.5rem out cut exactly that (three pixels one level apart on green at 1x; the same at 2x).
+   And the clip's padding must not grow the focus ring of a link that IS the `.brand.glow`: reached
+   by the keyboard, its ring is compared with the same link unclipped, ringed as base.css rings
+   everything (`outline-offset: 2px`). */
+for (const [theme, dsf] of [["green", 1], ["green", 2], ["warm", 1], ["warm", 2]]) {
+  await load("nobanner", { width: 375, height: 800, dsf, motion: "reduce" });
+  for (const [shape, html, ring] of [[".bar-side > .brand > .glow", null, false],
+    ["words straight in a .brand", BAR_B("components", NAV_B), false],
+    ["the focus ring of an a.brand.glow, reached by Tab", `<header class="bar" id="t-bar-b"><button type="button" id="t-before">menu</button>
+      <a class="brand glow" href="#" id="t-link">components<span class="cursor-block" aria-hidden="true"></span></a></header>`, true]]) {
     if (html) await inject(html);
     const bar = html ? "#t-bar-b" : "header.bar";
     await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)};
       document.head.insertAdjacentHTML("beforeend", "<style id='t-still'>*, *::before, *::after { animation: none !important; transition: none !important; overflow-clip-margin: 0px !important; }</style>"); null`);
+    let focused = true;
+    if (ring) {
+      await page(`document.getElementById("t-before").focus(); null`);
+      for (const type of ["rawKeyDown", "keyUp"]) await send("Input.dispatchKeyEvent", { type, key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+      focused = await page(`document.activeElement?.id === "t-link" && document.activeElement.matches(":focus-visible")`);
+    }
     await frames(3);
     const box = await page(`(() => { const r = document.querySelector(${JSON.stringify(bar)}).getBoundingClientRect(); return { x: 0, y: r.top, width: 375, height: r.height }; })()`);
     // The page settles for a while after load (fonts, the rail, observers): a shot counts once the
@@ -367,13 +380,35 @@ for (const theme of ["green", "warm"]) {
       throw new Error("the bar never stopped changing");
     };
     const clipped = await shot();
-    await page(`document.head.insertAdjacentHTML("beforeend", "<style id='t-open'>header.bar .brand, header.bar .brand > .glow { overflow: visible !important; padding: 0 !important; margin: 0 !important; }</style>"); null`);
+    await page(`document.head.insertAdjacentHTML("beforeend", "<style id='t-open'>header.bar .brand, header.bar .brand > .glow { overflow: visible !important; padding: 0 !important; margin: 0 !important; } header.bar .brand:focus-visible { outline-offset: 2px !important; }</style>"); null`);
     await frames(3);
     const open = await shot();
     await page(`document.getElementById("t-open").remove(); document.getElementById("t-still").remove(); document.getElementById("t-bar-b")?.remove(); null`);
-    await check(`a wordmark that fits (${shape}, ${theme}, 375) paints exactly as it does unclipped, with no overflow-clip-margin to lean on`,
-      () => clipped === open, "the clip cuts the glow");
+    await check(`a wordmark that fits (${shape}, ${theme}, 375 at ${dsf}x) paints exactly as it does unclipped, with no overflow-clip-margin to lean on`,
+      () => focused && clipped === open, focused ? "the clip changes the picture" : "the link did not take keyboard focus");
   }
+}
+
+/* What the brand's priority must not take from a page, at 320: a page's own `.bar-side
+   { flex-shrink: 0 }` still holds (the rule is one class strong), and an icon button beside a bare
+   wordmark keeps its own box — 28px under a mouse, the 44px touch target under a finger. */
+await load("nobanner", { width: 320, height: 800 });
+await inject(`<style id="t-own">.bar-side { flex-shrink: 0; }</style><header class="bar" id="t-bar-b"><div class="bar-side"><a class="brand" href="#"><span class="glow">${LONG_BRAND}</span></a></div>
+  <div class="bar-side">${BURGER}</div></header>`);
+await frames(2);
+const own = await page(`getComputedStyle(document.querySelector("#t-bar-b > .bar-side ~ .bar-side")).flexShrink`);
+await check("a page's own .bar-side { flex-shrink: 0 } keeps the controls' end at 0 beside an unfloored brand", () => own === "0", own);
+await page(`document.getElementById("t-own").remove(); null`);
+const ICONS = `<header class="bar" id="t-bar-b"><span class="brand glow">${LONG_BRAND}</span>
+  <button type="button" class="btn-icon" data-icon="refresh" aria-label="one"></button><button type="button" class="btn-icon" data-icon="copy" aria-label="two"></button><button type="button" class="btn-icon" data-icon="x" aria-label="three"></button></header>`;
+for (const coarse of [false, true]) {
+  await load("nobanner", { width: 320, height: 800, coarse });
+  await inject(ICONS);
+  await frames(2);
+  const icons = await page(`({ coarse: matchMedia("(pointer: coarse)").matches, widths: [...document.querySelectorAll("#t-bar-b .btn-icon")].map((b) => +b.getBoundingClientRect().width.toFixed(2)) })`);
+  const size = coarse ? 44 : 28;
+  await check(`three .btn-icon beside a ${LONG_BRAND.length}-character bare wordmark at 320, ${coarse ? "under a finger" : "under a mouse"}: each keeps ${size}px`,
+    () => icons.coarse === coarse && icons.widths.length === 3 && icons.widths.every((w) => near(w, size, 0.01)), icons);
 }
 await load("nobanner");
 await load("nobanner");

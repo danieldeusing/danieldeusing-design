@@ -73,6 +73,9 @@
   box-sizing: border-box;
   inline-size: var(--control-h);
   block-size: var(--control-h);
+  /* A square that never gives up width in a flex row (0.62.4): beside a wordmark in a phone's bar it
+     was squeezed 28px to 16px. Not a min-inline-size, which would undo the 44px touch target. */
+  flex-shrink: 0;
   margin: 0;
   padding: 0;
   font: inherit;

@@ -126,7 +126,8 @@ bar, between the brand and the nav. Two sources, so it is an element, not a loca
   the band still gives way before the brand. Below 48rem only: on the desktop the ends take equal
   shares, and no wordmark is that long. The clip spends 0.75rem of padding on the glow and takes it
   back with a negative margin, so a wordmark that fits is never boxed in WebKit either, which has no
-  `overflow-clip-margin`.
+  `overflow-clip-margin`; a link that is itself the `.brand.glow` keeps base.css's focus ring. The
+  priority is one class strong: a page's own `.bar-side { flex-shrink: 0 }` wins.
 
 A bar written before the slots (brand, burger and nav as direct children) still lays out: the bar
 is `space-between`, and every slot rule keys on its own class.

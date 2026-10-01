@@ -32,6 +32,9 @@ All notable changes to this project are documented here. The format follows
   fits is never boxed, in WebKit too, which has no `overflow-clip-margin` (every iOS browser). The
   controls give way first, down to their own min-content, and the brand only for what is left: a
   wrapping nav wraps beside a "danieldeusing-docs" that fits, instead of the wordmark becoming "d…".
+  That priority is one class strong, so a page's own `.bar-side { flex-shrink: 0 }` still holds, and a
+  link that is itself the `.brand.glow` keeps base.css's focus ring (the clip's padding grew it from
+  96×24 to 120×48).
   Beside a centre band with no burger the band still gives way first. Every example and template is
   pixel-identical at 320, 375 and 1280 in all four themes where the wordmark fits; it changed where it
   did not: chrome.html's `.bar--app` demo at 320 (its contents ran 49px past the bar; now "c…") and
@@ -39,7 +42,10 @@ All notable changes to this project are documented here. The format follows
 - **An icon button keeps its icon's width when squeezed.** reset.css's `svg { max-width: 100% }`
   makes an inline svg's min-content zero, so a `.nav-burger` beside a long wordmark fell from 40px to
   its 18px of padding with the icon spilling out (danieldeusing-family's header, in all three
-  engines). `.nav-burger > svg` and `.btn-icon > svg` take `max-inline-size: none`.
+  engines). `.nav-burger > svg` and `.btn-icon > svg` take `max-inline-size: none`, and a `.btn-icon`
+  no longer shrinks at all in a flex row (`flex-shrink: 0`; a `min-inline-size` would undo its 44px
+  touch target): beside a bare wordmark at 320 three of them fell from 28px to 16px, and
+  controls.html's drawer close button, 24px square, was 18.9px wide at 320 since before 0.62.4.
 - **filters.html calls `initTableScroll()`.** Under a finger the table-tools table's header buttons
   grow to 44px and the table is 449px wide; with no `.tablewrap` around it the page scrolled
   sideways on a touch phone (Chromium widens the layout viewport instead: innerWidth 478 at 375).
@@ -59,8 +65,11 @@ All notable changes to this project are documented here. The format follows
   bar shapes pages ship, at 320 (a fitting wordmark beside a wrapping nav, beside a search field, and
   a long one beside a burger in `.bar-side` wrappers and straight in the bar), each judged on: no
   sideways scroll, no control below its own min-content, a fitting brand whole, a cut brand only once
-  every control is at its min-content; and a fitting wordmark painting exactly as it does unclipped
-  with `overflow-clip-margin` taken away, on green and warm.
+  every control is at its min-content; a fitting wordmark painting exactly as it does unclipped
+  with `overflow-clip-margin` taken away, on green and warm, at 1x and 2x with reduced motion (the CRT
+  overlay otherwise hides the glow's faint tail, and a 0.5rem clip passed), and the same for the ring
+  of a keyboard-focused `a.brand.glow`; a page's own `.bar-side { flex-shrink: 0 }` keeping 0; and
+  three `.btn-icon` beside a long bare wordmark at 320 keeping 28px under a mouse and 44px under touch.
 - **check-dropdown: where a moved panel lands, on a 320px page with the real stylesheets** — an
   `.ls-panel`, a panel with inline styles of its own (restored on close), one under
   `transform: scale(0.5)`, and one cockpit's patcher strips while it is open.

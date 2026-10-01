@@ -1024,6 +1024,9 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   header.bar .brand { min-inline-size: 0; white-space: nowrap; }
   header.bar .brand > .glow { min-inline-size: 0; text-overflow: ellipsis; overflow: clip; padding: 0.75rem; margin: -0.75rem; }
   header.bar .brand.glow { overflow: clip; padding: 0.75rem; margin: -0.75rem; }
+  /* …and a link that IS the `.brand.glow` keeps base.css's ring: its padding would otherwise carry the
+     2px offset 0.75rem further out on every side (96×24 became 120×48). */
+  header.bar .brand.glow:focus-visible { outline-offset: calc(2px - 0.75rem); }
   header.bar .brand > .cursor-block { flex: none; }
   header.bar:is(:has(.nav-burger), :not(:has(> .bar-center))) > .bar-side:not(.bar-side ~ .bar-side) { min-inline-size: 0; }
   /* Everything beside the brand shrinks in proportion to its width, the brand with it, so the brand
@@ -1031,11 +1034,12 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
      measured). A millionfold share makes them reach their own min-content first, and the brand gives
      way only for what is left: the controls' end beside an unfloored brand, and the siblings of a
      `.brand` written straight in the bar. The siblings' rule has zero specificity, so a page's own
-     flex-shrink wins; the end's has to outrank `.bar-side { flex: 0 1 auto }` above.
+     flex-shrink wins; the end's is one class strong, which beats `.bar-side { flex: 0 1 auto }` above
+     by coming after it, and loses to a page's own `.bar-side { flex-shrink: 0 }`.
      ponytail: a factor, not a priority — flexbox has none. 1000 still cost the brand 1/64px;
      a million measured exact. */
   :where(header.bar:has(> .brand) > :not(.brand)) { flex-shrink: 1000000; }
-  header.bar:is(:has(.nav-burger), :not(:has(> .bar-center))) > .bar-side ~ .bar-side { flex-shrink: 1000000; }
+  :where(header.bar:is(:has(.nav-burger), :not(:has(> .bar-center))) > .bar-side) ~ .bar-side { flex-shrink: 1000000; }
   .site-nav.open { display: block; }
   /* The desktop rail is a desktop idea: a fixed 17rem column would eat a phone.
      Below the breakpoint the burger owns navigation — the rail un-fixes and becomes a

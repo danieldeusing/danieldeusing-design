@@ -84,6 +84,7 @@ let globalsInstalled = false;
 
 const optionsOf = (instance) => instance.select.options;
 const label = (element) => (element.textContent || "").trim();
+const isHidden = (select) => select.hasAttribute("hidden");
 const indexOf = (item) => Number(item.dataset.index);
 const searchable = (instance) =>
   instance.select.hasAttribute("data-search") ||
@@ -166,8 +167,9 @@ function syncTrigger(instance) {
   trigger.disabled = select.disabled;
   // A select the page hides is a control the page hid: what the runtime drew for it goes too, the
   // whole .filter-dd with its clear for a filter (0.62.2; until then the trigger stayed on screen).
+  // The ATTRIBUTE, either value: hidden="until-found" copied as itself would leave the group drawn.
   const drawn = instance.group || instance.field;
-  if (drawn.hidden !== select.hidden) drawn.hidden = select.hidden;
+  if (drawn.hidden !== isHidden(select)) drawn.hidden = isHidden(select);
   // An invalid select must SAY so where the reader is looking. The select itself
   // is transparent and aria-hidden, so a red edge or an announcement pinned to it
   // reaches nobody; the trigger is the control now. The error's TEXT goes with it:
@@ -412,7 +414,7 @@ function enhance(select) {
   instance.observer = new MutationObserver(() => {
     syncTrigger(instance);
     // A list left open over a control the page just hid would float over nothing.
-    if (instance.panel && select.hidden) close(instance, false);
+    if (instance.panel && isHidden(select)) close(instance, false);
     if (instance.panel) {
       // The list changed under an open panel. Rebuild it rather than show a stale
       // one — and keep what the reader had typed into its search, which a poll
@@ -590,7 +592,9 @@ function buildPanel(instance) {
  * the last poll while the value underneath had moved on.
  */
 function open(instance) {
-  if (instance.select.disabled) return;
+  // A hidden select has no trigger on screen, so a list opened for it (a programmatic click) would
+  // float over nothing.
+  if (instance.select.disabled || isHidden(instance.select)) return;
   if (openInstance && openInstance !== instance) close(openInstance, false);
 
   const panel = buildPanel(instance);

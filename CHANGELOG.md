@@ -19,17 +19,25 @@ All notable changes to this project are documented here. The format follows
 - **`findMisplacedFilters()` finds a search's row through plain wrappers.** Its walk from a drawn
   search went up through `.search-field`, `<label>` and `.filter-bar-lead` only, so a search in an
   unclassed `<div>` or `<span>`, with a `.switch` or a `select` beside that wrapper, was not judged.
-  It now also passes any element that draws nothing but the search's chain and `<label>`s of words. A
-  wrapper holding another control ends the walk, and so does `root`. A `.switch` or `select` anywhere
+  It now also passes a `<div>` or `<span>` with no class and no role whose element children are only
+  the search's chain and `<label>`s of words. That test reads markup, not what is drawn, so a verdict
+  taken on load does not flip once data arrives (an empty result count beside the search ends the
+  walk exactly as a filled one does); `<template>`, `<script>` and `<style>` are ignored. Every other
+  element ends the walk: a `.filter-bar`, `<search>`, `<form>`, `<fieldset>`, a cell, a `<dialog>`, a
+  `<section>`, `<article>`, `<aside>`, `<main>`, anything with a class or a role, and a wrapper that
+  also holds a heading, a paragraph or a control. So does `root`. A `.switch` or `select` anywhere
   else is still not judged: a form with the search in one row and a select in the next reports
-  nothing. The exemptions and the drawn-only rule are unchanged.
+  nothing. The exemptions are unchanged, and only the search and the controls judged must be drawn.
 - **A hidden `<select>` draws nothing.** `initSelects()` never read `hidden`, so a picker the page hid
   kept its trigger on the screen. The drawn control now follows the select's `hidden`: the
   `.select-field`, or the whole `.filter-dd` with its clear, is hidden with it, shown again when the
   attribute goes, and an open list closes when its select is hidden. Setting the attribute on the
   select is enough, so a patcher that writes only the select's attributes (cockpit's `cockpitPatch`)
-  hides and shows the trigger without rebuilding it. `findMisplacedFilters()` judges an enhanced
-  select by that drawn `.select-field`, not by the `<select>` inside it.
+  hides and shows the trigger without rebuilding it, a filter's two-level slot included. Either value
+  of the attribute counts (`hidden="until-found"` too), and a hidden select's list does not open, even
+  on a programmatic click. Only the attribute is followed: a class or `display: none` on the select
+  hides the select and leaves its trigger drawn. `findMisplacedFilters()` judges an enhanced select by
+  that drawn `.select-field`, not by the `<select>` inside it.
 
 ### Changed
 
@@ -37,9 +45,20 @@ All notable changes to this project are documented here. The format follows
   height check refused one until the fix above.
 - Every current-version pin (README, the html-doc skill, the documentation and error-page
   templates) moves to 0.62.2.
+- The vendored cockpit patcher CI drives the runtime against (`scripts/fixtures/cockpit-dom-patch.js`)
+  is refreshed from danieldeusing-infra ad44527 (2026-09-30); the copy from 4547845 had no
+  `.filter-dd` slot.
 
-Consumers: nothing to change, unless a page wraps its search in a plain `<div>` or `<span>` beside
-filter controls outside a `.filter-bar`; such a page is now reported (`outside-filter-bar`).
+Consumers: nothing to change in markup. Two things are new on screen or in a gate:
+
+- A `<select hidden>` now hides its trigger (and a filter's clear). A page that set `hidden` on a
+  select and still relied on its trigger showing loses that picker.
+- `findMisplacedFilters()` newly reports `outside-filter-bar` for exactly one shape: a `.switch` or a
+  `select` that is a child of (or in a `<label>` that is a child of) the element laying out a drawn
+  search, where the search reaches that element through one or more `<div>`s or `<span>`s with no
+  class and no role holding nothing but the search and `<label>` words, and no `.filter-bar` is around
+  the control. It also judges an enhanced select by its `.select-field`, so a hidden `<select>` whose
+  trigger a page forces on screen is judged; with the runtime's own rule that cannot happen.
 
 ## 0.62.1 (2026-09-30)
 

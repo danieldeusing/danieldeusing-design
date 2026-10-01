@@ -944,6 +944,13 @@ await evaluate(`document.getElementById("hp").hidden = true; tick()`);
 await check("hidden: an open list closes when its select is hidden — no panel left over a control that is gone",
   () => evaluate(`!panel() && triggerOf("hp").getAttribute("aria-expanded") === "false"`),
   () => evaluate(`!!panel() + " " + triggerOf("hp").getAttribute("aria-expanded")`));
+await evaluate(`triggerOf("hp").click(); tick()`);
+await check("hidden: a programmatic click on a hidden select's trigger opens nothing — no list floating over a control that is not drawn",
+  () => evaluate(`!panel() && triggerOf("hp").getAttribute("aria-expanded") === "false"`), () => evaluate(`panel() && JSON.stringify(box(panel()))`));
+await evaluate(`document.getElementById("hf").hidden = false; tick()`);
+await evaluate(`document.getElementById("hf").setAttribute("hidden", "until-found"); tick()`);
+await check("hidden: hidden=\"until-found\" counts as hidden — the filter's group, trigger and clear draw nothing",
+  () => evaluate(nothingDrawn("hf")), () => evaluate(`document.getElementById("hf").closest(".filter-dd").outerHTML.slice(0, 80)`));
 
 // cockpit's patcher writes attributes onto the SELECT inside the .select-field slot and never onto the
 // wrapper (infra rules/05), so a patch that sets or removes `hidden` on the select must be enough.
@@ -963,6 +970,18 @@ if (!patcher) {
   await check(`hidden: cockpitPatch (${patcher.split("/").slice(-3).join("/")}) setting \`hidden\` on the select hides the trigger, removing it shows it — the same trigger, never rebuilt`,
     async () => hiddenByPatch && (await evaluate(triggerDrawn("pp"))) && (await evaluate(`triggerOf("pp").id`)) === trigger,
     async () => `hidden by patch: ${hiddenByPatch}, shown again: ${await evaluate(triggerDrawn("pp"))}`);
+  // A FILTER is two levels deep — .filter-dd > .select-field > select — the slot cockpit's FILTER_WRAP
+  // descends. The whole group, its clear included, hides and shows; the trigger is the same node.
+  const filterMarkup = (hidden) => `<select id="pf" data-filter aria-label="repo"${hidden ? " hidden" : ""}><option value="">all</option><option value="a" selected>a</option></select>`;
+  await evaluate(`mount('<div id="pmf">${filterMarkup(false)}</div>'); initSelects(); window.__pfTrigger = triggerOf("pf"); tick()`);
+  const shownAtFirst = await evaluate(`drawn(triggerOf("pf")) && drawn(clearOf("pf"))`);
+  await evaluate(`cockpitPatch(document.getElementById("pmf"), ${JSON.stringify(filterMarkup(true))}); tick()`);
+  const filterHidden = await evaluate(`${nothingDrawn("pf")} && triggerOf("pf") === window.__pfTrigger`);
+  await evaluate(`cockpitPatch(document.getElementById("pmf"), ${JSON.stringify(filterMarkup(false))}); tick()`);
+  await check("hidden: ...and on a select[data-filter], the .filter-dd with its clear hides and shows under the patch — the same trigger node throughout, one group",
+    async () => shownAtFirst && filterHidden && (await evaluate(`drawn(triggerOf("pf")) && drawn(clearOf("pf")) && triggerOf("pf") === window.__pfTrigger
+      && document.querySelectorAll("#pmf .filter-dd").length === 1`)),
+    async () => JSON.stringify({ shownAtFirst, filterHidden, after: await evaluate(`[drawn(triggerOf("pf")), triggerOf("pf") === window.__pfTrigger, document.querySelectorAll("#pmf .filter-dd").length]`) }));
 }
 
 /* ── which lists get a search row: only a long FILTER, or one that asks (C8) ── */
@@ -2292,8 +2311,8 @@ await check("0.62.1 findFlushBlocks: only the body's FIRST drawn block may sit o
 /* ═══ 0.62.2 — a search's row is found through plain wrappers ═════════════════════════════════════
    0.62.1 walked up from a search through .search-field, <label> and .filter-bar-lead only, so a search
    in an unclassed <div> or <span>, with a switch and a picker beside that wrapper, was not judged. The
-   walk now also passes a wrapper that draws nothing but the search's own chain (the search, its clear,
-   a <label> of words). A wrapper holding another control ends it, and so does the root. */
+   walk now also passes a plain <div> or <span> (no class, no role) that holds nothing but the search's
+   own chain and <label>s of words, drawn or not. Any other element ends it, and so does the root. */
 await evaluate(`(() => {
   const at = document.createElement("div");
   at.id = "fx-0622";
@@ -2302,7 +2321,7 @@ await evaluate(`(() => {
     <select aria-label="lines" id="w-sel"><option>200</option><option>all</option></select>
     <button type="button" class="switch" role="switch" aria-checked="false" id="w-sw">follow</button></div>
   <div class="row" id="s-row"><span><label for="s-q">find</label><span class="search-field"><input type="search" id="s-q">
-    <button type="button" class="search-clear" aria-label="clear search"></button></span><button type="button" class="switch" role="switch" aria-checked="false" hidden>hidden</button></span>
+    <button type="button" class="search-clear" aria-label="clear search"></button></span><template><select><option>x</option></select></template></span>
     <button type="button" class="switch" role="switch" aria-checked="false" id="s-sw">wrap</button></div>
   <div class="row" id="m-row"><div id="m-wrap"><span class="search-field"><input type="search" aria-label="with a button"></span>
     <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="m-btn">go</button></div>
@@ -2320,7 +2339,7 @@ await evaluate(`(() => {
 await sleep(150);
 const drawn = (ids) => evaluate(`${JSON.stringify(ids)}.every((id) => document.getElementById(id).getClientRects().length > 0)`);
 const wrapped = await misplaced(`document.getElementById("fx-0622")`);
-await check("0.62.2 findMisplacedFilters: a search in an unclassed <div>, or a <span> holding its label words, its clear and a HIDDEN switch, has a row — the select and switches beside the wrapper are reported",
+await check("0.62.2 findMisplacedFilters: a search in an unclassed <div>, or a <span> holding its label words, its clear and a <template>, has a row — the select and switches beside the wrapper are reported",
   () => ["w-sel", "w-sw", "s-sw"].every((id) => wrapped.includes("outside-filter-bar " + id)), JSON.stringify(wrapped));
 await check("0.62.2 findMisplacedFilters: a wrapper holding the search AND another control (a button, a <label> with a picker) ends the walk — nothing above it is reported, the labelled picker in it is",
   async () => (await drawn(["m-btn", "m-sel", "m-sw", "l-sel", "l-sw"])) && !wrapped.some((r) => /m-|l-sw/.test(r)) &&
@@ -2331,6 +2350,39 @@ await check("0.62.2 findMisplacedFilters: nothing else in the fixture is reporte
 const atRoot = await misplaced(`document.querySelector("#w-row > div")`);
 await check("0.62.2 findMisplacedFilters: called on the wrapper itself, the walk stops at the root — the controls outside it are not reported",
   () => atRoot.length === 0, JSON.stringify(atRoot));
+
+// What ends the walk does not depend on what is drawn at the moment, and a container with a meaning of
+// its own is never walked through.
+await evaluate(`(() => {
+  const at = document.createElement("div");
+  at.id = "fx-0622-stops";
+  const sw = (id) => '<button type="button" class="switch" role="switch" aria-checked="false" id="' + id + '">x</button>';
+  const sf = (name) => '<span class="search-field"><input type="search" aria-label="' + name + '"></span>';
+  at.innerHTML =
+    '<div class="row" id="c-row"><div>' + sf("counted") + '<p class="result-count" id="c-count"></p></div>' + sw("c-sw") + '</div>' +
+    '<div class="row"><div class="filter-bar">' + sf("in a bar") + '</div>' + sw("k-bar-sw") + '</div>' +
+    '<div class="row"><search>' + sf("in a search element") + '</search>' + sw("k-search-sw") + '</div>' +
+    '<div class="row"><form>' + sf("in a form") + '</form><select aria-label="beside a form" id="k-form-sel"><option>a</option></select></div>' +
+    '<div class="row"><div role="search">' + sf("in a role") + '</div>' + sw("k-role-sw") + '</div>' +
+    '<div class="row"><div class="card-head">' + sf("in a classed div") + '</div>' + sw("k-class-sw") + '</div>' +
+    '<div class="row"><div><h3 id="h-head">logs</h3>' + sf("beside a heading") + '</div><select aria-label="beside a heading" id="h-sel"><option>a</option></select></div>' +
+    '<div class="row"><div><p id="p-text">type to filter</p>' + sf("beside a paragraph") + '</div>' + sw("p-sw") + '</div>';
+  document.querySelector("main").append(at); })(); null`);
+await sleep(100);
+const stops = () => misplaced(`document.getElementById("fx-0622-stops")`);
+const countEmpty = await stops();
+// rendered() in rhythm.js needs a box with both sides > 0: an empty count is 0px tall.
+const emptyCountDrawn = await evaluate(`document.getElementById("c-count").getBoundingClientRect().height > 0`);
+await evaluate(`document.getElementById("c-count").textContent = "3 of 17"; null`);
+const countFilled = await stops();
+await check("0.62.2 findMisplacedFilters: a wrapper holding the search and a result count gives one verdict whether the count is empty (undrawn) or filled",
+  async () => !emptyCountDrawn && (await drawn(["c-count", "c-sw"])) && JSON.stringify(countEmpty) === JSON.stringify(countFilled) && !countFilled.some((r) => /c-sw/.test(r)),
+  () => JSON.stringify({ emptyCountDrawn, countEmpty, countFilled }));
+await check("0.62.2 findMisplacedFilters: the walk does not pass a .filter-bar, a <search>, a <form>, an element with a role, or a classed <div> — nothing beside them is reported",
+  async () => (await drawn(["k-bar-sw", "k-search-sw", "k-form-sel", "k-role-sw", "k-class-sw"])) && !countFilled.some((r) => /k-/.test(r)), JSON.stringify(countFilled));
+await check("0.62.2 findMisplacedFilters: a drawn heading or <p> beside the search in a wrapper ends the walk",
+  async () => (await drawn(["h-head", "p-text", "h-sel", "p-sw"])) && !countFilled.some((r) => /h-sel|p-sw/.test(r)), JSON.stringify(countFilled));
+await check("0.62.2 findMisplacedFilters: nothing at all in that fixture is reported", () => countFilled.length === 0, JSON.stringify(countFilled));
 
 await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
 

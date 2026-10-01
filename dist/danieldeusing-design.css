@@ -3851,6 +3851,12 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   cursor: pointer; padding: 0.55rem; margin: -0.3rem -0.3rem -0.3rem 0;
 }
 .nav-burger:hover { color: var(--primary); }
+/* AN ICON IN A CONTROL KEEPS ITS SIZE (0.62.4). reset.css caps every svg at `max-width: 100%`, and a
+   percentage cap makes a replaced element's min-content zero, so a control holding an inline <svg>
+   had no floor of its own: squeezed, the burger fell to its 18px of padding with its 22px icon
+   spilling out. The cap is for images in running text; an icon has its own size. (`.btn-icon > svg`
+   takes the same in controls.css.) */
+.nav-burger > svg { max-inline-size: none; }
 .mobile-nav { display: none; list-style: none; margin: 0; padding: 0; }
 .mobile-footer { display: none; }
 
@@ -3875,13 +3881,15 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
      bar, the docs wordmark broke at its hyphen ("danieldeusing-" / "docs", a 68px bar instead of
      45). danieldeusing.de had the equal shares from 48.0625rem up only, for the same reason. */
   .bar-side { flex: 0 1 auto; }
-  /* THE BRAND GIVES WAY (0.62.4). The bar does not wrap and its right end keeps its min-content
-     floor, so a long wordmark beside the controls made the header — and the page — wider than a
-     phone (a 33-character wordmark and a nav: 332px at 320). The controls keep their size and the
-     wordmark is what shrinks: its end becomes an ellipsis when it is the system's
-     `.brand > .glow` (the shape this file's header comment documents), and is clipped when the
-     words sit straight in the `.brand`, where no box of their own can take an ellipsis. The clip
-     reaches 1rem past the box so the glow is never cut while the wordmark fits.
+  /* THE BRAND GIVES WAY (0.62.4). The bar does not wrap, so a long wordmark beside the controls made
+     the header — and the page — wider than a phone (a 33-character wordmark and a nav: 332px at 320).
+     The wordmark is what gives way: it stays on one line, and its end becomes an ellipsis when it is
+     the system's `.brand > .glow` (the shape this file's header comment documents), or is clipped
+     when the words sit straight in the `.brand`, where no box of their own can take an ellipsis.
+     The clip has 0.75rem of padding to spend on the glow, cancelled by an equal negative margin, so
+     a wordmark that fits is never boxed: `overflow-clip-margin` would say the same, and WebKit (every
+     iOS browser) does not have it. 0.75rem, not 0.5rem: the 8px glow's tail reaches past 8px (three
+     pixels one level apart on green, measured) and 12px is where it ends.
 
      The brand's END loses its min-content floor only where no centre band competes for the room
      (a bar with a burger hides the band; one without a band has none): beside a band, the band
@@ -3889,24 +3897,20 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
      on the desktop the ends take equal shares to centre the band, and an end without a floor
      there would truncate at half the bar a wordmark that fits. */
   header.bar .brand { min-inline-size: 0; white-space: nowrap; }
-  header.bar .brand > .glow {
-    min-inline-size: 0; text-overflow: ellipsis;
-    overflow: clip; overflow-clip-margin: 1rem;
-  }
-  header.bar .brand.glow { overflow: clip; overflow-clip-margin: 1rem; }
+  header.bar .brand > .glow { min-inline-size: 0; text-overflow: ellipsis; overflow: clip; padding: 0.75rem; margin: -0.75rem; }
+  header.bar .brand.glow { overflow: clip; padding: 0.75rem; margin: -0.75rem; }
   header.bar .brand > .cursor-block { flex: none; }
-  /* A `.brand` straight in the bar shrinks beside its siblings in proportion to their widths, so it
+  header.bar:is(:has(.nav-burger), :not(:has(> .bar-center))) > .bar-side:not(.bar-side ~ .bar-side) { min-inline-size: 0; }
+  /* Everything beside the brand shrinks in proportion to its width, the brand with it, so the brand
      would give up room the controls could still give by wrapping (8.45px of a fitting wordmark,
-     measured). A millionfold share makes the siblings reach their own min-content first, and the
-     brand gives way only for what is left. Zero specificity: a page's own flex-shrink wins.
+     measured). A millionfold share makes them reach their own min-content first, and the brand gives
+     way only for what is left: the controls' end beside an unfloored brand, and the siblings of a
+     `.brand` written straight in the bar. The siblings' rule has zero specificity, so a page's own
+     flex-shrink wins; the end's has to outrank `.bar-side { flex: 0 1 auto }` above.
      ponytail: a factor, not a priority — flexbox has none. 1000 still cost the brand 1/64px;
      a million measured exact. */
   :where(header.bar:has(> .brand) > :not(.brand)) { flex-shrink: 1000000; }
-  header.bar:is(:has(.nav-burger), :not(:has(> .bar-center))) > .bar-side:not(.bar-side ~ .bar-side) { min-inline-size: 0; }
-  /* The controls' end does not shrink at all: its min-content is not a floor a control can rely on (the
-     burger's 22px icon counts as nothing in it, so a squeezed end crushed the burger to its padding,
-     40px to 18px, under a long wordmark), and an end that does not wrap has nothing to give. */
-  .bar-side ~ .bar-side { flex-shrink: 0; }
+  header.bar:is(:has(.nav-burger), :not(:has(> .bar-center))) > .bar-side ~ .bar-side { flex-shrink: 1000000; }
   .site-nav.open { display: block; }
   /* The desktop rail is a desktop idea: a fixed 17rem column would eat a phone.
      Below the breakpoint the burger owns navigation — the rail un-fixes and becomes a
@@ -4343,7 +4347,9 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   -webkit-mask: var(--ico) center / contain no-repeat;
   mask: var(--ico) center / contain no-repeat;
 }
-.btn-icon > svg { inline-size: var(--icon-size); block-size: var(--icon-size); }
+/* `max-inline-size: none` (0.62.4): reset.css's `max-width: 100%` on every svg makes its min-content
+   zero, so a squeezed icon button had no floor and fell to its border, the icon spilling out. */
+.btn-icon > svg { inline-size: var(--icon-size); block-size: var(--icon-size); max-inline-size: none; }
 
 /* Hover and open are one look: the edge takes the glyph's colour and a 12% wash of it fills the box.
    PRESSED IS NOT THAT LOOK (the lead's ruling on the WP5 review): it is solid, below. A pressed toggle

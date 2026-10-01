@@ -257,7 +257,12 @@ share the padding, the `--muted` highlight (on hover, `data-active="true"`, or R
   (0.62.4): it is never wider than the viewport less 8px a side, and once open `initDropdowns()`
   moves a panel that crosses either edge back inside it (by `left`, so the page stops scrolling
   sideways too). A panel that fits is not touched, so a `--down` menu near a phone's right edge
-  shifts left and every other menu stays where the stylesheet put it. A framework app that renders
+  shifts left and every other menu stays where the stylesheet put it. The move is written
+  `!important` (so `.ls-panel`'s `left: auto !important` cannot undo it), measured in the panel's own
+  px (a `transform: scale()` above it is allowed for), written again if a patcher drops the `style`
+  while the menu is open, and whatever the page had inline on `left`, `right` or `inline-size` comes
+  back when it closes. Known limit: the moved panel's width is pinned, so content that changes while
+  it is open keeps the width it opened with until it is opened again. A framework app that renders
   its own panel places it itself.
 - **A framework app never renders a native `<select>`, or a component library's own menu skin.** Its
   listbox puts `.select-panel` on the panel and `.select-option` on each row — `aria-selected` or

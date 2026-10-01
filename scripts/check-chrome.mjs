@@ -297,6 +297,84 @@ const fitB = await page(`(() => { const REACH = ${REACH}, b = T.q("#t-bar-b .bra
   return { brand: b.getBoundingClientRect().width, words: REACH(b), wrapped: one.getBoundingClientRect().height > 1.5 * parseFloat(getComputedStyle(one).fontSize) * 1.3 }; })()`);
 await check("…while a wordmark that fits keeps its whole width beside controls that wrap to fit: they give way first",
   () => fitB.wrapped && fitB.brand >= fitB.words - 0.01, fitB);
+
+/* THE BAR AT 320, IN THE SHAPES PAGES SHIP (0.62.4, review round 1). What must hold in each: the
+   page never scrolls sideways and nothing overhangs the bar; no control is squashed below its own
+   min-content; a brand that fits stays whole; and if the brand is cut, every control is already at
+   its min-content — nothing else had anything left to give. A control's min-content is measured on
+   a copy of it laid out at `width: min-content` beside it; the overhang counts margins, because the
+   burger leans 0.3rem into the bar's padding on purpose. */
+const JUDGE = (bar, controls) => `(() => { const h = document.querySelector(${JSON.stringify(bar)}), cs = getComputedStyle(h);
+  const inner = h.getBoundingClientRect().right - parseFloat(cs.paddingRight), kids = [...h.children].filter((k) => k.getClientRects().length);
+  const minOf = (el) => { const c = el.cloneNode(true); c.removeAttribute("id"); c.style.cssText += ";position:absolute;visibility:hidden;inline-size:min-content;flex:none";
+    el.after(c); const w = c.getBoundingClientRect().width; c.remove(); return w; };
+  const glow = h.querySelector(".brand > .glow") || h.querySelector(".brand");
+  return { sw: document.scrollingElement.scrollWidth, cw: document.documentElement.clientWidth,
+    overhang: +(Math.max(...kids.map((k) => k.getBoundingClientRect().right + parseFloat(getComputedStyle(k).marginRight))) - inner).toFixed(2),
+    cut: glow.scrollWidth > glow.clientWidth + 0.5,
+    controls: [...h.querySelectorAll(${JSON.stringify(controls)})].filter((k) => k.getClientRects().length)
+      .map((k) => ({ el: k.tagName.toLowerCase() + "." + k.className, w: +k.getBoundingClientRect().width.toFixed(2), min: +minOf(k).toFixed(2) })) }; })()`;
+const holds = (j, { whole } = {}) => j.sw <= j.cw && j.overhang <= 0.5 && j.controls.length > 0
+  && j.controls.every((c) => c.w >= c.min - 0.5) && (!j.cut || j.controls.every((c) => c.w <= c.min + 0.5)) && (whole === undefined || j.cut !== whole);
+const BURGER = `<button type="button" class="nav-burger" aria-label="menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg></button>`;
+const shapes = [
+  ["(a) a wordmark that fits, beside a nav that wraps: the nav wraps, the wordmark stays whole", true,
+    `<header class="bar" id="t-bar-b"><div class="bar-side"><a class="brand" href="#"><span class="glow">danieldeusing-docs</span><span class="cursor-block" aria-hidden="true"></span></a></div>
+     <div class="bar-side"><nav aria-label="t" style="display: flex; flex-wrap: wrap; column-gap: 0.75rem"><a href="#">blog</a><a href="#">about</a><a href="#">rss</a></nav></div></header>`, "#t-bar-b nav"],
+  ["(b) a wordmark beside a search field: nothing overhangs, the field keeps its min-content", undefined,
+    `<header class="bar" id="t-bar-b"><div class="bar-side"><a class="brand" href="#"><span class="glow">danieldeusing</span><span class="cursor-block" aria-hidden="true"></span></a></div>
+     <div class="bar-side"><div class="search-field"><input type="search" aria-label="search" placeholder="search…"></div></div></header>`, "#t-bar-b .search-field"],
+  [`(c) a ${LONG_BRAND.length}-character wordmark and a burger in .bar-side wrappers: the wordmark is cut, the burger keeps its 40px`, false,
+    `<header class="bar" id="t-bar-b"><div class="bar-side"><a class="brand" href="#"><span class="glow">${LONG_BRAND}</span><span class="cursor-block" aria-hidden="true"></span></a></div>
+     <div class="bar-side">${BURGER}</div></header>`, "#t-bar-b .nav-burger"],
+  [`(c) …and as danieldeusing-family writes it, brand and burger straight in the bar`, false,
+    `<header class="bar" id="t-bar-b"><a class="brand" href="#"><span class="glow">${LONG_BRAND}</span><span class="cursor-block" aria-hidden="true"></span></a>${BURGER}</header>`, "#t-bar-b .nav-burger"],
+];
+await load("nobanner", { width: 320, height: 800 });
+for (const [label, whole, html, controls] of shapes) {
+  await inject(html);
+  await frames(2);
+  const j = await page(JUDGE("#t-bar-b", controls));
+  const burger = controls.endsWith("nav-burger") ? j.controls[0]?.w : null;
+  await check(`at 320, ${label}`, () => holds(j, { whole }) && (burger === null || near(burger, 39.59, 0.5)), j);
+}
+
+/* A WORDMARK THAT FITS IS NEVER BOXED. The clip that truncates a long one must leave the glow of a
+   short one alone, in an engine without `overflow-clip-margin` too (WebKit, so every iOS browser):
+   the run takes the property away (`overflow-clip-margin: 0`) and compares the bar's pixels with the
+   same bar unclipped (`overflow: visible`, and none of the padding the clip spends on the glow).
+   They must be identical, on the glowing themes. */
+for (const theme of ["green", "warm"]) {
+  await load("nobanner", { width: 375, height: 800 });
+  for (const [shape, html] of [[".bar-side > .brand > .glow", null],
+    ["words straight in a .brand", BAR_B("components", NAV_B)]]) {
+    if (html) await inject(html);
+    const bar = html ? "#t-bar-b" : "header.bar";
+    await page(`document.documentElement.dataset.theme = ${JSON.stringify(theme)};
+      document.head.insertAdjacentHTML("beforeend", "<style id='t-still'>*, *::before, *::after { animation: none !important; transition: none !important; overflow-clip-margin: 0px !important; }</style>"); null`);
+    await frames(3);
+    const box = await page(`(() => { const r = document.querySelector(${JSON.stringify(bar)}).getBoundingClientRect(); return { x: 0, y: r.top, width: 375, height: r.height }; })()`);
+    // The page settles for a while after load (fonts, the rail, observers): a shot counts once the
+    // next one, three frames later, is the same picture.
+    const shot = async () => {
+      let last = null;
+      for (let i = 0; i < 40; i += 1) {
+        const now = (await send("Page.captureScreenshot", { format: "png", clip: { ...box, scale: 1 }, captureBeyondViewport: false })).data;
+        if (now === last) return now;
+        last = now;
+        await frames(3);
+      }
+      throw new Error("the bar never stopped changing");
+    };
+    const clipped = await shot();
+    await page(`document.head.insertAdjacentHTML("beforeend", "<style id='t-open'>header.bar .brand, header.bar .brand > .glow { overflow: visible !important; padding: 0 !important; margin: 0 !important; }</style>"); null`);
+    await frames(3);
+    const open = await shot();
+    await page(`document.getElementById("t-open").remove(); document.getElementById("t-still").remove(); document.getElementById("t-bar-b")?.remove(); null`);
+    await check(`a wordmark that fits (${shape}, ${theme}, 375) paints exactly as it does unclipped, with no overflow-clip-margin to lean on`,
+      () => clipped === open, "the clip cuts the glow");
+  }
+}
 await load("nobanner");
 await load("nobanner");
 const app = await page(`({ h: T.rect("#app-bar").height, pos: T.cs("#app-bar", "position"), pl: T.cs("#app-bar", "paddingLeft"),

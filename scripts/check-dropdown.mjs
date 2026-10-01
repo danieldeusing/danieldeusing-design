@@ -155,15 +155,30 @@ const HARNESS = `<!doctype html><html><head><meta charset="utf-8"><style>
   window.ready = true;
 </script></body></html>`;
 
+// Where a moved panel lands needs the real stylesheets and a phone's width (the last section).
+const PLACE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/components.css"><link rel="stylesheet" href="/src/chrome.css">
+<style>body { margin: 0; } #p-scaled .dropdown-panel { inline-size: 200px; }</style></head><body>
+<details class="dropdown" id="p-ls" style="position: absolute; left: 106px; top: 40px"><summary>nav</summary>
+  <ul class="dropdown-panel dropdown-panel--down ls-panel"><li><a class="dropdown-item" href="#">one</a></li></ul></details>
+<details class="dropdown" id="p-author" style="position: absolute; left: 260px; top: 120px"><summary>author</summary>
+  <ul class="dropdown-panel dropdown-panel--down" style="left: 3px; inline-size: 150px"><li><button type="button" class="dropdown-item">one</button></li></ul></details>
+<div style="position: absolute; left: 0; top: 200px; width: 640px; transform: scale(0.5); transform-origin: 0 0">
+  <details class="dropdown" id="p-scaled" style="position: absolute; left: 560px; top: 0"><summary>scaled</summary>
+  <ul class="dropdown-panel dropdown-panel--down"><li><button type="button" class="dropdown-item">one</button></li></ul></details></div>
+<div id="p-mount"></div>
+<script type="module">import * as dropdown from "/runtime/dropdown.js"; dropdown.initDropdowns(); window.ready = true;</script></body></html>`;
+
 const server = createServer((req, res) => {
-  if (req.url === "/") {
+  if (req.url === "/" || req.url === "/place") {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(HARNESS);
+    res.end(req.url === "/" ? HARNESS : PLACE);
     return;
   }
-  const file = { "/runtime/dropdown.js": "runtime/dropdown.js", "/runtime/theme.js": "runtime/theme.js" }[req.url];
+  const file = { "/runtime/dropdown.js": "runtime/dropdown.js", "/runtime/theme.js": "runtime/theme.js",
+    "/src/tokens.css": "src/tokens.css", "/src/components.css": "src/components.css", "/src/chrome.css": "src/chrome.css" }[req.url];
   if (!file) { res.writeHead(404); res.end(); return; }
-  res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+  res.writeHead(200, { "content-type": `${file.endsWith(".css") ? "text/css" : "text/javascript"}; charset=utf-8` });
   res.end(readFileSync(join(root, file), "utf8"));
 }).listen(0, "127.0.0.1");
 await new Promise((ok) => server.on("listening", ok));
@@ -644,6 +659,67 @@ await section("the theme items follow the theme, whoever changes it", async () =
   check("one theme order everywhere: THEMES is warm, green, mono, paper",
     (await evaluate("(window.THEMES || []).join()")) === "warm,green,mono,paper", await evaluate("window.THEMES"));
   await evaluate("setTheme('warm'); null");
+});
+
+/* ── a moved panel: on screen, and nobody else's styles lost (0.62.4) ───────
+   A phone-width page with the real stylesheets. Each panel crosses an edge when it opens, so
+   initDropdowns() moves it; what is asserted is where it lands and what it leaves behind:
+   · `.ls-panel` pins `left: auto !important` (chrome.css) — the move must still win, or the panel
+     drops to its static place and the page widens;
+   · a panel with its own inline left and width gets them back when it closes;
+   · under a `transform: scale(0.5)` the move and the pinned width are in the panel's own px;
+   · cockpit's patcher drops a `style` its markup lacks — a moved panel that is still open moves
+     again. */
+await section("a moved panel: on screen, and nobody else's styles lost", async () => {
+  await send("Emulation.setDeviceMetricsOverride", { width: 320, height: 800, deviceScaleFactor: 1, mobile: true });
+  await send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/place` });
+  for (let i = 0; i < 50 && !(await evaluate("window.ready === true").catch(() => false)); i += 1) await sleep(100);
+  const open = async (id) => { await evaluate(`document.getElementById(${JSON.stringify(id)}).open = true; null`); await sleep(80); };
+  const shut = async (id) => { await evaluate(`document.getElementById(${JSON.stringify(id)}).open = false; null`); await sleep(80); };
+  const where = (id) => evaluate(`(() => { const p = document.querySelector("#" + ${JSON.stringify(id)} + " .dropdown-panel"), r = p.getBoundingClientRect();
+    return { left: +r.left.toFixed(2), right: +r.right.toFixed(2), width: +r.width.toFixed(2), sw: document.scrollingElement.scrollWidth,
+      inline: { left: p.style.left, right: p.style.right, inlineSize: p.style.inlineSize } }; })()`);
+  const inside = (w) => w.left >= 7.5 && w.right <= 312.5 && w.sw <= 320;
+
+  await open("p-ls");
+  const ls = await where("p-ls");
+  check("an .ls-panel (left: auto !important) that opens past the left edge lands inside the screen, and the page does not widen", inside(ls), ls);
+  await shut("p-ls");
+
+  await open("p-author");
+  const authored = await where("p-author");
+  await shut("p-author");
+  const back = await where("p-author");
+  check("a panel with its own inline left and width is moved inside the screen while open…", inside(authored), authored);
+  check("…and gets its own left and width back when it closes", back.inline.left === "3px" && back.inline.inlineSize === "150px" && back.inline.right === "", back.inline);
+
+  await open("p-scaled");
+  const scaled = await where("p-scaled");
+  check("under transform: scale(0.5) the panel lands inside the screen at its own scaled width (100px on screen)",
+    inside(scaled) && Math.abs(scaled.width - 100) <= 0.5, scaled);
+  await shut("p-scaled");
+
+  const candidates = [process.env.DD_COCKPIT_DOM_PATCH, join(root, "../danieldeusing-infra/cockpit/pages/dom-patch.js"),
+    join(root, "../../danieldeusing-infra/cockpit/pages/dom-patch.js")].filter(Boolean);
+  const file = candidates.find((path) => existsSync(path));
+  if (!file) {
+    console.log(`SKIP  cockpit's dom-patch.js is not beside this checkout (looked in ${candidates.join(", ")})`);
+    check("DD_REQUIRE_COCKPIT_DOM_PATCH is not set, so a missing dom-patch.js may skip", process.env.DD_REQUIRE_COCKPIT_DOM_PATCH !== "1");
+    return;
+  }
+  await evaluate(readFileSync(file, "utf8"));
+  const html = '<details class="dropdown" id="p-patch" style="position: absolute; left: 270px; top: 300px"><summary>patch</summary>' +
+    '<ul class="dropdown-panel dropdown-panel--down"><li><button type="button" class="dropdown-item">one</button></li></ul></details>';
+  await evaluate(`document.getElementById("p-mount").innerHTML = ${JSON.stringify(html)}; null`);
+  await open("p-patch");
+  const moved = await where("p-patch");
+  await evaluate(`cockpitPatch(document.getElementById("p-mount"), ${JSON.stringify(html)}); null`);
+  await sleep(80);
+  const patched = { ...(await where("p-patch")), open: await isOpen("p-patch") };
+  check(`cockpitPatch (${file.split("/").slice(-3).join("/")}) drops the moved panel's style while it is open, and it is moved again`,
+    inside(moved) && patched.open && inside(patched), { moved, patched });
+  await shut("p-patch");
+  await send("Emulation.clearDeviceMetricsOverride");
 });
 
 console.log(failures ? `\ncheck-dropdown: ${failures} FAILED` : "\ncheck-dropdown: all checks passed");

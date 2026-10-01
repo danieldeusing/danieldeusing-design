@@ -69,10 +69,12 @@ const BORROWED = [["lucide-react", "lucide", "DD_LUCIDE_REACT"], ["@tailwindcss/
 
 // Whether a flag's path lies inside $RUNNER_TEMP/<dir>/node_modules once its `.` and `..` segments are
 // resolved: a prefix match alone passes `${{ runner.temp }}/tailwind/node_modules/../../elsewhere`. The
-// runner's temp directory is one opaque root, so a `..` that climbs out of it lands outside too.
+// runner's temp directory is one opaque root, so a `..` that climbs out of it lands outside too. Only
+// the `${{ runner.temp }}` expression: a step's `env:` is not shell-expanded, so `$RUNNER_TEMP` there is
+// a literal string and the suite would look for a directory called that.
 const ROOT = "/<runner.temp>";
 const insideRunnerTemp = (value, dir) => {
-  const m = value.match(/^(?:\$\{\{\s*runner\.temp\s*\}\}|\$\{?RUNNER_TEMP\}?)(\/.*)$/);
+  const m = value.match(/^\$\{\{\s*runner\.temp\s*\}\}(\/.*)$/);
   return !!m && posix.normalize(ROOT + m[1]).startsWith(`${ROOT}/${dir}/node_modules/`);
 };
 

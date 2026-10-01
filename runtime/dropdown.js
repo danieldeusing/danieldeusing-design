@@ -327,30 +327,59 @@ function closeAll(except) {
  * Moved by `left`, not `translate`: Chrome kept a translated panel's old box in the page's scrollable
  * overflow, so the panel came back on screen and the page went on scrolling sideways (measured:
  * scrollWidth 447 in a 375px viewport with the panel at 182-367). Its width is pinned first, because
- * an absolute box's shrink-to-fit width depends on its offsets. The width cap that keeps a panel
- * narrower than the screen is components.css's.
+ * an absolute box's shrink-to-fit width depends on its offsets; a panel whose content changes while
+ * it is open keeps that width until it is opened again. The width cap that keeps a panel narrower
+ * than the screen is components.css's.
+ *
+ * Written `!important`, because a stylesheet may pin a side that way (chrome.css's
+ * `.dropdown-panel.ls-panel { left: auto !important }`), and a `left` that loses leaves `right: auto`
+ * to drop the panel to its static place. Whatever the author had inline on those properties is kept
+ * and put back when the panel closes. Measured against the panel's own scale (its rect over its
+ * layout width), which is the root's zoom times any `transform: scale()` above it: a rect is visual
+ * px, `left` is the containing block's own px. And a renderer that patches attributes (cockpit's
+ * `cockpitPatch`) drops a `style` its markup does not carry, so while a moved panel is open its
+ * `style` is watched and the move written again.
  */
 const EDGE = 8;
-const moved = new WeakSet();
+const PLACED = ["left", "right", "inline-size"];
+const moves = new WeakMap(); // panel -> { kept, wrote, observer }
+
+function writeMove(panel, { wrote }) {
+  for (const [prop, value] of Object.entries(wrote))
+    if (panel.style.getPropertyValue(prop) !== value || panel.style.getPropertyPriority(prop) !== "important")
+      panel.style.setProperty(prop, value, "important");
+}
+
+function unmove(panel) {
+  const move = moves.get(panel);
+  if (!move) return;
+  moves.delete(panel);
+  move.observer.disconnect();
+  for (const [prop, value, priority] of move.kept)
+    if (value) panel.style.setProperty(prop, value, priority);
+    else panel.style.removeProperty(prop);
+}
+
 function keepOnScreen(details) {
   const panel = panelOf(details);
   if (!panel) return;
-  if (moved.has(panel)) {
-    moved.delete(panel);
-    panel.style.left = panel.style.right = panel.style.inlineSize = "";
-  }
+  unmove(panel);
   if (!details.open) return;
   const style = getComputedStyle(panel);
   if (style.position !== "absolute") return;
-  // Divided on the write, as popup.js explains: a rect is visual px, a length is multiplied by zoom.
-  const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
   const { left, right, width } = panel.getBoundingClientRect();
   const dx = left < EDGE ? EDGE - left : Math.min(0, document.documentElement.clientWidth - EDGE - right);
-  if (!dx) return;
-  moved.add(panel);
-  panel.style.inlineSize = `${width / zoom}px`;
-  panel.style.left = `${parseFloat(style.left) + dx / zoom}px`;
-  panel.style.right = "auto";
+  const layoutWidth = parseFloat(style.inlineSize);
+  if (!dx || !layoutWidth) return;
+  const scale = width / layoutWidth;
+  const move = {
+    kept: PLACED.map((prop) => [prop, panel.style.getPropertyValue(prop), panel.style.getPropertyPriority(prop)]),
+    wrote: { "inline-size": style.inlineSize, left: `${parseFloat(style.left) + dx / scale}px`, right: "auto" },
+  };
+  move.observer = new MutationObserver(() => writeMove(panel, move));
+  moves.set(panel, move);
+  writeMove(panel, move);
+  move.observer.observe(panel, { attributes: true, attributeFilter: ["style"] });
 }
 
 function onToggle(event) {

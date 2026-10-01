@@ -14,22 +14,32 @@ All notable changes to this project are documented here. The format follows
   panel to 447px at 375) and the page scrolled sideways while it was open. `initDropdowns()` now
   moves an open panel that crosses either edge of the viewport back inside it, 8px clear, by `left`
   with its width pinned (a `translate` brought the panel back but left the page scrolling: Chrome kept
-  the old box in the scrollable overflow). A panel that fits is not touched, and a panel placed by
-  script (`position: fixed`, a table header's filter) is left to that script. `.dropdown-panel` is
-  also capped at `max-inline-size: calc(100vw - 16px)`, so a panel wider than the phone is narrowed
-  first. Measured on every example, 145 menus at 320, 375 and 1280: only those two panels moved.
+  the old box in the scrollable overflow). The move is written `!important`, so `.ls-panel`'s
+  `left: auto !important` cannot drop the panel to its static place (which widened the page to 378px
+  at 320); it is measured in the panel's own px, so a `transform: scale()` above it is allowed for;
+  a patcher that drops the `style` while the menu is open (cockpit's `cockpitPatch`) has the move
+  written again; and an inline `left`, `right` or `inline-size` the page had on the panel comes back
+  when it closes. A panel that fits is not touched, and a panel placed by script (`position: fixed`,
+  a table header's filter) is left to that script. `.dropdown-panel` is also capped at
+  `max-inline-size: calc(100vw - 16px)`, so a panel wider than the phone is narrowed first. Measured
+  on every example, 145 menus at 320, 375 and 1280: only those two panels moved. Known limit: a moved
+  panel keeps the width it opened with if its content changes while it is open.
 - **A long wordmark no longer widens a phone page: the brand gives way** (below 48rem). The bar does
-  not wrap and its right end keeps its size, so components.html's old 33-character wordmark and its
-  nav made the page 332px wide at 320. The wordmark now stays on one line and shrinks:
-  `.brand > .glow` ends in an ellipsis, words written straight in a `.brand` are clipped (bare text
-  has no box to carry one; the clip reaches 1rem past the box so the glow is never cut). The right
-  `.bar-side` no longer shrinks (squeezed, it crushed the burger from 40px to its 18px of padding,
-  because the icon counts for nothing in its min-content), and a `.brand` straight in the bar lets
-  its siblings wrap to their min-content before it gives anything. Beside a centre band with no
-  burger the band still gives way first. Every example and template is pixel-identical at 320, 375
-  and 1280 in all four themes where the wordmark fits; it changed where it did not: chrome.html's
-  `.bar--app` demo at 320 (its contents ran 49px past the bar; now "c…") and components.html at 320
-  on green and paper (its nav ran 0.86px past the bar's padding).
+  not wrap, so components.html's old 33-character wordmark and its nav made the page 332px wide at
+  320. The wordmark now stays on one line and shrinks: `.brand > .glow` ends in an ellipsis, words
+  written straight in a `.brand` are clipped (bare text has no box to carry one). The clip spends
+  0.75rem of padding on the glow and takes it back with an equal negative margin, so a wordmark that
+  fits is never boxed, in WebKit too, which has no `overflow-clip-margin` (every iOS browser). The
+  controls give way first, down to their own min-content, and the brand only for what is left: a
+  wrapping nav wraps beside a "danieldeusing-docs" that fits, instead of the wordmark becoming "d…".
+  Beside a centre band with no burger the band still gives way first. Every example and template is
+  pixel-identical at 320, 375 and 1280 in all four themes where the wordmark fits; it changed where it
+  did not: chrome.html's `.bar--app` demo at 320 (its contents ran 49px past the bar; now "c…") and
+  components.html at 320 on green and paper (its nav ran 0.86px past the bar's padding).
+- **An icon button keeps its icon's width when squeezed.** reset.css's `svg { max-width: 100% }`
+  makes an inline svg's min-content zero, so a `.nav-burger` beside a long wordmark fell from 40px to
+  its 18px of padding with the icon spilling out (danieldeusing-family's header, in all three
+  engines). `.nav-burger > svg` and `.btn-icon > svg` take `max-inline-size: none`.
 - **filters.html calls `initTableScroll()`.** Under a finger the table-tools table's header buttons
   grow to 44px and the table is 449px wide; with no `.tablewrap` around it the page scrolled
   sideways on a touch phone (Chromium widens the layout viewport instead: innerWidth 478 at 375).
@@ -45,12 +55,20 @@ All notable changes to this project are documented here. The format follows
   `(pointer: coarse)` matches only when touch is emulated, and fails a layout viewport wider than the
   emulated width. Plus a panel wider than the phone, injected. All fail on 0.62.3.
 - **check-chrome: a 33-character wordmark at 320** in both brand shapes (fits, one line, ellipsis or
-  clip, controls unchanged) and a fitting wordmark beside controls that must wrap (untouched).
-  Fails on 0.62.3; each of the three rules is mutation-proven.
+  clip, controls unchanged) and a fitting wordmark beside controls that must wrap (untouched); the
+  bar shapes pages ship, at 320 (a fitting wordmark beside a wrapping nav, beside a search field, and
+  a long one beside a burger in `.bar-side` wrappers and straight in the bar), each judged on: no
+  sideways scroll, no control below its own min-content, a fitting brand whole, a cut brand only once
+  every control is at its min-content; and a fitting wordmark painting exactly as it does unclipped
+  with `overflow-clip-margin` taken away, on green and warm.
+- **check-dropdown: where a moved panel lands, on a 320px page with the real stylesheets** — an
+  `.ls-panel`, a panel with inline styles of its own (restored on close), one under
+  `transform: scale(0.5)`, and one cockpit's patcher strips while it is open.
 - **check-release-gate resolves `.` and `..` before it judges a borrowed path.** `DD_TAILWIND_NODE`,
   `DD_MERMAID` and `DD_LUCIDE_REACT` were matched by prefix, so
   `${{ runner.temp }}/tailwind/node_modules/../../elsewhere` passed. The runner's temp directory is
-  now one opaque root and the path is normalised first; a `..` that climbs out fails.
+  now one opaque root and the path is normalised first; a `..` that climbs out fails, and so does a
+  path written `$RUNNER_TEMP/…`, which a step's `env:` does not expand.
 - **check-cards names an SVG element in a diagnostic** instead of printing
   `[object SVGAnimatedString]` for its class, as the file's `WIDE` helper already did.
 

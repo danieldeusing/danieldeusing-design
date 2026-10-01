@@ -24,6 +24,16 @@ All notable changes to this project are documented here. The format follows
   "paused — scroll down to resume", a sentence in a `white-space: nowrap` flex item, which made the
   page 343px wide. A console status is one word (`live`, `paused`, `ended`), so the example is what
   changed, not the CSS. check-cards now asserts no sideways scroll at 320px as well as 375px.
+- **No example page scrolls sideways at 320px or 375px, and a suite says so for every page.**
+  `check-filters.mjs`, which already sweeps every file in `examples/`, now fails a page whose
+  `scrollWidth` exceeds its viewport at either width and names the elements that overflow the page
+  itself (an element inside its own scrolling wrapper, or inside a closed `<details>`, is not
+  counted). It found three pages, all examples at fault and none the CSS: `chrome.html` (336px: the
+  `.bar--app` title strip is a fixed-width desktop specimen, so its frame now scrolls),
+  `components.html` (332px: its page header's brand and nav did not fit one line, so the header
+  wraps) and `controls.html` (372px: `.demo-matrix` was `minmax(22rem, 1fr)`, now
+  `minmax(min(22rem, 100%), 1fr)`). `data.html`, `filters.html` and `icons.html` had wide elements
+  but no overflow: a `.tablewrap`, the page's own `overflow-x: auto` table, and closed menus.
 
 ## 0.62.2 (2026-09-30)
 

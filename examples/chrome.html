@@ -72,6 +72,8 @@
       .content h3 { margin: 1.1rem 0 0.4rem; font-size: var(--fs-base); color: var(--muted-foreground); font-weight: 400; }
       .demo-row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; }
       .demo-frame { border: 1px dashed var(--border); padding: 0.75rem; }
+      /* A desktop window's title strip is a fixed-width specimen: on a phone it scrolls inside its frame. */
+      .demo-frame--app { overflow-x: auto; }
       /* A footer or an app bar shown as a SPECIMEN inside the page must not be fixed or sticky. */
       .demo-frame header.bar,
       .demo-frame footer.status { position: static; margin-inline: 0; }
@@ -194,7 +196,7 @@
               <p class="bar-status" role="status"><span class="dot" data-tone="destructive" aria-hidden="true"></span>down</p>
             </div>
             <h3>.bar--app — a desktop app's window title strip (static cursor, traffic-light gutter)</h3>
-            <div class="demo-frame">
+            <div class="demo-frame demo-frame--app">
               <header class="bar bar--app" id="app-bar">
                 <div class="bar-side"><span class="brand"><span class="glow">configr</span><span class="cursor-block cursor-block--static" aria-hidden="true"></span></span></div>
                 <div class="bar-side"><span class="demo-note">~/projects/estate</span></div>

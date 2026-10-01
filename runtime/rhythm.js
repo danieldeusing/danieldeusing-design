@@ -81,6 +81,10 @@ export function findFlushBlocks(root = document, { blocks = STACKED_BLOCKS, tole
     ((q.lower === p.lower && q.upper.contains(p.upper)) || (q.upper === p.upper && q.lower.contains(p.lower)))));
 }
 
+// An enhanced select is seen as its trigger, so what is judged is the .select-field the runtime drew
+// (0.62.2): a hidden select with a drawn trigger is a picker on the screen.
+const seen = (el) => rendered(el.parentElement?.matches(".select-field") ? el.parentElement : el);
+
 const FILTER_CONTROLS = ".filter-dd, select[data-filter], .sort-ctl, .chip-set";
 const SEARCH = '.search-field, input[type="search"]';
 const SEARCH_WRAP = ".search-field, label, .filter-bar-lead";
@@ -126,7 +130,7 @@ const BAR_LEAD = 'input[type="search"], .search-field, h2, h3, h4, h5, h6, .filt
  *
  * Only what is rendered is judged, as in findFlushBlocks(): a control, a bar or a bar's child that
  * is `display: none` (itself or an ancestor, so a closed dialog), zero-sized or `visibility: hidden`
- * is skipped. Edges are border boxes, compared within `tolerance` px.
+ * is skipped. An enhanced select counts as rendered when its `.select-field` is (0.62.2). Edges are border boxes, compared within `tolerance` px.
  */
 export function findMisplacedFilters(root = document, { tolerance = 1 } = {}) {
   const found = [];
@@ -151,14 +155,14 @@ export function findMisplacedFilters(root = document, { tolerance = 1 } = {}) {
     for (const el of row.querySelectorAll(".switch, select:not([data-filter])")) {
       let unit = el.parentElement?.matches(".select-field") ? el.parentElement : el; // what the runtime put in its place
       if (unit.parentElement !== row && unit.parentElement?.matches("label")) unit = unit.parentElement;
-      if (unit.parentElement !== row || judged.has(el) || !rendered(el) || el.closest(".filter-bar, th, .dropdown-panel")) continue;
+      if (unit.parentElement !== row || judged.has(el) || !seen(el) || el.closest(".filter-bar, th, .dropdown-panel")) continue;
       judged.add(el);
       report(el, "outside-filter-bar");
     }
   }
   const IN_TOOLBAR = `${SEARCH}, ${FILTER_CONTROLS}, select, .switch, .segmented`;
   for (const bar of root.querySelectorAll(".dialog-toolbar:not(.filter-bar)")) {
-    if ([...bar.querySelectorAll(IN_TOOLBAR)].some((el) => rendered(el) && !el.closest(".dropdown-panel"))) report(bar, "toolbar-not-filter-bar");
+    if ([...bar.querySelectorAll(IN_TOOLBAR)].some((el) => seen(el) && !el.closest(".dropdown-panel"))) report(bar, "toolbar-not-filter-bar");
   }
 
   // ponytail: left-to-right only; an RTL bar would mirror both edges.

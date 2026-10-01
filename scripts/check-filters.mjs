@@ -918,6 +918,53 @@ await evaluate(`document.getElementById("start").focus(); document.getElementByI
 await check("moved: ...focus aimed at the select lands on the NEW trigger (the old listeners are gone)",
   () => evaluate(`document.activeElement === triggerOf("mv")`));
 
+/* ── a hidden select draws nothing (0.62.2) ──
+   Until 0.62.1 select.js never read `hidden`: the select went, and the trigger the runtime drew for
+   it stayed on the screen. The drawn control is the .select-field, or the whole .filter-dd with its
+   clear, and it follows the select's attribute when the page toggles it later. */
+
+const nothingDrawn = (id) => `(() => { const s = document.getElementById(${JSON.stringify(id)}); const w = s.closest(".filter-dd") || s.parentElement;
+  return w.matches(".select-field, .filter-dd") && [w, ...w.querySelectorAll("*")].every((e) => e.getClientRects().length === 0); })()`;
+const triggerDrawn = (id) => `drawn(triggerOf(${JSON.stringify(id)}))`;
+await evaluate(`mount(\`<select hidden data-filter id="hf" aria-label="source"><option value="">all</option><option value="s" selected>seedr</option></select>
+  <select hidden id="hp" aria-label="kind"><option>agent</option><option>skill</option></select>\`); initSelects(); tick()`);
+await check("hidden: a <select hidden data-filter> (holding a value, so its clear is shown) and a plain <select hidden> draw nothing — no trigger, no clear, no wrapper",
+  async () => (await evaluate(nothingDrawn("hf"))) && (await evaluate(nothingDrawn("hp"))) && (await evaluate(`clearOf("hf").hidden === false`)),
+  async () => evaluate(`[triggerOf("hf"), triggerOf("hp")].map((t) => t.getClientRects().length).join("/")`));
+await evaluate(`document.getElementById("hf").hidden = false; document.getElementById("hp").hidden = false; tick()`);
+await check("hidden: removing `hidden` shows the trigger (and the filter's clear)",
+  async () => (await evaluate(triggerDrawn("hf"))) && (await evaluate(triggerDrawn("hp"))) && (await evaluate(`drawn(clearOf("hf"))`)));
+await evaluate(`document.getElementById("hf").hidden = true; document.getElementById("hp").hidden = true; tick()`);
+await check("hidden: ...and setting it again hides them",
+  async () => (await evaluate(nothingDrawn("hf"))) && (await evaluate(nothingDrawn("hp"))));
+await evaluate(`document.getElementById("hp").hidden = false; tick()`);
+await click(`triggerOf("hp")`);
+await check("hidden: [premise] the list is open", () => evaluate(`!!panel() && triggerOf("hp").getAttribute("aria-expanded") === "true"`));
+await evaluate(`document.getElementById("hp").hidden = true; tick()`);
+await check("hidden: an open list closes when its select is hidden — no panel left over a control that is gone",
+  () => evaluate(`!panel() && triggerOf("hp").getAttribute("aria-expanded") === "false"`),
+  () => evaluate(`!!panel() + " " + triggerOf("hp").getAttribute("aria-expanded")`));
+
+// cockpit's patcher writes attributes onto the SELECT inside the .select-field slot and never onto the
+// wrapper (infra rules/05), so a patch that sets or removes `hidden` on the select must be enough.
+const patcher = [process.env.DD_COCKPIT_DOM_PATCH, join(root, "../danieldeusing-infra/cockpit/pages/dom-patch.js"),
+  join(root, "../../danieldeusing-infra/cockpit/pages/dom-patch.js")].filter(Boolean).find((path) => existsSync(path));
+if (!patcher) {
+  console.log("SKIP  cockpit's dom-patch.js is not beside this checkout, so the patched-hidden case is not run");
+  await check("DD_REQUIRE_COCKPIT_DOM_PATCH is not set, so a missing dom-patch.js may skip", () => process.env.DD_REQUIRE_COCKPIT_DOM_PATCH !== "1");
+} else {
+  await evaluate(readFileSync(patcher, "utf8"));
+  const markup = (hidden) => `<select id="pp" aria-label="patched"${hidden ? " hidden" : ""}><option>a</option><option>b</option></select>`;
+  await evaluate(`mount('<div id="pm">${markup(false)}</div>'); initSelects(); tick()`);
+  const trigger = await evaluate(`triggerOf("pp").id`);
+  await evaluate(`cockpitPatch(document.getElementById("pm"), ${JSON.stringify(markup(true))}); tick()`);
+  const hiddenByPatch = await evaluate(nothingDrawn("pp"));
+  await evaluate(`cockpitPatch(document.getElementById("pm"), ${JSON.stringify(markup(false))}); tick()`);
+  await check(`hidden: cockpitPatch (${patcher.split("/").slice(-3).join("/")}) setting \`hidden\` on the select hides the trigger, removing it shows it — the same trigger, never rebuilt`,
+    async () => hiddenByPatch && (await evaluate(triggerDrawn("pp"))) && (await evaluate(`triggerOf("pp").id`)) === trigger,
+    async () => `hidden by patch: ${hiddenByPatch}, shown again: ${await evaluate(triggerDrawn("pp"))}`);
+}
+
 /* ── which lists get a search row: only a long FILTER, or one that asks (C8) ── */
 
 const LANGS = ["ada", "basic", "cobol", "dart", "elixir", "fortran", "go", "haskell", "idris", "java", "kotlin",
@@ -2218,6 +2265,23 @@ const actions = await inDialog("fx-actions", ".dialog-toolbar", ".dialog-body");
 await check("0.62.1 findMisplacedFilters: a toolbar of actions with a hidden select and switch and a switch in its open .dropdown-panel, and a hidden toolbar holding a select — none is \"toolbar-not-filter-bar\"",
   async () => actions.drawn && actions.misplaced.length === 0 && (await evaluate(`(() => { const d = document.getElementById("fx-actions"); d.showModal();
     const shown = document.getElementById("act-wrap").getClientRects().length > 0; d.close(); return shown; })()`)), JSON.stringify(actions));
+// 0.62.2: the two hidden selects above pass because the picker a reader would see is not drawn, not
+// merely because the <select> is. Forced back on screen, each is judged again.
+const hiddenPickers = () => evaluate(`(async () => { const d = document.getElementById("fx-actions"); d.showModal();
+  await new Promise((r) => setTimeout(r, 50));
+  const fields = [document.getElementById("row-hc-sel"), d.querySelector("#act-tb select[hidden]")].map((s) => s.parentElement);
+  const out = { wrapped: fields.every((f) => f.matches(".select-field")), drawn: fields.map((f) => f.getClientRects().length > 0) };
+  for (const f of fields) f.style.setProperty("display", "inline-flex", "important");
+  const { findMisplacedFilters } = await import("/runtime/rhythm.js");
+  const name = ({ element, reason }) => reason + " " + (element.id || element.querySelector("[id]")?.id);
+  out.forced = [...findMisplacedFilters(document.getElementById("fx-rows")), ...findMisplacedFilters(d)].map(name);
+  for (const f of fields) f.style.removeProperty("display");
+  d.close(); return out; })()`);
+const pickers = await hiddenPickers();
+await check("0.62.2 the hidden select in #row-hidden-ctl and the one in #act-tb draw no trigger — that is why neither is judged",
+  () => pickers.wrapped && pickers.drawn.every((d) => d === false), JSON.stringify(pickers));
+await check("0.62.2 ...and forced back on screen, the picker beside the search is \"outside-filter-bar\" and the actions toolbar is \"toolbar-not-filter-bar\"",
+  () => pickers.forced.includes("outside-filter-bar row-hc-sel") && pickers.forced.includes("toolbar-not-filter-bar act-tb"), JSON.stringify(pickers));
 const gap = await inDialog("fx-gap", ".dialog-toolbar", ".console");
 await check("0.62.1 findFlushBlocks: a hidden notice between the toolbar and the body, and a hidden callout above the console, do not break the exemption",
   () => gap.drawn && near(gap.edge, 0, 0.5) && gap.flush.length === 0, JSON.stringify(gap));

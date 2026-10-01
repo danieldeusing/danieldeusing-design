@@ -23,6 +23,13 @@ All notable changes to this project are documented here. The format follows
   wrapper holding another control ends the walk, and so does `root`. A `.switch` or `select` anywhere
   else is still not judged: a form with the search in one row and a select in the next reports
   nothing. The exemptions and the drawn-only rule are unchanged.
+- **A hidden `<select>` draws nothing.** `initSelects()` never read `hidden`, so a picker the page hid
+  kept its trigger on the screen. The drawn control now follows the select's `hidden`: the
+  `.select-field`, or the whole `.filter-dd` with its clear, is hidden with it, shown again when the
+  attribute goes, and an open list closes when its select is hidden. Setting the attribute on the
+  select is enough, so a patcher that writes only the select's attributes (cockpit's `cockpitPatch`)
+  hides and shows the trigger without rebuilding it. `findMisplacedFilters()` judges an enhanced
+  select by that drawn `.select-field`, not by the `<select>` inside it.
 
 ### Changed
 

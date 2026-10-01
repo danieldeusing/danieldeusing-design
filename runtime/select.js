@@ -164,6 +164,10 @@ function syncTrigger(instance) {
   const { select, trigger, value } = instance;
   const option = select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
   trigger.disabled = select.disabled;
+  // A select the page hides is a control the page hid: what the runtime drew for it goes too, the
+  // whole .filter-dd with its clear for a filter (0.62.2; until then the trigger stayed on screen).
+  const drawn = instance.group || instance.field;
+  if (drawn.hidden !== select.hidden) drawn.hidden = select.hidden;
   // An invalid select must SAY so where the reader is looking. The select itself
   // is transparent and aria-hidden, so a red edge or an announcement pinned to it
   // reaches nobody; the trigger is the control now. The error's TEXT goes with it:
@@ -407,6 +411,8 @@ function enhance(select) {
   // longer in the list, which reads as the page having lost the setting.
   instance.observer = new MutationObserver(() => {
     syncTrigger(instance);
+    // A list left open over a control the page just hid would float over nothing.
+    if (instance.panel && select.hidden) close(instance, false);
     if (instance.panel) {
       // The list changed under an open panel. Rebuild it rather than show a stale
       // one — and keep what the reader had typed into its search, which a poll
@@ -430,7 +436,7 @@ function enhance(select) {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ["disabled", "selected", "value", "label", "aria-invalid", "aria-describedby", "aria-label", "data-icon", "data-search"],
+    attributeFilter: ["hidden", "disabled", "selected", "value", "label", "aria-invalid", "aria-describedby", "aria-label", "data-icon", "data-search"],
   });
 }
 

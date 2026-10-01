@@ -285,6 +285,11 @@ output. Cockpit's logs drawer was an `aside` with its own `.backdrop` div and a 
 moved no focus at all. `follow` is a `.switch` (never a `[x]` text toggle); there is no slide-in, and
 cockpit never had one.
 
+The console sits flush under the toolbar, and that is the design: `findFlushBlocks()` does not report
+a dialog's toolbar over its body (0.62.1), so the console carries no `data-flush`.
+`findMisplacedFilters()` reports the toolbar as `toolbar-not-filter-bar` if it drops `filter-bar`,
+and a lines picker or `follow` beside the search as `outside-filter-bar` (`filters.md`).
+
 ## A popup opened inside a dialog goes into the dialog
 
 A modal dialog is in the top layer and the rest of the page is inert beneath it, so anything opened

@@ -125,7 +125,8 @@ Anything on the left that is not in a lead packs right with the filters.
   row, and the controls wrap under it, still right-aligned.
 - **A dialog's toolbar that filters is a `.filter-bar` as well**: `<div class="dialog-toolbar
   filter-bar">`, the search first, then the filters and switches, then the count and the steppers.
-  The logs drawer is the example (`overlays.md`).
+  The logs drawer is the example (`overlays.md`). Its body starts flush under it, and
+  `findFlushBlocks()` knows that (0.62.1): mark nothing `data-flush` for that edge.
 - `<search>` is the landmark (or `role="search"` on a `<div>`). **Label it when a page has more than
   one**: `<search class="filter-bar" aria-label="skills">`.
 - `.filter-bar--sticky` pins the bar under a page's header — set `--sticky-top` to the header's
@@ -139,7 +140,8 @@ keeps the rule:
 
 | reason | what it found |
 |---|---|
-| `outside-filter-bar` | a `.filter-dd`, an un-enhanced `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no `.filter-bar` around it. A table header (`th`) and a `.dropdown-panel` are exempt; a dialog is not. A `.chip-set` of `.chip--remove` chips is a list of values (cockpit's author lists), not a filter, and is not judged |
+| `outside-filter-bar` | a `.filter-dd`, an un-enhanced `select[data-filter]`, a `.sort-ctl` or a `.chip-set` with no `.filter-bar` around it. A table header (`th`) and a `.dropdown-panel` are exempt; a dialog is not. A `.chip-set` of `.chip--remove` chips is a list of values (cockpit's author lists), not a filter, and is not judged. Since 0.62.1 also a `.switch` or any `select` that is a sibling of a `.search-field` or a bare `input[type=search]` with no `.filter-bar` around them: a toggle or a picker beside a search is a filter toolbar whether the page says so or not |
+| `toolbar-not-filter-bar` | (0.62.1) a `.dialog-toolbar` holding a search or a filter control (a `.filter-dd`, any `select`, a `.switch`, a `.segmented`, a `.chip-set`, a `.sort-ctl`) that is not also a `.filter-bar`. Cockpit's old logs drawer was exactly this, and passed 0.62.0 |
 | `lead-not-left` | a lead after a control in its row, or a row's first lead whose left edge is not the bar's left content edge. A run of leads (a prompt label, then the search) is fine |
 | `controls-not-right` | on one visual row of a bar, the right-most control does not end at the bar's right content edge |
 | `active-unmarked` | an optional filter holding a value without `data-active="true"` on its trigger or with its × hidden — the page set the value and the runtime never heard (dispatch `change` on the select) |
@@ -153,8 +155,9 @@ const wrong = findMisplacedFilters().map(({ element, reason }) => `${reason}: ${
 What is not rendered (`display: none` on it or an ancestor, a closed dialog, zero size,
 `visibility: hidden`) is skipped, so run it in each state that shows a bar.
 
-A `.switch` or a `.segmented` outside a bar is not reported — both are used as settings too — so a
-page puts its filter toggles in a `.filter-bar` itself.
+A `.switch`, a plain `select` or a `.segmented` anywhere else is not reported — each is a setting in
+a form as often as a filter — so a page puts filter toggles that are not beside a search in a
+`.filter-bar` itself.
 
 ## A search box — `.search-field` and `initSearchFields()`
 

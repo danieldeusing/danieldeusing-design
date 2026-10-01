@@ -479,8 +479,11 @@ rows usually does, or when the renderer says it wrote a different number of rows
 
 **A renderer that patches rows in place declares its row count: `data-table-rows="N"`** on the
 `<table>`, set in the same task as the rows, where N is the number of rows it wrote into the tbody
-not counting detail rows (`data-row-for`). When N is not the number the engine holds, the body is
-read as the whole new set. Without it, one case cannot be told apart from a page editing cells: a
+not counting detail rows (`data-row-for`). **N is read only in the task that writes it** — a
+`setAttribute`, even of an unchanged value, as cockpit's paint does every poll — so a value in the
+first markup, or one left standing while the page adds or removes rows by hand, is never read.
+When the N just written is not the number the engine holds, the body is read as the whole new set.
+Without it, one case cannot be told apart from a page editing cells: a
 renderer whose new set has exactly as many rows as are showing rewrites them in place and moves none,
 and the engine keeps the withheld rows it no longer has. Until a render whose row count differs —
 at most one poll on a page that polls, indefinitely on one that does not — those ghosts are counted

@@ -925,6 +925,59 @@ await check("0.62.3 — one task moves table A out and appends table B after the
   () => swapped === JSON.stringify({ barIn: "mount", action: true, aBar: true, b: 3, a: 3 }), swapped);
 await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
 
+/* ── 0.62.3 · a moved table's page bar is not left in front of a neighbour that will never adopt it ──────
+   A neighbour with an engine bar of its own, or with data-table-search="off", stands after A's leavings. It
+   takes no page bar, so the bar goes with A. */
+const neighbour = async (fWrap) => evaluate(`(async () => {
+  localStorage.clear();
+  const mount = document.getElementById("mount"), stash = document.getElementById("later");
+  stash.replaceChildren();
+  mount.innerHTML = '<search class="filter-bar" data-table-bar aria-label="nbA"><button type="button" id="nb-action">act</button></search>' + ${JSON.stringify(swapWrap("nbA"))} + ${JSON.stringify("FWRAP")};
+  await new Promise((r) => setTimeout(r, 50));
+  const bar = mount.querySelector("search[data-table-bar]");
+  stash.append(mount.querySelector('.tablewrap:has(table[data-table-id="nbA"])'));
+  await new Promise((r) => setTimeout(r, 150));
+  const kids = (el) => [...el.children].map((n) => n.matches("search[data-table-bar]") ? "PB" : n.matches("search") ? "EB" : n.querySelector?.("table")?.getAttribute("data-table-id") || n.className);
+  return JSON.stringify({ later: kids(stash), mount: kids(mount), barWithA: bar.parentElement === stash && bar.nextElementSibling?.querySelector("table")?.getAttribute("data-table-id") === "nbA" });
+})()`.replace(JSON.stringify("FWRAP"), JSON.stringify(fWrap)));
+const fOwnBar = await neighbour(swapWrap("nbF"));
+await check("0.62.3 — table A moves away from a neighbour that drew its own engine bar: A's page bar goes with A, F keeps its own",
+  () => JSON.parse(fOwnBar).barWithA && JSON.parse(fOwnBar).mount[0] === "EB" && !JSON.parse(fOwnBar).mount.includes("PB"), fOwnBar);
+const fOff = await neighbour(swapWrap("nbF").replace("data-table-tools", 'data-table-tools data-table-search="off"'));
+await check("0.62.3 — ...and away from a neighbour with data-table-search=\"off\": the page bar goes with A",
+  () => JSON.parse(fOff).barWithA && JSON.parse(fOff).mount[0] === "nbF" && !JSON.parse(fOff).mount.includes("PB"), fOff);
+await evaluate(`document.getElementById("mount").replaceChildren(); document.getElementById("later").replaceChildren(); null`);
+
+/* ── 0.62.3 · data-table-rows is read only in the task that writes it ──────────────────────────────────────
+   Answered on every observer callback, a wrong count — or one the page made stale by removing a row — read
+   the body on the engine's own filter pass and dropped every withheld row. A correct count written again,
+   unchanged, as cockpit's paint() does on every paint, reads nothing. */
+const allBack = async (setup, filter, between = "") => {
+  await evaluate(`localStorage.clear(); ${setup}; null`);
+  await sleep(50);
+  await evaluate(`${between}; null`);
+  await sleep(50);
+  await evaluate(`window.setFilter("name", ${JSON.stringify(filter)}); null`);
+  await sleep(50);
+  await evaluate(`window.setFilter("name", ""); null`);
+  await sleep(50);
+  return evaluate(`[...document.querySelectorAll("#mount tbody tr:not([data-table-placeholder]):not([data-row-for])")].map((r) => r.cells[0].textContent).join()`);
+};
+const wrong = await allBack(`window.build({ attrs: ' data-table-rows="2"' })`, "a");
+await check("0.62.3 — data-table-rows=\"2\" in the markup of a 3-row table, then a filter: clearing it gives all 3 back", () => wrong === "ada,grace,linus", wrong);
+const madeStale = await allBack(`window.build({ attrs: ' data-table-rows="3"' })`, "ada", `document.querySelectorAll("#mount tbody tr")[2].remove()`);
+await check("0.62.3 — ...a correct 3, then the page removes a row without updating it, then a filter: the 2 left come back",
+  () => madeStale === "ada,grace", madeStale);
+const DETAIL = '<table data-table-tools data-table-id="detail" data-sort-key="name" data-table-rows="6"><thead><tr><th data-col="name">name</th><th data-col="team">team</th><th data-col="score">score</th></tr></thead><tbody>' +
+  ["ada", "grace", "linus"].map((n) => `<tr data-row-key="${n}"><td>${n}</td><td>t</td><td>1</td></tr><tr data-row-for="${n}"><td colspan="3">about ${n}</td></tr>`).join("") + "</tbody></table>";
+const detail = await allBack(`document.getElementById("mount").innerHTML = ${JSON.stringify(DETAIL)}; window.initTableTools(document.getElementById("mount"))`, "a");
+await check("0.62.3 — ...a detail-row table that counts its data-row-for rows (6 for 3), then a filter: all 3 come back", () => detail === "ada,grace,linus", detail);
+const rewritten = await allBack(`window.build({ attrs: ' data-table-rows="3"' }); window.setFilter("name", "a")`, "",
+  `(() => { const t = document.querySelector("#mount table"); t.setAttribute("data-table-rows", "3"); t.tBodies[0].rows[0].cells[2].textContent = "31"; })()`);
+await check("0.62.3 — ...and a correct count written again, unchanged, with a cell write under a filter (cockpit's paint): nothing withheld is lost",
+  () => rewritten === "ada,grace,linus", rewritten);
+await evaluate(`document.getElementById("mount").replaceChildren(); null`);
+
 /* ── 0.62.3 · a <thead> replaced under a filter keeps the withheld rows ──────────────────────────────── */
 await evaluate(`localStorage.clear(); window.build(); window.setFilter("name", "a"); null`);
 await sleep(50);

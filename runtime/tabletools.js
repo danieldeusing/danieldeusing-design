@@ -673,7 +673,8 @@ function buildHeaderControls(inst) {
  * withheld, counted in "3 of 10 — 7 hidden", offered in a pick menu, and back on screen when the filter
  * is cleared, possibly beside the same record written into a shown row. `resetTableView()` keeps them
  * too. They go at the next render whose row count differs. A renderer says how many rows it wrote with
- * `data-table-rows` on the table; when that is not the number held here, the body is the set (`fromBody`).
+ * `data-table-rows` on the table, detail rows (`data-row-for`) not counted, read only in the task that writes
+ * it; when that is not the number held here, the body is the set (`fromBody`).
  */
 const sameRows = (body, rows) => body.rows.length === rows.length && rows.every((row, i) => body.rows[i] === row);
 
@@ -765,9 +766,12 @@ function refreshPickOptions(inst) {
   }
 }
 
-/* The PAGE'S bar, when it put one directly before the table's wrapper. */
+/* The PAGE'S bar, when it put one directly before the table's wrapper — looking back past a pager or a count
+   another table left there when it moved (never past a table's wrapper), so a table that lands after a moved
+   one's leavings adopts the bar rather than drawing a second. */
 const pageBarOf = (anchor) => {
-  const before = anchor.previousElementSibling;
+  let before = anchor.previousElementSibling;
+  while (before && before.matches(".table-pager, p.result-count")) before = before.previousElementSibling;
   return before && before.matches("search.filter-bar[data-table-bar]") ? before : null;
 };
 
@@ -804,12 +808,14 @@ function useSearchBox(inst, input) {
 function barToBring(inst) {
   const bar = inst.bar || inst.carriedBar;
   if (!bar || !bar.isConnected) return null;
-  // A pager, a count or an engine's own bar beside it are a table's chrome — this one's leavings, or the
-  // chrome of a table standing after them — not a sign that nothing stands after the bar.
+  // A pager or a count beside it is what this table left behind, not a table standing after the bar. Only
+  // an engine table that searches (and would adopt the bar) keeps it; a neighbour with its own bar or with
+  // `data-table-search="off"` never takes it, so the bar goes with its table.
   let next = bar.nextElementSibling;
-  while (next && next.matches(".table-pager, p.result-count, search.filter-bar:not([data-table-bar])")) next = next.nextElementSibling;
+  while (next && next.matches(".table-pager, p.result-count")) next = next.nextElementSibling;
   const other = next && (next.matches("table") ? next : next.matches(".tablewrap") ? next.querySelector(":scope > table") : null);
-  return other && other !== inst.table && other.hasAttribute("data-table-tools") ? null : bar;
+  const adopter = other && other !== inst.table && other.hasAttribute("data-table-tools") && other.getAttribute("data-table-search") !== "off";
+  return adopter ? null : bar;
 }
 
 /*
@@ -1187,8 +1193,11 @@ function enhance(table) {
       rec.target !== body && body.contains(rec.target) &&
       (rec.type === "attributes" ? ROW_READS.has(rec.attributeName) : !relabel(rec.target)));
 
-    // A renderer that declares how many rows it wrote, and it is not the number held, rewrote the set.
-    const stale = declaredOtherwise(inst);
+    // A renderer that declares how many rows it wrote, and it is not the number held, rewrote the set. Read
+    // only in the batch that WRITES it: answered on every callback, a count that was wrong, or went stale when
+    // the page later removed a row, read the body on the next filter keystroke and dropped every withheld row.
+    // An unchanged value written again (cockpit's paint() writes it on every paint) matches and reads nothing.
+    const stale = records.some((rec) => rec.target === table && rec.attributeName === "data-table-rows") && declaredOtherwise(inst);
     if (moved || rewritten || stale) {
       snapshot(inst, stale);
       applyTableView(table);

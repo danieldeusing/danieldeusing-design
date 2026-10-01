@@ -9,10 +9,12 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - **`data-table-rows="N"` on an engine table**: the number of rows the renderer wrote into the tbody,
-  not counting detail rows (`data-row-for`), set in the same task as the rows. When it is not the
-  number the engine holds, the engine reads the body as the whole new set, so a renderer that patches
-  rows in place never leaves withheld rows behind (the cost under *Fixed*). Optional; a table without
-  it behaves as before.
+  not counting detail rows (`data-row-for`), set in the same task as the rows. N is read only in the
+  task that writes it (`setAttribute`, even with an unchanged value); a value in the initial markup, or
+  one left standing while the page adds or removes rows, is never read. When the N just written
+  is not the number the engine holds, the engine reads the body as the whole new set, so a renderer
+  that patches rows in place never leaves withheld rows behind (the cost under *Fixed*). Optional; a
+  table without it behaves as before.
 
 ### Fixed
 
@@ -47,13 +49,15 @@ All notable changes to this project are documented here. The format follows
   left a page's `search[data-table-bar]` where it stood; the engine then drew a second bar, and a
   second box, at the new place, and a box the page drew went on searching the moved table from the
   old one. The adopted bar now goes directly before the table, as an adopted count already did,
-  unless the new place has a page bar of its own or another engine table stands after it (past any
-  pager, count or engine bar between them). A page's box keeps driving its table when the table is
-  detached and inserted again.
+  unless the new place has a page bar of its own, or an engine table that searches (and so would adopt
+  it) stands after it, past any pager or count the moved table left there. A table that lands after
+  those leavings adopts the bar through them instead of drawing a second. A page's box keeps driving
+  its table when the table is detached and inserted again.
 
 Consumers: nothing has to change in markup. A renderer that patches an engine table's rows in place
-(cockpit's `cockpitTable`) should set `data-table-rows` on the table with every paint. A page that moves an engine table and relied on its own bar
-staying behind now sees the bar go with the table; move the bar back, or give the new place a bar.
+(cockpit's `cockpitTable`) should set `data-table-rows` on the table with every paint. A page that
+moves an engine table and relied on its own bar staying behind now sees the bar go with the table;
+move the bar back, or give the new place a bar.
 
 ## 0.62.2 (2026-09-30)
 

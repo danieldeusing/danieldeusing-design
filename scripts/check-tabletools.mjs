@@ -958,8 +958,24 @@ const detachReturn = async (kind, between) => {
   await evaluate(`document.getElementById("outside").remove(); document.getElementById("frame").remove(); null`);
   return JSON.stringify(out);
 };
+const blankPoint = async () => JSON.parse(await evaluate(`JSON.stringify({ x: innerWidth - 5, y: innerHeight - 5 })`));
+const wheelBlank = async () => {
+  const { x, y } = await blankPoint();
+  await send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: 120 });
+};
+// A touch swipe, as a phone scrolls: touch emulation on for the gesture only.
+const swipeBlank = async () => {
+  const { x, y } = await blankPoint();
+  await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - 100 }] });
+  await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+};
 const BETWEEN = {
   "a real click on blank page": clickBlank,
+  "a real mouse-wheel scroll over blank page": wheelBlank,
+  "a real touch swipe over blank page": swipeBlank,
   "a script focusing an input above the table": () => evaluate(`document.getElementById("outside").focus(); null`),
   "a script focusing an input inside an iframe": () => evaluate(`document.getElementById("frame").contentDocument.querySelector("input").focus(); null`),
 };

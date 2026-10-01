@@ -19,7 +19,7 @@ All notable changes to this project are documented here. The format follows
   document first: focus in the page's box, its action or the engine's box fell to `<body>`. It is
   given back to the same control, without scrolling, and a text box keeps its caret. A table detached
   and inserted again draws a new engine box; that box takes the focus and the caret, unless the reader
-  clicked, pressed a key or moved focus in between, or focus is somewhere else when the table returns.
+  clicked, pressed a key, scrolled or moved focus in between, or focus is somewhere else when the table returns.
   A pager whose table leaves the document forgets what held focus in it.
 - **Giving focus back does not scroll the page.** The focus goes back once every move of the batch
   has landed. Given back halfway, Chromium and Firefox anchored the scroll on the focused box in a

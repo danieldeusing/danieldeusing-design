@@ -965,14 +965,14 @@ function retire(inst) {
   // The engine's box goes below, and a reader typing in it would be left on <body>: where its caret was goes
   // with the view, for the box drawn when the node comes back — until the reader does anything at all. A
   // click on nothing also leaves focus on <body>, and a box that took focus after it would turn the next
-  // Space into a query.
+  // Space into a query. A wheel scroll counts: it fires no pointerdown (a touch swipe does).
   const box = inst.searchField && document.activeElement === inst.searchBox ? inst.searchBox : null;
   const entry = { identity: inst.identity, view: inst.view, bar: inst.bar, caret: box && [box.selectionStart, box.selectionEnd] };
   carried.set(inst.table, entry);
   if (entry.caret) {
     const done = new AbortController();
     const drop = () => { entry.caret = null; done.abort(); };
-    for (const type of ["pointerdown", "keydown", "focusin"]) document.addEventListener(type, drop, { capture: true, signal: done.signal });
+    for (const type of ["pointerdown", "keydown", "wheel", "focusin"]) document.addEventListener(type, drop, { capture: true, signal: done.signal });
   }
   // Gone, not renewed in place: the count this file made would go on standing where the table was.
   if (!inst.table.isConnected && madeCounts.has(inst.count)) inst.count.remove();

@@ -585,7 +585,9 @@ without it behaves exactly as described here.
   page's box (with its caret), the page's action, the engine's box — given back without scrolling, and
   focus anywhere else is not moved. A detached table's engine box is a new one when it returns; it takes
   the focus and the caret, unless the reader did anything in between (a click, a key, a focus elsewhere).
-  Focus is given back once the whole move has landed, so scroll anchoring cannot shift the page.
+  Focus is given back once the whole move has landed, so scroll anchoring cannot shift the page. That is a
+  microtask after the engine's moves, so page code in a microtask queued in the same task sees `<body>`
+  focused for that moment (a dialog opened there records `<body>` as the place to return focus to).
 - **A pager survives a patched mount (0.62.3).** The pager is in no renderer's markup, so a patcher that
   re-renders the whole mount (cockpitTable's shell: bar, wrapper, count) puts the count's markup in its
   place; the same pager goes back after the wrapper, on the page the reader was on. Since 0.62.4 the

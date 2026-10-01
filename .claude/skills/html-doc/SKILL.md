@@ -7,7 +7,9 @@ description: >-
   jsDelivr CDN. Use when the user says "create a documentation in html for this
   workflow", "make an HTML doc/page for this", "document this process as a
   webpage", "write this workflow up as a single HTML file", or wants a shareable
-  standalone .html doc with the terminal look. Produces ONE .html file that needs
+  standalone .html doc with the terminal look. Also for a report or write-up of an
+  investigation, analysis or review that others will read ("write a report",
+  "write it up with screenshots and proofs", "explain it ELI5"). Produces ONE .html file that needs
   no build step and opens directly in a browser, and can optionally be published to the
   password-protected docs.danieldeusing.de by moving it into the danieldeusing-docs repo and
   pushing (the push is the deploy). Also use when the user says "publish this doc", "put this
@@ -114,9 +116,37 @@ already carries two, and if you cannot write the sentence you do not have an exc
      cards, `.eli5` for callouts/tips, `.ascii-rule` for dividers, `.link-quiet` for inline links,
      and `pre.mermaid` for diagrams (see step 5). The title is the template's `h1.page-title` and
      the tagline its `.lede`.
-   - **Reader first.** Open the page with a TL;DR: three to five bullets in the first section
-     (`#overview`), for a reader who reads it once. Put a diagram before the paragraph it
-     explains. Fold detail into `details.fold`.
+   - **Reader first: short, visual, proven.** The reference is the VU3DEV-390597 report
+     (`site-internal/poi/vu3/vu3dev-390597-nova-dcc-sync.html` in the docs repo, 2026-09-30;
+     Daniel: *"The current report is good and we want to have this idea in the html docs"*).
+     The template's `#overview`, `#eli5`, `#flow` and `#proof` sections carry the shape:
+     - **TL;DR first** (`#overview`): three to five bullets, each opening with a bold label
+       (`What breaks:`, `Where:`, `When:`), for a reader who reads only that.
+     - **ELI5** (`#eli5`): one `.eli5` callout in everyday words, no identifiers, for a reader
+       who is not technical. An analogy is fine; a wrong simplification is not.
+       The system draws the `ELI5` badge itself (`.eli5::before`): write no label of your
+       own, or it reads "ELI5 ELI5". `.eli5-term` is for a term being explained inside it.
+     - **Text is bullets, short sentences and tables.** No paragraph a list can carry; a
+       comparison or a tally is a `<table>`, never prose. Shorter, not vaguer: keep every id,
+       number, time and file name — cut the words around them.
+     - **Visuals over text.** A diagram goes before the paragraph it explains (Mermaid, step
+       5: a sequence for who talks to whom, a flowchart for a decision or a proposed fix).
+       Screenshots go in the `.shots` grid as plain `<figure>`s (the system draws the image
+       border and the caption). A row of results — runs, builds, environments — can be a
+       small page-local graphic: one square per item coloured from `--success` /
+       `--destructive`, the detail in `data-tip`. Its CSS is layout plus tokens with literal
+       fallbacks, like everything else in the `<style>`.
+     - **Proof for every claim** (`#proof`; one section per kind of proof is fine): the
+       screenshot that shows the value, a log excerpt in a bare `<pre>` (timestamps kept,
+       secrets and customer data replaced), the tally with its counts, a table of what was
+       ruled out and by which observation, and the steps that were done (`ol.steps`) so a
+       reader can retrace them. What is *not* proven gets its own short section.
+     - **Screenshots are embedded**, so the page stays one file: crop to the part that proves
+       the point, downscale (`sips -Z 900 in.png --out s.jpg -s format jpeg -s formatOptions
+       70`, 20–80 KB each), inline as `data:image/jpeg;base64,…`. The caption names the
+       value the image shows. A screenshot pasted into chat is not on disk: ask for its path,
+       or rebuild it as a graphic or a table and say so.
+     Fold long detail into `details.fold`.
    - **Tables: author a plain `<table>` and stop there.** The system styles it by element (0.10.0), and
      `initTableScroll()` (already wired at the bottom of the template) wraps every table so the
      table scrolls, never the page. What the page may still own is column widths, with a

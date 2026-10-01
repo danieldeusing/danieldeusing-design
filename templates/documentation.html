@@ -137,6 +137,10 @@
       .body { margin-top: 0.85rem; }
       .body > * + * { margin-top: 0.75rem; }
 
+      /* Screenshots side by side, one column on a phone. Layout only: the system draws the
+         figure, its image border and the caption (base.css). */
+      .shots { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr)); }
+
       /* Every content component the generator uses is the system's, so none is declared here:
          `ol.steps` and `ul.plain` (content.css), `table.kv` (data.css), and a bare <code> and <pre>
          for inline code and a code block (base.css). A local copy of any of them is a fork that
@@ -273,11 +277,23 @@
           <h1 class="page-title">{{DOC_TITLE}}</h1>
           <p class="lede">{{TAGLINE}}</p>
 
-          <!-- one <section> per topic; each id must match a TOC entry. -->
+          <!-- one <section> per topic, each with an id (the minimap builds itself from them).
+               Short bullets and tables, a visual wherever one fits, proof for every claim. -->
           <section class="doc" id="overview" data-term>
-            <p class="prompt">echo overview</p>
+            <p class="prompt">echo tldr</p>
             <div class="body" data-term-out>
-              <p>{{OVERVIEW}}</p>
+              <ul class="plain">
+                <li><strong>{{TLDR_LABEL_1}}:</strong> {{TLDR_1}}</li>
+                <li><strong>{{TLDR_LABEL_2}}:</strong> {{TLDR_2}}</li>
+                <li><strong>{{TLDR_LABEL_3}}:</strong> {{TLDR_3}}</li>
+              </ul>
+            </div>
+          </section>
+
+          <section class="doc" id="eli5" data-term>
+            <p class="prompt">cat eli5.txt</p>
+            <div class="body" data-term-out>
+              <p class="eli5">{{ELI5}}</p>
             </div>
           </section>
 
@@ -312,6 +328,24 @@ flowchart TD
     classDef warn stroke-width:2px
     classDef new stroke-width:2px,stroke-dasharray:4 3
 </pre>
+            </div>
+          </section>
+
+          <!-- Proof: what was seen, not what was concluded. Screenshots are embedded as data URIs
+               (one file), each caption names the value it shows. Logs are an excerpt in a bare
+               <pre>, secrets and customer data replaced. Delete what the page has no proof for. -->
+          <section class="doc" id="proof" data-term>
+            <p class="prompt">cat proof.txt</p>
+            <div class="body" data-term-out>
+              <div class="shots">
+                <figure><img alt="{{SHOT_1_ALT}}" src="{{SHOT_1_DATA_URI}}" /><figcaption>{{SHOT_1_CAPTION}}</figcaption></figure>
+                <figure><img alt="{{SHOT_2_ALT}}" src="{{SHOT_2_DATA_URI}}" /><figcaption>{{SHOT_2_CAPTION}}</figcaption></figure>
+              </div>
+              <pre>{{LOG_EXCERPT}}</pre>
+              <table>
+                <thead><tr><th>{{PROOF_COL_1}}</th><th>{{PROOF_COL_2}}</th></tr></thead>
+                <tbody><tr><td>{{PROOF_ROW_1A}}</td><td>{{PROOF_ROW_1B}}</td></tr></tbody>
+              </table>
             </div>
           </section>
 

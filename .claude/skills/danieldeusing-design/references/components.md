@@ -253,7 +253,12 @@ share the padding, the `--muted` highlight (on hover, `data-active="true"`, or R
 - **Placement is not the look.** `.select-panel` sets no `position` — `initSelects()` writes
   `position: fixed` inline — so a framework app can put the class on its own listbox and place it
   itself. `.dropdown-panel` is `position: absolute` and opens upward, for a status-bar menu;
-  `.dropdown-panel--down` opens below, `--end` below and right-aligned.
+  `.dropdown-panel--down` opens below, `--end` below and right-aligned. **It stays on the screen**
+  (0.62.4): it is never wider than the viewport less 8px a side, and once open `initDropdowns()`
+  moves a panel that crosses either edge back inside it (by `left`, so the page stops scrolling
+  sideways too). A panel that fits is not touched, so a `--down` menu near a phone's right edge
+  shifts left and every other menu stays where the stylesheet put it. A framework app that renders
+  its own panel places it itself.
 - **A framework app never renders a native `<select>`, or a component library's own menu skin.** Its
   listbox puts `.select-panel` on the panel and `.select-option` on each row — `aria-selected` or
   `aria-checked` for the choice, `data-active` or `data-highlighted` for the highlight — and its

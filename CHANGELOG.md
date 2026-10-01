@@ -4,6 +4,56 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- **An open dropdown no longer pushes a phone page sideways or runs off its edge.** A
+  `.dropdown-panel--down` hangs from its `<details>`' left edge, so a menu near the right of a 320px
+  or 375px screen ran past it (components.html: the history menu to 352px at 320, the disclosure
+  panel to 447px at 375) and the page scrolled sideways while it was open. `initDropdowns()` now
+  moves an open panel that crosses either edge of the viewport back inside it, 8px clear, by `left`
+  with its width pinned (a `translate` brought the panel back but left the page scrolling: Chrome kept
+  the old box in the scrollable overflow). A panel that fits is not touched, and a panel placed by
+  script (`position: fixed`, a table header's filter) is left to that script. `.dropdown-panel` is
+  also capped at `max-inline-size: calc(100vw - 16px)`, so a panel wider than the phone is narrowed
+  first. Measured on every example, 145 menus at 320, 375 and 1280: only those two panels moved.
+- **A long wordmark no longer widens a phone page: the brand gives way** (below 48rem). The bar does
+  not wrap and its right end keeps its size, so components.html's old 33-character wordmark and its
+  nav made the page 332px wide at 320. The wordmark now stays on one line and shrinks:
+  `.brand > .glow` ends in an ellipsis, words written straight in a `.brand` are clipped (bare text
+  has no box to carry one; the clip reaches 1rem past the box so the glow is never cut). The right
+  `.bar-side` no longer shrinks (squeezed, it crushed the burger from 40px to its 18px of padding,
+  because the icon counts for nothing in its min-content), and a `.brand` straight in the bar lets
+  its siblings wrap to their min-content before it gives anything. Beside a centre band with no
+  burger the band still gives way first. Every example and template is pixel-identical at 320, 375
+  and 1280 in all four themes where the wordmark fits; it changed where it did not: chrome.html's
+  `.bar--app` demo at 320 (its contents ran 49px past the bar; now "c…") and components.html at 320
+  on green and paper (its nav ran 0.86px past the bar's padding).
+- **filters.html calls `initTableScroll()`.** Under a finger the table-tools table's header buttons
+  grow to 44px and the table is 449px wide; with no `.tablewrap` around it the page scrolled
+  sideways on a touch phone (Chromium widens the layout viewport instead: innerWidth 478 at 375).
+
+### Checks
+
+- **check-filters opens every menu, one at a time, and measures every phone width with a finger
+  too.** Every drawn `<details>` (dropdowns, table-header filters, mobile disclosures, folds) and
+  every `.select-trigger`, on the page, behind each burger toggle and in each dialog, at 320 and
+  375 (mouse and touch) and 1280: the page may not get wider than the viewport while one is open and
+  a floating panel must lie inside it. Each page reports how many it opened, and a page holding menus
+  that opened none fails. The closed-page sweep runs under touch as well, asserts
+  `(pointer: coarse)` matches only when touch is emulated, and fails a layout viewport wider than the
+  emulated width. Plus a panel wider than the phone, injected. All fail on 0.62.3.
+- **check-chrome: a 33-character wordmark at 320** in both brand shapes (fits, one line, ellipsis or
+  clip, controls unchanged) and a fitting wordmark beside controls that must wrap (untouched).
+  Fails on 0.62.3; each of the three rules is mutation-proven.
+- **check-release-gate resolves `.` and `..` before it judges a borrowed path.** `DD_TAILWIND_NODE`,
+  `DD_MERMAID` and `DD_LUCIDE_REACT` were matched by prefix, so
+  `${{ runner.temp }}/tailwind/node_modules/../../elsewhere` passed. The runner's temp directory is
+  now one opaque root and the path is normalised first; a `..` that climbs out fails.
+- **check-cards names an SVG element in a diagnostic** instead of printing
+  `[object SVGAnimatedString]` for its class, as the file's `WIDE` helper already did.
+
 ## 0.62.3 (2026-10-01)
 
 ### Added

@@ -271,6 +271,7 @@
       import { positionPopup } from "../runtime/popup.js";
       import { initDropdowns } from "../runtime/dropdown.js";
       import { initTableTools } from "../runtime/tabletools.js";
+      import { initTableScroll } from "../runtime/tablescroll.js";
 
       const $ = (selector) => document.querySelector(selector);
 
@@ -296,6 +297,9 @@
       initSortControls();
       initDropdowns();
       initTableTools();
+      // Every table gets its scrolling wrapper, as on any page that shows one: under a finger the
+      // header controls grow to 44px and the table-tools table is wider than a phone.
+      initTableScroll();
 
       /* ── the live list: the page owns the query, the runtime owns the controls ── */
       const TYPES = ["skill", "agent", "command", "hook", "mcp"];

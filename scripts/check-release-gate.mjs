@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { posix } from "node:path";
 
 // check-release-gate — every suite runs in CI and before the release publishes, and none can skip.
 //
@@ -66,6 +67,15 @@ const FLAGS = [
 // into, and the flag that points a suite at it.
 const BORROWED = [["lucide-react", "lucide", "DD_LUCIDE_REACT"], ["@tailwindcss/node", "tailwind", "DD_TAILWIND_NODE"], ["mermaid", "mermaid", "DD_MERMAID"]];
 
+// Whether a flag's path lies inside $RUNNER_TEMP/<dir>/node_modules once its `.` and `..` segments are
+// resolved: a prefix match alone passes `${{ runner.temp }}/tailwind/node_modules/../../elsewhere`. The
+// runner's temp directory is one opaque root, so a `..` that climbs out of it lands outside too.
+const ROOT = "/<runner.temp>";
+const insideRunnerTemp = (value, dir) => {
+  const m = value.match(/^(?:\$\{\{\s*runner\.temp\s*\}\}|\$\{?RUNNER_TEMP\}?)(\/.*)$/);
+  return !!m && posix.normalize(ROOT + m[1]).startsWith(`${ROOT}/${dir}/node_modules/`);
+};
+
 const gate = (name, text, required, before = Infinity) => {
   const ran = new Map();
   for (const step of steps(text)) {
@@ -100,7 +110,7 @@ const gate = (name, text, required, before = Infinity) => {
     // ...and the flag points into the directory it was installed into, not somewhere else.
     for (const step of new Set(ran.values())) {
       const value = (step.env.match(new RegExp(`^\\s*${flag}:\\s*(.+?)\\s*$`, "m")) || [])[1];
-      if (value && !value.startsWith("${{ runner.temp }}/" + dir + "/node_modules/")) fail(`${name}: ${flag} is ${value}, which is not inside the $RUNNER_TEMP/${dir} the install writes to`);
+      if (value && !insideRunnerTemp(value, dir)) fail(`${name}: ${flag} is ${value}, which is not inside the $RUNNER_TEMP/${dir} the install writes to`);
     }
   }
   return pins;

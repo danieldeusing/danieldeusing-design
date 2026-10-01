@@ -314,6 +314,45 @@ function closeAll(except) {
   }
 }
 
+/*
+ * A PANEL STAYS ON THE SCREEN (0.62.4). components.css places a panel against its <details> — under
+ * it from the left edge (`--down`), or from the right (the default and `--end`) — and only the page
+ * knows where the <details> sits. A `--down` menu near the right edge of a phone ran past it: the
+ * page scrolled sideways and the panel's end was off the screen. Once open, a panel crossing either
+ * edge of the viewport is moved back inside it, `EDGE` px clear, as positionPopup() keeps a list; one
+ * that fits is left exactly where the stylesheet put it, so nothing that fits ever moves. A panel
+ * something else places (`position: fixed`, written inline by positionPopup() for a table header's
+ * filter) is left to that, and this runs a frame after the toggle so that placement has happened.
+ *
+ * Moved by `left`, not `translate`: Chrome kept a translated panel's old box in the page's scrollable
+ * overflow, so the panel came back on screen and the page went on scrolling sideways (measured:
+ * scrollWidth 447 in a 375px viewport with the panel at 182-367). Its width is pinned first, because
+ * an absolute box's shrink-to-fit width depends on its offsets. The width cap that keeps a panel
+ * narrower than the screen is components.css's.
+ */
+const EDGE = 8;
+const moved = new WeakSet();
+function keepOnScreen(details) {
+  const panel = panelOf(details);
+  if (!panel) return;
+  if (moved.has(panel)) {
+    moved.delete(panel);
+    panel.style.left = panel.style.right = panel.style.inlineSize = "";
+  }
+  if (!details.open) return;
+  const style = getComputedStyle(panel);
+  if (style.position !== "absolute") return;
+  // Divided on the write, as popup.js explains: a rect is visual px, a length is multiplied by zoom.
+  const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
+  const { left, right, width } = panel.getBoundingClientRect();
+  const dx = left < EDGE ? EDGE - left : Math.min(0, document.documentElement.clientWidth - EDGE - right);
+  if (!dx) return;
+  moved.add(panel);
+  panel.style.inlineSize = `${width / zoom}px`;
+  panel.style.left = `${parseFloat(style.left) + dx / zoom}px`;
+  panel.style.right = "auto";
+}
+
 function onToggle(event) {
   const details = event.target;
   if (!(details instanceof HTMLDetailsElement) || !details.classList.contains("dropdown")) return;
@@ -321,6 +360,8 @@ function onToggle(event) {
   const summary = summaryOf(details);
   if (summary?.hasAttribute("aria-haspopup")) set(summary, "aria-expanded", String(details.open));
   if (details.open) closeAll(details);
+  if (details.open) requestAnimationFrame(() => keepOnScreen(details));
+  else keepOnScreen(details);
 }
 
 /* APG menu button: Enter, Space and ArrowDown open onto the first item, ArrowUp onto the last.
@@ -435,6 +476,7 @@ export function initDropdowns(root = document) {
     document.addEventListener("toggle", onToggle, true);
     document.addEventListener("click", onClick);
     document.addEventListener("keydown", onKeydown);
+    addEventListener("resize", () => { for (const details of document.querySelectorAll("details.dropdown[open]")) keepOnScreen(details); });
     // Attributes too: a renderer that patches attributes (cockpit's cockpitPatch) strips the ones
     // no markup carries — the menu roles, tabindex="-1", the summary's aria-* — and a menu stripped
     // mid-read is a list of loose buttons in the tab order. Re-marking puts back exactly those.

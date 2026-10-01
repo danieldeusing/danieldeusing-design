@@ -4,6 +4,39 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.62.1 (2026-09-30)
+
+### Fixed
+
+- **`findFlushBlocks()` no longer reports a dialog's toolbar sitting on its body.** 0.62.0 draws
+  `.dialog-toolbar.filter-bar` flush on the `.dialog-body` on purpose (the toolbar's rule is the
+  edge), but `.filter-bar` is a stacked block, so the toolbar over the first block in the body — the
+  logs drawer's `.console`, a table — was reported at 0px. Cockpit's logs drawer marked its console
+  `data-flush` to pass, and the reference drawer in the skill would have been flagged. A
+  `.dialog-toolbar` over the `.dialog-body` that follows it, or over that body's first block, is now
+  not a pair. Only inside a dialog: the same markup anywhere else is still judged.
+- **`findMisplacedFilters()` sees the layout cockpit's old logs drawer had.** Its toolbar was a
+  plain `.dialog-toolbar`, its lines picker a plain `<select>` and its `follow` switch sat beside the
+  search, and 0.62.0 judged none of the three.
+
+### Changed
+
+- **`toolbar-not-filter-bar`**, a new reason: a `.dialog-toolbar` holding a search or a filter
+  control (a `.filter-dd`, any `select`, a `.switch`, a `.segmented`, a `.chip-set`, a `.sort-ctl`)
+  that is not also a `.filter-bar`.
+- **`outside-filter-bar` also reports a `.switch` or any `select` beside a search** — a sibling of a
+  `.search-field` or a bare `input[type=search]` — with no `.filter-bar` around them: a toggle or a
+  picker next to a search is a filter toolbar whether the page says so or not. Anywhere else a
+  `.switch` or a plain `select` is still not judged; both are settings in forms. The table header,
+  `.dropdown-panel` and value-list exemptions and the rendered-only rule are unchanged.
+- The components demo's two "one toolbar row" examples put a picker beside a search, so they are
+  `.filter-bar`s now; the example sweep runs `findFlushBlocks()` beside `findMisplacedFilters()` on
+  every page and dialog, and finds nothing.
+- No CSS changes. Every current-version pin (README, the html-doc skill, the documentation and
+  error-page templates) moves to 0.62.1.
+
+Consumers: nothing to change; a `data-flush` added only to pass the toolbar→body edge can be removed.
+
 ## 0.62.0 (2026-09-30)
 
 ### Filters sit on the right, the search on the left, and an active filter shows its ×

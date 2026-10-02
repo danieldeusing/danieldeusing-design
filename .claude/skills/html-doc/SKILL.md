@@ -9,11 +9,9 @@ description: >-
   webpage", "write this workflow up as a single HTML file", or wants a shareable
   standalone .html doc with the terminal look. Also for a report or write-up of an
   investigation, analysis or review that others will read ("write a report",
-  "write it up with screenshots and proofs", "explain it ELI5"). Not for a write-up in the VU3 workspace — vu3-agent-kit's vu3-html-doc does those in the Columbus look. Produces ONE .html file that needs
-  no build step and opens directly in a browser, and can optionally be published to the
-  password-protected docs.danieldeusing.de by moving it into the danieldeusing-docs repo and
-  pushing (the push is the deploy). Also use when the user says "publish this doc", "put this
-  on docs.danieldeusing.de", or asks where an existing HTML doc should be stored.
+  "write it up with screenshots and proofs", "explain it ELI5"). Not for a write-up in the VU3 workspace — vu3-agent-kit's vu3-html-doc does those in the Columbus look. Also use when the
+  user says "publish this doc", "put this on docs.danieldeusing.de", or asks where an existing
+  HTML doc should be stored.
 ---
 
 # html-doc
@@ -128,9 +126,22 @@ already carries two, and if you cannot write the sentence you do not have an exc
        who is not technical. An analogy is fine; a wrong simplification is not.
        The system draws the `ELI5` badge itself (`.eli5::before`): write no label of your
        own, or it reads "ELI5 ELI5". `.eli5-term` is for a term being explained inside it.
-     - **Text is bullets, short sentences and tables.** No paragraph a list can carry; a
-       comparison or a tally is a `<table>`, never prose. Shorter, not vaguer: keep every id,
-       number, time and file name — cut the words around them.
+     - **Plain technical English, about 80% of ASD-STE100** (Simplified Technical English):
+       - One topic per paragraph, at most six sentences; a list for three or more items or
+         steps. No paragraph a list can carry; a comparison or a tally is a `<table>`, never
+         prose.
+       - A step is one instruction in the imperative, at most 20 words. A description is at
+         most 25 words.
+       - Active voice and simple tenses: "the call failed", not "the call has been failing".
+         Passive only when nobody knows who acted.
+       - Simple words: use, start, make sure, before, about, to, help; not utilize, commence,
+         ensure, prior to, approximately, in order to, facilitate.
+       - The same word for the same thing on the whole page: once "endpoint", always
+         "endpoint".
+       - Keep "the", "a" and "this": no telegram style, no noun stack longer than three words.
+       - Shorter, not vaguer: keep every id, number, time and file name, and cut the words
+         around them. Identifiers, file and method names, quoted log text, technical names and
+         dates stay as they are; the STE word list itself is not required.
      - **Visuals over text.** A diagram goes before the paragraph it explains (Mermaid, step
        5: a sequence for who talks to whom, a flowchart for a decision or a proposed fix).
        Screenshots go in the `.shots` grid as plain `<figure>`s (the system draws the image
@@ -138,6 +149,27 @@ already carries two, and if you cannot write the sentence you do not have an exc
        small page-local graphic: one square per item coloured from `--success` /
        `--destructive`, the detail in `data-tip`. Its CSS is layout plus tokens with literal
        fallbacks, like everything else in the `<style>`.
+     - **Interactive where it explains.** Where a reader follows a sequence or compares two
+       states, add a small explainer: a step-through of a flow (back and next show one node
+       and its sentence), a before/after choice, a what-if calculator for a rule with numbers,
+       a filter on a long table. The page states every fact without it:
+       - Write the static version first and mark its outermost block `data-static` (a table goes
+         into a `<div data-static>`: `initTableScroll()` wraps the table itself). Directly after
+         it, write an empty `<doc-explainer id="…"></doc-explainer>`, with nothing between the
+         tags. While the explainer has content, the template hides its static twin; with
+         JavaScript off and in print, the static version shows.
+       - Its code goes at the end of the template's module script, and it writes only inside its
+         own element. To step through a diagram, clone the rendered `<svg>` into the explainer
+         and mark the nodes in the clone. Give the clone new ids
+         (`svg.outerHTML.replaceAll(svg.id, svg.id + "-x")`): with the original's ids its
+         arrowheads point at the hidden twin and vanish. Take the clone in a function that you
+         call from `renderDiagrams`, after the zoom wiring, so a theme switch refreshes it.
+       - The controls are the system's: back and next as `.btn-icon` (`data-icon`
+         `chevron-left`, `chevron-right`), a before/after choice as `.segmented`, a filter as a
+         filter dropdown or a chip set. Read `references/controls.md` and
+         `references/filters.md` of `danieldeusing-design` first. Its own CSS is layout plus
+         tokens with literal fallbacks.
+       - No new library and no network call.
      - **Proof for every claim** (`#proof`; one section per kind of proof is fine): the
        screenshot that shows the value, a log excerpt in a bare `<pre>` (timestamps kept,
        secrets and customer data replaced), the tally with its counts, a table of what was
@@ -338,6 +370,10 @@ already carries two, and if you cannot write the sentence you do not have an exc
    no-JS / `prefers-reduced-motion` fallbacks intact. Don't strip `aria-*` attributes. The page
    must stay fully readable with JavaScript disabled — which is also why diagram sources live in
    a `<pre>`: without JS the reader still sees the raw Mermaid source instead of an empty box.
+   With explainers, `grep -c '<doc-explainer[^>]*></doc-explainer>'` counts every explainer in
+   the saved file (so without JS the static twins show) and prints 0 on the output of the step-5
+   command with `--dump-dom` in place of `--screenshot=…` (the script filled each one); then
+   click through each one in a browser.
 
 7. **Write one file.** Save the filled HTML to the user's chosen path, or default to
    `./<slug>-docs.html` next to the subject. Do **not** create any companion `.css`/`.js` files —

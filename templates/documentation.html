@@ -169,14 +169,21 @@
          classDef keeps only the shape (a width, a dash) and these rules paint it. `!important`
          because mermaid's own theme rules sit inside the svg under an id selector, which no class
          selector here out-ranks. `warn` is a failure or a gap; `new` is a proposed node. */
-      pre.mermaid .node.warn > :is(rect, polygon, circle, ellipse, path) {
+      :is(pre.mermaid, doc-explainer) .node.warn > :is(rect, polygon, circle, ellipse, path) {
         stroke: var(--destructive, #a02c2c) !important;
         fill: color-mix(in srgb, var(--destructive, #a02c2c) 13%, transparent) !important;
       }
-      pre.mermaid .node.new > :is(rect, polygon, circle, ellipse, path) {
+      :is(pre.mermaid, doc-explainer) .node.new > :is(rect, polygon, circle, ellipse, path) {
         stroke: var(--primary, #8a4516) !important;
         fill: color-mix(in srgb, var(--primary, #8a4516) 13%, transparent) !important;
       }
+
+      /* Interactive explainer: written empty, filled by a page script at load; while it has
+         content it stands in on screen for the block marked data-static directly before it.
+         Without JS and in print, the static block shows. */
+      doc-explainer { display: block; }
+      @media screen { [data-static]:has(+ doc-explainer:not(:empty)) { display: none; } }
+      @media print { doc-explainer { display: none !important; } }
     </style>
   </head>
 

@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- **The `.eli5` badge reads "In plain words".** Daniel, reviewing the VU3 pages on 04.10.2026: a
+  plain-language part is never named "ELI5". The class keeps its name, so no markup changes; a
+  page that wrote its own "ELI5" label into the box should drop it.
+- **The documentation template's plain-words and notes sections are plain text.** `#eli5` (one
+  `.eli5` box) is now `#plain-words` with `{{PLAIN_WORDS}}` in a paragraph, and `#notes` is a
+  paragraph: a box holds only additional info inside a section, never a whole section or a
+  summary. The executive summary and the plain-words section in boxes were the trigger.
+- **html-doc** follows the same rules, and a root cause is one section with a sub-section per
+  reader instead of one section per reader.
+
 ## 0.62.4 (2026-10-01)
 
 ### Fixed

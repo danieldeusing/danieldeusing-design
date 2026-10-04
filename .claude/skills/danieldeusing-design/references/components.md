@@ -29,9 +29,10 @@ Contents:
 
 ## `.eli5` is opt-in per item, never a field every item fills (0.45.0)
 
-An ELI5 box exists to make one hard thing legible to someone outside the discipline — a product
-owner reading a code review, a family member reading a finance page. It is not a second rendering
-of every item.
+An `.eli5` box (its badge reads *In plain words*, never "ELI5") exists to make one hard thing
+legible to someone outside the discipline — a product owner reading a code review, a family member
+reading a finance page. It is not a second rendering of every item, and it is an aside inside a
+section's text: a whole section or a summary in plain words is plain text, never this box.
 
 **Add one only where a plain-language sentence gives a non-technical reader something they could
 act on.** If the text above it is already clear to anyone, there is nothing to explain, and an

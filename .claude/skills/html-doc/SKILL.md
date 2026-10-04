@@ -113,19 +113,25 @@ already carries two, and if you cannot write the sentence you do not have an exc
      (0.61.0): `.prompt` for shell-style headers, `ol.steps` for ordered steps, `ul.plain` for lists,
      `table.kv` (see below) for key/value specs, a bare `<pre>` for a code block and a bare `<code>`
      for inline code (no class; `base.css` draws both), a `ul.card-grid` of `.card-terminal`s for
-     cards, `.eli5` for callouts/tips, `.ascii-rule` for dividers, `.link-quiet` for inline links,
+     cards, `.eli5` for the everyday picture of one hard point, `aside.callout` for a note or a trap, `.ascii-rule` for dividers, `.link-quiet` for inline links,
      and `pre.mermaid` for diagrams (see step 5). The title is the template's `h1.page-title` and
      the tagline its `.lede`.
    - **Reader first: short, visual, proven.** The reference is the VU3DEV-390597 report
      (`site-internal/poi/vu3/vu3dev-390597-nova-dcc-sync.html` in the docs repo, 2026-09-30;
      Daniel: *"The current report is good and we want to have this idea in the html docs"*).
-     The template's `#overview`, `#eli5`, `#flow` and `#proof` sections carry the shape:
+     The template's `#overview`, `#plain-words`, `#flow` and `#proof` sections carry the shape:
      - **TL;DR first** (`#overview`): three to five bullets, each opening with a bold label
        (`What breaks:`, `Where:`, `When:`), for a reader who reads only that.
-     - **ELI5** (`#eli5`): one `.eli5` callout in everyday words, no identifiers, for a reader
-       who is not technical. An analogy is fine; a wrong simplification is not.
-       The system draws the `ELI5` badge itself (`.eli5::before`): write no label of your
-       own, or it reads "ELI5 ELI5". `.eli5-term` is for a term being explained inside it.
+     - **In plain words** (`#plain-words`): a few sentences in everyday words, no identifiers,
+       for a reader who is not technical. Plain paragraphs, never a box. An analogy is fine; a
+       wrong simplification is not. The name is always *In plain words*, never "ELI5".
+     - **Boxes hold additional info only:** an `.eli5` box is the everyday picture of one hard
+       point inside a section's text (the system draws its *In plain words* badge: write no
+       label of your own; `.eli5-term` is for a term explained inside it), an `aside.callout`
+       a note or a trap. A summary or the main content of a section is never a box.
+     - **Root cause:** a page that explains a root cause does it in one section, with one
+       sub-section per reader (for example *In plain words*, *For requirements engineers*,
+       *Technical*), never in one section per reader.
      - **Plain technical English, about 80% of ASD-STE100** (Simplified Technical English):
        - One topic per paragraph, at most six sentences; a list for three or more items or
          steps. No paragraph a list can carry; a comparison or a tally is a `<table>`, never

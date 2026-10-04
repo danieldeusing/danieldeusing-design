@@ -1341,7 +1341,7 @@ pre { line-height: var(--lh-base); }
    rows with a label beside a control, every row starts its value wherever its own label ends:
 
      review type: [public — posts on the PR]
-     comments: [x] agent info  [x] ELI5
+     comments: [x] agent info  [x] In plain words
      login: [gitlab-public]
 
    which is what a form looks like when nobody decided where the value column is. The labels are
@@ -1349,7 +1349,7 @@ pre { line-height: var(--lh-base); }
    A grid decides it once, for every row:
 
      review type   [public — posts on the PR]
-     comments      [x] agent info  [x] ELI5
+     comments      [x] agent info  [x] In plain words
      login         [gitlab-public]
 
    NOT `subgrid`: these rows are usually rendered independently — one block per repo, one per
@@ -2501,7 +2501,9 @@ select:disabled,
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   ELI5 — an "explain like I'm 5" callout box (first-time-term explainers).
+   In plain words — the one marked callout: the everyday picture of one hard
+   point, as an aside inside a section's text. A whole section or a summary in
+   plain words is plain text, never this box. The badge is never "ELI5".
    ───────────────────────────────────────────────────────────────────────── */
 .eli5 {
   margin: 1.25em 0;
@@ -2515,14 +2517,14 @@ select:disabled,
   line-height: 1.6;
 }
 .eli5::before {
-  content: "ELI5";
+  content: "In plain words";
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-right: 0.6em;
   vertical-align: 0.08em;
   font-family: var(--font-mono);
-  font-size: 0.72em;   /* not-text: the ELI5 marker glyph, sized against its own box */
+  font-size: 0.72em;   /* not-text: the marker, sized against its own box */
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.04em;

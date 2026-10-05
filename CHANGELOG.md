@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- **A plain link in a doc section looks like a link.** The reset leaves every `a` in the text
+  colour without an underline, and `section.doc` had no link rule, so the links of a docs page
+  read as plain text (Daniel, 04.10.2026). A link without a class in the running text of `section.doc`
+  (a paragraph, a list item, a table cell, a caption, a quote) now takes the `.markdown a` look: `--primary`, underlined, the focus ring. The selector weighs (0,0,1), so
+  every component that styles its own links, and the print rule, still win.
+
 ## 0.63.0 (2026-10-04)
 
 ### Changed

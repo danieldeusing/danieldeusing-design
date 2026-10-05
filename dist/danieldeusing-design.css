@@ -9702,12 +9702,20 @@ dialog.dgm-overlay::backdrop {
 .markdown li::marker {
   color: var(--muted-foreground);
 }
-.markdown a {
+/* A plain link in the running text of a doc section looks like a markdown link. Without this the
+   reset left it in the text colour with no underline, so a docs page's links read as plain text
+   (Daniel, 04.10.2026). Running text only: a link a component places itself, such as a panel-head
+   title, keeps its look; with the whole section in the selector the panel-head link took the
+   underline (measured). (0,0,1) beats only the reset: every component that styles its own links,
+   and the print rule, still win. */
+.markdown a,
+:where(section.doc :is(p, li, td, th, dd, dt, figcaption, blockquote, caption)) a:where(:not([class])) {
   color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 4px;
 }
-.markdown a:focus-visible {
+.markdown a:focus-visible,
+:where(section.doc :is(p, li, td, th, dd, dt, figcaption, blockquote, caption)) a:where(:not([class])):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

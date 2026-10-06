@@ -1,0 +1,163 @@
+<!doctype html>
+<!--
+  danieldeusing-design — the review report template ("danieldeusing-docs", 0.64.0).
+
+  One code-review report, read once: the run, the summary, the findings, the requirement, general
+  notes, what lies outside the diff and the dispatch failures, one section each. It is html-doc's
+  page for a single document: no rail, no burger and no minimap; a contents aside and the status
+  footer with the theme picker instead. The stylesheet links, the pre-paint script and the marked
+  runtime import are documentation.html's, byte for byte (scripts/check-integration.mjs compares
+  them). scripts/bake.mjs makes a written report self-contained.
+
+  The orchestrator fills five placeholders, each written in double braces: TITLE (escaped text,
+  also in the footer), DESCRIPTION (escaped), HEADER (the prompt line, the h1 and the lede), BODY
+  (one <section class="doc" data-term> per topic) and TOC (one <li> per section). This comment
+  names them without braces, so a fill never writes into it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{TITLE}}</title>
+    <meta name="description" content="{{DESCRIPTION}}" />
+    <meta name="theme-color" content="#f5efe2" />
+
+    <!-- pre-paint: apply the saved theme + animation gate before first paint -->
+    <script>
+      (() => {
+        const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
+        let theme = "warm";
+        try {
+          const stored = localStorage.getItem("theme");
+          if (stored && stored in bg) theme = stored;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg[theme]);
+
+        let animOff = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        try {
+          if (localStorage.getItem("anim") === "off") animOff = true;
+        } catch {}
+        if (animOff) document.documentElement.classList.add("anim-off");
+
+        // The `ls -l` rail is SHOWN by default. A reader who hid it must not watch it
+        // paint and then jump away on every single load, so the state is applied HERE —
+        // the runtime module at the end of <body> runs long after first paint.
+        try {
+          if (localStorage.getItem("ls-nav") === "off") document.documentElement.dataset.lsNav = "off";
+        } catch {}
+      })();
+    </script>
+
+    <!-- The design system, pinned, with the same release as an offline fallback: see
+         documentation.html. A baked report carries both inline. -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.63.1/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.63.1.min.css'"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.63.1/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.63.1.fonts.css'"
+    />
+
+    <style>
+      /* Only the page's own vertical rhythm: .wrap, the TOC (.layout/.toc/.navlist), the title,
+         the lede, the lists, code and table.kv are the design system's since 0.60.0. */
+      main.wrap { padding-block: 2.5rem 5rem; }
+      /* design-conformance: spacing BETWEEN doc sections on this page template, not a restyle
+         of the shared .doc — the system sets its own margin for the standalone case. */
+      section.doc { margin-top: 2.5rem; }
+      .body { margin-top: 0.85rem; }
+      .body > * + * { margin-top: 0.75rem; }
+
+      /* Findings: severity reads from the left edge — .card-terminal--rule's 4px edge, coloured
+         through --rule-color per severity. */
+      .finding + .finding { margin-top: 0.75rem; }
+      .finding .finding-loc { margin-bottom: 0.75rem; }
+      .finding-body > * + * { margin-top: 0.6rem; }
+      .finding-body ul.plain { margin: 0; padding-left: 1.15rem; }
+      .finding-body ul.plain > li + li { margin-top: 0.3rem; }
+      .finding { --rule-color: var(--border); }
+      .sev-blocking { --rule-color: var(--destructive); }
+      .sev-warning { --rule-color: var(--warning); }
+      .sev-nit { --rule-color: var(--muted-foreground); }
+      .finding-loc { color: var(--muted-foreground); }
+    </style>
+  </head>
+
+  <body>
+    <a href="#top" class="skip-link">skip to content</a>
+    <header class="bar">
+      <a href="#top" class="brand">
+        <span class="glow">danieldeusing-docs</span>
+        <span class="cursor-block" aria-hidden="true"></span>
+      </a>
+      <!-- NO NAVIGATION. A review report is ONE document: opened from a link in cockpit,
+           published beside its siblings, read once (Daniel, 2026-08-21). The brand line says what
+           this document is, which is not navigation. -->
+    </header>
+
+    <main class="wrap" id="top">
+      <div class="layout">
+        <div class="content">
+          {{HEADER}}
+
+{{BODY}}
+        </div>
+
+        <aside class="toc">
+          <nav class="navlist toc-inner" aria-labelledby="toc-h">
+            <p class="navlist-label" id="toc-h">on this page</p>
+            <ol>
+{{TOC}}
+            </ol>
+          </nav>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="status">
+      <span class="status-left"><span class="glow">[reviews]</span> {{TITLE}}</span>
+      <nav class="status-right" aria-label="page settings">
+        <a class="doc-link" href="https://danieldeusing.de">danieldeusing.de</a>
+        <span class="sep" aria-hidden="true"></span>
+        <details class="dropdown">
+          <summary>
+            <span class="visually-hidden">theme </span>
+            <span class="dd-dot" aria-hidden="true"></span>
+            <span data-theme-label>warm</span>
+            <span aria-hidden="true">▾</span>
+          </summary>
+          <ul class="dropdown-panel">
+            <li><button type="button" class="dropdown-item" data-theme-value="warm">warm</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="green">green</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="mono">mono</button></li>
+            <li><button type="button" class="dropdown-item" data-theme-value="paper">paper</button></li>
+          </ul>
+        </details>
+        <button type="button" class="anim-toggle" data-anim-toggle aria-pressed="true" aria-label="Toggle animations">
+          <span data-anim-box aria-hidden="true">[x]</span>
+          <span>anim</span>
+        </button>
+      </nav>
+    </footer>
+
+    <script type="module">
+      // dd-runtime: scripts/bake.mjs swaps this import for the runtime it inlines.
+      import { applyStoredTheme, initThemeSwitcher, initDropdowns, initTerminal, initAnimToggle, initTableScroll, initToc } from
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.63.1/runtime/index.js";
+      applyStoredTheme();
+      initThemeSwitcher();
+      initDropdowns();
+      initTerminal();
+      initAnimToggle();
+      // the run table holds paths, SHAs and agent lists — without this a wide one scrolls the
+      // whole page sideways instead of scrolling itself (a baked report has the wrapper already)
+      initTableScroll();
+      // table-of-contents scroll-spy: the entry for the section being read carries aria-current.
+      initToc();
+    </script>
+  </body>
+</html>

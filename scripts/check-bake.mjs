@@ -2,10 +2,10 @@
  * check-bake.mjs — scripts/bake.mjs on pages made from the templates (0.64.0).
  *
  * The fixtures are the documentation template itself (one diagram, one table), the template without
- * its diagrams, and small changes that break one rule each. The design files come from a folder built
- * from this checkout (--assets), with two stand-in woff2 files whose bytes say which face is which, so
- * the check needs no release and no network. The diagrams need a browser, and Mermaid from DD_MERMAID
- * (CI) or jsDelivr.
+ * its diagrams, the review report template as the orchestrator fills it, and small changes that break
+ * one rule each. The design files come from a folder built from this checkout (--assets), with two
+ * stand-in woff2 files whose bytes say which face is which, so the check needs no release and no
+ * network. The diagrams need a browser, and Mermaid from DD_MERMAID (CI) or jsDelivr.
  */
 import { spawnSync } from "node:child_process";
 import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { bakedProblems, remoteLoads, restore, THEMES } from "./bake.mjs";
 import { CHROME, reporter } from "./lib/chromium.mjs";
-import { hasClass, scan } from "./lib/tags.mjs";
+import { content, hasClass, scan } from "./lib/tags.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const { check, done } = reporter("check-bake");
@@ -104,6 +104,21 @@ const scriptOnly = bakeFile("script-only.html", scriptKept);
 await check("a page whose diagram was removed but whose diagram script was kept bakes with no browser: the script inert, nothing remote left", () =>
   scriptOnly.code === 0 && /<script type="text\/plain" data-dd-diagrams>/.test(scriptOnly.text) && remoteLoads(scriptOnly.text).length === 0
   && restore(scriptOnly.text) === scriptKept, () => scriptOnly.out);
+
+// ── the review report ────────────────────────────────────────────────────────────────────────────
+// The review report as the orchestrator fills it: no diagrams, so no browser.
+const report = pinned(readFileSync(join(root, "templates", "review-report.html"), "utf8")
+  .replace("{{HEADER}}", '<p class="prompt">orchestrator.js run</p><h1 class="page-title">review</h1><p class="lede">fixture</p>')
+  .replace("{{BODY}}", '<section class="doc" id="run" data-term><p class="prompt">cat run.json</p><div class="body" data-term-out><table class="kv"><tr><th>repo</th><td>x</td></tr></table></div></section>')
+  .replace("{{TOC}}", '<li><a href="#run" data-toc-link="run">Run</a></li>'));
+const reportBaked = bakeFile("review.html", report);
+await check("the filled review template bakes with no browser and loads nothing", () =>
+  reportBaked.code === 0 && remoteLoads(reportBaked.text).length === 0, () => reportBaked.out);
+// The inlined runtime quotes "initTableScroll();" in a usage comment, so only the page's own script can answer.
+const ownScript = scan(reportBaked.text).find((el) => el.tag === "script" && "data-dd-runtime-import" in el.attrs);
+const ownCode = ownScript ? content(reportBaked.text, ownScript) : "";
+await check("...its own script still calls initToc() and initTableScroll() from ddRuntime", () =>
+  /const \{[^}]*initToc[^}]*\} = globalThis\.ddRuntime;/.test(ownCode) && ownCode.includes("initToc();") && ownCode.includes("initTableScroll();"));
 
 // ── refusals: exit 1, the message names the cause, the file as it was ────────────────────────────
 const refusals = [

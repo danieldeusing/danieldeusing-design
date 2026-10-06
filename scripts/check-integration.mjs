@@ -263,6 +263,33 @@ if (sibling) {
     : `NOTE  the vendored patcher differs from ${sibling} — refresh scripts/fixtures/cockpit-dom-patch.js`);
 }
 
+// ── the review report template ──────────────────────────────────────────────────────────────────
+// THE REVIEW REPORT IS HTML-DOC'S PAGE (0.64.0). templates/review-report.html carries three parts of
+// documentation.html unchanged — the stylesheet links with their fallbacks, the pre-paint script, and
+// the marked runtime import — so a release that changes one changes both, or this fails.
+{
+  const doc = read("templates/documentation.html");
+  const review = read("templates/review-report.html");
+  const links = (html) => [...html.matchAll(/<link\s+rel="stylesheet"[\s\S]*?\/>/g)].map((m) => m[0]).join("\n");
+  const prePaint = (html) => html.match(/<head>[\s\S]*?(<script>[\s\S]*?<\/script>)/)?.[1];
+  const runtimeUrl = (html) => html.match(/\/\/ dd-runtime: scripts\/bake\.mjs swaps this import[^\n]*\n\s*import \{[^}]*\} from\s*("[^"]+")/)?.[1];
+  check("templates/review-report.html: the stylesheet links are documentation.html's, byte for byte", () =>
+    links(doc) && links(doc) === links(review) ? [] : ["the <link rel=stylesheet> elements differ"]);
+  check("templates/review-report.html: the pre-paint script is documentation.html's, byte for byte", () =>
+    prePaint(doc) && prePaint(doc) === prePaint(review) ? [] : ["the pre-paint <script> differs"]);
+  check("templates/review-report.html: the marked runtime import names documentation.html's url", () =>
+    runtimeUrl(doc) && runtimeUrl(doc) === runtimeUrl(review) ? [] : [`${runtimeUrl(review)} vs ${runtimeUrl(doc)}`]);
+  check("templates/review-report.html: five placeholders outside its comments, each filled by the orchestrator", () => {
+    const markup = review.replace(/<!--[\s\S]*?-->/g, "");
+    return ["{{TITLE}}", "{{DESCRIPTION}}", "{{HEADER}}", "{{BODY}}", "{{TOC}}"].filter((p) => !markup.includes(p)).map((p) => `no ${p}`);
+  });
+  check("templates/review-report.html: no placeholder inside a comment, where a fill would copy the report into it", () =>
+    (review.match(/<!--[\s\S]*?-->/g) ?? []).filter((c) => /\{\{[A-Z]+\}\}/.test(c)).map(() => "a comment holds a {{…}} placeholder"));
+  check("templates/review-report.html: no rail, no burger, no diagram script", () =>
+    [/class="ls-nav"/, /data-nav-toggle/, /data-ls-nav-toggle/, /data-dd-diagrams/, /initLsNav\(\)|initBurgerNav\(\)/]
+      .filter((re) => re.test(review)).map((re) => `has ${re}`));
+}
+
 /* ── every init, twice ──────────────────────────────────────────────────────────────────────────── */
 
 // Pages call init* from more than one place — a layout and a view, a first render and a re-render —

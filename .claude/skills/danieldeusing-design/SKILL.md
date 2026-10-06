@@ -336,6 +336,11 @@ out of its own `node_modules` instead of copying whatever the nearest surface ha
 - **`templates/documentation.html`** — a whole page built on it, for a one-file doc.
 - **`templates/error-page.html`** (0.60.0) — the 404 and the crash page on the same chrome
   (`references/content.md`).
+- **`templates/review-report.html`** (0.64.0) — the cockpit's review report on the same chrome,
+  built on the documentation template: one document with a contents aside, no rail and no minimap.
+
+Before you share a page written from `documentation.html` or `review-report.html`, bake it with
+`scripts/bake.mjs`; the `html-doc` skill carries the steps.
 
 `references/chrome.md` describes every piece of that chrome for an author.
 

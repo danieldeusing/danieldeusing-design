@@ -8,8 +8,10 @@
  * holds its svg (an estate page: the four theme variants, warm shown), and at 375 px the page does
  * not scroll sideways. Then JavaScript on, still offline, at 1400 px: no request, no script error,
  * the runtime is there on a dd-baked page, and the paper theme shows the paper variants and a
- * diagram's zoom opens the paper one. A full-page screenshot per width goes to the temp directory:
- * look at both before a page is called done. The same check on a page as written fails.
+ * diagram's zoom opens the paper one. A variant counts as shown by the display its CSS gives it, so
+ * a diagram in a hidden tab panel passes; the zoom opens the first diagram a reader can see. A
+ * full-page screenshot per width goes to the temp directory: look at both before a page is called
+ * done. The same check on a page as written fails.
  * Exit codes: 0 every page passed, 1 a page failed, 2 usage or no browser.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -31,7 +33,7 @@ const STATE = `(() => ({
   diagrams: [...document.querySelectorAll("pre.mermaid")].map((pre) => {
     const svgs = [...pre.querySelectorAll(":scope > svg")];
     return { variants: svgs.map((s) => s.getAttribute("data-theme-variant")),
-             shown: svgs.filter((s) => s.getClientRects().length).map((s) => s.getAttribute("data-theme-variant") ?? "svg") };
+             shown: svgs.filter((s) => getComputedStyle(s).display !== "none").map((s) => s.getAttribute("data-theme-variant") ?? "svg") };
   }),
   sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   height: document.documentElement.scrollHeight,
@@ -46,8 +48,10 @@ const LIVE = `(async () => {
   document.documentElement.dataset.theme = "paper";
   await frame();
   result.shown = [...document.querySelectorAll("pre.mermaid")].map((pre) =>
-    [...pre.querySelectorAll(":scope > svg")].filter((s) => s.getClientRects().length).map((s) => s.dataset.themeVariant).join());
-  document.querySelector("pre.mermaid").click();
+    [...pre.querySelectorAll(":scope > svg")].filter((s) => getComputedStyle(s).display !== "none").map((s) => s.dataset.themeVariant).join());
+  const visible = [...document.querySelectorAll("pre.mermaid")].find((pre) => pre.getClientRects().length);
+  if (!visible) return result;
+  visible.click();
   await frame();
   result.zoomed = document.querySelector("dialog.dgm-overlay[open] svg")?.dataset.themeVariant ?? null;
   document.querySelector("dialog.dgm-overlay[open]")?.close();
@@ -97,7 +101,7 @@ for (const page of pages) {
     const live = await browser.evaluate(LIVE);
     if (live.baked && live.runtime !== "object") problems.push("JavaScript on: no globalThis.ddRuntime, the runtime was not inlined");
     if (live.variants && live.shown.some((s) => s !== "paper")) problems.push(`JavaScript on, paper theme: the diagrams show ${live.shown.join(" | ")}`);
-    if (live.variants && live.zoomed !== "paper") problems.push(`JavaScript on, paper theme: the zoom opened ${live.zoomed ?? "nothing"}`);
+    if (live.variants && "zoomed" in live && live.zoomed !== "paper") problems.push(`JavaScript on, paper theme: the zoom opened ${live.zoomed ?? "nothing"}`);
   } catch (error) {
     problems.push(`the check threw: ${error.message.split("\n")[0]}`);
   } finally {

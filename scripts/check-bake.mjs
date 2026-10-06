@@ -204,4 +204,15 @@ writeFileSync(unbakedFile, template);
 const notBaked = verify(unbakedFile);
 await check("verify-baked fails the page as written: it can tell the difference", () =>
   notBaked.status === 1 && notBaked.stdout.includes("a request left the page"), () => notBaked.stdout + notBaked.stderr);
+const hideFirstDiagram = (html) => html.replace(/<pre class="mermaid"[\s\S]*?<\/pre>/, "<div hidden>$&</div>");
+const hiddenFile = join(work, "hidden.html");
+writeFileSync(hiddenFile, hideFirstDiagram(drawn.text));
+const hidden = verify(hiddenFile);
+await check("verify-baked passes a baked page whose diagram sits in a hidden container: a variant shows by its computed display",
+  () => hidden.status === 0, () => hidden.stdout + hidden.stderr);
+const firstHiddenFile = join(work, "first-hidden.html");
+writeFileSync(firstHiddenFile, hideFirstDiagram(two.text));
+const firstHidden = verify(firstHiddenFile);
+await check("...and with two diagrams, the first one hidden, the zoom opens the first one a reader can see",
+  () => firstHidden.status === 0, () => firstHidden.stdout + firstHidden.stderr);
 done();

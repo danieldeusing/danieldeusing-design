@@ -392,7 +392,7 @@ entry in that array.
 - **Tokens-only / look-only consumer → unpinned** (`…/npm/@danieldeusing/design/dist/…`, no
   `@x.y.z`). One design system, every surface on the current version — Daniel's call, 2026-08-05.
   A stale cached stylesheet there means slightly older colours, never a broken page. netmon's
-  `tokens.css` layer, the seedr playgrounds and pagr-docs are on this side today.
+  `tokens.css` layer and the seedr playgrounds are on this side today.
   **This is where a surface should sit, not a roster of where they are** — audited 2026-08-06,
   `deploy/ci-orchestrator` was hard-pinned at **0.1.5** and had no token since. morning-briefs
   imports the unpinned `src/` files (look-only) and keeps its own fixes in its stylesheet; for
@@ -422,6 +422,10 @@ entry in that array.
   staging** (once the edge turns over). So (a) look at them after publishing, and (b) keep new
   CSS backward-compatible with the markup consumers still ship — `0.2.0`'s `html:has(.ls-nav)`
   guard is the worked example.
+- **A page made with `html-doc` → neither side: it is baked.** It loads no CDN url at all:
+  `scripts/bake.mjs` inlines the CSS, fonts, runtime and diagrams, and the page keeps the design
+  of its date (Daniel, 2026-10-06). That includes pagr-docs, which tracked the unpinned url from
+  2026-08-05 until it was baked; that decision no longer applies.
 
 ## Changing the system
 

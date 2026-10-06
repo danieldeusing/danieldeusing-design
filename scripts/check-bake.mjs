@@ -195,4 +195,13 @@ const broken = template.replace(/<pre class="mermaid">[\s\S]*?<\/pre>/, '<pre cl
 const unparsable = bakeFile("broken.html", broken);
 await check("a diagram Mermaid cannot draw is refused, the file unchanged", () =>
   unparsable.code === 1 && unparsable.out.includes("could not be drawn") && unparsable.text === broken, () => unparsable.out);
+const verify = (file) => spawnSync(process.execPath, [join(root, "scripts", "verify-baked.mjs"), file], { encoding: "utf8" });
+const verified = verify(drawn.file);
+await check("verify-baked passes the baked template: offline, JavaScript off and on, 375 and 1400 px", () => verified.status === 0,
+  () => verified.stdout + verified.stderr);
+const unbakedFile = join(work, "unbaked.html");
+writeFileSync(unbakedFile, template);
+const notBaked = verify(unbakedFile);
+await check("verify-baked fails the page as written: it can tell the difference", () =>
+  notBaked.status === 1 && notBaked.stdout.includes("a request left the page"), () => notBaked.stdout + notBaked.stderr);
 done();

@@ -379,9 +379,13 @@ tap-target sizing under a coarse pointer, a phone gutter, a deliberately fixed-d
 each states a real reason. If you cannot write the sentence, you do not have an exception — you
 have a fork.
 
-**It only knows three surfaces** — `cockpit`, `netmon` and `docs`, listed in `SURFACES` at the top
-of the script. `apps/pagr`, the seedr playgrounds and `deploy/ci-orchestrator` are unchecked, and
-every one of them has drifted. Adding a surface is one entry in that array.
+**It knows seven surfaces** — `cockpit`, `netmon`, `docs`, `docs-server`, `review-report`, `family`
+and `pagr`, listed in `SURFACES` at the top of the script. `review-report` is the orchestrator's
+review report: the check renders it and judges it only against its own release (`pinFrom`). Still
+unchecked: seedr and seedr-internal (the web app, the playgrounds and the studio), configr,
+morning-briefs, the orchestrator's execution report, and the `html-doc` pages outside the docs site.
+One of those is `apps/pagr/pagr-docs.html`, because pagr's root is `src/`. Adding a surface is one
+entry in that array.
 
 ## Pin or unpin the CDN url — decided by whether your markup is coupled to a release
 

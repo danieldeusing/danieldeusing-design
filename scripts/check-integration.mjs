@@ -410,6 +410,21 @@ if (!CHROME) {
     check("...and a figure a later initDiagramZoom() wires opens in the page's one view: 1 overlay <dialog> after both have opened", () =>
       zoom === 1 ? [] : [`${zoom} overlay dialogs`]);
 
+    // A BAKED DIAGRAM HOLDS ONE SVG PER THEME (0.64.0) and CSS shows the reader's. The view opens the
+    // one on screen: with the warm variant hidden, the paper one is what a reader sees and zooms.
+    const variant = typeof second === "string" ? second : await within(browser.evaluate(`(async () => {
+      const frame = () => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      document.getElementById("s2").insertAdjacentHTML("beforeend", '<figure class="diagram" id="dgm3">' +
+        '<svg data-theme-variant="warm" style="display:none" viewBox="0 0 10 10"><rect width="5" height="5"/></svg>' +
+        '<svg data-theme-variant="paper" viewBox="0 0 10 10"><rect width="5" height="5"/></svg></figure>');
+      dd.initDiagramZoom(".diagram");
+      document.getElementById("dgm3").click(); await frame();
+      const shown = document.querySelector("dialog.dgm-overlay[open] svg")?.getAttribute("data-theme-variant");
+      document.querySelector("dialog.dgm-overlay[open]")?.close(); await frame();
+      return shown ?? "no open view"; })()`));
+    check("...and a diagram with theme variants opens the variant on screen, not the first in the markup", () =>
+      variant === "paper" ? [] : [String(variant)]);
+
     // THE TEMPLATE'S DIAGRAM, IN THE THEME'S OWN RED (0.61.1). Its `classDef warn` carried a literal
     // #a02c2c: warm's --destructive, and wrong on the other three themes. Mermaid does not take var() in
     // a style at all (measured with 11.16.0: with or without a fallback the diagram fails to parse), so
@@ -446,6 +461,20 @@ if (!CHROME) {
       return !!document.querySelector("pre.mermaid[data-processed] svg .node.warn"); })()`), 20000);
     check("templates/documentation.html: its diagram renders to an <svg> with the warn node in it", () =>
       rendered === true ? [] : [rendered === false ? "no rendered svg with a .node.warn (did mermaid load? DD_MERMAID, or else the CDN)" : String(rendered)]);
+    // THE BAKE'S CONTRACT (0.64.0): the diagram code is its own data-dd-diagrams script, it renders on
+    // request and resolves to one svg per diagram, and every pass announces itself for the explainers.
+    const contract = rendered !== true ? null : await within(browser.evaluate(`(async () => {
+      let passes = 0;
+      document.addEventListener("dd:diagrams", () => { passes += 1; });
+      const svgs = await window.ddRenderDiagrams();
+      return { diagrams: document.querySelectorAll("pre.mermaid").length, svgs: svgs.map((s) => typeof s === "string" && s.startsWith("<svg")), passes,
+               script: !!document.querySelector('script[type="module"][data-dd-diagrams]') }; })()`));
+    check("templates/documentation.html: window.ddRenderDiagrams() resolves to one svg per diagram and fires dd:diagrams", () =>
+      contract && contract.script && contract.passes >= 1 && contract.svgs.length === contract.diagrams && contract.svgs.every(Boolean)
+        ? [] : [JSON.stringify(contract)]);
+    check("templates/documentation.html: the runtime import carries the dd-runtime mark the bake looks for", () =>
+      /\/\/ dd-runtime: scripts\/bake\.mjs swaps this import[^\n]*\n\s*import \{[^}]*\} from\s*"https:\/\/cdn\.jsdelivr\.net\/npm\/@danieldeusing\/design@[\d.]+\/runtime\/index\.js";/
+        .test(read("templates/documentation.html")) ? [] : ["no marked runtime import"]);
     if (mermaidDir) {
       // Anything else the page asks jsDelivr for (the webfont) is refused, not failed: the diagram does
       // not need it, and a refusal is the point. Only a mermaid file the copy lacks is a fault.

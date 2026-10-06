@@ -45,10 +45,18 @@ const MAX_SCALE = 12;
 const DRAG_SLOP = 4; // px a press may wander and still be a click rather than a pan
 const KEY_PAN = 40; // px an arrow key moves the artwork
 
+/* The artwork an opener names and opens. A baked page (scripts/bake.mjs, 0.64.0) holds one svg per
+   theme in each diagram, and CSS shows the reader's: that one, not the first in the markup. */
+function artworkOf(el) {
+  const variants = el.querySelectorAll(":scope > svg[data-theme-variant]");
+  if (!variants.length) return el.querySelector("svg, img, canvas");
+  return Array.from(variants).find((svg) => svg.getClientRects().length) ?? variants[0];
+}
+
 /* "zoom: network map" for an image with alt text, "zoom image" for one without, "zoom diagram" for
    everything else — the middle case because "diagram" is what the old name called a photograph. */
 function nameOf(el) {
-  const node = el.querySelector("svg, img, canvas");
+  const node = artworkOf(el);
   const own = node?.tagName === "IMG" ? node.getAttribute("alt")
     : node?.tagName.toLowerCase() === "svg" ? node.getAttribute("aria-label") || node.querySelector(":scope > title")?.textContent
     : null;
@@ -206,7 +214,7 @@ function viewer() {
   };
 
   const open = (source) => {
-    const node = source.querySelector("svg, img, canvas");
+    const node = artworkOf(source);
     if (!node) return;
     // Built on first use, and again if a page re-render took it out of <body>.
     if (!view?.isConnected) build();

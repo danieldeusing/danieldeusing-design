@@ -407,6 +407,7 @@ flowchart TD
     </footer>
 
     <script type="module">
+      // dd-runtime: scripts/bake.mjs swaps this import for the runtime it inlines.
       import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom, initMinimap, initTooltips } from
         "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.63.1/runtime/index.js";
       applyStoredTheme();
@@ -427,81 +428,97 @@ flowchart TD
       // markup contract, so both are a no-op on a page that has none of their element —
       // and neither can be forgotten on the day a page grows one.
       initSelects();
+      // EVERY DIAGRAM IS ZOOMABLE. A flowchart sized to fit a text column is unreadable at
+      // exactly the moment someone needs to read it, so the system ships the overlay (click /
+      // Enter / Space, wheel-zoom about the pointer, drag-pan, + - 0, Escape) and a doc has no
+      // reason to opt out. Wired HERE and not in the diagram script below, because a baked page
+      // keeps that script as inert text and has its svgs already. The opener takes the svg at
+      // the moment it opens: the one the diagram script last drew, or a baked diagram's variant
+      // of the current theme. A second call wires nothing twice.
+      initDiagramZoom("pre.mermaid");
 
-      // Mermaid diagrams — themed from the design tokens, re-rendered on theme switch.
-      // Delete this block (and the pre.mermaid CSS) if the page has no diagrams.
+      // The minimap builds itself from the sections — one bar each, in the left gutter,
+      // with the scroll-spy built in. No markup and no per-section wiring: add a
+      // <section class="doc" id="..."> and it appears. It returns null (and renders
+      // nothing) when there are fewer than two sections, on the same reasoning as a
+      // one-entry nav.
+      initMinimap({ sections: "section.doc" });
+      // The minimap's bars carry `data-tip`, not `title`: the native tooltip waits about a
+      // second and renders in the OS's chrome, which is useless on a strip meant to be
+      // scrubbed. This shows the section name instantly, in the page's own type. Delegated,
+      // so it covers the bars the minimap just built.
+      initTooltips();
+    </script>
+
+    <!-- Mermaid diagrams, themed from the design tokens and drawn again on a theme switch.
+         window.ddRenderDiagrams() draws every diagram once more in the current theme and
+         resolves to one svg per diagram: scripts/bake.mjs calls it once per theme, keeps the
+         four svgs in the page and turns this script into inert text (type="text/plain").
+         Every pass ends with a dd:diagrams event, which an explainer listens for.
+         Delete this script (and the pre.mermaid CSS) if the page has no diagrams. -->
+    <script type="module" data-dd-diagrams>
       import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.esm.min.mjs";
 
       const diagrams = Array.from(document.querySelectorAll("pre.mermaid"));
-      if (diagrams.length) {
-        // capture the sources before the first render replaces them with SVG
-        for (const node of diagrams) node.dataset.mermaidSource = node.textContent;
+      // capture the sources before the first render replaces them with SVG
+      for (const node of diagrams) node.dataset.mermaidSource = node.textContent;
 
-        // Renders are serialized: applyStoredTheme() writes data-theme on startup, so an
-        // unguarded observer would kick off a second pass while the first is still
-        // running — two passes mutating the same nodes stack every diagram into one box.
-        let renderPass = 0;
-        let pending = Promise.resolve();
-        let zoomWired = false;
+      // Renders are serialized: applyStoredTheme() writes data-theme on startup, so an
+      // unguarded observer would kick off a second pass while the first is still
+      // running — two passes mutating the same nodes stack every diagram into one box.
+      let renderPass = 0;
+      let pending = Promise.resolve([]);
 
-        const renderDiagrams = () => {
-          pending = pending.then(async () => {
-            const pass = (renderPass += 1);
-            const styles = getComputedStyle(document.documentElement);
-            const token = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
-            mermaid.initialize({
-              startOnLoad: false,
-              securityLevel: "strict",
-              fontFamily: token("--font-mono", "monospace"),
-              flowchart: { htmlLabels: true, useMaxWidth: true },
-              themeVariables: {
-                background: token("--background", "#f5efe2"),
-                primaryColor: token("--card", "#efe7d4"),
-                primaryTextColor: token("--foreground", "#43352a"),
-                primaryBorderColor: token("--border", "#d9cdb6"),
-                secondaryColor: token("--muted", "#ece3cf"),
-                tertiaryColor: token("--muted", "#ece3cf"),
-                lineColor: token("--muted-foreground", "#71614e"),
-                textColor: token("--foreground", "#43352a"),
-                mainBkg: token("--card", "#efe7d4"),
-                nodeBorder: token("--border", "#d9cdb6"),
-                clusterBkg: token("--muted", "#ece3cf"),
-                clusterBorder: token("--border", "#d9cdb6"),
-                edgeLabelBackground: token("--background", "#f5efe2"),
-                titleColor: token("--primary", "#8a4516"),
-              },
-            });
-            // render ids must be unique per pass, or a re-render collides with itself
-            for (const [index, node] of diagrams.entries()) {
-              try {
-                const { svg } = await mermaid.render(`mermaid-svg-${index}-${pass}`, node.dataset.mermaidSource);
-                node.innerHTML = svg;
-                node.dataset.processed = "true";
-              } catch {
-                // a broken diagram falls back to its source — it must never blank the box
-                node.textContent = node.dataset.mermaidSource;
-                node.removeAttribute("data-processed");
-              }
-            }
-            // EVERY DIAGRAM IS ZOOMABLE. A flowchart sized to fit a text column is
-            // unreadable at exactly the moment someone needs to read it, so the system
-            // ships the overlay (click / Enter / Space, wheel-zoom about the pointer,
-            // drag-pan, + - 0, Escape) and a doc has no reason to opt out.
-            //
-            // Wired ONCE, and after the first render rather than before it: the opener
-            // binds a listener per element and is not idempotent, so calling it again on
-            // the theme re-render would open two overlays per click. Re-rendering is safe
-            // regardless — initDiagramZoom CLONES the svg on open, so it always picks up
-            // whatever the <pre> currently holds, and the original nodes mermaid keeps
-            // references to are never moved out of the document.
-            if (!zoomWired) {
-              zoomWired = true;
-              initDiagramZoom("pre.mermaid");
-            }
+      const renderDiagrams = () => {
+        pending = pending.then(async () => {
+          const pass = (renderPass += 1);
+          const styles = getComputedStyle(document.documentElement);
+          const token = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: "strict",
+            fontFamily: token("--font-mono", "monospace"),
+            flowchart: { htmlLabels: true, useMaxWidth: true },
+            themeVariables: {
+              background: token("--background", "#f5efe2"),
+              primaryColor: token("--card", "#efe7d4"),
+              primaryTextColor: token("--foreground", "#43352a"),
+              primaryBorderColor: token("--border", "#d9cdb6"),
+              secondaryColor: token("--muted", "#ece3cf"),
+              tertiaryColor: token("--muted", "#ece3cf"),
+              lineColor: token("--muted-foreground", "#71614e"),
+              textColor: token("--foreground", "#43352a"),
+              mainBkg: token("--card", "#efe7d4"),
+              nodeBorder: token("--border", "#d9cdb6"),
+              clusterBkg: token("--muted", "#ece3cf"),
+              clusterBorder: token("--border", "#d9cdb6"),
+              edgeLabelBackground: token("--background", "#f5efe2"),
+              titleColor: token("--primary", "#8a4516"),
+            },
           });
-          return pending;
-        };
+          // render ids must be unique per pass, or a re-render collides with itself
+          const svgs = [];
+          for (const [index, node] of diagrams.entries()) {
+            try {
+              const { svg } = await mermaid.render(`mermaid-svg-${index}-${pass}`, node.dataset.mermaidSource);
+              node.innerHTML = svg;
+              node.dataset.processed = "true";
+              svgs.push(svg);
+            } catch {
+              // a broken diagram falls back to its source — it must never blank the box
+              node.textContent = node.dataset.mermaidSource;
+              node.removeAttribute("data-processed");
+              svgs.push(null);
+            }
+          }
+          document.dispatchEvent(new CustomEvent("dd:diagrams"));
+          return svgs;
+        });
+        return pending;
+      };
+      window.ddRenderDiagrams = renderDiagrams;
 
+      if (diagrams.length) {
         // Wait for the terminal reveal: a diagram inside a not-yet-revealed
         // [data-term-out] is visibility:hidden, and Mermaid would size it against a
         // container it cannot measure properly. With animation off, render at once.
@@ -520,18 +537,6 @@ flowchart TD
           void renderDiagrams();
         }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
       }
-
-      // The minimap builds itself from the sections — one bar each, in the left gutter,
-      // with the scroll-spy built in. No markup and no per-section wiring: add a
-      // <section class="doc" id="..."> and it appears. It returns null (and renders
-      // nothing) when there are fewer than two sections, on the same reasoning as a
-      // one-entry nav.
-      initMinimap({ sections: "section.doc" });
-      // The minimap's bars carry `data-tip`, not `title`: the native tooltip waits about a
-      // second and renders in the OS's chrome, which is useless on a strip meant to be
-      // scrubbed. This shows the section name instantly, in the page's own type. Delegated,
-      // so it covers the bars the minimap just built.
-      initTooltips();
     </script>
   </body>
 </html>

@@ -301,6 +301,8 @@ const TWICE_BODY = `<header class="bar"><button type="button" data-ls-nav-toggle
 <section class="doc" id="s2"><h2>two</h2>
   <button type="button" data-dialog-open="tw-dlg">open</button><dialog class="dialog" id="tw-dlg"><h2 class="dialog-title">d</h2><button type="button" data-dialog-close>x</button></dialog>
   <figure class="diagram" id="dgm"><svg viewBox="0 0 10 10" aria-label="flow"><rect width="5" height="5"/></svg></figure>
+  <pre class="mermaid" id="baked-diagram">${["warm", "green", "mono", "paper"].map((t) => `<svg data-theme-variant="${t}" viewBox="0 0 10 10"><rect width="5" height="5"/></svg>`).join("")}</pre>
+  <pre class="mermaid" id="plain-diagram"><svg viewBox="0 0 10 10"><rect width="5" height="5"/></svg></pre>
   <div id="ticks" data-label="pollers"></div><p>updated <span data-ago="2026-09-29T08:00:00Z">then</span></p>
   <table><tbody><tr><td class="pick"><input type="checkbox" aria-label="pick"></td><td>x</td></tr></tbody></table>
   <details class="fold"><summary>fold</summary><p>folded</p></details>
@@ -424,6 +426,37 @@ if (!CHROME) {
       return shown ?? "no open view"; })()`));
     check("...and a diagram with theme variants opens the variant on screen, not the first in the markup", () =>
       variant === "paper" ? [] : [String(variant)]);
+
+    // THE VARIANT CSS (0.64.0). src/content.css hides the variants of the other themes and leaves the reader's
+    // alone, so it keeps the display of every diagram svg (block: reset.css, and print.css in print). It once
+    // hid all four and gave the shown one `display: revert`, which dropped it to the browser's inline: a baked
+    // diagram laid out unlike a live one, on screen and in print, and nothing failed. Per theme (unset is warm),
+    // on screen and then with print media: exactly the matching variant has a box, and it has the plain svg's display.
+    const variantCss = typeof second === "string" ? second : await within((async () => {
+      const rows = [];
+      try {
+        for (const media of ["screen", "print"]) {
+          await browser.send("Emulation.setEmulatedMedia", { media: media === "print" ? "print" : "" });
+          rows.push(...await browser.evaluate(`[null, "warm", "green", "mono", "paper"].map((theme) => {
+            if (theme) document.documentElement.dataset.theme = theme; else document.documentElement.removeAttribute("data-theme");
+            const shown = [...document.querySelectorAll("#baked-diagram > svg")].filter((svg) => svg.getClientRects().length);
+            return { media: ${JSON.stringify(media)}, applied: matchMedia("print").matches === ${media === "print"}, theme: theme ?? "unset",
+              shown: shown.map((svg) => svg.dataset.themeVariant + ":" + getComputedStyle(svg).display),
+              plain: getComputedStyle(document.querySelector("#plain-diagram > svg")).display };
+          })`));
+        }
+      } finally {
+        await browser.send("Emulation.setEmulatedMedia", { media: "" });
+        await browser.evaluate(`document.documentElement.dataset.theme = "warm"`);
+      }
+      return rows;
+    })());
+    check("the variant CSS shows one svg per theme, with a diagram svg's display, on screen and in print", () =>
+      !Array.isArray(variantCss) ? [String(variantCss)] : variantCss.flatMap(({ media, applied, theme, shown, plain }) => {
+        const want = `${theme === "unset" ? "warm" : theme}:${plain}`;
+        return [...(applied ? [] : [`${media} media was not applied`]),
+          ...(shown.length === 1 && shown[0] === want ? [] : [`${media}, data-theme ${theme}: shown ${JSON.stringify(shown)}, want ["${want}"]`])];
+      }));
 
     // THE TEMPLATE'S DIAGRAM, IN THE THEME'S OWN RED (0.61.1). Its `classDef warn` carried a literal
     // #a02c2c: warm's --destructive, and wrong on the other three themes. Mermaid does not take var() in

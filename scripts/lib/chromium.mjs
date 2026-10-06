@@ -84,7 +84,10 @@ export async function launch(name) {
   // The profile goes with the browser: every run otherwise left a 2 MB directory in the temp dir.
   // The browser leads its own process group and the whole group is killed first, then the removal
   // retries: a renderer still writing into the profile left it behind with three quick tries.
+  // A closed browser takes its exit listener off: verify-baked launches one browser per page, and
+  // Node warns of a leak when one event holds 11 listeners.
   const close = () => {
+    process.off("exit", close);
     try { socket?.close(); } catch { /* already closed */ }
     try { process.kill(-chrome.pid, "SIGKILL"); } catch { chrome.kill("SIGKILL"); }
     try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch { /* reported by the leak count */ }

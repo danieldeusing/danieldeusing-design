@@ -195,7 +195,7 @@ const broken = template.replace(/<pre class="mermaid">[\s\S]*?<\/pre>/, '<pre cl
 const unparsable = bakeFile("broken.html", broken);
 await check("a diagram Mermaid cannot draw is refused, the file unchanged", () =>
   unparsable.code === 1 && unparsable.out.includes("could not be drawn") && unparsable.text === broken, () => unparsable.out);
-const verify = (file) => spawnSync(process.execPath, [join(root, "scripts", "verify-baked.mjs"), file], { encoding: "utf8" });
+const verify = (...files) => spawnSync(process.execPath, [join(root, "scripts", "verify-baked.mjs"), ...files], { encoding: "utf8" });
 const verified = verify(drawn.file);
 await check("verify-baked passes the baked template: offline, JavaScript off and on, 375 and 1400 px", () => verified.status === 0,
   () => verified.stdout + verified.stderr);
@@ -215,4 +215,8 @@ writeFileSync(firstHiddenFile, hideFirstDiagram(two.text));
 const firstHidden = verify(firstHiddenFile);
 await check("...and with two diagrams, the first one hidden, the zoom opens the first one a reader can see",
   () => firstHidden.status === 0, () => firstHidden.stdout + firstHidden.stderr);
+// Node warns when one event holds 11 listeners, so a browser that leaves its exit listener behind shows up from the 11th page.
+const many = verify(...Array(12).fill(plain.file));
+await check("verify-baked over 12 pages in one call passes each of them and prints no MaxListenersExceededWarning: a closed browser takes its exit listener with it",
+  () => many.status === 0 && !many.stderr.includes("MaxListenersExceededWarning"), () => `exit ${many.status}: ${many.stderr.trim()}`);
 done();

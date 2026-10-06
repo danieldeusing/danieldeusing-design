@@ -17,9 +17,12 @@ description: >-
 # html-doc
 
 Turn a workflow, process, script, or project into one self-contained HTML page styled by
-**danieldeusing-design** — the repo this skill lives in. The page pulls all CSS/JS from the
-jsDelivr CDN, so the output is a **single `.html` file** that opens directly in a browser — no
-build step, no companion assets.
+**danieldeusing-design** — the repo this skill lives in. While you write it, the page pulls its
+CSS and JS from the jsDelivr CDN and draws its diagrams in the browser. The last step, the
+**bake** (`scripts/bake.mjs`), puts the CSS, the fonts, the runtime and every diagram as SVG into
+the file. The result is a **single `.html` file** that loads nothing: it renders the same in a
+browser, the Teams file preview, Element on iOS and a mail client, online or offline, with or
+without JavaScript, and it keeps the design of the day it was baked.
 
 For anything about the design system itself — tokens, themes, the component vocabulary, what a
 consumer may and may not redeclare — use the **`danieldeusing-design`** skill next door. This one
@@ -164,12 +167,24 @@ already carries two, and if you cannot write the sentence you do not have an exc
          it, write an empty `<doc-explainer id="…"></doc-explainer>`, with nothing between the
          tags. While the explainer has content, the template hides its static twin; with
          JavaScript off and in print, the static version shows.
-       - Its code goes at the end of the template's module script, and it writes only inside its
-         own element. To step through a diagram, clone the rendered `<svg>` into the explainer
-         and mark the nodes in the clone. Give the clone new ids
+       - Its code is its own `<script type="module">` after the template's scripts, never inside
+         them: the bake turns the diagram script into inert text, and an explainer must still run
+         in a baked page. It writes only inside its own element. To step through a diagram, clone
+         the svg that is shown (a baked diagram holds one per theme) into the explainer and mark
+         the nodes in the clone. Give the clone new ids
          (`svg.outerHTML.replaceAll(svg.id, svg.id + "-x")`): with the original's ids its
-         arrowheads point at the hidden twin and vanish. Take the clone in a function that you
-         call from `renderDiagrams`, after the zoom wiring, so a theme switch refreshes it.
+         arrowheads point at the hidden twin and vanish. Build it once the diagrams exist and again
+         on a theme switch:
+         ```js
+         const shown = (pre) =>
+           pre.querySelector(`:scope > svg[data-theme-variant="${document.documentElement.dataset.theme || "warm"}"]`) ??
+           pre.querySelector(":scope > svg");
+         const build = () => { /* clone shown(…) into this explainer and mark its nodes */ };
+         if (document.querySelector("pre.mermaid > svg")) build();   // baked, or drawn already
+         document.addEventListener("dd:diagrams", build);            // each render pass while the page is written
+         if (document.querySelector("pre.mermaid > svg[data-theme-variant]"))  // baked: a theme switch shows another svg
+           new MutationObserver(build).observe(document.documentElement, { attributeFilter: ["data-theme"] });
+         ```
        - The controls are the system's: back and next as `.btn-icon` (`data-icon`
          `chevron-left`, `chevron-right`), a before/after choice as `.segmented`, a filter as a
          filter dropdown or a chip set. Read `references/controls.md` and
@@ -298,14 +313,14 @@ already carries two, and if you cannot write the sentence you do not have an exc
 
    - **Every diagram is zoomable, and the template already wires it (0.10.0).** A flowchart
      scaled to fit a text column is unreadable at exactly the moment someone needs to read it,
-     so `initDiagramZoom("pre.mermaid")` runs after the first render and the system's overlay
-     does the rest: click / Enter / Space to open, wheel-zoom about the pointer, drag-pan,
-     `+ - 0`, Escape to close. Do not hand-roll a lightbox and do not drop the call when you
-     trim the diagram block — a diagram nobody can enlarge is the failure this exists to
-     prevent. Two things to preserve if you touch that code: it is wired **once** behind a
-     flag (the opener binds a listener per element and is not idempotent, so a second call
-     opens two overlays per click), and it is wired **after** the first render because it
-     clones the rendered `<svg>` — cloning is also why the theme re-render keeps working.
+     so the template's runtime script calls `initDiagramZoom("pre.mermaid")` and the system's
+     overlay does the rest: click / Enter / Space to open, wheel-zoom about the pointer,
+     drag-pan, `+ - 0`, Escape to close. Do not hand-roll a lightbox and do not drop the call —
+     a diagram nobody can enlarge is the failure this exists to prevent. Keep the call in the
+     runtime script, never in the diagram script: a baked page keeps the diagram script as
+     inert text. The overlay takes the `<svg>` at the moment it opens (the one the diagram
+     script drew last, or on a baked page the variant of the current theme), and a second
+     call wires nothing twice.
    - **Escape the line breaks.** Inside a `<pre>`, write `&lt;br/&gt;` in node labels, never a
      raw `<br/>`. A raw tag is parsed as an HTML element and the renderer — which reads
      `textContent` — receives the label with the break silently stripped, so every label runs
@@ -374,16 +389,15 @@ already carries two, and if you cannot write the sentence you do not have an exc
 
 6. **Preserve graceful degradation.** Keep the pre-paint `<script>` blocks in `<head>` and the
    no-JS / `prefers-reduced-motion` fallbacks intact. Don't strip `aria-*` attributes. The page
-   must stay fully readable with JavaScript disabled — which is also why diagram sources live in
-   a `<pre>`: without JS the reader still sees the raw Mermaid source instead of an empty box.
+   must stay fully readable with JavaScript disabled. Before the bake, a reader without JS sees a
+   diagram's source in its `<pre>`; the baked page shows the diagram itself.
    With explainers, `grep -c '<doc-explainer[^>]*></doc-explainer>'` counts every explainer in
    the saved file (so without JS the static twins show) and prints 0 on the output of the step-5
    command with `--dump-dom` in place of `--screenshot=…` (the script filled each one); then
    click through each one in a browser.
 
-7. **Write one file.** Save the filled HTML to the user's chosen path, or default to
-   `./<slug>-docs.html` next to the subject. Do **not** create any companion `.css`/`.js` files —
-   it's single-file by design; styling comes from the CDN.
+7. **Write one file, then bake it.** Save the filled HTML to the user's chosen path, or default to
+   `./<slug>-docs.html` next to the subject. Do **not** create any companion `.css`/`.js` files.
 
    Then have the saved page checked for contradictions by a fresh-context subagent that
    receives only the saved file's path — not this conversation, not your notes. It returns
@@ -391,6 +405,20 @@ already carries two, and if you cannot write the sentence you do not have an exc
    file and method names, counts, versions and dates), each with both locations. Fix each one
    before step 8. Where no subagent is available, run the same check yourself. The check is
    never written into the page.
+
+   **Bake it, always, as the last change to the file**, then check it the way a preview opens it:
+   ```bash
+   node ~/Work/danieldeusing/danieldeusing-design/scripts/bake.mjs <file>
+   node ~/Work/danieldeusing/danieldeusing-design/scripts/verify-baked.mjs <file>
+   ```
+   The bake draws each diagram once per theme in headless Chrome, inlines the design CSS, the
+   fonts the text needs and the runtime records the page imports, and stamps
+   `<meta name="dd-baked">`. It refuses, and leaves the file as it was, when a diagram cannot be
+   drawn or anything would still load from the network: fix the page and bake again. A baked
+   page bakes again from the page as written, so to change one, edit the baked file (never a
+   `data-dd-inline` block) and bake again. `verify-baked.mjs` opens the page with the network
+   blocked, without and then with JavaScript, at 375 and 1400 px, and prints two screenshot
+   paths: look at both. A page that has not passed the bake and this check is not done.
 
 8. **Offer to publish** to `docs.danieldeusing.de`. Ask first — some docs are local-only. If the
    user declines, stop here and report the local path.
@@ -412,6 +440,8 @@ already carries two, and if you cannot write the sentence you do not have an exc
    where in the tree the file goes, moving it into the docs repo, checking that the folder is
    reachable and recording it in 1Password, and the pull-before-push that deploys it.
 
+   Publish the baked file. Bake again after any change, before each publish.
+
 9. **Report.** Give the local path (or the published URL — `https://docs.internal.danieldeusing.de/…`
    for `site-internal/`, `https://docs.danieldeusing.de/…` for `site/` — plus the 1P item name if
    it was published), that it opens directly in a browser, and that themes (warm / green / mono /
@@ -426,7 +456,8 @@ already carries two, and if you cannot write the sentence you do not have an exc
 - This is a fill-a-template skill, not a generator framework. No config, no flags beyond the
   output path.
 - Mermaid is pinned to `@11.16.0` and loaded as an ESM module from jsDelivr, independently of the
-  design-system version. Bump it deliberately, never to `@latest`.
+  design-system version. Bump it deliberately, never to `@latest`. The bake draws with the same
+  pin; a baked page carries the SVGs and no Mermaid.
 - The renderer waits for the `term:contentdone` event before drawing, because a diagram inside a
   not-yet-revealed `[data-term-out]` is `visibility: hidden` and cannot be measured. It also
   serializes render passes — an unguarded theme-change observer fires while the first pass is

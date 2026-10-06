@@ -130,7 +130,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
      (`site-internal/poi/vu3/vu3dev-390597-nova-dcc-sync.html` in the docs repo, 2026-09-30;
      Daniel: *"The current report is good and we want to have this idea in the html docs"*).
      The template's `#overview`, `#plain-words`, `#flow` and `#proof` sections carry the shape:
-     - **TL;DR first** (`#overview`): three to five bullets, each opening with a bold label
+     - **In short first** (`#overview`): three to five bullets, each opening with a bold label
        (`What breaks:`, `Where:`, `When:`), for a reader who reads only that.
      - **In plain words** (`#plain-words`): a few sentences in everyday words, no identifiers,
        for a reader who is not technical. Plain paragraphs, never a box. An analogy is fine; a
@@ -141,7 +141,12 @@ already carries two, and if you cannot write the sentence you do not have an exc
        a note or a trap. A summary or the main content of a section is never a box.
      - **Root cause:** a page that explains a root cause does it in one section, with one
        sub-section per reader (for example *In plain words*, *For requirements engineers*,
-       *Technical*), never in one section per reader.
+       *Technical*), never in one section per reader. Open the section with one short paragraph
+       before the first sub-section that says the parts explain the same cause for different
+       readers and names each label the page uses, only the parts present: "The three parts
+       below explain the same cause for three readers. Each part carries the label of its
+       reader: PO for the product owner, RE for requirements engineers, DEV for developers."
+       Without it, a reader takes the labels for three different causes.
      - **Plain technical English, about 80% of ASD-STE100** (Simplified Technical English):
        - One topic per paragraph, at most six sentences; a list for three or more items or
          steps. No paragraph a list can carry; a comparison or a tally is a `<table>`, never

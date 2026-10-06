@@ -458,6 +458,48 @@ if (!CHROME) {
           ...(shown.length === 1 && shown[0] === want ? [] : [`${media}, data-theme ${theme}: shown ${JSON.stringify(shown)}, want ["${want}"]`])];
       }));
 
+    // A BAKED PAGE'S TABS, WITH NO SCRIPT (0.64.0). Only the runtime switches panels, so a preview that runs no
+    // script (Teams, Element on iOS, a mail client) would show the first panel and nothing else. src/data.css
+    // shows every panel and no tab row, as print does, on a page that carries the dd-baked meta and has no
+    // data-theme: the template's pre-paint script sets one whenever scripts run. A theme, or no meta, leaves the
+    // tabs alone, so an app that uses tabs without a theme keeps its hidden panels. A panel hidden="until-found"
+    // keeps its own display (the rule skips it, as the print rule and tokens.css do).
+    const tabsCss = typeof second === "string" ? second : await within(browser.evaluate(`(() => {
+      const html = document.documentElement;
+      document.getElementById("s2").insertAdjacentHTML("beforeend", '<div id="tabbed">' +
+        '<div class="tabs" role="tablist" aria-label="fixture">' +
+        '<button type="button" class="tab" role="tab" id="fx-a" aria-controls="fx-pa" aria-selected="true">a</button>' +
+        '<button type="button" class="tab" role="tab" id="fx-b" aria-controls="fx-pb" aria-selected="false" tabindex="-1">b</button></div>' +
+        '<div id="fx-pa" role="tabpanel" aria-labelledby="fx-a">a</div>' +
+        '<div id="fx-pb" role="tabpanel" aria-labelledby="fx-b" hidden>b</div>' +
+        '<div id="fx-pc" role="tabpanel" hidden="until-found" style="display:flex">c</div></div>');
+      const display = (selector) => getComputedStyle(document.querySelector(selector)).display;
+      const rows = [];
+      try {
+        for (const [baked, theme] of [[true, null], [true, "warm"], [true, "green"], [true, "mono"], [true, "paper"], [false, null], [false, "warm"]]) {
+          document.querySelector('meta[name="dd-baked"]')?.remove();
+          if (baked) document.head.insertAdjacentHTML("beforeend", '<meta name="dd-baked" content="0.64.0 2026-10-05">');
+          if (theme) html.dataset.theme = theme; else html.removeAttribute("data-theme");
+          rows.push({ baked, theme: theme ?? "unset", panel: display("#fx-pb"), row: display("#tabbed .tabs"), found: display("#fx-pc") });
+        }
+      } finally {
+        document.querySelector('meta[name="dd-baked"]')?.remove();
+        html.dataset.theme = "warm";
+        document.getElementById("tabbed").remove();
+      }
+      return rows;
+    })()`));
+    check("a baked page with no data-theme shows every tab panel and no tab row; a theme, or no baked meta, leaves the tabs alone", () =>
+      !Array.isArray(tabsCss) ? [String(tabsCss)] : tabsCss.flatMap(({ baked, theme, panel, row, found }) => {
+        const open = baked && theme === "unset";
+        const where = `${baked ? "baked" : "not baked"}, data-theme ${theme}`;
+        return [
+          ...(panel === (open ? "block" : "none") ? [] : [`${where}: the hidden panel has display ${panel}, want ${open ? "block" : "none"}`]),
+          ...(row === (open ? "none" : "flex") ? [] : [`${where}: the tab row has display ${row}, want ${open ? "none" : "flex"}`]),
+          ...(found === "flex" ? [] : [`${where}: the until-found panel has display ${found}, want its own flex`]),
+        ];
+      }));
+
     // THE TEMPLATE'S DIAGRAM, IN THE THEME'S OWN RED (0.61.1). Its `classDef warn` carried a literal
     // #a02c2c: warm's --destructive, and wrong on the other three themes. Mermaid does not take var() in
     // a style at all (measured with 11.16.0: with or without a fallback the diagram fails to parse), so

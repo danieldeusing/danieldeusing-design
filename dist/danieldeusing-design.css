@@ -7445,6 +7445,15 @@ section.doc.tab-panel { margin-top: 1.35rem; }
   }
 }
 
+/* ── A BAKED PAGE, NO SCRIPT (0.64.0) ──────────────────────────────────────────────────────────
+   Only the runtime switches tab panels, so a preview that runs no script (Teams, Element on iOS, a
+   mail client) shows a baked page's first panel and nothing else. It gets what print gets: every
+   panel and no tab row. A page with no data-theme ran no script, because the template's pre-paint
+   script always sets one (content.css shows the diagram variants by the same sign). The dd-baked
+   meta keeps an app that uses tabs without a theme out of this rule. */
+html:not([data-theme]):has(meta[name="dd-baked"]) .tabs { display: none !important; }
+html:not([data-theme]):has(meta[name="dd-baked"]) [role="tabpanel"][hidden]:not([hidden="until-found" i]) { display: block !important; }
+
 /* ===== cards.css ===== */
 /*
  * danieldeusing-design — cards and lists (0.60.0).

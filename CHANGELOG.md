@@ -15,8 +15,8 @@ All notable changes to this project are documented here. The format follows
   Element on iOS and a mail client fetch nothing and run no script; a Poirot page showed no styles
   and raw diagram source there (Daniel, 05.10.2026). A baked page carries `<meta name="dd-baked">`,
   bakes again from the page as written, and the bake refuses a page that would still load from the
-  network. `scripts/verify-baked.mjs` opens a baked page offline, without and with JavaScript, at
-  375 and 1400 px.
+  network. `scripts/verify-baked.mjs` opens a baked page offline, without JavaScript at 375 and
+  1400 px, then with JavaScript at 1400 px.
 - **`dist/danieldeusing-design.runtime.js`**: the runtime as one classic script, one record per
   module, every export of `runtime/index.js` on `globalThis.ddRuntime`. The build makes it with no
   dependency; `check-runtime-bundle.mjs` compares it with the modules.

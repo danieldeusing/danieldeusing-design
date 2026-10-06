@@ -215,7 +215,7 @@ runtime/      28 dependency-free ES modules and index.js (the barrel)
 dist/         danieldeusing-design.css + .min.css + .runtime.js   (committed — jsDelivr serves these)
 tokens/       tokens.json                            (committed — generated from tokens.css)
 examples/     one page per reference, every component rendered (not published to npm)
-templates/    page-chrome.html · documentation.html · error-page.html
+templates/    page-chrome.html · documentation.html · error-page.html · review-report.html
 docs/         migrations/                            (what a surface changes to adopt a release)
 scripts/      build.mjs and the check-*.mjs suites   (zero-dependency build and checks)
 .claude/skills/danieldeusing-design/                 (the skill: SKILL.md and references/)

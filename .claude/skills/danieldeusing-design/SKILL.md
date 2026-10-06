@@ -319,7 +319,7 @@ its markup:
 ## Chrome templates: start here for any surface
 
 The chrome has a **markup contract**, documented at the top of `src/chrome.css` and shown end to
-end in two templates that ship in the package (`files`), so a consumer reads the canonical markup
+end in the templates that ship in the package (`files`), so a consumer reads the canonical markup
 out of its own `node_modules` instead of copying whatever the nearest surface happens to do today
 — which is how the pre-rail dropdown propagated in the first place:
 

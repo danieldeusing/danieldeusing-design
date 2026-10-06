@@ -100,7 +100,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
      `danieldeusing-design-<v>.fonts.css` (the fonts file is `src/fonts.css` with its two
      `@font-face` urls repointed at the woff2 files sitting beside it — upstream loads those from
      the CDN, which is precisely what is unavailable when the fallback fires). Then update every
-     page in one pass: `rg -l 'design@' site site-internal`.
+     page that is not baked in one pass. List the pages with `rg -l 'design@' site site-internal`
+     and drop the baked ones, which `rg -l '<meta name="dd-baked"' site site-internal` lists. A
+     baked page keeps the design of the day it was baked.
    - **The path is site-absolute**, so it resolves only for a doc served from
      `docs.danieldeusing.de`. A page as written, kept on disk and opened over `file://`, has no
      fallback. If the CDN is unreachable it renders unstyled, which is what the

@@ -86,11 +86,11 @@ jobs:
         if: steps.decide.outputs.publish == 'true'
         run: npm install --no-save --no-package-lock --ignore-scripts --prefix "$RUNNER_TEMP/tailwind" @tailwindcss/node@4.3.3
 
-      # check-integration draws templates/documentation.html's diagram with mermaid. The template
-      # loads it from jsDelivr; the suite loads this copy instead (same version as the template's
-      # import, which the suite compares) and blocks cdn.jsdelivr.net in its browser, so a CDN
-      # outage cannot fail a release and a CDN-only pass is impossible.
-      - name: Borrow mermaid 11.16.0 for check-integration
+      # check-integration and check-bake draw templates/documentation.html's diagram with mermaid.
+      # The template loads it from jsDelivr; the suites load this copy instead (check-integration
+      # compares its version with the template's import) and block the CDN's mermaid in their
+      # browser, so a CDN outage cannot fail a release and a CDN-only pass is impossible.
+      - name: Borrow mermaid 11.16.0 for check-integration and check-bake
         if: steps.decide.outputs.publish == 'true'
         run: npm install --no-save --no-package-lock --ignore-scripts --prefix "$RUNNER_TEMP/mermaid" mermaid@11.16.0
 

@@ -150,6 +150,16 @@ const named = remoteLoads('<img alt="" src="https://example.com/a.png" /><p styl
 await check("a load is named by its element and url, with no line number", () =>
   named.join("|") === "<img>: https://example.com/a.png|<p> style: https://example.com/b.png", () => named.join("|"));
 
+// ── the workflows: the comments on the borrowed mermaid name this check ──────────────────────────
+const commentBlocks = (text) => text.match(/(?:^[ \t]*#.*(?:\n|$))+/gm) ?? [];
+const mermaidComments = (flow) => commentBlocks(readFileSync(join(root, ".github", "workflows", flow), "utf8")).filter((block) => /mermaid/i.test(block));
+for (const flow of ["ci.yml", "release.yml"]) {
+  await check(`${flow}: every comment that mentions the borrowed mermaid names check-bake`, () => {
+    const blocks = mermaidComments(flow);
+    return blocks.length > 0 && blocks.every((block) => block.includes("check-bake"));
+  }, () => mermaidComments(flow).filter((block) => !block.includes("check-bake")).map((block) => block.trim().split("\n")[0].trim()));
+}
+
 // ── diagrams: a browser draws them ───────────────────────────────────────────────────────────────
 if (!CHROME) {
   console.log("      the diagram half SKIPPED — no headless chromium on this machine.");

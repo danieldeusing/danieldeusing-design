@@ -163,6 +163,16 @@ await check("the template bakes with its diagram drawn (exit 0)", () => drawn.co
 await check("...each diagram holds one svg per theme, renamed dd-diagram-<n>-<theme>", () =>
   pres.length === 1 && pres.every((pre, i) => THEMES.every((t) =>
     svgsOf(drawn.text, pre).some((svg) => svg.attrs["data-theme-variant"] === t && svg.attrs.id === `dd-diagram-${i + 1}-${t}`))));
+const distinct = (pre) => new Set(svgsOf(drawn.text, pre).map((svg) =>
+  drawn.text.slice(svg.start, svg.end).replaceAll(svg.attrs.id, "").replace(/ data-theme-variant="[^"]*"/, ""))).size;
+await check("...and the four variants differ once their ids are removed: each was drawn in its own theme", () =>
+  pres.every((pre) => distinct(pre) === THEMES.length), () => pres.map((pre) => `${distinct(pre)} distinct of ${THEMES.length}`).join(", "));
+// Distinct is not enough: variants drawn in each other's themes also differ. Each theme's --card is the node fill Mermaid gets.
+const { themes: tokens } = JSON.parse(readFileSync(join(root, "tokens", "tokens.json"), "utf8"));
+const strangers = (pre) => THEMES.filter((t) => !svgsOf(drawn.text, pre).some((svg) =>
+  svg.attrs["data-theme-variant"] === t && drawn.text.slice(svg.start, svg.end).toLowerCase().includes(tokens[t].card.toLowerCase())));
+await check("...and each variant holds its own theme's --card colour (tokens/tokens.json), so none was drawn in another theme", () =>
+  pres.every((pre) => strangers(pre).length === 0), () => pres.map((pre) => `without their own --card: ${strangers(pre).join(", ")}`).join("; "));
 await check("...keeps its source in data-mermaid-source and is marked data-processed", () =>
   pres.every((pre) => pre.attrs["data-mermaid-source"]?.includes("flowchart") && pre.attrs["data-processed"] === "true"));
 await check("...and the diagram script is inert text", () =>

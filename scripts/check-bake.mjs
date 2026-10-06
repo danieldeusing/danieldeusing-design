@@ -167,6 +167,11 @@ await check("...and nothing remote is left", () => remoteLoads(drawn.text).lengt
 const redrawn = bakeFile("diagrams-again.html", drawn.text);
 await check("baking the baked template again gives the same file", () => redrawn.code === 0 && unstamped(redrawn.text) === unstamped(drawn.text),
   () => `exit ${redrawn.code}: ${redrawn.out.trim()}`);
+const blank = bakeFile("blank.html", template.replace('<pre class="mermaid">', '<pre class="mermaid">\n'));
+const blankAgain = bakeFile("blank-again.html", blank.text);
+await check("a diagram that starts with a blank line gives the same file on a second bake", () =>
+  blank.code === 0 && blankAgain.code === 0 && unstamped(blankAgain.text) === unstamped(blank.text),
+  () => `exit ${blank.code}/${blankAgain.code}: ${blank.out.trim()} ${blankAgain.out.trim()}`);
 const two = bakeFile("two.html", template.replace(/(<pre class="mermaid">[\s\S]*?<\/pre>)/, "$1\n$1"));
 await check("two diagrams get eight svgs with eight different ids", () => {
   const ids = scan(two.text).filter((el) => el.tag === "svg" && el.parent?.tag === "pre").map((el) => el.attrs.id);

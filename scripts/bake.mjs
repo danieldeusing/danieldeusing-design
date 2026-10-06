@@ -103,7 +103,8 @@ export function restore(html) {
       edits.push({ start: el.start, end: el.openEnd, text: setAttr(tag, "type", "module") });
     } else if (el.tag === "pre" && hasClass(el, "mermaid") && "data-mermaid-source" in attrs) {
       edits.push({ start: el.start, end: el.openEnd, text: setAttr(setAttr(tag, "data-processed", null), "data-mermaid-source", null) });
-      edits.push({ start: el.openEnd, end: el.closeStart, text: escapeText(attrs["data-mermaid-source"]) });
+      // The parser drops the first newline after <pre>, so write one: a source that starts with a blank line keeps it.
+      edits.push({ start: el.openEnd, end: el.closeStart, text: `\n${escapeText(attrs["data-mermaid-source"])}` });
     } else if (el.tag === "div" && hasClass(el, "tablewrap") && "data-dd-inline" in attrs) {
       edits.push({ start: el.start, end: el.openEnd, text: "" }, { start: el.closeStart, end: el.end, text: "" });
     }

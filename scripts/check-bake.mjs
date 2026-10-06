@@ -81,7 +81,7 @@ await check("a page with a latin-ext character keeps both faces", () =>
   extended.text.includes(b64("LATIN-FACE")) && extended.text.includes(b64("LATIN-EXT-FACE")));
 await check("a character reference above U+10FFFF or a lone surrogate reads as U+FFFD, as in a browser: scan() does not throw", () => {
   const { attrs } = scan('<p data-a="&#99999999;" data-b="&#xD800;" data-c="&#65;">x</p>')[0];
-  return attrs["data-a"] === "�" && attrs["data-b"] === "�" && attrs["data-c"] === "A";
+  return attrs["data-a"] === "\ufffd" && attrs["data-b"] === "\ufffd" && attrs["data-c"] === "A";
 });
 
 // ── what is not a load ───────────────────────────────────────────────────────────────────────────

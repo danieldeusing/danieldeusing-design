@@ -17,7 +17,7 @@ const ENTITIES = { quot: '"', amp: "&", lt: "<", gt: ">", apos: "'", nbsp: " " 
 export const escapeText = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 export const escapeAttr = (s) => escapeText(s).replaceAll('"', "&quot;");
 // A browser reads a reference above U+10FFFF or a lone surrogate as U+FFFD; String.fromCodePoint throws on the first.
-const codePoint = (n) => (n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff) ? "�" : String.fromCodePoint(n));
+const codePoint = (n) => (n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff) ? "\ufffd" : String.fromCodePoint(n));
 export const unescape = (s) => s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(quot|amp|lt|gt|apos|nbsp));/gi,
   (m, dec, hex, name) => (dec ? codePoint(Number(dec)) : hex ? codePoint(parseInt(hex, 16)) : ENTITIES[name.toLowerCase()]));
 

@@ -212,7 +212,7 @@ explanations were unreachable no matter which attribute they used.
 ```
 src/          the 18 stylesheets, index.css (the bundle) and tailwind.css (the Tailwind v4 entry)
 runtime/      27 dependency-free ES modules and index.js (the barrel)
-dist/         danieldeusing-design.css + .min.css   (committed — jsDelivr serves these)
+dist/         danieldeusing-design.css + .min.css + .runtime.js   (committed — jsDelivr serves these)
 tokens/       tokens.json                            (committed — generated from tokens.css)
 examples/     one page per reference, every component rendered (not published to npm)
 templates/    page-chrome.html · documentation.html · error-page.html
@@ -224,7 +224,8 @@ scripts/      build.mjs and the check-*.mjs suites   (zero-dependency build and 
 ## Build
 
 Zero dependencies. The build inlines `index.css`'s imports into the `dist/` bundle, minifies it,
-and regenerates `tokens.json`:
+and regenerates `tokens.json`. It also writes the runtime as one classic script,
+`danieldeusing-design.runtime.js`, which a baked page inlines:
 
 ```sh
 npm run build

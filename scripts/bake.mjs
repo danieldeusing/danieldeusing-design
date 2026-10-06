@@ -42,7 +42,7 @@ const REMOTE = /^\s*(?:https?:)?\/\//i;
 const SRC_TAGS = new Set(["script", "img", "source", "video", "audio", "track", "iframe", "embed"]);
 const ACTIVE = new Set(["", "module", "text/javascript", "application/javascript"]);
 const CSS_LOAD = /@import\s*(?:url\()?\s*["']?((?:https?:)?\/\/[^"')\s;]+)|url\(\s*["']?((?:https?:)?\/\/[^"')\s]+)/gi;
-const JS_LOAD = /\bimport\s*(?:\(\s*|[\w$*{}\s,]*?\bfrom\s*|)["']((?:https?:)?\/\/[^"']+)["']/g;
+const JS_LOAD = /\bimport\s*(?:\(\s*|[\w$*{}\s,]*?\bfrom\s*|)["'`]((?:https?:)?\/\/[^"'`]+)["'`]/g;
 
 /** The page cannot be made self-contained; nothing is written. */
 export class Refusal extends Error {}
@@ -57,11 +57,12 @@ export function remoteLoads(html) {
   const found = [];
   for (const el of scan(html)) {
     const at = `<${el.tag}> line ${lineOf(html, el.start)}`;
-    const { rel = "", href = "", src = "", srcset = "", data = "", style = "" } = el.attrs;
+    const { rel = "", href = "", "xlink:href": xlink = "", src = "", srcset = "", data = "", style = "" } = el.attrs;
     if (el.tag === "link" && /\b(?:stylesheet|icon|preload|modulepreload)\b/i.test(rel) && REMOTE.test(href)) found.push(`${at}: ${href}`);
     if (SRC_TAGS.has(el.tag) && REMOTE.test(src)) found.push(`${at}: ${src}`);
     for (const candidate of srcset.split(",")) if (REMOTE.test(candidate)) found.push(`${at}: ${candidate.trim()}`);
     if (el.tag === "object" && REMOTE.test(data)) found.push(`${at}: ${data}`);
+    if (el.tag === "image") for (const url of [href, xlink]) if (REMOTE.test(url)) found.push(`${at}: ${url}`);
     for (const m of style.matchAll(CSS_LOAD)) found.push(`${at} style: ${m[1] ?? m[2]}`);
     if (el.end === undefined) continue;
     if (el.tag === "style") for (const m of content(html, el).matchAll(CSS_LOAD)) found.push(`${at}: ${m[1] ?? m[2]}`);

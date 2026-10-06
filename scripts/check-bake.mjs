@@ -105,6 +105,7 @@ const refusals = [
   ["a url() in a style attribute", withoutDiagrams.replace("</h1>", "</h1><p style=\"background: url('https://example.com/b.png')\">x</p>"), "example.com/b.png"],
   ["an import in an active module script", withoutDiagrams.replace("</body>", '<script type="module">import z from "https://example.com/z.js";</script></body>'), "example.com/z.js"],
   ["an import() in an active module script", withoutDiagrams.replace("</body>", '<script type="module">await import("https://example.com/f.js");</script></body>'), "example.com/f.js"],
+  ["an import() with a backtick url in an active module script", withoutDiagrams.replace("</body>", '<script type="module">await import(`https://example.com/h.js`);</script></body>'), "example.com/h.js"],
   ["a srcset from the network", withoutDiagrams.replace("</h1>", '</h1><img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" srcset="https://example.com/c.png 2x" />'), "example.com/c.png"],
   ["an <object data> from the network", withoutDiagrams.replace("</h1>", '</h1><object data="https://example.com/d.svg"></object>'), "example.com/d.svg"],
   ["a <link rel=icon> from the network", withoutDiagrams.replace("</head>", '<link rel="icon" href="https://example.com/e.ico" /></head>'), "example.com/e.ico"],
@@ -132,6 +133,10 @@ await check("bakedProblems: two diagrams that share an svg id", () => {
 });
 await check("bakedProblems: a diagram without its four theme variants", () =>
   bakedProblems('<pre class="mermaid"><svg data-theme-variant="warm"></svg></pre>').some((p) => p.includes("not one per theme")));
+const images = ['<svg><image href="https://example.com/i.png" /></svg>', '<svg><image xlink:href="https://example.com/i.png" /></svg>',
+  '<svg><image href="data:image/gif;base64,R0lGODlhAQABAAAAACw=" /></svg>'];
+await check("an svg <image> with a remote href or xlink:href is a load, one with a data: href is not", () =>
+  images.map((html) => remoteLoads(html).length).join() === "1,1,0", () => `loads found: ${images.map((html) => remoteLoads(html).length).join()}, want 1,1,0`);
 
 // ── diagrams: a browser draws them ───────────────────────────────────────────────────────────────
 if (!CHROME) {

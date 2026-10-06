@@ -88,6 +88,13 @@ const harmless = bakeFile("harmless.html", withoutDiagrams.replace("</h1>", `</h
   <svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>
   <img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" />`));
 await check("a link, code, a pre, a text/plain script, an xmlns and a data: url are not loads", () => harmless.code === 0, () => harmless.out);
+const quoted = bakeFile("quoted.html", withoutDiagrams.replace("</h1>", `</h1>
+  <p><code>https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.41.1/dist/danieldeusing-design.min.css</code></p>
+  <pre>import { initTabs } from "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.39.0/runtime/index.js";</pre>
+  <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.40.0/src/fonts.css" /> -->`));
+await check("a design url quoted in a <code>, a <pre> or a comment is text, not a pin: the page bakes and keeps it", () =>
+  quoted.code === 0 && quoted.text.includes("design@0.41.1/dist/danieldeusing-design.min.css</code>")
+  && quoted.text.includes('design@0.39.0/runtime/index.js";</pre>') && quoted.text.includes("design@0.40.0/src/fonts.css"), () => quoted.out);
 
 // ── refusals: exit 1, the message names the cause, the file as it was ────────────────────────────
 const refusals = [

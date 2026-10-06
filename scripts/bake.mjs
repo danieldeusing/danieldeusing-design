@@ -247,13 +247,19 @@ async function renderVariants(html, pageDir) {
 /** Bakes one page: → { html, notes }. Throws Refusal when the page cannot load nothing; NoBrowser when its diagrams need a browser this machine lacks. */
 export async function bake(source, { assets = null, pageDir = process.cwd(), date = new Date().toISOString().slice(0, 10) } = {}) {
   let html = restore(source);
-  const pins = new Set([...html.matchAll(PIN)].map((m) => m[1]));
+  const elements = scan(html);
+  // The version is read where the bake replaces something: a stylesheet link and the runtime import. A design url quoted in a <code>, a <pre> or a comment is text.
+  const pins = new Set();
+  for (const el of elements) {
+    const replaced = el.tag === "link" && /\bstylesheet\b/i.test(el.attrs.rel ?? "") ? [el.attrs.href ?? ""]
+      : isActive(el) && el.end !== undefined ? [...content(html, el).matchAll(RUNTIME_IMPORT)].map((m) => m[0]) : [];
+    for (const url of replaced) for (const m of url.matchAll(PIN)) pins.add(m[1]);
+  }
   if (pins.size === 0) throw new Refusal("the page pins no danieldeusing-design version on jsDelivr");
   if (pins.size > 1) throw new Refusal(`the page pins more than one design version: ${[...pins].join(", ")}`);
   const [version] = pins;
   const files = designFiles(version, assets);
   const notes = [];
-  const elements = scan(html);
   const edits = [];
 
   // 1. The design CSS and fonts.css, in place of their links.

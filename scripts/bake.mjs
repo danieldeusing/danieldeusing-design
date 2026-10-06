@@ -41,7 +41,7 @@ const RUNTIME_READ = /const \{[^}]*\} = globalThis\.ddRuntime;/;
 const REMOTE = /^\s*(?:https?:)?\/\//i;
 const SRC_TAGS = new Set(["script", "img", "source", "video", "audio", "track", "iframe", "embed"]);
 const ACTIVE = new Set(["", "module", "text/javascript", "application/javascript"]);
-const CSS_LOAD = /@import\s+(?:url\()?\s*["']?((?:https?:)?\/\/[^"')\s;]+)|url\(\s*["']?((?:https?:)?\/\/[^"')\s]+)/gi;
+const CSS_LOAD = /@import\s*(?:url\()?\s*["']?((?:https?:)?\/\/[^"')\s;]+)|url\(\s*["']?((?:https?:)?\/\/[^"')\s]+)/gi;
 const JS_LOAD = /\bimport\s*(?:\(\s*|[\w$*{}\s,]*?\bfrom\s*|)["']((?:https?:)?\/\/[^"']+)["']/g;
 
 /** The page cannot be made self-contained; nothing is written. */

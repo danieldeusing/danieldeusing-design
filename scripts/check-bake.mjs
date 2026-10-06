@@ -94,6 +94,7 @@ const refusals = [
   ["an <img> from the network", withoutDiagrams.replace("</h1>", '</h1><img alt="" src="https://example.com/a.png" />'), "example.com/a.png"],
   ["a script src from the network", withoutDiagrams.replace("</h1>", '</h1><script src="//example.com/a.js"></script>'), "example.com/a.js"],
   ["an @import in a style block", withoutDiagrams.replace("</style>", '@import url("https://example.com/a.css");</style>'), "example.com/a.css"],
+  ["an @import written without a space, as minified CSS writes it", withoutDiagrams.replace("</style>", '@import"https://example.com/g.css";</style>'), "example.com/g.css"],
   ["a url() in a style attribute", withoutDiagrams.replace("</h1>", "</h1><p style=\"background: url('https://example.com/b.png')\">x</p>"), "example.com/b.png"],
   ["an import in an active module script", withoutDiagrams.replace("</body>", '<script type="module">import z from "https://example.com/z.js";</script></body>'), "example.com/z.js"],
   ["an import() in an active module script", withoutDiagrams.replace("</body>", '<script type="module">await import("https://example.com/f.js");</script></body>'), "example.com/f.js"],

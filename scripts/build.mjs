@@ -5,6 +5,7 @@
  * Outputs:
  *   dist/danieldeusing-design.css      — src/index.css with @imports inlined (CDN bundle)
  *   dist/danieldeusing-design.min.css  — minified bundle
+ *   dist/danieldeusing-design.runtime.js — runtime/ as one classic script (a baked page inlines it)
  *   tokens/tokens.json                 — tokens.css parsed into JSON (for native/Tauri/Figma)
  *
  * Run: node scripts/build.mjs  (or `npm run build`)
@@ -13,6 +14,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildRuntime } from "./lib/runtime.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const srcDir = join(root, "src");
@@ -155,10 +157,18 @@ const tokensJson = {
 await mkdir(tokensDir, { recursive: true });
 await writeFile(join(tokensDir, "tokens.json"), JSON.stringify(tokensJson, null, 2) + "\n");
 
+/* ── 4. The runtime as one classic script, for baked pages (0.64.0) ────── */
+
+// A baked page loads nothing, so it cannot import runtime/index.js: scripts/bake.mjs inlines the
+// records of this file instead. scripts/lib/runtime.mjs has the format and what it refuses.
+const runtime = buildRuntime(join(root, "runtime"), pkg.version);
+await writeFile(join(distDir, "danieldeusing-design.runtime.js"), runtime);
+
 /* ── done ───────────────────────────────────────────────────────────────── */
 
 const bytes = (s) => `${(Buffer.byteLength(s) / 1024).toFixed(1)} kB`;
 console.log("built dist + tokens:");
 console.log(`  dist/danieldeusing-design.css      ${bytes(banner + body)}`);
 console.log(`  dist/danieldeusing-design.min.css  ${bytes(banner + minify(body))}`);
+console.log(`  dist/danieldeusing-design.runtime.js ${bytes(runtime)}`);
 console.log(`  tokens/tokens.json                 ${Object.keys(themes).length} themes`);

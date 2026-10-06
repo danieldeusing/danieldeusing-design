@@ -24,7 +24,7 @@
  * src/fonts.css, files/<woff2>), else from this clone when it is the version the page pins, else
  * from jsDelivr. The cockpit bakes its review reports with --assets: no network, and no diagrams, so
  * no browser. DD_CHROME names the browser, DD_MERMAID a local mermaid package (CI).
- * Exit codes: 0 baked, 1 refused (nothing written), 2 usage, input or no browser.
+ * Exit codes: 0 baked, 1 refused (nothing written), 2 usage, input, no browser or no network.
  */
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
@@ -49,6 +49,8 @@ const RAW_QUOTE_HINT = '(a raw " in its data-mermaid-source? write it as &quot;)
 export class Refusal extends Error {}
 /** This machine cannot draw the page's diagrams. */
 export class NoBrowser extends Error {}
+/** This machine cannot reach jsDelivr for the design files. */
+export class NoNetwork extends Error {}
 
 const isActive = (el) => el.tag === "script" && ACTIVE.has((el.attrs.type ?? "").trim().toLowerCase());
 const lineOf = (html, at) => html.slice(0, at).split("\n").length;
@@ -130,7 +132,7 @@ function designFiles(version, assets) {
     try {
       response = await fetch(url);
     } catch (error) {
-      throw new Refusal(`${url}: ${error.cause?.code ?? error.message}`);
+      throw new NoNetwork(`cannot reach ${url}: ${error.cause?.code ?? error.message}; bake again when the network is back`);
     }
     if (!response.ok) throw new Refusal(`${url}: HTTP ${response.status}${why(url)}`);
     return response;
@@ -251,7 +253,7 @@ async function renderVariants(html, pageDir) {
   }
 }
 
-/** Bakes one page: → { html, notes }. Throws Refusal when the page cannot load nothing; NoBrowser when its diagrams need a browser this machine lacks. */
+/** Bakes one page: → { html, notes }. Throws Refusal when the page cannot load nothing; NoBrowser when its diagrams need a browser this machine lacks; NoNetwork when jsDelivr cannot be reached. */
 export async function bake(source, { assets = null, pageDir = process.cwd(), date = new Date().toISOString().slice(0, 10) } = {}) {
   let html = restore(source);
   const elements = scan(html);
@@ -385,7 +387,7 @@ async function main(argv) {
     return 0;
   } catch (error) {
     if (error instanceof Refusal) fail(1, `refused, ${page} left unchanged: ${error.message}`);
-    if (error instanceof NoBrowser) fail(2, error.message);
+    if (error instanceof NoBrowser || error instanceof NoNetwork) fail(2, error.message);
     fail(2, error.stack ?? String(error));
   }
 }

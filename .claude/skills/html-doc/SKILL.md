@@ -3,8 +3,8 @@ name: html-doc
 description: >-
   Generate a single-file, self-contained HTML documentation page for a workflow,
   process, script, or project — styled with the danieldeusing terminal design
-  system (CRT/JetBrains-Mono look, four themes) loaded build-free from the
-  jsDelivr CDN. Use when the user says "create a documentation in html for this
+  system (CRT/JetBrains-Mono look, four themes) and baked as the last step, so
+  that it loads nothing from the network. Use when the user says "create a documentation in html for this
   workflow", "make an HTML doc/page for this", "document this process as a
   webpage", "write this workflow up as a single HTML file", or wants a shareable
   standalone .html doc with the terminal look. Also for a report or write-up of an
@@ -20,9 +20,13 @@ Turn a workflow, process, script, or project into one self-contained HTML page s
 **danieldeusing-design** — the repo this skill lives in. While you write it, the page pulls its
 CSS and JS from the jsDelivr CDN and draws its diagrams in the browser. The last step, the
 **bake** (`scripts/bake.mjs`), puts the CSS, the fonts, the runtime and every diagram as SVG into
-the file. The result is a **single `.html` file** that loads nothing: it renders the same in a
-browser, the Teams file preview, Element on iOS and a mail client, online or offline, with or
-without JavaScript, and it keeps the design of the day it was baked.
+the file.
+
+The result is a **single `.html` file** that loads nothing. Its content reads the same in a
+browser, the Teams file preview, Element on iOS and a mail client, online or offline. It also
+reads the same with JavaScript off. With JavaScript off, the diagrams show in the warm theme, and
+the theme picker, the zoom and the minimap do not work. The file keeps the design of the day it
+was baked.
 
 For anything about the design system itself — tokens, themes, the component vocabulary, what a
 consumer may and may not redeclare — use the **`danieldeusing-design`** skill next door. This one
@@ -98,9 +102,10 @@ already carries two, and if you cannot write the sentence you do not have an exc
      the CDN, which is precisely what is unavailable when the fallback fires). Then update every
      page in one pass: `rg -l 'design@' site site-internal`.
    - **The path is site-absolute**, so it resolves only for a doc served from
-     `docs.danieldeusing.de`. A doc kept on disk and opened over `file://` has no fallback: if
-     the CDN is unreachable it renders unstyled — which is what the `var(--token, <literal>)`
-     fallbacks in the `<style>` block are for. Say so when reporting a local-only doc.
+     `docs.danieldeusing.de`. A page as written, kept on disk and opened over `file://`, has no
+     fallback. If the CDN is unreachable it renders unstyled, which is what the
+     `var(--token, <literal>)` fallbacks in the `<style>` block are for. The bake (step 7) ends
+     this: a baked page loads nothing, so it needs no fallback and no warning in the report.
 
 4. **Fill the placeholders.** Replace every `{{PLACEHOLDER}}`:
    - `{{FOLDER}}` — the project / folder slug (e.g. `pagr`); used in the `cat …/README.md` prompt
@@ -168,7 +173,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
          tags. While the explainer has content, the template hides its static twin; with
          JavaScript off and in print, the static version shows.
        - Its code is its own `<script type="module">` after the template's scripts, never inside
-         them: the bake turns the diagram script into inert text, and an explainer must still run
+         them. The bake turns the diagram script into inert text, and an explainer must still run
          in a baked page. It writes only inside its own element. To step through a diagram, clone
          the svg that is shown (a baked diagram holds one per theme) into the explainer and mark
          the nodes in the clone. Give the clone new ids
@@ -318,8 +323,8 @@ already carries two, and if you cannot write the sentence you do not have an exc
      drag-pan, `+ - 0`, Escape to close. Do not hand-roll a lightbox and do not drop the call —
      a diagram nobody can enlarge is the failure this exists to prevent. Keep the call in the
      runtime script, never in the diagram script: a baked page keeps the diagram script as
-     inert text. The overlay takes the `<svg>` at the moment it opens (the one the diagram
-     script drew last, or on a baked page the variant of the current theme), and a second
+     inert text. The overlay takes the `<svg>` at the moment it opens. That is the one the
+     diagram script drew last or, on a baked page, the variant of the current theme. A second
      call wires nothing twice.
    - **Escape the line breaks.** Inside a `<pre>`, write `&lt;br/&gt;` in node labels, never a
      raw `<br/>`. A raw tag is parsed as an HTML element and the renderer — which reads
@@ -411,14 +416,23 @@ already carries two, and if you cannot write the sentence you do not have an exc
    node ~/Work/danieldeusing/danieldeusing-design/scripts/bake.mjs <file>
    node ~/Work/danieldeusing/danieldeusing-design/scripts/verify-baked.mjs <file>
    ```
-   The bake draws each diagram once per theme in headless Chrome, inlines the design CSS, the
+   The bake draws each diagram once per theme in headless Chrome. It inlines the design CSS, the
    fonts the text needs and the runtime records the page imports, and stamps
    `<meta name="dd-baked">`. It refuses, and leaves the file as it was, when a diagram cannot be
-   drawn or anything would still load from the network: fix the page and bake again. A baked
-   page bakes again from the page as written, so to change one, edit the baked file (never a
-   `data-dd-inline` block) and bake again. `verify-baked.mjs` opens the page with the network
-   blocked, without and then with JavaScript, at 375 and 1400 px, and prints two screenshot
-   paths: look at both. A page that has not passed the bake and this check is not done.
+   drawn or anything would still load from the network: fix the page and bake again.
+
+   A baked page bakes again from the page as written, so to change one, edit the baked file and
+   bake again. Edit only what you wrote: the bake builds every `data-dd-inline` block and every
+   diagram svg again, so a change there is lost. To change a diagram, edit the
+   `data-mermaid-source` attribute of its `<pre>`. Write a `"` there as `&quot;`: with a raw `"`
+   the bake keeps the old svgs and does not refuse. The baked file is large (about 0.5 MB with
+   one diagram), and some of its lines hold 50 KB or more. Find the line with `grep -n` and read
+   a short range.
+
+   `verify-baked.mjs` opens the page with the network blocked. It runs without JavaScript at 375
+   and 1400 px, then with JavaScript at 1400 px. It prints two screenshot paths, both from the
+   runs without JavaScript: look at both. A page that has not passed the bake and this check is
+   not done.
 
 8. **Offer to publish** to `docs.danieldeusing.de`. Ask first — some docs are local-only. If the
    user declines, stop here and report the local path.
@@ -449,7 +463,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
 
    If published, **verify it actually landed** rather than assuming — `curl -u daniel -s -o
    /dev/null -w '%{http_code}' <url>` should be 200. A push that succeeded while the webhook
-   failed leaves the site silently stale until the hourly reconcile.
+   failed leaves the site silently stale until the hourly reconcile. A 200 also comes for a page
+   that was not baked. To see that the baked file is there, run
+   `curl -u daniel -s <url> | grep -c '<meta name="dd-baked"'`: it prints 1.
 
 ## Notes
 

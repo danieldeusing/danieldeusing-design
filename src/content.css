@@ -702,10 +702,11 @@ ul.dash > li::before {
    A baked page (scripts/bake.mjs) carries each diagram once per theme, as
    <svg data-theme-variant="warm|green|mono|paper"> inside its pre.mermaid, because a preview that
    runs no script (Teams, Element on iOS, a mail client) cannot draw one. The variant of the
-   reader's theme shows; warm when no theme is set, which is a page opened with JavaScript off. */
-pre.mermaid > svg[data-theme-variant] { display: none; }
-html:not([data-theme]) pre.mermaid > svg[data-theme-variant="warm"],
-html[data-theme="warm"] pre.mermaid > svg[data-theme-variant="warm"],
-html[data-theme="green"] pre.mermaid > svg[data-theme-variant="green"],
-html[data-theme="mono"] pre.mermaid > svg[data-theme-variant="mono"],
-html[data-theme="paper"] pre.mermaid > svg[data-theme-variant="paper"] { display: revert; }
+   reader's theme shows; warm when no theme is set, which is a page opened with JavaScript off.
+   Only the other variants are hidden, so the shown one keeps the display of every diagram svg,
+   on screen and in print. */
+html:not([data-theme]) pre.mermaid > svg[data-theme-variant]:not([data-theme-variant="warm"]),
+html[data-theme="warm"] pre.mermaid > svg[data-theme-variant]:not([data-theme-variant="warm"]),
+html[data-theme="green"] pre.mermaid > svg[data-theme-variant]:not([data-theme-variant="green"]),
+html[data-theme="mono"] pre.mermaid > svg[data-theme-variant]:not([data-theme-variant="mono"]),
+html[data-theme="paper"] pre.mermaid > svg[data-theme-variant]:not([data-theme-variant="paper"]) { display: none; }

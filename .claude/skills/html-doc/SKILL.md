@@ -432,7 +432,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
    bake again. Edit only what you wrote: the bake builds every `data-dd-inline` block and every
    diagram svg again, so a change there is lost. To change a diagram, edit the
    `data-mermaid-source` attribute of its `<pre>`. Write a `"` there as `&quot;`: with a raw `"`
-   the bake keeps the old svgs and does not refuse. The baked file is large (about 0.5 MB with
+   the bake refuses the page and says why. The baked file is large (about 0.5 MB with
    one diagram), and some of its lines hold 50 KB or more. Find the line with `grep -n` and read
    a short range.
 

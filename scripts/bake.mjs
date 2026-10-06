@@ -43,6 +43,7 @@ const SRC_TAGS = new Set(["script", "img", "source", "video", "audio", "track", 
 const ACTIVE = new Set(["", "module", "text/javascript", "application/javascript"]);
 const CSS_LOAD = /@import\s*(?:url\()?\s*["']?((?:https?:)?\/\/[^"')\s;]+)|url\(\s*["']?((?:https?:)?\/\/[^"')\s]+)/gi;
 const JS_LOAD = /\bimport\s*(?:\(\s*|[\w$*{}\s,]*?\bfrom\s*|)["'`]((?:https?:)?\/\/[^"'`]+)["'`]/g;
+const RAW_QUOTE_HINT = '(a raw " in its data-mermaid-source? write it as &quot;)';
 
 /** The page cannot be made self-contained; nothing is written. */
 export class Refusal extends Error {}
@@ -71,18 +72,22 @@ export function remoteLoads(html) {
   return found;
 }
 
-/** What a baked page must not hold: a remote load, a diagram without one svg per theme, two svgs with one id. */
+/** What a baked page must not hold: a remote load, a diagram without one svg per theme, two svgs with one id, a diagram svg outside a readable <pre class="mermaid">. */
 export function bakedProblems(html) {
   const problems = remoteLoads(html).map((load) => `loads ${load}`);
   const elements = scan(html);
   const ids = new Map();
-  elements.filter((el) => el.tag === "pre" && hasClass(el, "mermaid")).forEach((pre, i) => {
+  const pres = elements.filter((el) => el.tag === "pre" && hasClass(el, "mermaid"));
+  pres.forEach((pre, i) => {
     const svgs = elements.filter((el) => el.tag === "svg" && el.parent === pre);
     const themes = svgs.map((svg) => svg.attrs["data-theme-variant"] ?? "").sort();
     if (themes.join() !== [...THEMES].sort().join()) problems.push(`diagram ${i + 1} holds ${svgs.length} svg(s) (${themes.join(", ") || "none"}), not one per theme`);
     for (const svg of svgs) if (svg.attrs.id) ids.set(svg.attrs.id, (ids.get(svg.attrs.id) ?? 0) + 1);
   });
   for (const [id, count] of ids) if (count > 1) problems.push(`${count} diagrams share the svg id ${id}`);
+  for (const svg of elements) {
+    if (svg.tag === "svg" && "data-theme-variant" in svg.attrs && !pres.includes(svg.parent)) problems.push(`a diagram svg sits outside a readable <pre class="mermaid"> ${RAW_QUOTE_HINT}`);
+  }
   return problems;
 }
 
@@ -325,7 +330,7 @@ export async function bake(source, { assets = null, pageDir = process.cwd(), dat
   if (pres.length) {
     if (!script) throw new Refusal(`${pres.length} diagram(s) and no <script data-dd-diagrams>: move the page into the ${version} template first`);
     const drawn = await renderVariants(html, pageDir);
-    if (drawn.sources.length !== pres.length) throw new Refusal(`the browser found ${drawn.sources.length} diagram(s), the page has ${pres.length}`);
+    if (drawn.sources.length !== pres.length) throw new Refusal(`the browser found ${drawn.sources.length} diagram(s), the page has ${pres.length}; a <pre class="mermaid"> start tag may be unreadable ${RAW_QUOTE_HINT}`);
     pres.forEach((pre, i) => {
       const svgs = THEMES.map((theme) => {
         const svg = drawn[theme]?.[i];
@@ -346,7 +351,7 @@ export async function bake(source, { assets = null, pageDir = process.cwd(), dat
   const at = charset ? charset.openEnd : html.search(/<\/head>/i);
   html = `${html.slice(0, at)}<meta name="dd-baked" content="${version} ${date}" />${html.slice(at)}`;
   const problems = bakedProblems(html);
-  if (problems.length) throw new Refusal(problems.join("; "));
+  if (problems.length) throw new Refusal([...new Set(problems)].join("; "));
   return { html, notes };
 }
 

@@ -138,6 +138,7 @@ const refusals = [
   ["a page that pins no design version", withoutDiagrams.replaceAll(/https:\/\/cdn\.jsdelivr\.net\/npm\/@danieldeusing\/design@[\d.]+\//g, "/x/"), "pins no danieldeusing-design version"],
   ["a page that pins two versions", withoutDiagrams.replace(`design@${version}/src/fonts.css`, "design@0.1.0/src/fonts.css"), "more than one design version"],
   ["a diagram without a data-dd-diagrams script", template.replace(/<script type="module" data-dd-diagrams>[\s\S]*?<\/script>/, ""), "no <script data-dd-diagrams>"],
+  ["a diagram svg outside a readable <pre class=\"mermaid\">", withoutDiagrams.replace("</h1>", '</h1><div><svg data-theme-variant="warm"></svg></div>'), 'outside a readable <pre class="mermaid">'],
 ];
 for (const [what, html, needle] of refusals) {
   const result = bakeFile("refused.html", html);
@@ -159,6 +160,11 @@ await check("bakedProblems: two diagrams that share an svg id", () => {
 });
 await check("bakedProblems: a diagram without its four theme variants", () =>
   bakedProblems('<pre class="mermaid"><svg data-theme-variant="warm"></svg></pre>').some((p) => p.includes("not one per theme")));
+await check("bakedProblems: each svg of a diagram outside a readable <pre class=\"mermaid\"> is a problem, none inside one", () => {
+  const svgs = THEMES.map((t) => `<svg data-theme-variant="${t}"></svg>`).join("");
+  const outside = (html) => bakedProblems(html).filter((p) => p.includes("outside a readable")).length;
+  return outside(`<div>${svgs}</div>`) === THEMES.length && outside(`<pre class="mermaid">${svgs}</pre>`) === 0;
+});
 const images = ['<svg><image href="https://example.com/i.png" /></svg>', '<svg><image xlink:href="https://example.com/i.png" /></svg>',
   '<svg><image href="data:image/gif;base64,R0lGODlhAQABAAAAACw=" /></svg>'];
 await check("an svg <image> with a remote href or xlink:href is a load, one with a data: href is not", () =>
@@ -212,6 +218,22 @@ const broken = template.replace(/<pre class="mermaid">[\s\S]*?<\/pre>/, '<pre cl
 const unparsable = bakeFile("broken.html", broken);
 await check("a diagram Mermaid cannot draw is refused, the file unchanged", () =>
   unparsable.code === 1 && unparsable.out.includes("could not be drawn") && unparsable.text === broken, () => unparsable.out);
+// A raw " in data-mermaid-source ends the attribute: scan() cannot read the <pre> start tag, so the old svgs belong to no diagram.
+const diagramsIn = (html) => scan(html).filter((el) => el.tag === "pre" && hasClass(el, "mermaid"));
+const rawQuote = (html) => html.replace(/(<pre class="mermaid"[^>]*?)&quot;/, '$1"');
+const quoted1 = rawQuote(drawn.text);
+await check("a raw \" in data-mermaid-source leaves the <pre> start tag unreadable: scan() finds no diagram on a one-diagram page", () =>
+  quoted1 !== drawn.text && diagramsIn(quoted1).length === 0);
+const quoteRefused = bakeFile("raw-quote.html", quoted1);
+await check("...and the re-bake is refused: exit 1, the message names the raw quote once (not once per svg), the file unchanged", () =>
+  quoteRefused.code === 1 && quoteRefused.out.split('raw " in its data-mermaid-source').length === 2 && quoteRefused.text === quoted1,
+  () => `exit ${quoteRefused.code}: ${quoteRefused.out.trim()}`);
+const quoted2 = rawQuote(two.text);
+const quoteRefused2 = bakeFile("raw-quote-two.html", quoted2);
+await check("...and with two diagrams, the refusal for the count the browser found names the raw quote too, the file unchanged", () =>
+  diagramsIn(quoted2).length === 1 && quoteRefused2.code === 1 && quoteRefused2.out.includes("the browser found 2 diagram(s), the page has 1")
+  && quoteRefused2.out.includes('raw " in its data-mermaid-source') && quoteRefused2.text === quoted2,
+  () => `exit ${quoteRefused2.code}: ${quoteRefused2.out.trim()}`);
 const verify = (...files) => spawnSync(process.execPath, [join(root, "scripts", "verify-baked.mjs"), ...files], { encoding: "utf8" });
 const verified = verify(drawn.file);
 await check("verify-baked passes the baked template: offline, JavaScript off and on, 375 and 1400 px", () => verified.status === 0,

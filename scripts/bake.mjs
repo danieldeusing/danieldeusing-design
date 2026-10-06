@@ -52,11 +52,11 @@ export class NoBrowser extends Error {}
 const isActive = (el) => el.tag === "script" && ACTIVE.has((el.attrs.type ?? "").trim().toLowerCase());
 const lineOf = (html, at) => html.slice(0, at).split("\n").length;
 
-/** Every load of a remote url left in the page, as "<tag> line N: url". */
+/** Every load of a remote url left in the page, as "<tag>: url". */
 export function remoteLoads(html) {
   const found = [];
   for (const el of scan(html)) {
-    const at = `<${el.tag}> line ${lineOf(html, el.start)}`;
+    const at = `<${el.tag}>`;
     const { rel = "", href = "", "xlink:href": xlink = "", src = "", srcset = "", data = "", style = "" } = el.attrs;
     if (el.tag === "link" && /\b(?:stylesheet|icon|preload|modulepreload)\b/i.test(rel) && REMOTE.test(href)) found.push(`${at}: ${href}`);
     if (SRC_TAGS.has(el.tag) && REMOTE.test(src)) found.push(`${at}: ${src}`);
@@ -316,15 +316,15 @@ export async function bake(source, { assets = null, pageDir = process.cwd(), dat
   if (wrapped) notes.push(`${wrapped} table(s) wrapped`);
   html = splice(html, edits);
 
-  // 4. The diagrams: each drawn once per theme in a browser, the data-dd-diagrams script made inert.
+  // 4. The diagrams: each drawn once per theme in a browser. The data-dd-diagrams script becomes inert on every page that has one, with diagrams or without.
   const after = scan(html);
   const pres = after.filter((el) => el.tag === "pre" && hasClass(el, "mermaid"));
+  const script = after.find((el) => el.tag === "script" && "data-dd-diagrams" in el.attrs);
+  const diagramEdits = [];
   if (pres.length) {
-    const script = after.find((el) => el.tag === "script" && "data-dd-diagrams" in el.attrs);
     if (!script) throw new Refusal(`${pres.length} diagram(s) and no <script data-dd-diagrams>: move the page into the ${version} template first`);
     const drawn = await renderVariants(html, pageDir);
     if (drawn.sources.length !== pres.length) throw new Refusal(`the browser found ${drawn.sources.length} diagram(s), the page has ${pres.length}`);
-    const diagramEdits = [];
     pres.forEach((pre, i) => {
       const svgs = THEMES.map((theme) => {
         const svg = drawn[theme]?.[i];
@@ -335,10 +335,10 @@ export async function bake(source, { assets = null, pageDir = process.cwd(), dat
       const tag = setAttr(setAttr(html.slice(pre.start, pre.openEnd), "data-processed", "true"), "data-mermaid-source", drawn.sources[i]);
       diagramEdits.push({ start: pre.start, end: pre.openEnd, text: tag }, { start: pre.openEnd, end: pre.closeStart, text: svgs.join("") });
     });
-    diagramEdits.push({ start: script.start, end: script.openEnd, text: setAttr(html.slice(script.start, script.openEnd), "type", "text/plain") });
-    html = splice(html, diagramEdits);
     notes.push(`${pres.length} diagram(s), ${THEMES.length} themes each`);
   }
+  if (script) diagramEdits.push({ start: script.start, end: script.openEnd, text: setAttr(html.slice(script.start, script.openEnd), "type", "text/plain") });
+  html = splice(html, diagramEdits);
 
   // 5. The stamp, then everything a baked page must not hold.
   const charset = scan(html).find((el) => el.tag === "meta" && "charset" in el.attrs);

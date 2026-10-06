@@ -95,6 +95,11 @@ const quoted = bakeFile("quoted.html", withoutDiagrams.replace("</h1>", `</h1>
 await check("a design url quoted in a <code>, a <pre> or a comment is text, not a pin: the page bakes and keeps it", () =>
   quoted.code === 0 && quoted.text.includes("design@0.41.1/dist/danieldeusing-design.min.css</code>")
   && quoted.text.includes('design@0.39.0/runtime/index.js";</pre>') && quoted.text.includes("design@0.40.0/src/fonts.css"), () => quoted.out);
+const scriptKept = template.replaceAll(/<pre class="mermaid">[\s\S]*?<\/pre>/g, "");
+const scriptOnly = bakeFile("script-only.html", scriptKept);
+await check("a page whose diagram was removed but whose diagram script was kept bakes with no browser: the script inert, nothing remote left", () =>
+  scriptOnly.code === 0 && /<script type="text\/plain" data-dd-diagrams>/.test(scriptOnly.text) && remoteLoads(scriptOnly.text).length === 0
+  && restore(scriptOnly.text) === scriptKept, () => scriptOnly.out);
 
 // ── refusals: exit 1, the message names the cause, the file as it was ────────────────────────────
 const refusals = [
@@ -137,6 +142,9 @@ const images = ['<svg><image href="https://example.com/i.png" /></svg>', '<svg><
   '<svg><image href="data:image/gif;base64,R0lGODlhAQABAAAAACw=" /></svg>'];
 await check("an svg <image> with a remote href or xlink:href is a load, one with a data: href is not", () =>
   images.map((html) => remoteLoads(html).length).join() === "1,1,0", () => `loads found: ${images.map((html) => remoteLoads(html).length).join()}, want 1,1,0`);
+const named = remoteLoads('<img alt="" src="https://example.com/a.png" /><p style="background: url(https://example.com/b.png)">x</p>');
+await check("a load is named by its element and url, with no line number", () =>
+  named.join("|") === "<img>: https://example.com/a.png|<p> style: https://example.com/b.png", () => named.join("|"));
 
 // ── diagrams: a browser draws them ───────────────────────────────────────────────────────────────
 if (!CHROME) {

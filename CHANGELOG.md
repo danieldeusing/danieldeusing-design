@@ -4,6 +4,40 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.64.0 (2026-10-06)
+
+### Added
+
+- **A baked page loads nothing.** `scripts/bake.mjs` makes a page written from
+  `templates/documentation.html` or `templates/review-report.html` one self-contained file: the
+  design CSS, the fonts its text uses and the runtime records it imports are inlined, every diagram
+  is drawn once per theme as SVG, and every table gets its `.tablewrap`. The Teams file preview,
+  Element on iOS and a mail client fetch nothing and run no script; a Poirot page showed no styles
+  and raw diagram source there (Daniel, 05.10.2026). A baked page carries `<meta name="dd-baked">`,
+  bakes again from the page as written, and the bake refuses a page that would still load from the
+  network. `scripts/verify-baked.mjs` opens a baked page offline, without and with JavaScript, at
+  375 and 1400 px.
+- **`dist/danieldeusing-design.runtime.js`**: the runtime as one classic script, one record per
+  module, every export of `runtime/index.js` on `globalThis.ddRuntime`. The build makes it with no
+  dependency; `check-runtime-bundle.mjs` compares it with the modules.
+- **`templates/review-report.html`**: the cockpit's review report on top of html-doc, with its
+  stylesheet links, pre-paint script and runtime import shared.
+- **Theme variants of a diagram**: `pre.mermaid > svg[data-theme-variant]` shows the variant of
+  `html[data-theme]`, warm without JavaScript.
+- **Tabs without JavaScript**: a baked page opened with JavaScript off shows every tab panel and
+  hides the tab bar, as print does. The rule in `src/data.css` is scoped to
+  `html:not([data-theme]):has(meta[name="dd-baked"])`: the template's pre-paint script always sets
+  `data-theme`, so a page with no `data-theme` ran no script.
+
+### Changed
+
+- **The documentation template's diagram code is its own `<script type="module" data-dd-diagrams>`.**
+  `window.ddRenderDiagrams()` draws on request and resolves to the svgs; each pass fires
+  `dd:diagrams`. Diagram zoom is wired by the runtime script and opens the variant on screen.
+- **html-doc** bakes every page and checks it offline as the last step; an explainer is its own
+  script and clones the svg that is shown. Its pin sweep now leaves a baked page alone, so a baked
+  page keeps the design of its date.
+
 ## 0.63.1 (2026-10-04)
 
 ### Fixed

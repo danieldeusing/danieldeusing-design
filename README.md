@@ -48,9 +48,9 @@ unpin" section has the reasoning.
       })();
     </script>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.63.1/dist/danieldeusing-design.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.64.0/dist/danieldeusing-design.min.css" />
     <!-- optional: the real JetBrains Mono webfont (otherwise falls back to Menlo) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.63.1/src/fonts.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.64.0/src/fonts.css" />
   </head>
   <body>
     <p class="prompt">cat hello.txt</p>
@@ -59,7 +59,7 @@ unpin" section has the reasoning.
 
     <script type="module">
       import { initThemeSwitcher, initDropdowns, initTerminal } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.63.1/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.64.0/runtime/index.js";
       initThemeSwitcher();
       initDropdowns();
       initTerminal();
@@ -120,7 +120,7 @@ Every stylesheet is exported on its own too (`@danieldeusing/design/<file>.css`)
 
 ## Runtime (optional)
 
-27 dependency-free ES modules, re-exported from `@danieldeusing/design/runtime` and importable one
+28 dependency-free ES modules, re-exported from `@danieldeusing/design/runtime` and importable one
 by one from `@danieldeusing/design/runtime/<module>`. Nothing runs at import, so a server-side
 render can import the barrel, and every `init*()` is called once per page: a delegated listener or
 a MutationObserver reaches what is rendered later. The ones most pages call:
@@ -211,7 +211,7 @@ explanations were unreachable no matter which attribute they used.
 
 ```
 src/          the 18 stylesheets, index.css (the bundle) and tailwind.css (the Tailwind v4 entry)
-runtime/      27 dependency-free ES modules and index.js (the barrel)
+runtime/      28 dependency-free ES modules and index.js (the barrel)
 dist/         danieldeusing-design.css + .min.css + .runtime.js   (committed — jsDelivr serves these)
 tokens/       tokens.json                            (committed — generated from tokens.css)
 examples/     one page per reference, every component rendered (not published to npm)
@@ -225,7 +225,7 @@ scripts/      build.mjs and the check-*.mjs suites   (zero-dependency build and 
 
 Zero dependencies. The build inlines `index.css`'s imports into the `dist/` bundle, minifies it,
 and regenerates `tokens.json`. It also writes the runtime as one classic script,
-`danieldeusing-design.runtime.js`, which a baked page inlines:
+`danieldeusing-design.runtime.js`, which a baked page inlines.
 
 ```sh
 npm run build

@@ -117,8 +117,10 @@ await check("the filled review template bakes with no browser and loads nothing"
 // The inlined runtime quotes "initTableScroll();" in a usage comment, so only the page's own script can answer.
 const ownScript = scan(reportBaked.text).find((el) => el.tag === "script" && "data-dd-runtime-import" in el.attrs);
 const ownCode = ownScript ? content(reportBaked.text, ownScript) : "";
+// Each name must come from ddRuntime and its call must start a line, so a call in a comment does not count.
 await check("...its own script still calls initToc() and initTableScroll() from ddRuntime", () =>
-  /const \{[^}]*initToc[^}]*\} = globalThis\.ddRuntime;/.test(ownCode) && ownCode.includes("initToc();") && ownCode.includes("initTableScroll();"));
+  ["initToc", "initTableScroll"].every((n) =>
+    new RegExp(`const \\{[^}]*\\b${n}\\b[^}]*\\} = globalThis\\.ddRuntime;`).test(ownCode) && new RegExp(`^\\s*${n}\\(\\);`, "m").test(ownCode)));
 
 // ── refusals: exit 1, the message names the cause, the file as it was ────────────────────────────
 const refusals = [

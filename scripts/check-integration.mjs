@@ -279,9 +279,11 @@ if (sibling) {
     prePaint(doc) && prePaint(doc) === prePaint(review) ? [] : ["the pre-paint <script> differs"]);
   check("templates/review-report.html: the marked runtime import names documentation.html's url", () =>
     runtimeUrl(doc) && runtimeUrl(doc) === runtimeUrl(review) ? [] : [`${runtimeUrl(review)} vs ${runtimeUrl(doc)}`]);
-  check("templates/review-report.html: five placeholders outside its comments, each filled by the orchestrator", () => {
+  check("templates/review-report.html: five placeholders outside its comments ({{TITLE}} twice, in the title and the footer), each filled by the orchestrator", () => {
     const markup = review.replace(/<!--[\s\S]*?-->/g, "");
-    return ["{{TITLE}}", "{{DESCRIPTION}}", "{{HEADER}}", "{{BODY}}", "{{TOC}}"].filter((p) => !markup.includes(p)).map((p) => `no ${p}`);
+    const count = (p) => markup.split(p).length - 1;
+    return [["{{TITLE}}", 2], ["{{DESCRIPTION}}", 1], ["{{HEADER}}", 1], ["{{BODY}}", 1], ["{{TOC}}", 1]]
+      .filter(([p, want]) => count(p) < want).map(([p, want]) => `${p}: ${count(p)} outside the comments, want ${want}`);
   });
   check("templates/review-report.html: no placeholder inside a comment, where a fill would copy the report into it", () =>
     (review.match(/<!--[\s\S]*?-->/g) ?? []).filter((c) => /\{\{[A-Z]+\}\}/.test(c)).map(() => "a comment holds a {{…}} placeholder"));

@@ -132,8 +132,10 @@ already carries two, and if you cannot write the sentence you do not have an exc
      The template's `#overview`, `#plain-words`, `#flow` and `#proof` sections carry the shape:
      - **In short first** (`#overview`): three to five bullets, each opening with a bold label
        (`What breaks:`, `Where:`, `When:`), for a reader who reads only that.
-     - **In plain words** (`#plain-words`): a few sentences in everyday words, no identifiers,
-       for a reader who is not technical. Plain paragraphs, never a box. An analogy is fine; a
+     - **In plain words** (`#plain-words`): for a reader who is not technical. Where a picture
+       helps, start with one large, simple picture without identifiers. Use a small Mermaid
+       flowchart in everyday words, or one screenshot. Then write at most four short sentences
+       in everyday words, no identifiers. Plain paragraphs, never a box. An analogy is fine; a
        wrong simplification is not. The name is always *In plain words*, never "ELI5".
      - **Boxes hold additional info only:** an `.eli5` box is the everyday picture of one hard
        point inside a section's text (the system draws its *In plain words* badge: write no
@@ -147,6 +149,8 @@ already carries two, and if you cannot write the sentence you do not have an exc
        below explain the same cause for three readers. Each part carries the label of its
        reader: PO for the product owner, RE for requirements engineers, DEV for developers."
        Without it, a reader takes the labels for three different causes.
+       The part for the product owner follows the *In plain words* rule: one picture where it
+       helps, then at most four short sentences.
      - **Plain technical English, about 80% of ASD-STE100** (Simplified Technical English):
        - One topic per paragraph, at most six sentences; a list for three or more items or
          steps. No paragraph a list can carry; a comparison or a tally is a `<table>`, never
@@ -422,6 +426,7 @@ already carries two, and if you cannot write the sentence you do not have an exc
    ```bash
    node ~/Work/danieldeusing/danieldeusing-design/scripts/bake.mjs <file>
    node ~/Work/danieldeusing/danieldeusing-design/scripts/verify-baked.mjs <file>
+   node ~/Work/danieldeusing/danieldeusing-design/scripts/verify-prose.mjs <file>
    ```
    The bake draws each diagram once per theme in headless Chrome. It inlines the design CSS, the
    fonts the text needs and the runtime records the page imports, and stamps
@@ -440,6 +445,11 @@ already carries two, and if you cannot write the sentence you do not have an exc
    and 1400 px, then with JavaScript at 1400 px. It prints two screenshot paths, both from the
    runs without JavaScript: look at both. A page that has not passed the bake and this check is
    not done.
+
+   `verify-prose.mjs` prints warnings for the prose in `<main>`: unapproved words,
+   contractions, "has/have + verb", a passive with "by", sentences over 25 words and paragraphs
+   over six sentences. Fix each warning the writing rules of step 4 cover; it never fails the
+   page.
 
 8. **Offer to publish** to `docs.danieldeusing.de`. Ask first — some docs are local-only. If the
    user declines, stop here and report the local path.

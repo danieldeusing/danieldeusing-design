@@ -98,6 +98,7 @@ jobs:
           node scripts/check-chrome.mjs
           node scripts/check-runtime-bundle.mjs
           node scripts/check-bake.mjs
+          node scripts/check-prose.mjs
 
       # The dist bundle and tokens.json are committed (jsDelivr serves them). Fail
       # if a source change landed without rebuilding the committed artifacts.

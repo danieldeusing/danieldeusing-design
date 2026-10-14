@@ -370,8 +370,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
      Then look at the screenshot. (`--force-prefers-reduced-motion` skips the typing animation so
      content is visible immediately.) Before you judge a diagram or a wide table, zoom into its
      region at full resolution — the browser tool's zoom action, or a crop of the PNG
-     (`sips -c <h> <w> --cropOffset <y> <x> /tmp/doc.png --out /tmp/doc-part.png`): at
-     full-page scale a clipped label or a squeezed column does not show. For a stricter check,
+     (`sips -c <h> <w> --cropOffset <y> <x> /tmp/doc.png --out /tmp/doc-part.png`; sips reads an
+     offset of `0 0` as no offset and crops from the centre, so the top edge is `--cropOffset 1 1`):
+     at full-page scale a clipped label or a squeezed column does not show. For a stricter check,
      load the page in Puppeteer and assert that every `pre.mermaid` contains an `<svg>` and that
      no label still contains a literal `<br/>`.
    - **Also use this same screenshot to catch table overflow** whenever the page has any table —

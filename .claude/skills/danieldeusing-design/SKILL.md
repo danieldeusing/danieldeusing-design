@@ -32,9 +32,8 @@ disagrees with four other pages and, for colour, is provably wrong on at least o
 
   <!-- Pre-paint, inline, before any stylesheet. The theme must be settled before
        first paint or the page visibly flashes the wrong one. Nothing here touches
-       scale, and nothing should: there is no wide-screen scaling since 0.56.0 — a
-       page caps at --content-w and the rest of the viewport is margin. This template
-       used to carry a zoom script; do not bring it back. -->
+       scale, and nothing should: a page caps at --content-w and the rest of the
+       viewport is margin. Do not add a zoom script. -->
   <script>
     (() => {
       const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
@@ -136,9 +135,8 @@ on at least one theme and four sat inside the gap, clearing neither side.
 ## Measurements: one column, one type scale (0.4.0)
 
 Colours are declared four times because arithmetic forces it. Measurements are the opposite:
-one right answer, and it must not vary by theme, page or surface. Audited 2026-08-05, five
-surfaces had **four** content widths (78rem / 1180px / 72rem / none) and netmon a flat `13px`
-where everything else sat at `0.75rem` — because the system offered no token to inherit.
+one right answer, and it must not vary by theme, page or surface. A surface with no token to
+inherit picks its own width and size, and the surfaces drift apart.
 
 ```css
 --content-w: 90rem;     --content-pad: 1.5rem;  /* 1440px; 1.25rem a side below 40rem (0.60.0) */
@@ -156,23 +154,16 @@ read as body copy, a label or a heading inside a page takes it. The step carries
 so a title that uses it needs no media query. `foundations.md` has the rest of the scale's tokens:
 control, card, glyph and dot sizes, the twelve categorical hues, elevation, motion and tone.
 
-### ONE SIZE FOR TEXT (0.27.0, Daniel) — `--fs-xs`, `--fs-sm` and `--fs-md` are gone
+### ONE SIZE FOR TEXT — there is no `--fs-xs`, `--fs-sm` or `--fs-md`
 
 Body, tables, labels, badges, notes, buttons, form controls, meta lines: **all `--fs-base`.** If you
 are reaching for a `font-size` on anything a person reads, the answer is already decided. The only
 sizes left are the three heading steps, and each is a jump rather than a nudge.
 
-**Do not re-derive the old scale from memory.** It had four text steps at 10 / 11 / 12 / 13px, and
-this very section used to defend them: *"steps are 1px apart at the bottom on purpose."* That
-reasoning was wrong in a way only usage could show. Differences that small cannot be told apart on
-sight, so nothing ever **chose** between them — every surface picked whichever felt right when it was
-written, and **578 hand-rolled `font-size` declarations** grew across the estate while every
-conformance check passed, because none of them had an opinion about type. One cockpit repository card
-rendered text at 10.2px, 10.8px, 10.88px, 11px, 12px and 13px at once. Daniel found it by looking:
-*"why in details we have different font sizes?"*
-
-The fix is not discipline, it is **removing the choice**. With one text size there is no near-miss to
-pick, and `font-size` stops being a decision anybody makes while writing a component.
+**Do not add smaller text steps from memory.** Steps 1px apart cannot be told apart on sight, so
+nobody **chooses** between them: every surface picks whichever feels right, and hand-rolled
+`font-size` values pile up while every conformance check passes. With one text size there is no
+near-miss to pick, and `font-size` stops being a decision anybody makes while writing a component.
 
 - **Must read as quieter?** `--muted-foreground`, `opacity`, or weight. Colour separates a label from
   its value far better than one pixel ever did, and it survives zoom and a printout.
@@ -180,9 +171,8 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
 - **A glyph is not text.** A `content:`-drawn pseudo-element (`ⓘ`, `⤢`, a marker) is sized against its
   own drawing and may keep a hand-rolled `em`. Say so inline: `/* not-text: … */`. Five in the system
   do; nothing else may.
-- **`table` is `--fs-base`.** It was `--fs-md` until 0.27.0, sitting under a comment that already said
-  *"a table cell is body copy"* — so every table in the estate rendered one step louder than the body
-  around it and louder than the label naming it. Do not re-add a table size.
+- **`table` is `--fs-base`.** A table cell is body copy; a larger table size reads louder than the
+  body around it and the label naming it. Do not add a table size.
 - **`em` compounds, `rem` does not.** Mixing them is how `0.85em`, `0.9em` and `0.68rem` landed as
   three near-identical pixel values inside one card. Write the token, not a ratio.
 
@@ -191,49 +181,38 @@ pick, and `font-size` stops being a decision anybody makes while writing a compo
   build-free page on an **unpinned** url writes the tokens itself *with literal fallbacks* —
   `max-width: var(--content-w, 90rem)` — because `.wrap` itself only exists from 0.4.0; see
   "Pin or unpin".
-- **One width for every section, and a surface that wants more raises the token** (0.44.0).
+- **One width for every section, and a surface that wants more raises the token.**
   A table section must never be wider than the prose sections beside it: blocks that start at
   different left edges read as broken however well each one is individually sized. So there is
-  no bleed class and none should be invented — cockpit had one for a few hours, for a genuinely
-  too-narrow activity table, and the right fix was `--content-w` going 78rem → 92rem for
-  everybody (and 92rem → **90rem / 1440px** in 0.56.0, when the scaling went). The number was measured, not chosen: the widest table in the estate wants 1353px,
-  88rem is the first value that fits it, and 92rem clears it while still leaving an 81px gutter
-  beside the `ls -l` rail at 1920. **The cap only binds above ~1744px**, so widening it is
+  no bleed class and none should be invented — a table that is too narrow raises `--content-w`
+  for everybody. The number is measured, not chosen: the widest table in the estate wants 1353px,
+  and **90rem / 1440px** fits it with a gutter beside the `ls -l` rail at 1920. **The cap only binds above ~1744px**, so widening it is
   invisible on a laptop and only shows on the monitors it gets raised about.
 - **`.wrap` sets the inline axis only** — vertical rhythm differs legitimately between a doc and a
   dashboard. A consumer adds `padding-block: 2.5rem 5rem`. **Never the `padding` shorthand**: it
   resets `padding-inline` to 0 and silently takes the shared margins back.
 - A page that genuinely is not a column (a full-bleed dashboard table) sets `max-width: none`
   deliberately. It does not invent a fifth number.
-- There is exactly **one** text step, three heading steps and one display step. The bottom of the
-  scale used to be four sizes 1px apart, defended here as deliberate; see "ONE SIZE FOR TEXT" above
-  for what usage showed instead.
+- There is exactly **one** text step, three heading steps and one display step; "ONE SIZE FOR
+  TEXT" above says why.
 - Tailwind apps get `max-w-content` and `text-fs-base` / `-lg` / `-xl` / `-2xl` / `-display`.
-  `text-fs-xs`, `-sm` and `-md` went with the tokens behind them. Tailwind's own `text-xs/sm/base`
+  There is no `text-fs-xs`, `-sm` or `-md`. Tailwind's own `text-xs/sm/base`
   are deliberately **not** remapped — opt in by name.
-- **There is no wide-screen scaling. Removed in 0.56.0 (Daniel).** From 0.29.0 to 0.55.0
-  `tokens.css` set a fluid root font size above 1920px, so every rem — type, `--content-w`,
-  `--space-section` — grew together on a large display. It is gone, and it will read as a
-  regression if you do not know why, so: everything authored in **px silently opted out** (icons
-  are sized by `width`/`height` attributes, controls had px heights, one component wrote an inline
-  px style no stylesheet can override), so a 4K screen doubled the text and left all of that
-  behind. Four releases went into chasing it. And what *did* scale scaled too much — 2x icons read
-  as oversized beside their labels, and a table sized for a 1472px column overlapped once every
-  measurement in it doubled.
-  **A page caps at `--content-w` (90rem / 1440px) and the rest of the viewport is margin.** The
-  root font size is the browser's own, which is also the accessible answer: a larger default is
-  honoured and text zoom works (WCAG 1.4.4).
-  Do not re-add a pre-paint `style.zoom` and do not re-add a fluid root — `bin/design-conformance`
-  check 5 fails a page that assigns a zoom, and it is now the only thing that would be scaling
-  anything.
-  `data-scale="fixed"` (0.47.0) went with it: an opt-out of a behaviour that no longer exists.
-  Setting it is harmless and does nothing.
+- **There is no wide-screen scaling.** A page caps at `--content-w` (90rem / 1440px) and the rest
+  of the viewport is margin. The root font size is the browser's own, which is also the accessible
+  answer: a larger default is honoured and text zoom works (WCAG 1.4.4).
+  Do not add a fluid root font size: everything authored in **px silently opts out** (icons are
+  sized by `width`/`height` attributes, controls have px heights, an inline px style beats any
+  stylesheet), so the text grows and all of that stays behind, while what does scale scales too
+  much — icons read as oversized and a sized table overlaps.
+  Do not add a pre-paint `style.zoom` either — `bin/design-conformance` check 5 fails a page that
+  assigns a zoom. `data-scale="fixed"` does nothing; do not set it.
 - **Never set `zoom` on a page.** It scales the coordinate *space*, so the page's pixel grid stops
   matching the browser's, and anything injected from outside — a password manager's dropdown, a
   translation bar — is positioned through one grid and written into the other. Measured on the
-  family login page: 1Password's dropdown landed 1.9x down and across from its field. Scaling the
-  unit had no second grid — and since 0.56.0 nothing scales the unit either, so a `style.zoom`
-  would be the only thing scaling anything, on one surface, out of step with every other.
+  family login page: 1Password's dropdown landed 1.9x down and across from its field. Nothing else
+  scales the unit, so a `style.zoom` would be the only thing scaling anything, on one surface, out
+  of step with every other.
 
 ## A card has its own padding (0.38.0, Daniel) — do not add your own
 
@@ -390,31 +369,27 @@ entry in that array.
 ## Pin or unpin the CDN url — decided by whether your markup is coupled to a release
 
 - **Tokens-only / look-only consumer → unpinned** (`…/npm/@danieldeusing/design/dist/…`, no
-  `@x.y.z`). One design system, every surface on the current version — Daniel's call, 2026-08-05.
+  `@x.y.z`). One design system, every surface on the current version.
   A stale cached stylesheet there means slightly older colours, never a broken page. netmon's
-  `tokens.css` layer and the seedr playgrounds are on this side today.
-  **This is where a surface should sit, not a roster of where they are** — audited 2026-08-06,
-  `deploy/ci-orchestrator` was hard-pinned at **0.1.5** and had no token since. morning-briefs
-  imports the unpinned `src/` files (look-only) and keeps its own fixes in its stylesheet; for
-  0.60.0 its `pre.mermaid` keeps the unboxed look there. A pin nobody bumps
+  `tokens.css` layer and the seedr playgrounds are on this side.
+  **This is where a surface should sit, not a roster of where they are.** morning-briefs
+  imports the unpinned `src/` files (look-only) and keeps its own fixes in its stylesheet; its
+  `pre.mermaid` keeps the unboxed look there. A pin nobody bumps
   is the failure mode on this side, exactly as a poisoned cache is on the other.
 - **A surface that ships the system's markup → pin** and bump the pin in the same commit as the
-  markup that needs it. Cockpit — and **the docs site since 2026-08-06**, when its pages adopted
-  the rail and the fixed footer. It sat on the unpinned list above right up until that day, which
-  is the shape of this rule: the side a surface belongs on is not a property of the surface, it is
-  a property of what its markup needs, so it changes the day the markup does.
-  **Cockpit is the case that proves it:** 2.65.0 shipped the `.ls-nav` rail
-  markup against the unpinned url, and jsDelivr serves that url `cache-control: max-age=604800` —
-  **seven days in the browser**. Every browser that had opened cockpit that week kept applying
-  0.1.6, which predates the rail: both nav toggles on screen, a 613px header, the brand floating
-  mid-page. **A release cannot fix a poisoned cache** — the url a release publishes to is the one
-  being cached. Only a *changed url* can.
+  markup that needs it: cockpit, and the docs site, whose pages carry the rail and the fixed
+  footer. The side a surface belongs on is not a property of the surface, it is a property of
+  what its markup needs, so it changes the day the markup does.
+  **Why:** jsDelivr serves the unpinned url `cache-control: max-age=604800` — **seven days in the
+  browser**. Markup shipped against it meets whatever build each browser cached; a rail on a build
+  that predates the rail shows both nav toggles, a 613px header and the brand floating mid-page.
+  **A release cannot fix a poisoned cache** — the url a release publishes to is the one being
+  cached. Only a *changed url* can.
 - **Unpinned is not "always current" — it is "current, eventually."** Same cache, other
-  direction: measured 2026-08-05, hours after `0.4.0` went to npm, the unpinned url still served
-  **`0.2.0`** (`curl -sI …` → `x-jsd-version: 0.2.0`, `age: 11267` against `s-maxage=43200`), and
+  direction: the edge can serve an older build for hours after a release (`s-maxage=43200`), and
   browsers hold their copy for the full seven days. So an unpinned consumer must survive a build
-  that *predates the token it is asking for*: `0.2.0` has no `.wrap` and no `--fs-*` at all, and
-  a bare `var(--content-w)` resolves to nothing — full-bleed page, collapsed type. **Give every
+  that *predates the token it is asking for*: there a bare `var(--content-w)` resolves to
+  nothing — full-bleed page, collapsed type. **Give every
   token an unpinned consumer depends on structurally a literal fallback**: `var(--content-w,
   90rem)`, `var(--fs-2xl, 1.7rem)`. Check what is actually being served before concluding a new
   token "doesn't work": `curl -sI <url> | grep x-jsd-version`.
@@ -424,8 +399,7 @@ entry in that array.
   guard is the worked example.
 - **A page made with `html-doc` → neither side: it is baked.** It loads no CDN url at all:
   `scripts/bake.mjs` inlines the CSS, fonts, runtime and diagrams, and the page keeps the design
-  of its date (Daniel, 2026-10-06). That includes pagr-docs, which tracked the unpinned url from
-  2026-08-05 until it was baked; that decision no longer applies.
+  of the day it was baked. That includes pagr-docs.
 
 ## Changing the system
 
@@ -435,12 +409,12 @@ Trusted Publishing on any push to `main` that bumps `package.json` version; an u
 is skipped, so docs/skills/template pushes are safe. Write the CHANGELOG entry the way the
 existing ones read: what changed, and the measurement or failure that forced it.
 
-**Push `main` first, tag after npm has the version.** The order is load-bearing and neither the
-CHANGELOG nor this file used to say so. `prepublishOnly` runs `check-release.mjs` inside the
+**Push `main` first, tag after npm has the version.** The order is load-bearing.
+`prepublishOnly` runs `check-release.mjs` inside the
 publish job, and check #2 refuses a version that is **already tagged on origin** — so tagging
-before the workflow finishes makes the release gate block the very publish it is gating. 0.16.0
-failed exactly that way: `✗ v0.16.0 is already a tag on origin — that release was cut.`, npm
-untouched, while the tag sat there implying it had shipped. Recovery is
+before the workflow finishes makes the release gate block the very publish it is gating. The
+publish then fails with `✗ vX.Y.Z is already a tag on origin — that release was cut.`, npm stays
+untouched, and the tag implies a release that did not ship. Recovery is
 `git push origin :refs/tags/vX.Y.Z`, `gh run rerun <id>`, then tag once `npm view` reports the new
 version. The workflow re-creates the tag itself on success, so the manual tag is a no-op — which
 is the clue that it was never yours to push first.

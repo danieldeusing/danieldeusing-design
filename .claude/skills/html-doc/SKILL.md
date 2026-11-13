@@ -55,28 +55,24 @@ already carries two, and if you cannot write the sentence you do not have an exc
    Daniel's machines. Elsewhere it is
    `../../../templates/documentation.html` from this file's *real* path (`readlink -f` it first:
    reached through a `~/.claude/skills/` symlink, or as a copy in `~/.copilot/skills/`, the
-   relative path points nowhere). There is deliberately **no second copy** bundled with the skill: two copies drifted
-   apart the moment the template changed, which is why the skill now ships inside the repo it
-   documents.
+   relative path points nowhere). There is deliberately **no second copy** bundled with the skill: two copies drift
+   apart the moment the template changes, so the skill ships inside the repo it documents.
 
 3. **Keep the CDN urls pinned, and keep the offline fallback on the same version.** The template
    already carries both, exactly as the published pages on `docs.danieldeusing.de` do:
 
    ```html
    <link rel="stylesheet"
-     href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.64.0/dist/danieldeusing-design.min.css"
-     onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.64.0.min.css'" />
+     href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@X.Y.Z/dist/danieldeusing-design.min.css"
+     onerror="this.onerror=null;this.href='/_design/danieldeusing-design-X.Y.Z.min.css'" />
    ```
 
-   **Copy the version from `templates/documentation.html`, never from this line.** The example
-   above said `0.7.0` until 2026-09-12 — a version that predates the `ls -l` rail this same
-   paragraph requires — because a version written in prose has nothing keeping it true. The
-   template is the one that ships.
+   **Copy the version from `templates/documentation.html`, never from this line.** A version
+   written in prose has nothing keeping it true; the template is the one that ships.
 
-   - **Pinned because this page ships the system's markup.** Since 2026-08-06 a doc carries the
-     `ls -l` rail and the fixed footer — the design system's own chrome — so it is coupled to the
-     release that styles it. That is exactly the case the `danieldeusing-design` skill says must
-     pin. Before that, a doc consumed only the *look* and unpinned was right.
+   - **Pinned because this page ships the system's markup.** A doc carries the `ls -l` rail and
+     the fixed footer — the design system's own chrome — so it is coupled to the release that
+     styles it. That is exactly the case the `danieldeusing-design` skill says must pin.
    - **Why unpinned would break it, concretely.** jsDelivr serves the unpinned url
      `cache-control: max-age=604800` — **seven days in the browser** (measured 2026-08-06), 12h at
      the edge. A reader who opened a doc last week keeps applying last week's build. Cockpit
@@ -249,14 +245,11 @@ already carries two, and if you cannot write the sentence you do not have an exc
      page is centred, and that difference is visible the moment you have both open.
    - **The chrome is full-bleed, the content is capped, and nothing scales with the window.**
      `header.bar` and `footer.status` span the viewport; `main.wrap` is the only capped thing, at
-     `--content-w` (90rem / 1440px since 0.56.0). Three states, one rule — and the reason it is
+     `--content-w` (90rem / 1440px). Three states, one rule — and the reason it is
      written down rather than left to the template: **a doc must never set `zoom`, and must never
-     restate a width.** Until 2026-09-12 the estate scaled the root font-size above 1920px so every
-     rem grew with the display, and 17 published docs additionally ran a pre-paint
-     `documentElement.style.zoom` of their own. Both are gone. A page that reintroduces either gets
-     a column that is 2944px wide on a 4K monitor with type to match, which is what this rule
-     exists to prevent — measured, not imagined. `bin/design-conformance` check 5 fails a page that
-     applies a zoom.
+     restate a width.** A page that scales its root font size with the display, or runs a pre-paint
+     `documentElement.style.zoom`, gets a column 2944px wide on a 4K monitor with type to match.
+     `bin/design-conformance` check 5 fails a page that applies a zoom.
 
    - **Navigation (top-right) — the `ls -l` rail, and most docs should not have one.**
      **The rule: a doc lists only itself, so the rail has one entry, so there is no rail.**
@@ -295,10 +288,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
    is `display:none` below 48rem, so without it a phone reader cannot switch theme); and the
    pre-paint `<head>` scripts — theme, animation gate and **the `ls-nav` read**. Those stay
    inline because a module at the end of `<body>` runs after first paint: a reader who hid the
-   rail would watch it paint and jump away on every load. **There is no zoom script**, and
-   since 0.56.0 no wide-screen scaling at all (from 0.29.0 to 0.55.0 it was the fluid root font
-   size in `tokens.css`, which needed no pre-paint block either). Do not copy a zoom script in
-   from an older page — `bin/design-conformance` check 5 fails a page that applies a zoom.
+   rail would watch it paint and jump away on every load. **There is no zoom script** and no
+   wide-screen scaling. Do not copy a zoom script in from an older page —
+   `bin/design-conformance` check 5 fails a page that applies a zoom.
 
    **Every measurement in the page's `<style>` block is a token with a literal fallback.**
    The local CSS is the page's own *layout* only (the template keeps `.wrap`, `section.doc`,
@@ -353,10 +345,9 @@ already carries two, and if you cannot write the sentence you do not have an exc
      svg under an id selector. Never put a colour in a `classDef`:
      - `var()` does not work there at all. Mermaid 11.16.0 rejects it with or without a fallback
        (a comma splits its style list, and a bare `var(--x)` fails to parse too), so the whole
-       diagram silently shows its source — 14 diagrams on docs did (2026-09-30).
+       diagram silently shows its source.
      - A hex does not follow the theme. `#a02c2c` is warm's `--destructive` and wrong on green,
-       mono and paper; this skill used to recommend it and claim it stayed in the palette across
-       themes. It did not.
+       mono and paper.
      Another status colour is one more rule of the same shape beside the template's two, reading
      its token. The renderer's own palette still comes from `themeVariables` read from the live
      tokens.
@@ -500,17 +491,14 @@ already carries two, and if you cannot write the sentence you do not have an exc
   all content is shown immediately.
 - **Visual defaults this system rejects.** Each was found in a published doc and removed:
   - rounded corners: `4px` on inline code chips, badges and verdict tags, `6px` on `pre` blocks,
-    warning boxes and the Mermaid source fallback (twenty declarations, 2026-08-07; Daniel: "We
-    have no rounded corners.");
-  - a second type size for code: a local `code.inline { font-size: 0.92em }` (2026-09-08; inline
-    code is the bare `<code>` now, with no class), and `pre` at
-    `var(--fs-md, 0.86rem)`, whose fallback kept 13.76px alive after `--fs-md` was deleted
-    (17 pages, 2026-08-11);
-  - a status colour written as a hex: `#a02c2c` 41 times across four pages (2026-08-06), and in
-    every Mermaid `classDef` this skill taught until 0.61.1 — right on warm, wrong on the other
-    three themes. A diagram's status colour is the page's CSS on `.node.<class>`, from the token;
-    the `classDef` keeps the shape;
-  - the navigation as a dropdown menu instead of the rail (2026-08-06; Daniel: "not a dropdown,
-    but a sidebar").
+    warning boxes and the Mermaid source fallback (Daniel: "We have no rounded corners.");
+  - a second type size for code: a local `code.inline { font-size: 0.92em }` (inline code is the
+    bare `<code>`, with no class), and `pre` at `var(--fs-md, 0.86rem)`, whose fallback keeps
+    13.76px alive although `--fs-md` does not exist;
+  - a status colour written as a hex, such as `#a02c2c`, also in a Mermaid `classDef` — right on
+    warm, wrong on the other three themes. A diagram's status colour is the page's CSS on
+    `.node.<class>`, from the token; the `classDef` keeps the shape;
+  - the navigation as a dropdown menu instead of the rail (Daniel: "not a dropdown, but a
+    sidebar").
 
   After each review, add what the page reached for instead.

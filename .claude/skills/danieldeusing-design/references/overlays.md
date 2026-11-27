@@ -391,6 +391,31 @@ document.addEventListener("pointerdown", (e) => {            // a press outside
 - Shift+F10 and the Menu key make it reachable from the keyboard. An action a reader needs often
   still deserves a visible control as well: nothing on a row says "right-click me".
 
+## The command palette — `initCommandPalette()`
+
+```js
+import { initCommandPalette } from "@danieldeusing/design/runtime/command";
+initCommandPalette({
+  trigger: document.querySelector("#cmdk-open"),   // its [data-cmdk-key] gets "⌘K" or "Ctrl K"
+  items: [
+    { label: "runners", group: "pages", run: () => (location.href = "/runners") },
+    { label: "restart dd-infra-ci-2", group: "commands", confirm: true, run: restart },
+  ],
+});
+```
+
+One `dialog.dialog.cmdk` for every page and command, built by the runtime:
+
+- **The key.** ⌘K on Apple platforms, Ctrl K elsewhere. It does nothing while focus is in a text
+  field, where the key belongs to the field.
+- **Groups, recent first.** Results come in the groups the items name, in that order. Before anything
+  is typed, the last three commands run come first under "recent" (`localStorage["cmdk-recent"]`).
+- **A combobox.** The field keeps focus; ↑ ↓ move, ↵ runs, Escape closes. `aria-activedescendant`
+  names the selected option, so a screen reader announces each move.
+- **A command that cannot be undone asks twice.** `confirm: true` turns the first ↵ into "press ↵ again
+  to …" on the row, in `--warning`; a move or an edit takes it back.
+- **A close button**, because touch has no Escape. Focus returns to what held it.
+
 ## A hover is `data-tip` — never the native `title` (0.26.0, Daniel)
 
 ```html

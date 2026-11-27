@@ -298,6 +298,26 @@
             <button type="button" class="lbl" id="f-hint">max per hour</button>
             <div class="field-val"><input class="demo-w-6" type="number" aria-label="max per hour" value="6" /><span class="field-desc">the label is a button: on a phone it opens its explanation</span></div>
           </div>
+          <div class="field-row" id="row-required">
+            <label class="lbl" for="f-repo">repository</label>
+            <div class="field-val"><input id="f-repo" type="text" required value="danieldeusing-infra" /><span class="field-desc">a required field: the label carries a muted *</span></div>
+          </div>
+          <div class="field-row" id="row-invalid" data-invalid>
+            <label class="lbl" for="f-branch">branch</label>
+            <div class="field-val">
+              <input id="f-branch" type="text" aria-invalid="true" aria-describedby="f-branch-err" value="main main" />
+              <p class="field-error" id="f-branch-err">a branch name has no space</p>
+            </div>
+          </div>
+          <div class="field-row" id="row-disabled" data-disabled>
+            <label class="lbl" for="f-owner">owner</label>
+            <input id="f-owner" type="text" disabled value="daniel" />
+          </div>
+          <fieldset class="field-set" id="f-set">
+            <legend>notify on</legend>
+            <label><input type="checkbox" checked /> a failed run</label>
+            <label><input type="checkbox" /> every run</label>
+          </fieldset>
           <div class="field-row field-row--stacked" id="row-stacked">
             <span class="lbl">agents</span>
             <table id="f-table">

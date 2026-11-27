@@ -480,12 +480,12 @@ const CURRENT = (row, title) => [
 ];
 
 const EXPECT = [
-  ["K2 card anatomy — head, title (500, body size), description (3-line clamp), foot", [
+  ["K2 card anatomy — head, title (600, --fs-lg), description (3-line clamp), foot", [
     ["#fx-card-head", "", "display", { is: "flex" }], ["#fx-card-head", "", "flex-wrap", { is: "wrap" }],
     ["#fx-card-head", "", "align-items", { is: "baseline" }], ["#fx-card-star", "", "align-self", { is: "center" }], ["#fx-card-head", "", "justify-content", { is: "space-between" }],
     ["#fx-card-head", "", "row-gap", "0.5rem"], ["#fx-card-head", "", "column-gap", "0.5rem"],
     ["#fx-card-title", "", "margin-top", { is: "0px" }], ["#fx-card-title", "", "margin-bottom", { is: "0px" }],
-    ["#fx-card-title", "", "font-size", "var(--fs-base)"], ["#fx-card-title", "", "font-weight", { is: "500" }], ["#fx-card-title", "", "color", "var(--foreground)"],
+    ["#fx-card-title", "", "font-size", "var(--fs-lg)"], ["#fx-card-title", "", "font-weight", { is: "600" }], ["#fx-card-title", "", "color", "var(--foreground)"],
     ["#fx-card-desc", "", "margin-top", { is: "0px" }], ["#fx-card-desc", "", "color", "var(--muted-foreground)"],
     ["#fx-card-desc", "", "-webkit-line-clamp", { is: "3" }], ["#fx-card-desc", "", "-webkit-box-orient", { is: "vertical" }],
     ["#fx-card-desc", "", "overflow-y", { is: "hidden" }],
@@ -512,19 +512,19 @@ const EXPECT = [
   ["K2/K3 in a grid a card is a flex column; a lone card built from the parts stacks the same way", [
     ["#fx-card", "", "display", { is: "flex" }], ["#fx-card", "", "flex-direction", { is: "column" }], ["#fx-card", "", "row-gap", "0.5rem"],
     ["#fx-card-lone", "", "display", { is: "flex" }], ["#fx-card-lone", "", "flex-direction", { is: "column" }],
-    ["#fx-grid", "", "display", { is: "grid" }], ["#fx-grid", "", "row-gap", "1rem"], ["#fx-grid", "", "column-gap", "1rem"],
+    ["#fx-grid", "", "display", { is: "grid" }], ["#fx-grid", "", "row-gap", "var(--card-gap)"], ["#fx-grid", "", "column-gap", "var(--card-gap)"],
     ["#fx-grid", "", "list-style-type", { is: "none" }], ["#fx-grid", "", "padding-left", { is: "0px" }], ["#fx-grid", "", "margin-top", { is: "0px" }],
   ]],
-  ["K4 stat tile — column, padding, card fill, 3px start edge; eyebrow label, --fs-xl tabular value", [
+  ["K4 stat tile — column, padding, card fill, 3px start edge; eyebrow label, --fs-2xl tabular value", [
     ["#fx-tile", "", "display", { is: "flex" }], ["#fx-tile", "", "flex-direction", { is: "column" }], ["#fx-tile", "", "row-gap", "0.25rem"],
     ["#fx-tile", "", "padding-top", "0.75rem"], ["#fx-tile", "", "padding-right", "0.9rem"], ["#fx-tile", "", "box-sizing", { is: "border-box" }],
     ["#fx-tile", "", "color", "var(--foreground)"], ["#fx-tile", "", "text-decoration-line", { is: "none" }], ["#fx-tile", "", "background-color", "var(--card)"],
     ...edge("#fx-tile", "top", "1px", "solid", "var(--border)"), ...edge("#fx-tile", "left", "3px", "solid", "var(--border)"),
     ...EYEBROW("#fx-tile-label", "var(--muted-foreground)"),
-    ["#fx-tile-value", "", "font-size", "var(--fs-xl)"], ["#fx-tile-value", "", "font-weight", { is: "700" }],
-    ["#fx-tile-value", "", "font-variant-numeric", { is: "tabular-nums" }], ["#fx-tile-value", "", "line-height", "calc(var(--fs-xl) * 1.3)"],
+    ["#fx-tile-value", "", "font-size", "var(--fs-2xl)"], ["#fx-tile-value", "", "font-weight", { is: "700" }],
+    ["#fx-tile-value", "", "font-variant-numeric", { is: "tabular-nums" }], ["#fx-tile-value", "", "line-height", "calc(var(--fs-2xl) * 1.3)"],
     ["#fx-tile-note", "", "color", "var(--muted-foreground)"], ["#fx-tile-cta", "", "color", "var(--primary)"], ["#fx-tile-cta", "", "align-self", { is: "flex-end" }],
-    ["#fx-stat-grid", "", "display", { is: "grid" }], ["#fx-stat-grid", "", "column-gap", "0.75rem"],
+    ["#fx-stat-grid", "", "display", { is: "grid" }], ["#fx-stat-grid", "", "column-gap", "var(--card-gap)"],
   ]],
   ["K4 states — idle success edge; action and broken edge + value + 4% tint; unknown dashed muted; data-tone; no leak", [
     ["#fx-tile-idle", "", "border-left-color", "var(--success)"], ["#fx-tile-idle-value", "", "color", "var(--foreground)"],
@@ -614,7 +614,7 @@ const EXPECT = [
     ["#fx-man-bottom", "", "margin-top", "1.75rem"], ["#fx-man-top-1", "", "flex-grow", { is: "1" }], ["#fx-man-top-1", "", "flex-basis", { is: "0px" }],
     ["#fx-man-top-2", "", "text-align", { is: "center" }], ["#fx-man-top-3", "", "text-align", { is: "end" }],
     ["#fx-man-sect1", "", "margin-top", { is: "0px" }], ["#fx-man-sect2", "", "margin-top", "1.25rem"], ["#fx-man-sect1", "", "font-size", "var(--fs-base)"],
-    ["#fx-man-sect1", "", "font-weight", { is: "700" }], ["#fx-man-sect1", "", "line-height", "calc(var(--fs-base) * 1.5)"],
+    ["#fx-man-sect1", "", "font-weight", { is: "700" }], ["#fx-man-sect1", "", "line-height", "calc(var(--fs-base) * var(--lh-base))"],
     ["#fx-man-sect1", "", "letter-spacing", "0.025em"], ["#fx-man-sect1", "", "color", "var(--primary)"],
     ["#fx-man-body", "", "margin-top", "0.375rem"], ["#fx-man-body", "", "padding-left", "1.75rem"], ["#fx-man-body", "", "color", "var(--muted-foreground)"],
     ["#fx-man-p1", "", "margin-top", { is: "0px" }], ["#fx-man-p1", "", "margin-bottom", { is: "0px" }], ["#fx-man-p2", "", "margin-top", "0.75rem"],
@@ -688,7 +688,7 @@ const EXPECT = [
     ["#fx-console-body", "", "overflow-y", { is: "auto" }], ["#fx-console-body", "", "overscroll-behavior-y", { is: "contain" }], ["#fx-console-body", "", "padding-top", "0.75rem"],
     ["#fx-console-body", "", "background-color", "var(--background)"], ["#fx-console-body", "", "color", "var(--foreground)"],
     ["#fx-console-body", "", "white-space", { is: "pre-wrap" }], ["#fx-console-body", "", "overflow-wrap", { is: "anywhere" }],
-    ["#fx-console-body", "", "line-height", "calc(var(--fs-base) * 1.5)"], ["#fx-console-body", "", "tab-size", { is: "2" }],
+    ["#fx-console-body", "", "line-height", "calc(var(--fs-base) * var(--lh-base))"], ["#fx-console-body", "", "tab-size", { is: "2" }],
     ["#fx-console-current", "", "background-color", "var(--muted)"],
   ]],
 ];
@@ -717,7 +717,15 @@ const GEOMETRY = [
     }).filter(Boolean);
   })()`)],
   ["K2 a head lines its WORDS up on one baseline — a title beside a bracket tag and a boxed tag (3px apart on 0.60.0) — and centres a lone glyph on the row", () => W(`(() => {
-    const words = (id) => { const r = document.createRange(); r.selectNodeContents(W.q(id)); return r.getBoundingClientRect(); };
+    // The baseline itself: a text box's bottom edge is the baseline plus the font's descent. The bottom
+    // edge alone is no proxy once the title is a larger size than the tags (a larger descent).
+    const ctx = document.createElement("canvas").getContext("2d");
+    const words = (id) => {
+      const walker = document.createTreeWalker(W.q(id), NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.data.trim() ? 1 : 3) });
+      const text = walker.nextNode(), r = document.createRange(); r.selectNodeContents(text);
+      ctx.font = getComputedStyle(text.parentElement).font;
+      return { bottom: r.getBoundingClientRect().bottom - ctx.measureText(text.data).fontBoundingBoxDescent };
+    };
     const title = words("#fx-head-title"), row = W.box("#fx-card-head-words .card-head"), ico = W.box("#fx-head-ico");
     return [W.near(words("#fx-head-bracket").bottom, title.bottom, "the bracket tag's words sit on the title's baseline"),
       W.near(words("#fx-head-tag").bottom, title.bottom, "the boxed tag's words sit on the title's baseline"),

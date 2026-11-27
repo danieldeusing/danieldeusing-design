@@ -4,6 +4,57 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.65.0 (2026-11-27)
+
+The ten proposals from the review against the Apple HIG and shadcn, plus one title per section and
+a theme that follows the OS.
+
+### Changed
+
+- **Text is 13px.** `--fs-base` 12 → 13px, the one text size still. The heading steps are 16 / 20 /
+  26px (`--fs-lg`, `--fs-xl`, `--fs-2xl`), `--lh-base` is 1.6, and a stat value is `--fs-2xl`.
+- **Prose stops at 72 characters.** New `--measure: 72ch` on `.lede`, `.markdown p` and a doc
+  section's paragraphs.
+- **More space.** `--card-pad` 12 → 16px, a new `--card-gap` of 20px between cards and stat tiles,
+  `--space-section` 40 → 56px.
+- **A clear hierarchy.** `.card-title` is `--fs-lg`, weight 600; a table header is weight 500.
+- **The scanlines sit behind the surfaces**, at about half strength, and go away under Increase
+  Contrast and forced colours.
+- **A section title is one element.** `<h2 class="prompt">steps</h2>` keeps the heading's own size and
+  `--foreground`, with the `$` in `--primary`; `.prompt` forced the body size onto a heading before.
+  `templates/documentation.html` uses plain words (`in short`, `steps`, `proof`) instead of
+  `cat steps.txt`. `check-content` refuses a `.prompt` followed by a heading with the same words.
+- **The theme follows the OS when nothing is stored**: dark gets `green`, light gets `warm`. The
+  templates' pre-paint scripts, the skill's snippet and `getStoredTheme()` do this.
+- **Field labels lead.** `.field-row > .lbl` is `--foreground`, weight 600. `data-invalid` on the row
+  turns the label `--destructive`, `.field-error` starts with ✗, `data-disabled` dims the label, and a
+  required control puts a muted `*` after its label.
+
+### Added
+
+- **Status not by colour alone.** A toned `.tag` and a `.stat-tile[data-state]` label start with the
+  state's glyph: ✓ ok, ✗ failed, ● attention or running, ○ queued. Screen readers skip it.
+- **`.skeleton`**: bars in the shape of what is loading, with a pulse that stops under Reduce Motion.
+- **`.toast` and `showToast()`** (`runtime/toast.js`): one at a time, no timer, an undo with ⌘Z or
+  Ctrl+Z, in a `role="status"` region made once.
+- **`.cmdk` and `initCommandPalette()`** (`runtime/command.js`): the ⌘K palette (Ctrl K off Apple),
+  grouped, recent first, a combobox with `aria-activedescendant`, a second ↵ for a `confirm` item, and
+  no shortcut inside a text field.
+- **`.field-set`**: a fieldset for a group of checkboxes, radios or switches, without the browser's box.
+- **Access.** `prefers-contrast: more` lifts muted text and strengthens borders; `color-scheme` follows
+  each theme; under a coarse pointer text fields and selects are 44px high; a pressed button moves 1px
+  and smooth scrolling runs only when motion is allowed; the body no longer clips sideways.
+
+### Fixed (found by the suites at 13px)
+
+- **`.confirm-code-input` is 28px again.** Its literal `.3rem` padding grew the field to 28.5px; it now
+  derives the padding from `--control-h`, as the select does.
+- **The phone footer stays two rows.** At 13px the anim toggle wrapped to a third row at 375px; the
+  path line is now `--lh-tight` and the controls are .75rem apart.
+- **`.entry-title` on h1–h3 sets its heading step**, so it is the same with tokens.css alone.
+- **`.empty--inline` and `.callout` glyphs** align from the tokens instead of `1lh`, which Chromium
+  rounds to 1/64px.
+
 ## 0.64.0 (2026-10-06)
 
 ### Added

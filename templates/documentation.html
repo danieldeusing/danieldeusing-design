@@ -44,7 +44,7 @@
     <script>
       (() => {
         const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
-        let theme = "warm";
+        let theme = matchMedia("(prefers-color-scheme: dark)").matches ? "green" : "warm";
         try {
           const stored = localStorage.getItem("theme");
           if (stored && stored in bg) theme = stored;
@@ -85,13 +85,13 @@
          on docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.64.0/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.64.0.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.65.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.64.0/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.64.0.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.65.0.fonts.css'"
     />
 
     <style>
@@ -287,7 +287,7 @@
           <!-- one <section> per topic, each with an id (the minimap builds itself from them).
                Short bullets and tables, a visual wherever one fits, proof for every claim. -->
           <section class="doc" id="overview" data-term>
-            <p class="prompt">cat in-short.md</p>
+            <h2 class="prompt">in short</h2>
             <div class="body" data-term-out>
               <ul class="plain">
                 <li><strong>{{TLDR_LABEL_1}}:</strong> {{TLDR_1}}</li>
@@ -298,14 +298,14 @@
           </section>
 
           <section class="doc" id="plain-words" data-term>
-            <p class="prompt">cat plain-words.md</p>
+            <h2 class="prompt">in plain words</h2>
             <div class="body" data-term-out>
               <p>{{PLAIN_WORDS}}</p>
             </div>
           </section>
 
           <section class="doc" id="steps" data-term>
-            <p class="prompt">cat steps.txt</p>
+            <h2 class="prompt">steps</h2>
             <div class="body" data-term-out>
               <ol class="steps">
                 <li>{{STEP_1}}</li>
@@ -320,7 +320,7 @@
                element by the browser, and the renderer (which reads textContent)
                would receive a label with the break silently stripped out. -->
           <section class="doc" id="flow" data-term>
-            <p class="prompt">cat flow.mmd</p>
+            <h2 class="prompt">flow</h2>
             <div class="body" data-term-out>
               <pre class="mermaid">
 flowchart TD
@@ -342,7 +342,7 @@ flowchart TD
                (one file), each caption names the value it shows. Logs are an excerpt in a bare
                <pre>, secrets and customer data replaced. Delete what the page has no proof for. -->
           <section class="doc" id="proof" data-term>
-            <p class="prompt">cat proof.txt</p>
+            <h2 class="prompt">proof</h2>
             <div class="body" data-term-out>
               <div class="shots">
                 <figure><img alt="{{SHOT_1_ALT}}" src="{{SHOT_1_DATA_URI}}" /><figcaption>{{SHOT_1_CAPTION}}</figcaption></figure>
@@ -357,7 +357,7 @@ flowchart TD
           </section>
 
           <section class="doc" id="notes" data-term>
-            <p class="prompt">cat notes.md</p>
+            <h2 class="prompt">notes</h2>
             <div class="body" data-term-out>
               <p>{{NOTES}}</p>
             </div>
@@ -409,7 +409,7 @@ flowchart TD
     <script type="module">
       // dd-runtime: scripts/bake.mjs swaps this import for the runtime it inlines.
       import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom, initMinimap, initTooltips } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.64.0/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();

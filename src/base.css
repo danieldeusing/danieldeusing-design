@@ -6,8 +6,11 @@
  * tokens.css (load that first). Plain CSS — no Tailwind required.
  */
 
-html {
-  scroll-behavior: smooth;
+/* Smooth scroll only for a reader who allows motion: a jump that glides is motion (Reduce Motion). */
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.anim-off) {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Default any element's border to the themed colour, so a bare `border-width`
@@ -31,7 +34,6 @@ body {
   font-family: var(--font-mono);
   font-size: var(--fs-base);
   line-height: var(--lh-base);
-  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -81,7 +83,7 @@ td {
 thead th {
   border-block-end-color: var(--border);
   color: var(--muted-foreground);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* The last row's rule would otherwise draw a line across the bottom of the table with
@@ -104,13 +106,16 @@ summary,
 }
 
 
-/* CRT scanlines: a fixed, non-interactive overlay above the page. Intensity is
+/* CRT scanlines: a fixed, non-interactive texture BEHIND the page's surfaces. A texture never
+   crosses text: on the canvas it shows, and every card, table and control covers it. z-index -1
+   puts it under body's content and over the canvas, which shows body's background because html
+   paints none. A surface that paints `html { background }` hides the texture. Intensity is
    per-theme via --scanline-opacity. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: -1;
   pointer-events: none;
   background: repeating-linear-gradient(
     0deg,
@@ -120,6 +125,12 @@ body::after {
     transparent 3px
   );
   opacity: var(--scanline-opacity);
+}
+/* Increase Contrast and forced colours: no texture at all. */
+@media (prefers-contrast: more), (forced-colors: active) {
+  body::after {
+    display: none;
+  }
 }
 
 ::selection {

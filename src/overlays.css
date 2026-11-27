@@ -248,6 +248,68 @@ dialog.dialog.dialog--drawer {
   border-width: 0 0 0 1px;
 }
 
+/* ── .cmdk — THE COMMAND PALETTE: every page and action behind one key ──────────────────────────────
+   initCommandPalette() (runtime/command.js) builds it; this draws it. A dialog.dialog with a search
+   field on top, the results in named groups (recent first, before anything is typed), and the keys
+   in the foot. ⌘K opens it on Apple platforms and Ctrl K elsewhere, never while the reader types in
+   a text field. A command that cannot be undone asks a second ↵ and shows the question in
+   --warning on its own row. The field is a control, so it keeps --control-h; the close button is
+   there for touch, which has no Escape. */
+dialog.dialog.cmdk {
+  inline-size: min(36rem, calc(100vw - 2rem));
+  margin-block-start: 15vh;
+}
+.cmdk-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  padding: 0.5rem;
+  border-block-end: 1px solid var(--border);
+}
+.cmdk-input {
+  flex: 1;
+  min-inline-size: 0;
+}
+.cmdk-list {
+  flex: 1;
+  min-block-size: 0;
+  max-block-size: 20rem;
+  margin: 0;
+  padding: 0.4rem;
+  overflow: auto;
+}
+.cmdk-group-label {
+  margin: 0.4rem 0.6rem 0.2rem;
+  color: var(--muted-foreground);
+}
+.cmdk-item {
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+}
+.cmdk-item[aria-selected="true"] {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.cmdk-item[data-armed] { color: var(--warning); }
+.cmdk-empty {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  color: var(--muted-foreground);
+}
+.cmdk-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  flex: none;
+  padding: 0.5rem 1rem;
+  color: var(--muted-foreground);
+  border-block-start: 1px solid var(--border);
+}
+@media (forced-colors: active) {
+  .cmdk-item[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+}
+
 /* ── .context-menu — the box of a menu opened at the pointer ──────────────────────────────────────
    The rows are the one popup look (`.select-panel` + `.dropdown-item`, components.css); this is
    only what a menu with no trigger needs on top: it is placed at a point, so it is fixed and above

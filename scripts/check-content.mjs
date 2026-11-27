@@ -194,7 +194,8 @@ window.__t = (() => {
     return value;
   };
   const token = (name) => probe("color", "var(" + name + ")");
-  // want: { prop: "exact" | { token: "--x" } | { re: "..." } | { px: n } }
+  // want: { prop: "exact" | { token: "--x" } | { re: "..." } | { px: n } | { calc: "var(--x) * n" } }
+  // calc resolves the expression on the same property at the root, so the want follows the token.
   const expect = (sel, pseudo, want) => {
     const s = cs(sel, pseudo);
     const out = [];
@@ -205,6 +206,7 @@ window.__t = (() => {
       else if (w.token) { const t = token(w.token); ok = got === t; show = w.token + " (" + t + ")"; }
       else if (w.re) { ok = new RegExp(w.re).test(got); show = "/" + w.re + "/"; }
       else if ("px" in w) { ok = Math.abs(parseFloat(got) - w.px) < 0.05; show = w.px + "px"; }
+      else if (w.calc) { const t = probe(prop, w.calc); ok = Math.abs(parseFloat(got) - parseFloat(t)) < 0.05; show = w.calc + " (" + t + ")"; }
       if (!ok) out.push(sel + (pseudo || "") + " " + prop + ": got " + JSON.stringify(got) + ", want " + show);
     }
     return out;
@@ -302,9 +304,9 @@ await load("?theme=warm");
 
 /* ── P1 page title and lede ─────────────────────────────────────────────────────────────────── */
 
-await check("P1 .page-title: 24px, 700, tight, -0.025em, --primary, the large glow, 1.5rem under the prompt", () => expectAll([
+await check("P1 .page-title: --fs-2xl, 700, tight, -0.025em, --primary, the large glow, 1.5rem under the prompt", () => expectAll([
   ["#p1-app .page-title", null, {
-    "font-size": "24px", "font-weight": "700", "line-height": { px: 31.2 }, "letter-spacing": { px: -0.6 },
+    "font-size": { calc: "var(--fs-2xl)" }, "font-weight": "700", "line-height": { calc: "calc(var(--fs-2xl) * var(--lh-tight))" }, "letter-spacing": { calc: "calc(var(--fs-2xl) * -0.025)" },
     color: { token: "--primary" }, "text-shadow": { re: "12px$" }, "overflow-wrap": "anywhere",
     "margin-top": "24px", "margin-bottom": "0px", "margin-left": "0px", "margin-right": "0px",
   }],
@@ -342,8 +344,8 @@ await check("P1 a long token wraps inside its column instead of overflowing it",
 
 await check("P2 .eyebrow: body size, 500, upper case, .05em, muted, no margin", () => expectAll([
   ["#eyebrow-plain", null, {
-    "font-size": "12px", "font-weight": "500", "letter-spacing": { px: 0.6 }, "text-transform": "uppercase",
-    "line-height": { px: 15.6 }, color: { token: "--muted-foreground" },
+    "font-size": { calc: "var(--fs-base)" }, "font-weight": "500", "letter-spacing": { calc: "calc(var(--fs-base) * 0.05)" }, "text-transform": "uppercase",
+    "line-height": { calc: "calc(var(--fs-base) * var(--lh-tight))" }, color: { token: "--muted-foreground" },
     "margin-top": "0px", "margin-bottom": "0px",
   }],
 ]));
@@ -352,7 +354,7 @@ await check("P2 data-tone colours an eyebrow (warning, primary)", () => expectAl
   ["#eyebrow-primary", null, { color: { token: "--primary" } }],
 ]));
 await check("P2 an h2.eyebrow.comment still reads at body size (the class beats the heading step)", () => expectAll([
-  ["#eyebrow-comment", null, { "font-size": "12px", "font-weight": "500" }],
+  ["#eyebrow-comment", null, { "font-size": { calc: "var(--fs-base)" }, "font-weight": "500" }],
 ]));
 // F7: --tone inherits, so a component that is neutral by default resets it at its root.
 await check("P2 an eyebrow with no tone of its own stays muted inside a toned container", () => expectAll([
@@ -384,19 +386,19 @@ await check("P3 in a narrow column the trailing link drops under the heading and
   return out;
 });
 await check("P3 .subhead: body size, 700, 1.4rem above and .3rem below, the first flush", () => expectAll([
-  ["#subheads .subhead:first-child", null, { "margin-top": "0px", "margin-bottom": "4.8px", "font-size": "12px", "font-weight": "700" }],
+  ["#subheads .subhead:first-child", null, { "margin-top": "0px", "margin-bottom": "4.8px", "font-size": { calc: "var(--fs-base)" }, "font-weight": "700" }],
   ["#subheads .subhead:nth-of-type(2)", null, { "margin-top": "22.4px", "margin-bottom": "4.8px" }],
 ]));
 
 /* ── P4 markdown and the lists ──────────────────────────────────────────────────────────────── */
 
 await check("P4 .markdown: 1.625, a .5rem rhythm, .75rem above a heading, headings --foreground", () => expectAll([
-  ["#md-article", null, { "line-height": { px: 19.5 }, "overflow-wrap": "break-word" }],
+  ["#md-article", null, { "line-height": { calc: "calc(var(--fs-base) * 1.625)" }, "overflow-wrap": "break-word" }],
   ["#md-article > p", null, { "margin-top": "8px", "margin-bottom": "0px" }],
-  ["#md-article > h1", null, { "font-size": "18px", "margin-top": "0px", color: { token: "--foreground" } }],
-  ["#md-article > h2", null, { "font-size": "18px", "font-weight": "700", "margin-top": "12px", "line-height": { px: 23.4 }, color: { token: "--foreground" } }],
-  ["#md-article > h3", null, { "font-size": "15px", "margin-top": "12px" }],
-  ["#md-article > h4", null, { "font-size": "12px", "margin-top": "12px" }],
+  ["#md-article > h1", null, { "font-size": { calc: "var(--fs-xl)" }, "margin-top": "0px", color: { token: "--foreground" } }],
+  ["#md-article > h2", null, { "font-size": { calc: "var(--fs-xl)" }, "font-weight": "700", "margin-top": "12px", "line-height": { calc: "calc(var(--fs-xl) * var(--lh-tight))" }, color: { token: "--foreground" } }],
+  ["#md-article > h3", null, { "font-size": { calc: "var(--fs-lg)" }, "margin-top": "12px" }],
+  ["#md-article > h4", null, { "font-size": { calc: "var(--fs-base)" }, "margin-top": "12px" }],
   ["#md-article strong", null, { color: { token: "--foreground" } }],
   ["#md-article > hr", null, { "margin-top": "16px", "margin-bottom": "16px" }],
 ]));
@@ -495,11 +497,11 @@ await check("P4 ul.dash: a drawn dash with no alt text, and a real hanging inden
 /* ── P5 code ────────────────────────────────────────────────────────────────────────────────── */
 
 const CODE_BOX = {
-  display: "block", "padding-top": "12px", "padding-left": "16px", "font-size": "12px", "line-height": "18px",
+  display: "block", "padding-top": "12px", "padding-left": "16px", "font-size": { calc: "var(--fs-base)" }, "line-height": { calc: "calc(var(--fs-base) * var(--lh-base))" },
   "white-space": "pre", "tab-size": "2", color: { token: "--foreground" },
   "background-color": { re: "." }, "border-top-width": "1px", "border-top-style": "solid", "margin-top": "0px",
 };
-await check("P5 .code-block: F5's pre look — --muted, --border, 12px/1.5, pre, tab 2", async () => {
+await check("P5 .code-block: F5's pre look — --muted, --border, --fs-base/--lh-base, pre, tab 2", async () => {
   const out = await expectAll([["#code-plain", null, CODE_BOX]]);
   const bg = await evaluate(`[getComputedStyle(__t.el("#code-plain")).backgroundColor, __t.surface("--muted"), getComputedStyle(__t.el("#code-plain")).borderTopColor, __t.probe("color", "var(--border)")]`);
   if (bg[0] !== bg[1]) out.push(`background ${bg[0]} is not --muted ${bg[1]}`);
@@ -1104,9 +1106,9 @@ await check("?bare: a .markdown link takes the --ring focus ring from a real Tab
 /* ── a phone ────────────────────────────────────────────────────────────────────────────────── */
 
 await load("?theme=warm", { width: 375, height: 812 });
-await check("375px: the display title steps down to 30px on a 36px line (1.2); the app title stays 24px", () => expectAll([
+await check("375px: the display title steps down to 30px on a 36px line (1.2); the app title stays --fs-2xl", () => expectAll([
   ["#p1-display .page-title", null, { "font-size": "30px", "line-height": { px: 36 } }],
-  ["#p1-app .page-title", null, { "font-size": "24px" }],
+  ["#p1-app .page-title", null, { "font-size": { calc: "var(--fs-2xl)" } }],
 ]));
 await check("375px: a boot line is one column, the value under its step", async () => {
   const out = await expectAll([["#boot .boot-line", null, { "grid-template-columns": { re: "^\\d+(\\.\\d+)?px$" } }]]);
@@ -1286,6 +1288,35 @@ await check("template: the crash variant is documented — alert, 'something bro
   for (const want of ['role="alert"', "something broke", 'class="page-title page-title--display"', 'class="btn-terminal btn-terminal--compact" data-reload', "{{ERROR_MESSAGE}}"]) {
     if (!block.includes(want)) out.push(`crash block lacks ${want}`);
   }
+  return out;
+});
+
+/* ── one title, said once ───────────────────────────────────────────────────────────────────────
+ * A section title is ONE element, `<h2 class="prompt">steps</h2>`. A `.prompt` followed by a
+ * heading with the same words ("$ cat steps.txt", then "Steps") says the title twice, in two sizes.
+ * The words are compared without "cat ", a folder, a file extension, case and punctuation. */
+const sayTwice = (html) => {
+  const words = (s) => s.replace(/<[^>]*>/g, "").trim().toLowerCase().replace(/^cat\s+/, "")
+    .replace(/^.*\//, "").replace(/\.[a-z0-9]+$/, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const re = /<(\w+)\b[^>]*\bclass="[^"]*\bprompt\b[^"]*"[^>]*>([\s\S]*?)<\/\1>\s*(?:<!--[\s\S]*?-->\s*)*<(h[1-4])\b[^>]*>([\s\S]*?)<\/\3>/g;
+  return [...html.matchAll(re)].filter((m) => words(m[2]) && words(m[2]) === words(m[4])).map((m) => words(m[2]));
+};
+await check("one title: no .prompt in templates/ or examples/ is followed by a heading that repeats its words", async () => {
+  const { readdirSync } = await import("node:fs");
+  const out = [];
+  for (const dir of ["templates", "examples"]) {
+    for (const f of readdirSync(join(root, dir)).filter((n) => n.endsWith(".html"))) {
+      for (const w of sayTwice(readFileSync(join(root, dir, f), "utf8"))) out.push(`${dir}/${f}: "$ ${w}" and a heading "${w}"`);
+    }
+  }
+  return out;
+});
+await check("...and it CAN fail: it names cat steps.txt + <h2>Steps</h2>, and passes a path over a different title", () => {
+  const out = [];
+  if (sayTwice(`<p class="prompt">cat steps.txt</p>\n<h2>Steps</h2>`).join() !== "steps") out.push("missed cat steps.txt + h2 Steps");
+  if (sayTwice(`<p class="prompt">cat notes/in-short.md</p><!-- x --><h3 class="x">In short</h3>`).join() !== "in short") out.push("missed a folder, a comment and a hyphen");
+  if (sayTwice(`<p class="prompt">cat {{FOLDER}}/README.md</p><h1 class="page-title">{{DOC_TITLE}}</h1>`).length) out.push("flagged a path over a different title");
+  if (sayTwice(`<h2 class="prompt">steps</h2><ol class="steps"><li>a</li></ol>`).length) out.push("flagged a single h2.prompt");
   return out;
 });
 

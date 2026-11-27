@@ -84,7 +84,7 @@
   background: transparent;
   border: 1px solid var(--control-edge);
   cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 .btn-icon:is([data-icon], [aria-busy="true"])::before {
   content: "";
@@ -670,7 +670,7 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
   max-inline-size: 14rem;
   min-block-size: var(--control-h);
   margin: 0;
-  padding: 0.3rem 0.5rem;
+  padding: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2) 0.5rem;
   font: inherit;
   font-family: var(--font-mono);
   font-size: var(--fs-base);
@@ -700,6 +700,10 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
    Every control above is sized for a pointer. On a touch screen each grows to WCAG's 44px target,
    and it grows by min-*, never by width or height, so the glyph or the label stays centred where it
    was drawn. A checkbox grows through its .check label, which is the target a thumb actually hits. */
+/* Pressed: 1px down while held, for a reader who allows motion (components.css says why). */
+@media (prefers-reduced-motion: no-preference) {
+  .btn-icon:active:not(:disabled, [aria-disabled="true"]) { transform: translateY(1px); }
+}
 @media (pointer: coarse) {
   .btn-icon { min-inline-size: 44px; min-block-size: 44px; }
   .switch,

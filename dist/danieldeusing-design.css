@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.64.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
+/*! danieldeusing-design v0.65.0 | MIT | https://github.com/danieldeusing/danieldeusing-design */
 /* ===== reset.css ===== */
 /*
  * danieldeusing-design — minimal reset.
@@ -127,6 +127,7 @@ table {
  */
 
 :root {
+  color-scheme: light;
   --background: #f5efe2;
   --foreground: #43352a;
   --card: #efe7d4;
@@ -152,7 +153,7 @@ table {
 
   --glow: rgba(160, 82, 45, 0.1);
   --glow-soft: rgba(160, 82, 45, 0.05);
-  --scanline-opacity: 0.15;
+  --scanline-opacity: 0.08;
 
   /* The per-theme inputs of the derived colours below (DERIVED COLOURS). */
   --cat-l: 0.45;           /* categorical text, worst over the whole hue circle: 5.57:1 */
@@ -166,6 +167,7 @@ table {
 
 /* CRT phosphor green */
 html[data-theme="green"] {
+  color-scheme: dark;
   --background: #020604;
   --foreground: #4fdd7d;
   --card: #04110a;
@@ -190,7 +192,7 @@ html[data-theme="green"] {
   --ring: #33ff66;
   --glow: rgba(51, 255, 102, 0.35);
   --glow-soft: rgba(51, 255, 102, 0.12);
-  --scanline-opacity: 0.5;
+  --scanline-opacity: 0.25;
   --cat-l: 0.74;           /* 7.65:1 worst */
   --cat-c: 0.12;
   --backdrop: rgb(0 0 0 / 0.6);   /* dims only: a dialog's fill 1.08:1 on it, its --control-edge 4.89:1 */
@@ -198,6 +200,7 @@ html[data-theme="green"] {
 
 /* white-phosphor terminal */
 html[data-theme="mono"] {
+  color-scheme: dark;
   --background: #050505;
   --foreground: #d4d4d4;
   --card: #0d0d0d;
@@ -222,7 +225,7 @@ html[data-theme="mono"] {
   --ring: #ffffff;
   --glow: rgba(255, 255, 255, 0.25);
   --glow-soft: rgba(255, 255, 255, 0.08);
-  --scanline-opacity: 0.45;
+  --scanline-opacity: 0.22;
   --cat-l: 0.74;           /* 7.71:1 worst */
   --cat-c: 0.12;
   --backdrop: rgb(0 0 0 / 0.6);   /* dims only: a dialog's fill 1.07:1 on it, its --control-edge 5.55:1 */
@@ -230,6 +233,7 @@ html[data-theme="mono"] {
 
 /* black-on-white terminal (e-ink / printout) */
 html[data-theme="paper"] {
+  color-scheme: light;
   --background: #fafafa;
   --foreground: #1f1f1f;
   --card: #f1f1f1;
@@ -254,10 +258,21 @@ html[data-theme="paper"] {
   --ring: #000000;
   --glow: rgba(0, 0, 0, 0.06);
   --glow-soft: rgba(0, 0, 0, 0.04);
-  --scanline-opacity: 0.12;
+  --scanline-opacity: 0.06;
   --cat-l: 0.45;           /* 6.18:1 worst */
   --cat-c: 0.075;
   --backdrop: rgb(0 0 0 / 0.5);   /* a --card dialog on the dimmed page: 3.64:1 by its fill */
+}
+
+/* INCREASE CONTRAST. A reader who asks the OS for more contrast gets muted text near the foreground
+   (the HIG asks for 7:1 on small text there; the muted values above clear 4.5:1) and a border as firm
+   as a control's edge. After the four theme blocks, so it wins on source order at equal weight. */
+@media (prefers-contrast: more) {
+  :root,
+  html[data-theme] {
+    --muted-foreground: color-mix(in srgb, var(--foreground) 85%, var(--background));
+    --border: var(--control-edge);
+  }
 }
 
 /*
@@ -376,9 +391,10 @@ html[data-theme="paper"] {
      `--muted-foreground` is for — never an opacity step, which is an alpha nobody measured
      (utilities.css). Colour and weight separate a label from its value far better than one pixel
      ever did, and they keep working at any zoom. */
-  --fs-base: 0.75rem;   /* 12px — ALL normal text: body, tables, labels, badges, notes, controls */
-  --fs-lg: 0.9375rem;   /* 15px — h3 / section heads */
-  --fs-xl: 1.125rem;    /* 18px — h2, a dialog title, a stat value */
+  --fs-base: 0.8125rem; /* 13px — ALL normal text: body, tables, labels, badges, notes, controls.
+                           The macOS Body size: 12px sat below every platform's default. */
+  --fs-lg: 1rem;        /* 16px — h3, a card title, a section head */
+  --fs-xl: 1.25rem;     /* 20px — h2, a dialog title */
 
   /* ── VERTICAL RHYTHM BETWEEN SECTIONS ──────────────────────────────────────
      The reset zeroes every margin (`* { margin: 0 }`) and nothing here ever put
@@ -391,11 +407,12 @@ html[data-theme="paper"] {
 
      2.5rem is cockpit's existing value, promoted rather than invented, so the
      surface that already had a considered answer does not move. */
-  --space-section: 2.5rem;
-  --fs-2xl: 1.5rem;     /* 24px — h1 and .page-title: an app page's title */
+  --space-section: 3.5rem; /* 56px: a new part of the page reads as one by space alone */
+  --fs-2xl: 1.625rem;   /* 26px — h1, .page-title and a stat value */
 
   --lh-tight: 1.3;      /* headings and single-line chrome */
-  --lh-base: 1.5;       /* body copy; matches base.css */
+  --lh-base: 1.6;       /* body copy; matches base.css */
+  --measure: 72ch;      /* the longest line of running prose: 50–75 characters read best */
 
   /* The label column of a .field-row. DECLARED here, not merely read with a fallback in
      components.css — that is the difference between a token and a phantom. A consumer that
@@ -455,7 +472,8 @@ html[data-theme="paper"] {
  */
 :root {
   --control-h: 1.75rem;   /* 28px — every single-line control */
-  --card-pad: 0.75rem;    /* 12px */
+  --card-pad: 1rem;       /* 16px — the inset of every card */
+  --card-gap: 1.25rem;    /* 20px — between cards and between stat tiles */
   --icon-sm: 0.75rem;     /* 12px — beside a label, in a tag, a clear button */
   --icon-size: 0.875rem;  /* 14px — the default glyph */
   --icon-lg: 1rem;        /* 16px */
@@ -952,8 +970,11 @@ html.anim-off .cursor-block {
  * tokens.css (load that first). Plain CSS — no Tailwind required.
  */
 
-html {
-  scroll-behavior: smooth;
+/* Smooth scroll only for a reader who allows motion: a jump that glides is motion (Reduce Motion). */
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.anim-off) {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Default any element's border to the themed colour, so a bare `border-width`
@@ -977,7 +998,6 @@ body {
   font-family: var(--font-mono);
   font-size: var(--fs-base);
   line-height: var(--lh-base);
-  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -1027,7 +1047,7 @@ td {
 thead th {
   border-block-end-color: var(--border);
   color: var(--muted-foreground);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* The last row's rule would otherwise draw a line across the bottom of the table with
@@ -1050,13 +1070,16 @@ summary,
 }
 
 
-/* CRT scanlines: a fixed, non-interactive overlay above the page. Intensity is
+/* CRT scanlines: a fixed, non-interactive texture BEHIND the page's surfaces. A texture never
+   crosses text: on the canvas it shows, and every card, table and control covers it. z-index -1
+   puts it under body's content and over the canvas, which shows body's background because html
+   paints none. A surface that paints `html { background }` hides the texture. Intensity is
    per-theme via --scanline-opacity. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: -1;
   pointer-events: none;
   background: repeating-linear-gradient(
     0deg,
@@ -1066,6 +1089,12 @@ body::after {
     transparent 3px
   );
   opacity: var(--scanline-opacity);
+}
+/* Increase Contrast and forced colours: no texture at all. */
+@media (prefers-contrast: more), (forced-colors: active) {
+  body::after {
+    display: none;
+  }
 }
 
 ::selection {
@@ -1363,7 +1392,9 @@ pre { line-height: var(--lh-base); }
   gap: 0.5rem 0.75rem;
   margin: 0.35rem 0;
 }
-.field-row > .lbl { color: var(--muted-foreground); font-size: var(--fs-base); text-align: left; }
+/* The label names the field, so it reads in the foreground at 600; the description and the meta
+   under the control stay muted. */
+.field-row > .lbl { color: var(--foreground); font-size: var(--fs-base); font-weight: 600; text-align: left; }
 /* The value cell: controls sit on one row and wrap together, rather than each finding its own. */
 .field-row > .field-val {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; min-width: 0;
@@ -1395,6 +1426,37 @@ pre { line-height: var(--lh-base); }
 .field-error { flex-basis: 100%; margin: 0; }
 .field-desc { color: var(--muted-foreground); }
 .field-error { color: var(--destructive); }
+/* THE ERROR NAMES ITSELF, and so does its field. The error line leads with the system's fail glyph,
+   so it reads as an error without its colour; empty alternative text, because the sentence says it.
+   `data-invalid` on the row turns its label --destructive too, so the eye finds the field from the
+   label column; `aria-invalid` on the control still marks the control (below). `data-disabled` dims
+   the label with its control. */
+.field-error::before { content: "\2717  "; content: "\2717  " / ""; font-weight: 700; } /* not-text: the fail glyph */
+.field-row[data-invalid] > .lbl { color: var(--destructive); }
+.field-row[data-disabled] > .lbl { opacity: 0.45; }
+/* REQUIRED IS NOT AN ERROR. A row whose control carries `required` or `aria-required` gets a muted
+   `*` after its label, drawn from the attribute, so the mark and the validation cannot disagree.
+   Muted, never --destructive: red already means "this is wrong". */
+.field-row:has(:required, [aria-required="true"]) > .lbl::after { content: " *"; content: " *" / ""; color: var(--muted-foreground); font-weight: 400; }
+
+/* A GROUP OF CHECKBOXES, RADIOS OR SWITCHES is a fieldset, so a screen reader names the group with
+   its legend. `.field-set` takes the browser's box away and stacks the legend over its options,
+   the description under the legend when there is one. */
+.field-set {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-inline-size: 0;
+  margin: 0.35rem 0;
+  padding: 0;
+  border: 0;
+}
+.field-set > legend {
+  margin-block-end: 0.15rem;
+  padding: 0;
+  font-weight: 600;
+  color: var(--foreground);
+}
 
 /* A LABEL THAT EXPLAINS ITSELF ON TOUCH. Cockpit's config panel carries a paragraph behind each
    label, and on a phone there is no hover to read it by — so the label is a <button> that opens
@@ -1406,7 +1468,8 @@ pre { line-height: var(--lh-base); }
   padding: 0;
   font: inherit;
   font-size: var(--fs-base);
-  color: var(--muted-foreground);
+  font-weight: 600;
+  color: var(--foreground);
   text-align: start;
   background: none;
   border: 0;
@@ -1430,10 +1493,19 @@ pre { line-height: var(--lh-base); }
 /* ─────────────────────────────────────────────────────────────────────────
    Shell affordances — `$ command` section headers and `# comment` lines.
    ───────────────────────────────────────────────────────────────────────── */
+/* On a paragraph or a span, a `$ command` line: the body size, bold, muted. On a heading it IS the
+   section's title: the heading element's own step and the foreground, with the `$` in --primary.
+   The body size sits in :where() at zero weight, so h1–h3 keep their step; a small `$` line above a
+   heading that repeats its words is the pattern this replaces. */
 .prompt {
-  font-size: var(--fs-base);
   font-weight: 700;
   color: var(--muted-foreground);
+}
+:where(.prompt) {
+  font-size: var(--fs-base);
+}
+:is(h1, h2, h3, h4).prompt {
+  color: var(--foreground);
 }
 .prompt::before {
   content: "$ ";
@@ -1729,6 +1801,11 @@ pre { line-height: var(--lh-base); }
    that should be a coin toss under a thumb. `min-*`, never width/height, so the glyph stays centred
    by the flexbox. Last in the family on purpose: it has to outrank `--compact`'s 28px floor, and
    the two are equal in specificity. */
+/* PRESSED. A button moves 1px down while it is held, so the press is felt before the result
+   arrives. Only for a reader who allows motion: a moving button is motion (Reduce Motion). */
+@media (prefers-reduced-motion: no-preference) {
+  .btn-terminal:active:not(:disabled, [aria-disabled="true"]) { transform: translateY(1px); }
+}
 @media (pointer: coarse) {
   .btn-terminal { min-block-size: 44px; }
   .btn-terminal--destructive,
@@ -2663,6 +2740,16 @@ details.fold--boxed > summary { padding-block: 0.5rem; }
 
 @media (pointer: coarse) {
   details.fold > summary { min-block-size: 44px; }
+}
+
+/* 44px FIELDS ON A TOUCH SCREEN, like every button: a 28px text field or select is a hard target
+   for a thumb. `min-block-size`, so the text stays centred; after the select's own rules, which it
+   has to outrank at equal weight. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"]),
+  textarea,
+  select,
+  .select-trigger { min-block-size: 44px; }
 }
 
 /* ── legend: one rendering of each state, beside the thing it keys ─────────────────────────────
@@ -3983,15 +4070,15 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
      picker and its links on a phone altogether. Now a page with no `.mobile-footer` keeps the
      fixed footer, wrapped to two rows (above). */
   body:has(.site-nav .mobile-footer) footer.status { display: none; }
-  .status-left { flex: 1 1 100%; }
+  .status-left { flex: 1 1 100%; line-height: var(--lh-tight); }
   /* The controls take the second row, and a control that does not fit wraps rather than running
      off the edge: a clipped control cannot be reached at all, which is worse than a footer one row
      taller than --status-h. Measured at 375px: a link, the theme menu and the anim toggle fit one
      row with room to spare; add the language menu and it takes a third row, which the measured
      --status-reserve clears (the 3.25rem alone did not). */
-  .status-right { flex: 1 1 100%; flex-wrap: wrap; row-gap: 0.25rem; }
-  /* …and the room the body reserves follows the footer's real height: two rows (18px of path,
-     .25rem of gap, the 28px control row and the rule — 51px, inside 3.25rem), or nothing at all
+  .status-right { flex: 1 1 100%; flex-wrap: wrap; row-gap: 0.25rem; column-gap: 0.75rem; }
+  /* …and the room the body reserves follows the footer's real height: two rows (the path at
+     --lh-tight, 16.9px, .25rem of gap, the 28px control row and the rule — about 50px, inside 3.25rem), or nothing at all
      where it folded away.
 
      `!important` IS LOAD-BEARING HERE, and only here. --status-h is declared in tokens.css, which
@@ -4346,7 +4433,7 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
   background: transparent;
   border: 1px solid var(--control-edge);
   cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 .btn-icon:is([data-icon], [aria-busy="true"])::before {
   content: "";
@@ -4932,7 +5019,7 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
   max-inline-size: 14rem;
   min-block-size: var(--control-h);
   margin: 0;
-  padding: 0.3rem 0.5rem;
+  padding: calc((var(--control-h) - var(--fs-base) * var(--lh-tight) - 2px) / 2) 0.5rem;
   font: inherit;
   font-family: var(--font-mono);
   font-size: var(--fs-base);
@@ -4962,6 +5049,10 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
    Every control above is sized for a pointer. On a touch screen each grows to WCAG's 44px target,
    and it grows by min-*, never by width or height, so the glyph or the label stays centred where it
    was drawn. A checkbox grows through its .check label, which is the target a thumb actually hits. */
+/* Pressed: 1px down while held, for a reader who allows motion (components.css says why). */
+@media (prefers-reduced-motion: no-preference) {
+  .btn-icon:active:not(:disabled, [aria-disabled="true"]) { transform: translateY(1px); }
+}
 @media (pointer: coarse) {
   .btn-icon { min-inline-size: 44px; min-block-size: 44px; }
   .switch,
@@ -5200,6 +5291,16 @@ input:is([type="checkbox"], [type="radio"]):disabled { opacity: 0.45; cursor: de
   mask: var(--ico) center / contain no-repeat;
 }
 
+/* A STATE TAG CARRIES ITS GLYPH. The tone's colour alone fails a reader who cannot tell the hues
+   apart, so a toned tag leads with feedback.css's .state glyph for the same meaning: ✓ success,
+   ✗ destructive, ● warning and info, ○ pending. Empty alternative text: the word already says it.
+   Not on a tag that draws its own ::before (an icon, the brackets, an icon-only tag) and not on an
+   off tag, whose dotted edge says "off" whatever its tone. */
+.tag[data-tone]:not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { font-weight: 700; } /* not-text: a state glyph */
+.tag[data-tone="success"]:not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { content: "\2713"; content: "\2713" / ""; }
+.tag[data-tone="destructive"]:not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { content: "\2717"; content: "\2717" / ""; }
+.tag:is([data-tone="warning"], [data-tone="info"]):not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { content: "\25CF"; content: "\25CF" / ""; }
+.tag[data-tone="pending"]:not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { content: "\25CB"; content: "\25CB" / ""; }
 /* THE AXES A READER USES IN GREY (D10). Cockpit's execution pages read state by border style as
    much as by colour, and each style means ONE thing:
      --dashed   it does not count: not the proof, skipped, superseded, not actionable
@@ -5390,7 +5491,7 @@ button.tag:disabled { opacity: 0.45; cursor: default; }
    element here that carries no `data-tone` of its own resets `--tone` to the guaranteed-invalid
    value, and its `var(--tone, …)` falls back to its own default. The attribute on the element is
    the only thing that colours it — which is also the only thing a reader of the markup can see. */
-:is(.empty, .notice, .callout, .banner, .dot):not([data-tone]) { --tone: initial; }
+:is(.empty, .notice, .callout, .banner, .dot, .toast):not([data-tone]) { --tone: initial; }
 
 /* ── EMPTY: a list with nothing in it says WHICH nothing ──────────────────────────────── (S1)
    Three states look identical as a blank panel and are three different facts. The estate rendered
@@ -5448,7 +5549,7 @@ button.tag:disabled { opacity: 0.45; cursor: default; }
 .empty--inline[data-icon]::before {
   position: absolute;
   inset-inline-start: 0;
-  inset-block-start: calc(0.75rem + (1lh - var(--icon-size)) / 2);
+  inset-block-start: calc(0.75rem + (var(--lh-base) * var(--fs-base) - var(--icon-size)) / 2);
   inline-size: var(--icon-size);
   block-size: var(--icon-size);
 }
@@ -5566,7 +5667,7 @@ button.tag:disabled { opacity: 0.45; cursor: default; }
   content: "";
   position: absolute;
   inset-inline-start: 0.625rem;
-  inset-block-start: calc(0.25rem + (1lh - var(--icon-size)) / 2);
+  inset-block-start: calc(0.25rem + (var(--lh-base) * var(--fs-base) - var(--icon-size)) / 2);
   inline-size: var(--icon-size);
   block-size: var(--icon-size);
   background: var(--tone, var(--primary));
@@ -5690,6 +5791,72 @@ p.state { display: flex; white-space: normal; }
   color: var(--muted-foreground);
 }
 
+/* ── SKELETON: the shape of what is coming ────────────────────────────────────────────── (S10)
+   <div class="skeleton" role="status" aria-label="loading runs"><span></span><span></span><span></span></div>
+
+   Content whose shape is known (a list, a card, a table body) shows grey lines where its text will
+   be, so the page has its layout at once and does not jump when the data arrives. The spinner stays
+   for work without a shape: a busy button, a whole-page load. Each `<span>` is one line, and the
+   widths repeat 92 / 70 / 84% so the block reads as text, not as a bar chart.
+
+   The fill is the foreground at 12% over whatever surface it lands on: --muted on --card was
+   invisible on two themes. It pulses with dd-pulse; reduced motion and html.anim-off hold it still,
+   and a still skeleton still says "loading". The words are the `aria-label`. */
+.skeleton {
+  display: grid;
+  gap: 0.6rem;
+  padding-block: 0.25rem;
+}
+.skeleton > span {
+  display: block;
+  block-size: 0.8rem;
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
+  animation: dd-pulse 1.6s ease-in-out infinite;
+}
+.skeleton > span:nth-child(3n + 1) { inline-size: 92%; }
+.skeleton > span:nth-child(3n + 2) { inline-size: 70%; }
+.skeleton > span:nth-child(3n) { inline-size: 84%; }
+
+/* ── TOAST: what just happened, and the way back ────────────────────────────────────────── (S11)
+   <div class="toast" data-tone="success"><span class="toast-text">saved runner settings.</span>
+     <button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact">undo save</button>
+     <button type="button" class="btn-icon btn-icon--bare btn-icon--sm" data-icon="x" aria-label="close"></button></div>
+
+   The result of an action the reader just took, with its undo. runtime/toast.js builds it inside a
+   `role="status"` region, so a screen reader hears the sentence. IT DOES NOT LEAVE ON A TIMER: a
+   message that vanishes after six seconds is gone for a slow reader, and its undo with it. It stays
+   until the reader closes it, undoes, or the next toast replaces it.
+
+   Above footer.status, centred, on the popover surface with the float elevation. The tone colours
+   the start edge, and the words lead with the .state glyph of the same tone, so the edge is never
+   the only signal. */
+.toast {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: calc(var(--status-h) + 1rem);
+  z-index: 55; /* over footer.status (50), under an open select panel (60) */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  inline-size: max-content;
+  max-inline-size: calc(100vw - 2rem);
+  margin-inline: auto;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 1px solid var(--control-edge);
+  border-inline-start: 3px solid var(--tone, var(--primary));
+  box-shadow: var(--elev-float);
+}
+.toast-text { margin: 0 0.5rem 0 0; }
+.toast[data-tone] > .toast-text::before { font-weight: 700; color: var(--tone); } /* not-text: a state glyph */
+.toast[data-tone="success"] > .toast-text::before { content: "\2713  "; content: "\2713  " / ""; }
+.toast[data-tone="destructive"] > .toast-text::before { content: "\2717  "; content: "\2717  " / ""; }
+.toast:is([data-tone="warning"], [data-tone="info"]) > .toast-text::before { content: "\25CF  "; content: "\25CF  " / ""; }
+
 /* ── FENCE: text a stranger wrote ───────────────────────────────────────────────────────── (S7)
    A pull-request description, a ticket body, a commit message — bytes a third party chose, shown
    inside a page that also shows the reader's own words. Summarising while reading is where an
@@ -5776,7 +5943,8 @@ p.state { display: flex; white-space: normal; }
 
 @media (prefers-reduced-motion: reduce) {
   .spinner,
-  .dot--pulse { animation: none; }
+  .dot--pulse,
+  .skeleton > span { animation: none; }
 }
 
 /* ── FORCED COLOURS ─────────────────────────────────────────────────────────────────────────────
@@ -5796,7 +5964,8 @@ p.state { display: flex; white-space: normal; }
   .notice--lg[data-icon]::before,
   .callout[data-icon]::before,
   .spinner,
-  .dot {
+  .dot,
+  .skeleton > span {
     forced-color-adjust: preserve-parent-color;
     background: currentColor;
   }
@@ -5806,7 +5975,8 @@ p.state { display: flex; white-space: normal; }
     .notice--lg[data-icon]::before,
     .callout[data-icon]::before,
     .spinner,
-    .dot { background: CanvasText; }
+    .dot,
+    .skeleton > span { background: CanvasText; }
   }
 }
 
@@ -5815,7 +5985,9 @@ p.state { display: flex; white-space: normal; }
   .notice > .notice-dismiss { display: none; }
   .fence { break-inside: avoid; }
   .spinner,
-  .dot--pulse { animation: none; }
+  .dot--pulse,
+  .skeleton > span { animation: none; }
+  .toast { display: none; }
   /* A dot IS its fill, and print drops background colours by default — it would print as nothing. */
   .dot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
@@ -7562,16 +7734,17 @@ html:not([data-theme]):has(meta[name="dd-baked"]) [role="tabpanel"][hidden]:not(
   gap: 0.5rem;
 }
 .card-head > :is(.ico, .btn-icon) { align-self: center; }
-/* 500, not bold: the title is the name of the thing, and in a grid of forty cards forty bold titles
-   are a wall. seedr and configr both settled on medium weight at the body size.
+/* The card's heading: the --fs-lg step at 600 (Semibold), so the title reads as a title and the
+   description under it as the text it names. 600, not bold: in a grid of forty cards, forty bold
+   titles are a wall.
    The LEADING is stated, here and on .panel-title and .entry-title: 0.60.0's base.css gives h1–h3
    --lh-tight at zero specificity, so without it a title led 1.3 in the full bundle and 1.5 with
    tokens.css alone (measured against WP1's base.css: every card 2.4px taller alone) — and a title
    on a <p> or a <div> would lead differently from the same title on an <h3>. */
 .card-title {
   margin: 0;
-  font-size: var(--fs-base);
-  font-weight: 500;
+  font-size: var(--fs-lg);
+  font-weight: 600;
   line-height: var(--lh-tight);
   color: var(--foreground);
 }
@@ -7684,14 +7857,14 @@ html:not([data-theme]):has(meta[name="dd-baked"]) [role="tabpanel"][hidden]:not(
 
 /* ── K3 · CARD GRID ──────────────────────────────────────────────────────────────────────────────
    As many columns of at least 16rem as fit, and one column on a phone — `min(…, 100%)` stops a
-   16rem track from overflowing a narrower screen. The gap is 1rem, seedr's and danieldeusing.de's
-   (configr used 8px); `--card-min` and `--card-gap` are the two knobs. `auto-fill`, not `auto-fit`:
+   16rem track from overflowing a narrower screen. The gap is `--card-gap` (tokens.css, 20px);
+   `--card-min` and `--card-gap` are the two knobs. `auto-fill`, not `auto-fit`:
    a row of two cards keeps card-sized cards instead of stretching them across the page. The list
    reset lets the grid be the <ul> a list of cards semantically is. */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min, 16rem), 100%), 1fr));
-  gap: var(--card-gap, 1rem);
+  gap: var(--card-gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -7721,7 +7894,7 @@ html:not([data-theme]):has(meta[name="dd-baked"]) [role="tabpanel"][hidden]:not(
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(var(--stat-min, 11rem), 100%), 1fr));
-  gap: 0.75rem;
+  gap: var(--card-gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -7761,7 +7934,7 @@ html:not([data-theme]):has(meta[name="dd-baked"]) [role="tabpanel"][hidden]:not(
   color: var(--tone, var(--muted-foreground));
 }
 .stat-value {
-  font-size: var(--fs-xl);
+  font-size: var(--fs-2xl);
   font-weight: 700;
   line-height: var(--lh-tight);
   font-variant-numeric: tabular-nums;
@@ -7800,6 +7973,17 @@ html:not([data-theme]):has(meta[name="dd-baked"]) [role="tabpanel"][hidden]:not(
 .stat-tile[data-state="unknown"] .stat-value {
   color: var(--muted-foreground);
 }
+/* THE STATE IS NEVER COLOUR ALONE. The label leads with feedback.css's .state glyph for the same
+   state, in the state's colour: a reader who cannot tell the edge colours apart still reads ✓, ●, ✗
+   or ○. Empty alternative text: the label and the value already say it in words. */
+.stat-tile[data-state] .stat-label::before {
+  margin-inline-end: 0.4em;
+  font-weight: 700; /* not-text: a state glyph */
+}
+.stat-tile[data-state="idle"] .stat-label::before { content: "\2713"; content: "\2713" / ""; color: var(--success); }
+.stat-tile[data-state="action"] .stat-label::before { content: "\25CF"; content: "\25CF" / ""; color: var(--warning); }
+.stat-tile[data-state="broken"] .stat-label::before { content: "\2717"; content: "\2717" / ""; color: var(--destructive); }
+.stat-tile[data-state="unknown"] .stat-label::before { content: "\25CB"; content: "\25CB" / ""; color: var(--muted-foreground); }
 /* A tile that is a link takes K1's hover — --primary edge, --secondary fill — except on the state
    edge, which stays the state (see the file header). */
 a.stat-tile {
@@ -8180,13 +8364,18 @@ a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   color: var(--primary);
   font-weight: 700;
 }
-/* No font-size: the element decides (an h2 is --fs-xl, a p the body size). */
+/* The element decides the size (an h2 is --fs-xl, a p the body size). The heading steps are written
+   here too, at the class's own specificity: with tokens.css alone an h2 would take the browser's
+   1.5em, which matched --fs-xl only while the body was 12px. */
 .entry-title {
   margin: 0;
   color: var(--primary);
   font-weight: 700;
   line-height: var(--lh-tight);
 }
+:where(h1).entry-title { font-size: var(--fs-2xl); }
+:where(h2).entry-title { font-size: var(--fs-xl); }
+:where(h3).entry-title { font-size: var(--fs-lg); }
 .entry-title a {
   color: inherit;
   text-decoration: none;
@@ -9176,6 +9365,68 @@ dialog.dialog.dialog--drawer {
   border-width: 0 0 0 1px;
 }
 
+/* ── .cmdk — THE COMMAND PALETTE: every page and action behind one key ──────────────────────────────
+   initCommandPalette() (runtime/command.js) builds it; this draws it. A dialog.dialog with a search
+   field on top, the results in named groups (recent first, before anything is typed), and the keys
+   in the foot. ⌘K opens it on Apple platforms and Ctrl K elsewhere, never while the reader types in
+   a text field. A command that cannot be undone asks a second ↵ and shows the question in
+   --warning on its own row. The field is a control, so it keeps --control-h; the close button is
+   there for touch, which has no Escape. */
+dialog.dialog.cmdk {
+  inline-size: min(36rem, calc(100vw - 2rem));
+  margin-block-start: 15vh;
+}
+.cmdk-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  padding: 0.5rem;
+  border-block-end: 1px solid var(--border);
+}
+.cmdk-input {
+  flex: 1;
+  min-inline-size: 0;
+}
+.cmdk-list {
+  flex: 1;
+  min-block-size: 0;
+  max-block-size: 20rem;
+  margin: 0;
+  padding: 0.4rem;
+  overflow: auto;
+}
+.cmdk-group-label {
+  margin: 0.4rem 0.6rem 0.2rem;
+  color: var(--muted-foreground);
+}
+.cmdk-item {
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+}
+.cmdk-item[aria-selected="true"] {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.cmdk-item[data-armed] { color: var(--warning); }
+.cmdk-empty {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  color: var(--muted-foreground);
+}
+.cmdk-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  flex: none;
+  padding: 0.5rem 1rem;
+  color: var(--muted-foreground);
+  border-block-start: 1px solid var(--border);
+}
+@media (forced-colors: active) {
+  .cmdk-item[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+}
+
 /* ── .context-menu — the box of a menu opened at the pointer ──────────────────────────────────────
    The rows are the one popup look (`.select-panel` + `.dropdown-item`, components.css); this is
    only what a menu with no trigger needs on top: it is placed at a point, so it is fixed and above
@@ -9476,8 +9727,13 @@ dialog.dgm-overlay::backdrop {
 
 /* ── PAGE TITLE AND LEDE (P1) ─────────────────────────────────────────────────────────────────
    <p class="prompt">cat ~/about.txt</p>
-   <h1 class="page-title">about<span class="cursor-block" aria-hidden="true"></span></h1>
+   <h1 class="page-title">who builds this<span class="cursor-block" aria-hidden="true"></span></h1>
    <p class="lede">…</p>
+
+   THE PROMPT IS WHERE, THE TITLE IS WHAT. The path line is data (the file, the route), so the title
+   never repeats its last word: "$ cat ~/about.txt" over "about" says one thing twice in two sizes.
+   A section title is one element, `<h2 class="prompt">steps</h2>`; check-content refuses a
+   `.prompt` followed by a heading with the same words.
 
    ONE TITLE, LIT. seedr and danieldeusing.de draw the page title in --primary with the large glow;
    cockpit's `h1.title` was unlit and configr's was --foreground. The lit one wins because it is the
@@ -9532,6 +9788,13 @@ dialog.dgm-overlay::backdrop {
 .lede {
   margin: 0;
   color: var(--muted-foreground);
+}
+/* RUNNING PROSE STOPS AT --measure (72ch). A line of 13px monospace across a 90rem column is about
+   180 characters, and the eye loses the next line on the way back. Tables, code and cards keep the
+   column's full width; only paragraphs of reading text are capped. Zero weight, so a component that
+   sizes its own text wins. */
+:where(.lede, .markdown p, section.doc .body > p) {
+  max-inline-size: var(--measure);
 }
 .page-title + .lede {
   margin-block-start: 0.5rem;

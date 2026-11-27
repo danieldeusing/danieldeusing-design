@@ -31,7 +31,9 @@ Contents:
 |---|---|---|
 | `--control-h` | 1.75rem · 28px | every single-line control — input, select and filter trigger, search field, compact button, icon button, segmented option — as `min-block-size` |
 | `--control-edge` | `--foreground` at 60% | the border of every FIELD — input, textarea, select and filter trigger, search field, bordered icon button — and of every popup and dialog |
-| `--card-pad` | 0.75rem · 12px | the inset of `.card-terminal` and anything card-shaped |
+| `--card-pad` | 1rem · 16px | the inset of `.card-terminal` and anything card-shaped |
+| `--card-gap` | 1.25rem · 20px | between cards in a `.card-grid` and between stat tiles |
+| `--measure` | 72ch | the longest line of running prose: `.lede`, `.markdown p`, a doc section's paragraph |
 | `--icon-sm` · `--icon-size` · `--icon-lg` · `--icon-xl` | 12 · 14 · 16 · 24px | beside a label, in a tag, a clear button · the default inside a control · a larger control · an empty state, a page-level load |
 | `--dot-size` | 0.5rem · 8px | the status dot |
 | `--status-h` | 2rem · 32px | `footer.status`, so a page can reserve exactly that much room above it |
@@ -43,9 +45,9 @@ the system offered no height at all, so a compact button sat a few pixels short 
 beside it and every surface squared the row up by hand.
 
 - **`min-block-size`, never `height`.** A coarse pointer grows every control to 44px, and a label
-  that wraps must be able to grow its box. Mind the arithmetic inside it: 12px text at the body
-  line height (1.5) is an 18px line, and a 1px edge top and bottom leaves **8px of block padding**
-  in 28px. A text field with `padding-block: .3rem` measures 29.6px, taller than the button beside
+  that wraps must be able to grow its box. Mind the arithmetic inside it: 13px text at the body
+  line height (1.6) is a 20.8px line, and a 1px edge top and bottom leaves **5.2px of block padding**
+  in 28px. A text field with `padding-block: .3rem` measures 32.4px, taller than the button beside
   it.
 - **The field edge is not `--border`.** `--border` is a divider, quiet on purpose so a table does
   not read as a spreadsheet, and it measures 1.23–2.00:1 — under the 3:1 WCAG 1.4.11 asks of a
@@ -77,10 +79,10 @@ The type scale, whole, as the skill states it plus the one step this release add
 
 | token | size | for |
 |---|---|---|
-| `--fs-base` | 12px | ALL text a person reads: body, tables, labels, controls, code |
-| `--fs-lg` | 15px | h3, a section head |
-| `--fs-xl` | 18px | h2 |
-| `--fs-2xl` | 24px | h1 — an app page's title |
+| `--fs-base` | 13px | ALL text a person reads: body, tables, labels, controls, code |
+| `--fs-lg` | 16px | h3, a card title, a section head |
+| `--fs-xl` | 20px | h2, a dialog title |
+| `--fs-2xl` | 26px | h1 — an app page's title, a stat value |
 | `--fs-display` | **30px, 36px from 40rem** | a public-site page title (`.page-title--display`, content.css) and an error page's status code — only |
 
 **Why it exists (the lead, 2026-09-28).** danieldeusing.de is a source of truth, and it titles its
@@ -97,7 +99,7 @@ glance among controls and stays `--fs-2xl`.
   `.page-title--display`; an error page's code is the error-page template's. A bare `<h1>` stays
   `--fs-2xl` — the element default does not change, so no app title grows by accident.
 - **Not a text size.** No paragraph, label, heading inside a page, button or stat takes it. A figure
-  that must stand out is a stat tile's value at `--fs-xl`, not a display number.
+  that must stand out is a stat tile's value at `--fs-2xl`, not a display number.
 - **Tailwind:** `text-fs-display`. It sets the SIZE only: the line height stays the heading's
   (`--lh-tight`, 1.3), where `text-3xl` brought its own 1.2. Measured by
   `scripts/check-foundations.mjs` at 375, 639, 640 and 1440px wide.
@@ -188,7 +190,7 @@ did not change):
 | `outline-none` | dead — the system ring showed as well as your own | wins: **the element's focus indicator is now yours** |
 | `hidden` (or `md:flex`) on a class that sets `display` | the class won; the element stayed visible | the utility wins |
 | `leading-*`, `text-*`, `m*-*` on a styled element (`body`, `th`/`td`, a heading) | the element rule won | the utility wins |
-| a bare `<h1>`–`<h3>` | Preflight's reset: 12px, weight 400 | the heading steps (the defaults below) |
+| a bare `<h1>`–`<h3>` | Preflight's reset: the body size, weight 400 | the heading steps (the defaults below) |
 | `rounded-xs`, `rounded-2xl`, `-3xl`, `-4xl` | Tailwind's 2px…32px | square (`rounded-full` stays round: a true circle) |
 | your own unlayered CSS (Astro-scoped styles, rules outside `@layer`) | specificity decided | yours wins |
 | the tokens, `html.anim-off`, `data-tone`; print | — | unchanged: unlayered |
@@ -505,3 +507,16 @@ pencil were masks before any of this existed. The class and `data-icon` layer th
   attributes single-quoted, and **no attribute twice** — a duplicate makes the SVG invalid and the
   mask paints nothing, silently. `scripts/check-foundations.mjs` decodes every token and fails on
   one that does not paint.
+
+## Access: contrast, the scanlines, light and dark
+
+- **Increase Contrast** (`prefers-contrast: more`) lifts `--muted-foreground` to 85 % of the way to
+  `--foreground` and draws `--border` at `--control-edge`, on all four themes.
+- **The scanlines sit behind the surfaces** (`body::after`, `z-index: -1`), at about half the old
+  strength, so they never cross a card's text. Increase Contrast and forced colours remove them.
+- **`color-scheme`** is `light` on warm and paper and `dark` on green and mono, so a native control
+  (a scrollbar, a date picker) matches the theme.
+- **Touch.** Under a coarse pointer a text field, a textarea and a select are at least 44px high.
+- **Motion.** Smooth scrolling and a pressed button's 1px move happen only when the reader allows
+  motion; a colour fade stays.
+

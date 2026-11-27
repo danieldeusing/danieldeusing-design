@@ -110,8 +110,10 @@ const small = await textAt(360);
 await check("the SVG is drawn at the plot's measured size, with NO viewBox to scale it",
   () => wide.viewBox === null && wide.svgW === wide.plotW && wide.svgH === wide.plotH && small.svgW === small.plotW && small.plotW === 360,
   JSON.stringify({ wide, small }));
-await check("every label computes to 12px (--fs-base) at 960px and at 360px",
-  () => wide.sizes.join() === "12px" && small.sizes.join() === "12px", JSON.stringify([wide.sizes, small.sizes]));
+const fsBase = await evaluate(`(() => { const p = document.createElement("span"); p.style.fontSize = "var(--fs-base)";
+  document.body.append(p); const v = getComputedStyle(p).fontSize; p.remove(); return v; })()`);
+await check(`every label computes to --fs-base (${fsBase}) at 960px and at 360px`,
+  () => wide.sizes.join() === fsBase && small.sizes.join() === fsBase, JSON.stringify([wide.sizes, small.sizes]));
 await check("...and RENDERS at the same glyph height at both widths — the pixels, which a viewBox would have shrunk",
   () => wide.glyphH.length === 1 && small.glyphH.length === 1 && wide.glyphH[0] === small.glyphH[0] && wide.glyphH[0] >= 12,
   JSON.stringify([wide.glyphH, small.glyphH]));

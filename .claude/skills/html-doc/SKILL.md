@@ -112,11 +112,15 @@ already carries two, and if you cannot write the sentence you do not have an exc
      the `<h1>`, and the footer, which renders `[{{FOLDER}}] {{DOC_TITLE}}` (e.g.
      `[pagr] Source Code documentation`).
    - `{{DOC_DESCRIPTION}}` — the `<meta name="description">`.
-   - `{{TAGLINE}}` — the full-width lede under the title (it has no max-width — let it run full).
-   - **Sections** — one `<section class="doc" id="SLUG" data-term>` per topic, each with a `.prompt`
-     header and a `[data-term-out]` body. Add/remove sections to fit the subject; give each a unique
+   - `{{TAGLINE}}` — the lede under the title. It stops at `--measure` (72 characters), a readable line.
+   - **Sections** — one `<section class="doc" id="SLUG" data-term>` per topic, each with an
+     `<h2 class="prompt">` title and a `[data-term-out]` body. The title is ONE element: a real
+     heading at the heading size, with `$` before it. Its words are plain (`steps`, `proof`), never a
+     file name (`cat steps.txt`), and no second heading repeats them: `.prompt` + `h2` with the same
+     words reads twice and `check-content` refuses it. The path line above the page title stays a
+     `p.prompt`, because a path is data, not a title. Add/remove sections to fit the subject; give each a unique
      `id`. Every component below is the design system's, and the template declares none of them
-     (0.61.0): `.prompt` for shell-style headers, `ol.steps` for ordered steps, `ul.plain` for lists,
+     (0.61.0): `h2.prompt` for section titles, `ol.steps` for ordered steps, `ul.plain` for lists,
      `table.kv` (see below) for key/value specs, a bare `<pre>` for a code block and a bare `<code>`
      for inline code (no class; `base.css` draws both), a `ul.card-grid` of `.card-terminal`s for
      cards, `.eli5` for the everyday picture of one hard point, `aside.callout` for a note or a trap, `.ascii-rule` for dividers, `.link-quiet` for inline links,

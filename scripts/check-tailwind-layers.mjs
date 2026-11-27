@@ -268,8 +268,9 @@ check("...while a control with no utility still gets the system ring",
 
 /* ── the element defaults survive Preflight, and still yield to a utility ── */
 
-for (const [id, px] of [["h1", "24px"], ["h2", "18px"], ["h3", "15px"], ["h4", "12px"]]) {
-  check(`a bare <${id}> is ${px} — Preflight's heading reset shares the base layer and must not win`,
+for (const [id, name] of [["h1", "--fs-2xl"], ["h2", "--fs-xl"], ["h3", "--fs-lg"], ["h4", "--fs-base"]]) {
+  const px = await token(name, "fontSize");
+  check(`a bare <${id}> is ${name} (${px}) — Preflight's heading reset shares the base layer and must not win`,
     (await style(id, "fontSize")) === px, await style(id, "fontSize"));
 }
 check("...and bold", (await style("h2", "fontWeight")) === "700", await style("h2", "fontWeight"));
@@ -278,8 +279,8 @@ check("...while `text-2xl` on a heading still wins over the default",
 const bodyFont = await evaluate("getComputedStyle(document.body).fontFamily");
 check("<code> is the page's font, not Preflight's mono stack",
   (await style("code", "fontFamily")) === bodyFont, `${await style("code", "fontFamily")} vs body ${bodyFont}`);
-check("<code> inside a heading is the one text size, 12px",
-  (await style("code-in-h2", "fontSize")) === "12px", await style("code-in-h2", "fontSize"));
+check("<code> inside a heading is the one text size, --fs-base",
+  (await style("code-in-h2", "fontSize")) === (await token("--fs-base", "fontSize")), await style("code-in-h2", "fontSize"));
 check("<pre> is the page's font too",
   (await style("pre", "fontFamily")) === bodyFont, await style("pre", "fontFamily"));
 

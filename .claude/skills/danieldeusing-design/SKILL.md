@@ -37,7 +37,7 @@ disagrees with four other pages and, for colour, is provably wrong on at least o
   <script>
     (() => {
       const bg = { warm: "#f5efe2", green: "#020604", mono: "#050505", paper: "#fafafa" };
-      let t = "warm";
+      let t = matchMedia("(prefers-color-scheme: dark)").matches ? "green" : "warm";
       try { const s = localStorage.getItem("theme"); if (s && s in bg) t = s; } catch {}
       document.documentElement.dataset.theme = t;
       document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg[t]);
@@ -87,6 +87,13 @@ never borrows the system's for a stylesheet it does not load; borrowing the name
 `paper` (black on white, e-ink / printout). `:root` carries the warm values, so the page works
 with no attribute set. The choice persists in `localStorage["theme"]` — **the same key on every
 surface**, which is why picking a theme in the cockpit carries into the embedded netmon.
+With nothing stored, the theme follows the OS setting: dark gets `green`, light gets `warm`. The
+pre-paint script above and `getStoredTheme()` do this, so a reader who set Dark Mode once does not
+look for the switch on every surface.
+
+**No new colours for decoration.** The four themes keep their palettes. A colour is added only for a
+new meaning, and colour itself carries a meaning: a status (with its glyph), an identity (`data-hue`),
+or an action (`--primary`).
 
 Anything you build must be legible in all four. Test by flipping the attribute, not by trusting
 that it "should be fine": the two near-black themes and the two light ones fail in opposite
@@ -140,12 +147,13 @@ inherit picks its own width and size, and the surfaces drift apart.
 
 ```css
 --content-w: 90rem;     --content-pad: 1.5rem;  /* 1440px; 1.25rem a side below 40rem (0.60.0) */
---fs-base: 0.75rem;     /* 12px — ALL normal text. The only size you write. */
---fs-lg: 0.9375rem;     /* 15px — h3 / section heads */
---fs-xl: 1.125rem;      /* 18px — h2, a dialog title, a stat value */
---fs-2xl: 1.5rem;       /* 24px — h1 and an app's .page-title */
+--fs-base: 0.8125rem;   /* 13px — ALL normal text. The only size you write. */
+--fs-lg: 1rem;          /* 16px — h3, a card title, section heads */
+--fs-xl: 1.25rem;       /* 20px — h2, a dialog title */
+--fs-2xl: 1.625rem;     /* 26px — h1, an app's .page-title, a stat value */
 --fs-display: 1.875rem; /* 30px, 36px from 40rem — a public page title and an error code, nothing else (0.60.0) */
---lh-tight: 1.3;        --lh-base: 1.5;        --lh-display: 1.2;  /* the display step's leading */
+--lh-tight: 1.3;        --lh-base: 1.6;        --lh-display: 1.2;  /* the display step's leading */
+--measure: 72ch;        /* the longest line of running prose (.lede, .markdown p) */
 ```
 
 `--fs-display` is not a text size. It is danieldeusing.de's page title (`.page-title--display`,
@@ -216,8 +224,8 @@ near-miss to pick, and `font-size` stops being a decision anybody makes while wr
 
 ## A card has its own padding (0.38.0, Daniel) — do not add your own
 
-`.card-terminal` pads itself, `var(--card-pad)`: 12px on every side since 0.60.0 (it was
-`0.85rem 1.1rem`), the inset seedr's and configr's card grids already used. Before 0.38.0 it had none
+`.card-terminal` pads itself, `var(--card-pad)`: 16px on every side. Cards sit `--card-gap` (20px)
+apart, and sections `--space-section` (56px): a group reads as one by space alone. Before 0.38.0 it had none
 and every surface either added padding or, more often, did not — which is why the family contacts
 tiles shipped with their label starting hard against the border.
 

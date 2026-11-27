@@ -91,7 +91,7 @@ The parts:
 | class | what it is |
 |---|---|
 | `.card-head` | the top row — a value filter, a tag, a glyph, a star. Wraps, first item start, last item end. Its words sit on one baseline, so a `.card-title` beside a `.tag--bracket` lines up (0.61.0; they were 3px apart), and a lone `.ico` or `.btn-icon` centres on the row |
-| `.card-title` | the name, **any heading level**; the class sets the size (body size, weight 500). 500, not bold: forty bold titles in a grid are a wall |
+| `.card-title` | the name, **any heading level**; the class sets the size (`--fs-lg`, weight 600). One step above the body and semibold, not bold: the title leads the card, and forty bold titles in a grid are still a wall |
 | `.card-link` | the title's link. Takes the title's colour, no underline; the card's hover is its hover |
 | `.card-desc` | the description, muted, clamped to 3 lines (`--clamp-lines: 2` on it, in the page's stylesheet, to change it). Left-aligned — seedr's justified text opens rivers in a narrow monospace column |
 | `.card-foot` | stats and a date, muted. Sits on the card's floor, so every foot in a row of cards lines up |
@@ -129,8 +129,7 @@ is answered only where a click lands.
 ```
 
 As many columns of at least `--card-min` (16rem) as fit, and one column on a phone — `min(…, 100%)`
-stops a 16rem track from overflowing a narrower screen. The gap is `--card-gap`, 1rem (seedr's and
-danieldeusing.de's). **`auto-fill`, not `auto-fit`**: a row of two cards keeps card-sized cards
+stops a 16rem track from overflowing a narrower screen. The gap is `--card-gap`, 1.25rem, the same between stat tiles. **`auto-fill`, not `auto-fit`**: a row of two cards keeps card-sized cards
 instead of stretching them across the page. It resets the list, so the grid can be the `<ul>` a list
 of cards semantically is, and it zeroes its children's margins: base.css spaces a `<section>` that
 follows another one, and a grid item pushed down by that sits lower than its neighbours.
@@ -153,8 +152,8 @@ Nothing new is needed.
 
 One number and what it means. cockpit's home tiles, netmon's summary, seedr's category tiles,
 configr's stat counter and three family pages each drew their own; this is the one tile. The value is
-`--fs-xl` (seedr's 18px; cockpit's 24px and the family pages' own sizes move to it), bold and
-tabular.
+`--fs-2xl` (26px), bold and tabular, the one number the tile is about. Its label starts with the
+state's glyph (✓ idle, ● action, ✗ broken, ○ unknown), so the state does not hang on colour alone.
 
 | part | what it is |
 |---|---|

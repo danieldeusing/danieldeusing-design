@@ -45,7 +45,9 @@
   gap: 0.5rem 0.75rem;
   margin: 0.35rem 0;
 }
-.field-row > .lbl { color: var(--muted-foreground); font-size: var(--fs-base); text-align: left; }
+/* The label names the field, so it reads in the foreground at 600; the description and the meta
+   under the control stay muted. */
+.field-row > .lbl { color: var(--foreground); font-size: var(--fs-base); font-weight: 600; text-align: left; }
 /* The value cell: controls sit on one row and wrap together, rather than each finding its own. */
 .field-row > .field-val {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; min-width: 0;
@@ -77,6 +79,37 @@
 .field-error { flex-basis: 100%; margin: 0; }
 .field-desc { color: var(--muted-foreground); }
 .field-error { color: var(--destructive); }
+/* THE ERROR NAMES ITSELF, and so does its field. The error line leads with the system's fail glyph,
+   so it reads as an error without its colour; empty alternative text, because the sentence says it.
+   `data-invalid` on the row turns its label --destructive too, so the eye finds the field from the
+   label column; `aria-invalid` on the control still marks the control (below). `data-disabled` dims
+   the label with its control. */
+.field-error::before { content: "\2717  "; content: "\2717  " / ""; font-weight: 700; } /* not-text: the fail glyph */
+.field-row[data-invalid] > .lbl { color: var(--destructive); }
+.field-row[data-disabled] > .lbl { opacity: 0.45; }
+/* REQUIRED IS NOT AN ERROR. A row whose control carries `required` or `aria-required` gets a muted
+   `*` after its label, drawn from the attribute, so the mark and the validation cannot disagree.
+   Muted, never --destructive: red already means "this is wrong". */
+.field-row:has(:required, [aria-required="true"]) > .lbl::after { content: " *"; content: " *" / ""; color: var(--muted-foreground); font-weight: 400; }
+
+/* A GROUP OF CHECKBOXES, RADIOS OR SWITCHES is a fieldset, so a screen reader names the group with
+   its legend. `.field-set` takes the browser's box away and stacks the legend over its options,
+   the description under the legend when there is one. */
+.field-set {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-inline-size: 0;
+  margin: 0.35rem 0;
+  padding: 0;
+  border: 0;
+}
+.field-set > legend {
+  margin-block-end: 0.15rem;
+  padding: 0;
+  font-weight: 600;
+  color: var(--foreground);
+}
 
 /* A LABEL THAT EXPLAINS ITSELF ON TOUCH. Cockpit's config panel carries a paragraph behind each
    label, and on a phone there is no hover to read it by — so the label is a <button> that opens
@@ -88,7 +121,8 @@
   padding: 0;
   font: inherit;
   font-size: var(--fs-base);
-  color: var(--muted-foreground);
+  font-weight: 600;
+  color: var(--foreground);
   text-align: start;
   background: none;
   border: 0;
@@ -112,10 +146,19 @@
 /* ─────────────────────────────────────────────────────────────────────────
    Shell affordances — `$ command` section headers and `# comment` lines.
    ───────────────────────────────────────────────────────────────────────── */
+/* On a paragraph or a span, a `$ command` line: the body size, bold, muted. On a heading it IS the
+   section's title: the heading element's own step and the foreground, with the `$` in --primary.
+   The body size sits in :where() at zero weight, so h1–h3 keep their step; a small `$` line above a
+   heading that repeats its words is the pattern this replaces. */
 .prompt {
-  font-size: var(--fs-base);
   font-weight: 700;
   color: var(--muted-foreground);
+}
+:where(.prompt) {
+  font-size: var(--fs-base);
+}
+:is(h1, h2, h3, h4).prompt {
+  color: var(--foreground);
 }
 .prompt::before {
   content: "$ ";
@@ -411,6 +454,11 @@
    that should be a coin toss under a thumb. `min-*`, never width/height, so the glyph stays centred
    by the flexbox. Last in the family on purpose: it has to outrank `--compact`'s 28px floor, and
    the two are equal in specificity. */
+/* PRESSED. A button moves 1px down while it is held, so the press is felt before the result
+   arrives. Only for a reader who allows motion: a moving button is motion (Reduce Motion). */
+@media (prefers-reduced-motion: no-preference) {
+  .btn-terminal:active:not(:disabled, [aria-disabled="true"]) { transform: translateY(1px); }
+}
 @media (pointer: coarse) {
   .btn-terminal { min-block-size: 44px; }
   .btn-terminal--destructive,
@@ -1345,6 +1393,16 @@ details.fold--boxed > summary { padding-block: 0.5rem; }
 
 @media (pointer: coarse) {
   details.fold > summary { min-block-size: 44px; }
+}
+
+/* 44px FIELDS ON A TOUCH SCREEN, like every button: a 28px text field or select is a hard target
+   for a thumb. `min-block-size`, so the text stays centred; after the select's own rules, which it
+   has to outrank at equal weight. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"]),
+  textarea,
+  select,
+  .select-trigger { min-block-size: 44px; }
 }
 
 /* ── legend: one rendering of each state, beside the thing it keys ─────────────────────────────

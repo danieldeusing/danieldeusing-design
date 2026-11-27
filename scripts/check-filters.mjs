@@ -293,7 +293,7 @@ window.ready = true;
   // focus-ring and forced-colours assertion runs here, where nothing else can draw one.
   get "/bare"() { return `<!doctype html><html lang="en"><head><meta charset="utf-8">${load.tokens}${load.hidden}
 <link rel="stylesheet" href="/src/tokens.css"><link rel="stylesheet" href="/src/filters.css">
-<style>body { margin: 0; padding: 20px; font: 12px/1.5 monospace; } *, *::before, *::after { transition: none !important; }</style>
+<style>body { margin: 0; padding: 20px; font: var(--fs-base)/var(--lh-base) monospace; } *, *::before, *::after { transition: none !important; }</style>
 </head><body><button id="start" type="button">start</button>
 <search class="filter-bar" id="bar">
   <div class="search-field" id="sf"><input type="search" id="q" aria-label="search" value="x"><button type="button" class="search-clear" id="sclr" aria-label="clear search"></button></div>

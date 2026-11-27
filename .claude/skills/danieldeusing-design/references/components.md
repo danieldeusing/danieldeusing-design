@@ -446,7 +446,7 @@ of the name. A note inside is `.text-muted-foreground`; the way to where the sta
 
 ## `.card-terminal` (0.60.0)
 
-- **Padding is `--card-pad`** (.75rem) on every side; `.card-terminal--flush` is 0, for a card that
+- **Padding is `--card-pad`** (1rem) on every side; `.card-terminal--flush` is 0, for a card that
   frames a table or a `.row-list`. A wide table inside fades into `--card`, not into the page.
 - **Hover only where a click does something**: `a.card-terminal`, `button.card-terminal`, or
   `.card-terminal--link` (a card whose title link is the target). It is a `--primary` edge on the

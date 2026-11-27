@@ -658,5 +658,30 @@ spellings.
 - **A value that is a table** loses its first row's top padding, so the table's first line sits on
   the label's line.
 - **`button.lbl` is a label that opens its explanation** — in a dialog, on a phone, where there is
-  no hover to read a tip by. It keeps the label's look (no box, start-aligned, muted), turns
-  `--primary` under the pointer and in focus, and is 44px tall under a coarse pointer.
+  no hover to read a tip by. It keeps the label's look (no box, start-aligned, foreground, 600),
+  turns `--primary` under the pointer and in focus, and is 44px tall under a coarse pointer.
+
+### A label that leads, the required mark, a wrong or disabled row, a group
+
+```html
+<div class="field-row" data-invalid>
+  <label class="lbl" for="branch">branch</label>
+  <div class="field-val">
+    <input id="branch" required aria-invalid="true" aria-describedby="branch-err" />
+    <p class="field-error" id="branch-err">a branch name has no space</p>
+  </div>
+</div>
+<fieldset class="field-set"><legend>notify on</legend>
+  <label><input type="checkbox" /> a failed run</label>
+</fieldset>
+```
+
+- **The label is `--foreground`, weight 600.** It names the field, so it reads before the value;
+  the description under the control stays muted.
+- **Required is a muted `*`**, drawn from `required` or `aria-required="true"` on the control, so the
+  mark and the validation cannot disagree. Never red: red means "this is wrong".
+- **`data-invalid` on the row** turns its label `--destructive`; `.field-error` starts with ✗, so the
+  error does not hang on colour alone. On save, refuse while a field is wrong and move focus to it.
+- **`data-disabled` on the row** dims its label to .45, the same as the control.
+- **`.field-set`** is the fieldset for a group of checkboxes, radios or switches: the browser's box is
+  gone, the legend is a 600 label over the options, and a screen reader names the group by it.

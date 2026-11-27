@@ -227,6 +227,13 @@
         </p>
       </section>
 
+      <section id="cmdk">
+        <h2>command palette</h2>
+        <p class="lede">Press <kbd data-cmdk-key>⌘K</kbd> anywhere outside a text field, or the button. Type to filter; ↑ ↓ move, ↵ runs. A restart asks twice. What ran last comes first, under recent.</p>
+        <p class="row"><button type="button" class="btn-terminal btn-terminal--ghost btn-terminal--compact" id="cmdk-open">open the palette <kbd data-cmdk-key>⌘K</kbd></button></p>
+        <p class="lede" id="cmdk-result">ran: nothing yet</p>
+      </section>
+
       <section id="zoom">
         <h2>zoom view</h2>
         <p class="lede">Every diagram, figure and canvas here is an opener (Enter, Space or a click). Inside: wheel and + − 0 zoom, drag pans, Escape closes.</p>
@@ -501,6 +508,7 @@ PASS  the skill pins the current release</div></div>
       import { initSelects } from "../runtime/select.js";
       import { attachMenuKeys } from "../runtime/dropdown.js";
       import { positionPopup } from "../runtime/popup.js";
+      import { initCommandPalette } from "../runtime/command.js";
 
       const ITEM = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
 
@@ -510,6 +518,18 @@ PASS  the skill pins the current release</div></div>
       initTooltips();
       initSelects();
       initDiagramZoom(".diagram, .demo-figure");
+      const cmdkResult = document.getElementById("cmdk-result");
+      const ran = (what) => () => (cmdkResult.textContent = `ran: ${what}`);
+      initCommandPalette({
+        trigger: document.getElementById("cmdk-open"),
+        items: [
+          { label: "runners", group: "pages", run: ran("runners") },
+          { label: "skills", group: "pages", run: ran("skills") },
+          { label: "reviews", group: "pages", run: ran("reviews") },
+          { label: "switch theme", group: "commands", run: ran("switch theme") },
+          { label: "restart dd-infra-ci-2", group: "commands", confirm: true, run: ran("restart dd-infra-ci-2") },
+        ],
+      });
 
       /* ── page code ── */
       const result = document.getElementById("result");

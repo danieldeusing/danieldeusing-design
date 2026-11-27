@@ -1106,15 +1106,15 @@ html { scroll-padding-block-start: calc(var(--sticky-top, 3rem) + 1rem); }
      picker and its links on a phone altogether. Now a page with no `.mobile-footer` keeps the
      fixed footer, wrapped to two rows (above). */
   body:has(.site-nav .mobile-footer) footer.status { display: none; }
-  .status-left { flex: 1 1 100%; }
+  .status-left { flex: 1 1 100%; line-height: var(--lh-tight); }
   /* The controls take the second row, and a control that does not fit wraps rather than running
      off the edge: a clipped control cannot be reached at all, which is worse than a footer one row
      taller than --status-h. Measured at 375px: a link, the theme menu and the anim toggle fit one
      row with room to spare; add the language menu and it takes a third row, which the measured
      --status-reserve clears (the 3.25rem alone did not). */
-  .status-right { flex: 1 1 100%; flex-wrap: wrap; row-gap: 0.25rem; }
-  /* …and the room the body reserves follows the footer's real height: two rows (18px of path,
-     .25rem of gap, the 28px control row and the rule — 51px, inside 3.25rem), or nothing at all
+  .status-right { flex: 1 1 100%; flex-wrap: wrap; row-gap: 0.25rem; column-gap: 0.75rem; }
+  /* …and the room the body reserves follows the footer's real height: two rows (the path at
+     --lh-tight, 16.9px, .25rem of gap, the 28px control row and the rule — about 50px, inside 3.25rem), or nothing at all
      where it folded away.
 
      `!important` IS LOAD-BEARING HERE, and only here. --status-h is declared in tokens.css, which

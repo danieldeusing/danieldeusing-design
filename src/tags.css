@@ -82,6 +82,16 @@
   mask: var(--ico) center / contain no-repeat;
 }
 
+/* A STATE TAG CARRIES ITS GLYPH. The tone's colour alone fails a reader who cannot tell the hues
+   apart, so a toned tag leads with feedback.css's .state glyph for the same meaning: ✓ success,
+   ✗ destructive, ● warning and info, ○ pending. Empty alternative text: the word already says it.
+   Not on a tag that draws its own ::before (an icon, the brackets, an icon-only tag) and not on an
+   off tag, whose dotted edge says "off" whatever its tone. */
+.tag[data-tone]:not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { font-weight: 700; } /* not-text: a state glyph */
+.tag[data-tone="success"]:not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { content: "\2713"; content: "\2713" / ""; }
+.tag[data-tone="destructive"]:not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { content: "\2717"; content: "\2717" / ""; }
+.tag:is([data-tone="warning"], [data-tone="info"]):not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { content: "\25CF"; content: "\25CF" / ""; }
+.tag[data-tone="pending"]:not([data-icon], .tag--bracket, .tag--icon, .tag--off)::before { content: "\25CB"; content: "\25CB" / ""; }
 /* THE AXES A READER USES IN GREY (D10). Cockpit's execution pages read state by border style as
    much as by colour, and each style means ONE thing:
      --dashed   it does not count: not the proof, skipped, superseded, not actionable

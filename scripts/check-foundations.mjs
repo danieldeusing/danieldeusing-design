@@ -171,6 +171,8 @@ await evaluate(`window.M = {
     const v = getComputedStyle(p).color; p.remove(); return v; },
   len(expr) { const p = M.probe(); p.style.cssText = "position:absolute;inline-size:" + (expr.startsWith("--") ? "var(" + expr + ")" : expr);
     const w = p.getBoundingClientRect().width; p.remove(); return w; },
+  // The computed value of a property set to expr on a probe: a token as the browser resolves it.
+  css(prop, expr) { const p = M.probe(); p.style.setProperty(prop, expr); const v = getComputedStyle(p).getPropertyValue(prop); p.remove(); return v; },
   px(top, bottom) { const c = document.createElement("canvas"); c.width = c.height = 1; const x = c.getContext("2d");
     x.fillStyle = bottom || "#fff"; x.fillRect(0, 0, 1, 1); x.fillStyle = top; x.fillRect(0, 0, 1, 1);
     return Array.from(x.getImageData(0, 0, 1, 1).data).slice(0, 3); },
@@ -185,8 +187,9 @@ const r2 = (n) => n.toFixed(2);
 
 /* ── F1 · control, size and layout tokens ─────────────────────────────────── */
 
-for (const [token, px] of [["--control-h", 28], ["--card-pad", 12], ["--icon-sm", 12], ["--icon-size", 14],
-  ["--icon-lg", 16], ["--icon-xl", 24], ["--dot-size", 8], ["--status-h", 32]]) {
+for (const [token, px] of [["--control-h", 28], ["--card-pad", 16], ["--icon-sm", 12], ["--icon-size", 14],
+  ["--icon-lg", 16], ["--icon-xl", 24], ["--dot-size", 8], ["--status-h", 32],
+  ["--fs-base", 13], ["--fs-lg", 16], ["--fs-xl", 20], ["--fs-2xl", 26], ["--card-gap", 20], ["--space-section", 56]]) {
   const measured = await evaluate(`M.len(${JSON.stringify(token)})`);
   check(`${token} is ${px}px`, measured === px, `${measured}px`);
 }
@@ -195,8 +198,8 @@ check("a box sized by --control-h renders 28px tall",
 check("...and so does a text field that takes it as its min-block-size",
   (await evaluate('document.getElementById("ctl-field").getBoundingClientRect().height')) === 28,
   await evaluate('document.getElementById("ctl-field").getBoundingClientRect().height'));
-check("a card padded by --card-pad has a 12px inset",
-  (await evaluate('getComputedStyle(document.getElementById("card-pad")).paddingTop')) === "12px");
+check("a card padded by --card-pad has a --card-pad inset",
+  (await evaluate('getComputedStyle(document.getElementById("card-pad")).paddingTop === M.css("padding-top", "var(--card-pad)")')));
 check("--content-pad is 1.5rem (24px) on a desktop viewport", (await evaluate('M.len("--content-pad")')) === 24);
 await send("Emulation.setDeviceMetricsOverride", { width: 375, height: 800, deviceScaleFactor: 1, mobile: false });
 await sleep(150);
@@ -213,12 +216,12 @@ await sleep(150);
 for (const [width, px] of [[375, 30], [639, 30], [640, 36], [1440, 36]]) {
   await send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: false });
   await sleep(150);
-  const [size, title, code, app] = await evaluate(`[M.len("--fs-display"),
+  const [size, title, code, app, step] = await evaluate(`[M.len("--fs-display"),
     ...["display-title", "display-code", "display-app-title"].map((id) =>
-      parseFloat(getComputedStyle(document.getElementById(id)).fontSize))]`);
-  check(`--fs-display is ${px}px at ${width}px wide on a public title and an error code; an app title stays 24px`,
-    size === px && title === px && code === px && app === 24,
-    `token ${size}px, title ${title}px, code ${code}px, app title ${app}px`);
+      parseFloat(getComputedStyle(document.getElementById(id)).fontSize)), parseFloat(M.css("font-size", "var(--fs-2xl)"))]`);
+  check(`--fs-display is ${px}px at ${width}px wide on a public title and an error code; an app title stays --fs-2xl`,
+    size === px && title === px && code === px && app === step,
+    `token ${size}px, title ${title}px, code ${code}px, app title ${app}px (--fs-2xl ${step}px)`);
 }
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 await sleep(150);
@@ -280,25 +283,28 @@ for (const theme of THEMES) {
 
 await evaluate('M.theme("warm"); null');
 const cs = (id, prop) => evaluate(`getComputedStyle(document.getElementById(${JSON.stringify(id)}))[${JSON.stringify(prop)}]`);
-for (const [id, size] of [["el-h1", "24px"], ["el-h2", "18px"], ["el-h3", "15px"], ["el-h4", "12px"], ["el-h5", "12px"], ["el-h6", "12px"]]) {
-  check(`<${id.slice(3)}> is ${size}, bold`, (await cs(id, "fontSize")) === size && (await cs(id, "fontWeight")) === "700",
+for (const [id, token] of [["el-h1", "--fs-2xl"], ["el-h2", "--fs-xl"], ["el-h3", "--fs-lg"], ["el-h4", "--fs-base"], ["el-h5", "--fs-base"], ["el-h6", "--fs-base"]]) {
+  const size = await evaluate(`M.css("font-size", "var(${token})")`);
+  check(`<${id.slice(3)}> is ${token} (${size}), bold`, (await cs(id, "fontSize")) === size && (await cs(id, "fontWeight")) === "700",
     `${await cs(id, "fontSize")} ${await cs(id, "fontWeight")}`);
 }
-check("h1-h3 take --lh-tight (1.3)", Math.abs(parseFloat(await cs("el-h2", "lineHeight")) - 18 * 1.3) < 0.01,
+check("h1-h3 take --lh-tight (1.3)", Math.abs(parseFloat(await cs("el-h2", "lineHeight"))
+  - parseFloat(await evaluate('M.css("font-size", "var(--fs-xl)")')) * 1.3) < 0.01,
   await cs("el-h2", "lineHeight"));
 const bodyFamily = await evaluate("getComputedStyle(document.body).fontFamily");
 for (const id of ["el-code", "el-kbd", "el-samp", "el-pre"]) {
   check(`<${id.slice(3)}> is the page's font, not the user agent's monospace`, (await cs(id, "fontFamily")) === bodyFamily,
     await cs(id, "fontFamily"));
 }
-check("<code> inside an h2 is the one text size (12px)", (await cs("el-code-h2", "fontSize")) === "12px", await cs("el-code-h2", "fontSize"));
+check("<code> inside an h2 is the one text size (--fs-base)",
+  (await cs("el-code-h2", "fontSize")) === (await evaluate('M.css("font-size", "var(--fs-base)")')), await cs("el-code-h2", "fontSize"));
 check("inline <code> is a --muted box with a 1px --border hairline",
   (await cs("el-code", "backgroundColor")) === (await evaluate('M.tok("--muted")'))
     && (await cs("el-code", "borderTopWidth")) === "1px" && (await cs("el-code", "borderTopColor")) === (await evaluate('M.tok("--border")')));
 check("<kbd> is the same box", (await cs("el-kbd", "backgroundColor")) === (await cs("el-code", "backgroundColor")));
 check("<pre> is a --muted block, 12px by 16px of padding, --lh-base",
   (await cs("el-pre", "backgroundColor")) === (await evaluate('M.tok("--muted")'))
-    && (await cs("el-pre", "padding")) === "12px 16px" && (await cs("el-pre", "lineHeight")) === "18px",
+    && (await cs("el-pre", "padding")) === "12px 16px" && (await cs("el-pre", "lineHeight")) === (await evaluate('M.css("line-height", "calc(var(--fs-base) * var(--lh-base))")')),
   `${await cs("el-pre", "padding")} ${await cs("el-pre", "lineHeight")}`);
 check("...and the <code> inside it draws no second box",
   (await cs("el-pre-code", "borderTopWidth")) === "0px" && (await cs("el-pre-code", "backgroundColor")) === "rgba(0, 0, 0, 0)");

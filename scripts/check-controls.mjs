@@ -641,13 +641,17 @@ check("aria-disabled: a thumbnail's remove does nothing", s.removeKept === true,
 check("...a row's bin does not arm", s.binArmed === false, s);
 check("...the confirm of an armed pair does not confirm (and the same bin arms once enabled)", s.armsWhenEnabled && s.confirmIgnored && s.disarmed, s);
 
-s = await evaluate(`(() => { const { cs, rect, resolve, same } = __c; const v = cs('${T("code-value")}'), i = cs('${T("code-input")}'), st = cs('${T("code-status")}'), bad = cs('${T("code-status-bad")}');
+s = await evaluate(`(() => { const { el, cs, rect, resolve, same } = __c; const v = cs('${T("code-value")}'), i = cs('${T("code-input")}'), st = cs('${T("code-status")}'), bad = cs('${T("code-status-bad")}');
   return { value: [v.fontSize, v.fontWeight, v.letterSpacing, v.fontVariantNumeric, same(v.color, resolve('var(--primary)')), v.marginTop, v.fontFamily === resolve('var(--font-mono)', 'font-family')],
     input: [i.fontSize, i.letterSpacing, i.maxWidth, rect('${T("code-input")}').h, i.borderTopWidth, same(i.borderTopColor, resolve('var(--control-edge)')), i.fontFamily === resolve('var(--font-mono)', 'font-family')],
-    status: [st.minHeight === st.lineHeight, same(st.color, resolve('var(--muted-foreground)')), same(bad.color, resolve('var(--warning)'))] }; })()`);
-check(".confirm-code-value: --fs-xl, 700, tracked .16em, tabular, --primary, mono", s.value.join() === "18px,700,2.88px,tabular-nums,true,0px,true", s.value);
+    // One line reserved, rendered: the EMPTY status is as tall as the same status holding one line.
+    status: [(() => { const e = el('${T("code-status")}'), keep = e.textContent; e.textContent = ''; const h0 = e.getBoundingClientRect().height;
+      e.textContent = 'x'; const h1 = e.getBoundingClientRect().height; e.textContent = keep; return h0 > 0 && h0 === h1; })(), same(st.color, resolve('var(--muted-foreground)')), same(bad.color, resolve('var(--warning)'))],
+    want: { value: [resolve('var(--fs-xl)', 'font-size'), '700', resolve('calc(var(--fs-xl) * 0.16)', 'letter-spacing'), 'tabular-nums', true, '0px', true].join(),
+      input: [resolve('var(--fs-base)', 'font-size'), resolve('calc(var(--fs-base) * 0.14)', 'letter-spacing'), '224px', parseFloat(resolve('var(--control-h)', 'min-height')), '1px', true, true].join() } }; })()`);
+check(".confirm-code-value: --fs-xl, 700, tracked .16em, tabular, --primary, mono", s.value.join() === s.want.value, s.value);
 check(".confirm-code-input: the ONE text size, tracked .14em, capped at 14rem, at --control-h, mono",
-  s.input.join() === "12px,1.68px,224px,28,1px,true,true", s.input);
+  s.input.join() === s.want.input, s.input);
 check(".confirm-code-status: one line reserved; muted by default, --warning under data-tone", s.status.every(Boolean), s.status);
 s = await evaluate(`(() => { const { el, cs, resolve, same } = __c; const box = el('${T("confirm-code")}'); box.dataset.tone = 'destructive';
   const out = [getComputedStyle(box).getPropertyValue('--tone') !== '', same(cs('${T("code-status")}').color, resolve('var(--muted-foreground)'))];
@@ -686,7 +690,7 @@ check("no border-radius on any control or pseudo-element, except the radio and i
 // the same in both, and one that took it from a base.css or components.css rule does not.
 const setBare = async (on) => {
   await evaluate(on
-    ? `(() => { const b = getComputedStyle(document.body), keep = [b.fontFamily, b.fontSize, b.lineHeight];
+    ? `(() => { const b = getComputedStyle(document.body), keep = [b.fontFamily, b.fontSize, String(parseFloat(b.lineHeight) / parseFloat(b.fontSize))];
         for (const l of document.querySelectorAll('link[href$="base.css"], link[href$="components.css"]')) l.disabled = true;
         [document.body.style.fontFamily, document.body.style.fontSize, document.body.style.lineHeight] = keep; })(); null`
     : `(() => { for (const l of document.querySelectorAll('link[href$="base.css"], link[href$="components.css"]')) l.disabled = false;

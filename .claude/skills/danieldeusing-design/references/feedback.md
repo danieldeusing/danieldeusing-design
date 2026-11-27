@@ -34,6 +34,8 @@ a tint or which colour means what. Pick by **what you are saying**, not by how l
 | something true of the whole app — alerts, "control is frozen" | `.banner` | a notice at the top of one section |
 | the status of one row, read down a column | `.state` | colour alone |
 | work in progress | `.loading` with a `.spinner` in it | a spinner with no words |
+| content of a known shape is on its way — a list, a card | `.skeleton` | a spinner where the rows will be |
+| what an action just did, with the way back | `.toast` via `showToast()` | a notice that leaves on a timer |
 | text a third party wrote — a PR description, a ticket body | `.fence` | a code block, a quote, rendered markdown |
 | live / down at a glance, beside the word that says it | `.dot` | a dot on its own |
 | a word that classifies a thing — a state badge, a type, a scope | `.tag` | a button dressed as a tag |
@@ -280,6 +282,40 @@ load. It is one glyph, lucide's loader-circle, where configr had four sizes in t
 Every exit path replaces the loading row: rows, the empty state, or the failure. None of them may
 leave it spinning. A failure is an alert, so when the row sat in a status region the row leaves it
 and the failure is mounted beside the region, never inside it.
+
+## `.skeleton` — the shape of what is loading
+
+```html
+<div class="card-terminal" aria-busy="true">
+  <div class="skeleton" role="status" aria-label="loading runs"><span></span><span></span><span></span></div>
+</div>
+```
+
+**Show the shape when the shape is known.** A list or a card that will hold rows shows bars where
+the rows go, so the page does not jump when they arrive. Each `span` is one line, at 92 %, 70 % and
+84 % of the width. The fill is the foreground at 12 %, so it reads on `--card` and `--muted` alike.
+The bars pulse; `html.anim-off` and Reduce Motion stop the pulse and leave the bars. The words are
+the `aria-label`, under the same status rule as `.loading`. A spinner stays where no shape is known,
+and in a busy button.
+
+## `.toast` — what just happened, and the way back
+
+```js
+import { showToast } from "@danieldeusing/design/runtime/toast";
+showToast("saved runner settings.", { undo: () => restore(previous), undoLabel: "undo save" });
+showToast("could not save: the runner is offline.", { tone: "destructive" });
+```
+
+- **One at a time.** A new toast replaces the one on screen, so its undo always undoes the last act.
+- **No timer.** It stays until the reader closes it, undoes, or the next toast replaces it. A message
+  that leaves on its own is gone for a slow reader, and its undo with it.
+- **Undo has a key.** With `undo`, ⌘Z (Ctrl+Z off Apple) runs it while the toast is up, never inside a
+  text field.
+- **The region exists first.** `showToast()` makes one `div.toast-region[role=status]` and keeps it,
+  because a live region added with its words is often not announced.
+- It sits above `footer.status`, starts with the tone's glyph (✓ ✗ ●) and has a 3px edge in the
+  tone. A framework app renders the same markup from its own state:
+  `div.toast[data-tone] > span.toast-text + button.btn-terminal--ghost + button.btn-icon[data-icon=x]`.
 
 ## `.fence` — text a stranger wrote
 

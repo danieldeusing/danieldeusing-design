@@ -480,8 +480,9 @@ try {
   await check("surface --card, ink --foreground, glow --elev-modal, overflow hidden",
     box.bg && box.ink && box.shadow && box.overflow === "hidden", box);
   await check("--tablewrap-fade and --clamp-fade are the dialog's --card", box.fade && box.clampFade, box);
-  await check("one text size (--fs-base, 12px) in the mono face, set by the dialog itself",
-    box.font === "12px" && /JetBrains Mono/.test(box.family), box);
+  const fsBase = await evaluate(`__o.resolve("var(--fs-base)", "font-size")`);
+  await check("one text size (--fs-base, 13px) in the mono face, set by the dialog itself",
+    box.font === fsBase && /JetBrains Mono/.test(box.family), box);
   await check("::backdrop is --backdrop, with no blur", box.backdrop, box);
   await check("the dialog holding focus draws no ring (base.css's :focus-visible is loaded and overruled)",
     () => evaluate(`document.activeElement === __o.$("dlg-default") && __o.cs("dlg-default").outlineStyle === "none"`));
@@ -532,11 +533,12 @@ try {
       statusCut: status.scrollWidth > status.clientWidth && getComputedStyle(status).textOverflow === "ellipsis",
       section: s("rich-section-2").marginTop,
       th: __o.same(s("rich-th").backgroundColor, __o.resolve("var(--card)")),
+      titleWant: [__o.resolve("var(--fs-xl)", "font-size"), "700", __o.resolve("calc(var(--fs-xl) * var(--lh-tight))", "line-height"), "nowrap ellipsis hidden 0px"].join(" "),
     };
   })()`);
   await check("head: flex row, centred, .75rem gap, 1rem 1.5rem inset, a 1px --border rule, never shrinks",
     parts.head === "flex center 12px 16px 24px 1px 0" && parts.headRule, parts);
-  await check("title: --fs-xl, 700, --lh-tight, one line cut with an ellipsis", parts.title === "18px 700 23.4px nowrap ellipsis hidden 0px" && parts.truncated, parts);
+  await check("title: --fs-xl, 700, --lh-tight, one line cut with an ellipsis", parts.title === parts.titleWant && parts.truncated, parts);
   await check("...and a long title never pushes the X out of the head", parts.xInside, parts);
   await check("the X and the back arrow are icon buttons inked in --foreground, not the icon button's --primary",
     parts.xInk && parts.backInk, parts);
@@ -1007,7 +1009,7 @@ try {
   await check("the panel is a popup: --popover, --popover-foreground, 1px --control-edge, the --elev-float glow, no radius",
     panel.shown && panel.bg && panel.ink && panel.border === "1px solid" && panel.edge && panel.shadow && panel.radius === "0px", panel);
   await check("...a rem box (.45rem .625rem, at most 21.25rem) at --fs-base in the mono face",
-    panel.padding === "7.2px 10px" && panel.max === "340px" && panel.font === "12px" && panel.family, panel);
+    panel.padding === "7.2px 10px" && panel.max === "340px" && panel.font === fsBase && panel.family, panel);
   await check("...and its rows are .2rem apart (a later `gap` shorthand had zeroed that since 0.57.0)", panel.gap === 3.2, panel);
 
   section("tooltip — the top layer, Escape");
@@ -1480,11 +1482,12 @@ try {
   // cannot tell a dialog that declares its face from one that inherits it. A host page that says
   // otherwise can: serif at 20px on <body>, and the overlays must still be mono at --fs-base.
   const ownFont = await evaluate(`(() => {
+    const base = __o.resolve("var(--fs-base)", "font-size"), xl = __o.resolve("var(--fs-xl)", "font-size");
     document.body.style.fontFamily = "serif"; document.body.style.fontSize = "20px";
     const d = __o.$("dlg-default"); d.showModal();
     const t = __o.tip(); t.style.display = "grid";
-    const read = (n) => { const s = getComputedStyle(n); return /JetBrains Mono/.test(s.fontFamily) && s.fontSize === "12px"; };
-    const out = { dialog: read(d), title: read(d.querySelector(".dialog-title")) || getComputedStyle(d.querySelector(".dialog-title")).fontSize === "18px", tip: read(t) };
+    const read = (n) => { const s = getComputedStyle(n); return /JetBrains Mono/.test(s.fontFamily) && s.fontSize === base; };
+    const out = { dialog: read(d), title: read(d.querySelector(".dialog-title")) || getComputedStyle(d.querySelector(".dialog-title")).fontSize === xl, tip: read(t) };
     t.style.display = "none"; d.close();
     document.body.style.fontFamily = ""; document.body.style.fontSize = "";
     return out; })()`);

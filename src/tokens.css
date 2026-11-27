@@ -49,6 +49,7 @@
  */
 
 :root {
+  color-scheme: light;
   --background: #f5efe2;
   --foreground: #43352a;
   --card: #efe7d4;
@@ -74,7 +75,7 @@
 
   --glow: rgba(160, 82, 45, 0.1);
   --glow-soft: rgba(160, 82, 45, 0.05);
-  --scanline-opacity: 0.15;
+  --scanline-opacity: 0.08;
 
   /* The per-theme inputs of the derived colours below (DERIVED COLOURS). */
   --cat-l: 0.45;           /* categorical text, worst over the whole hue circle: 5.57:1 */
@@ -88,6 +89,7 @@
 
 /* CRT phosphor green */
 html[data-theme="green"] {
+  color-scheme: dark;
   --background: #020604;
   --foreground: #4fdd7d;
   --card: #04110a;
@@ -112,7 +114,7 @@ html[data-theme="green"] {
   --ring: #33ff66;
   --glow: rgba(51, 255, 102, 0.35);
   --glow-soft: rgba(51, 255, 102, 0.12);
-  --scanline-opacity: 0.5;
+  --scanline-opacity: 0.25;
   --cat-l: 0.74;           /* 7.65:1 worst */
   --cat-c: 0.12;
   --backdrop: rgb(0 0 0 / 0.6);   /* dims only: a dialog's fill 1.08:1 on it, its --control-edge 4.89:1 */
@@ -120,6 +122,7 @@ html[data-theme="green"] {
 
 /* white-phosphor terminal */
 html[data-theme="mono"] {
+  color-scheme: dark;
   --background: #050505;
   --foreground: #d4d4d4;
   --card: #0d0d0d;
@@ -144,7 +147,7 @@ html[data-theme="mono"] {
   --ring: #ffffff;
   --glow: rgba(255, 255, 255, 0.25);
   --glow-soft: rgba(255, 255, 255, 0.08);
-  --scanline-opacity: 0.45;
+  --scanline-opacity: 0.22;
   --cat-l: 0.74;           /* 7.71:1 worst */
   --cat-c: 0.12;
   --backdrop: rgb(0 0 0 / 0.6);   /* dims only: a dialog's fill 1.07:1 on it, its --control-edge 5.55:1 */
@@ -152,6 +155,7 @@ html[data-theme="mono"] {
 
 /* black-on-white terminal (e-ink / printout) */
 html[data-theme="paper"] {
+  color-scheme: light;
   --background: #fafafa;
   --foreground: #1f1f1f;
   --card: #f1f1f1;
@@ -176,10 +180,21 @@ html[data-theme="paper"] {
   --ring: #000000;
   --glow: rgba(0, 0, 0, 0.06);
   --glow-soft: rgba(0, 0, 0, 0.04);
-  --scanline-opacity: 0.12;
+  --scanline-opacity: 0.06;
   --cat-l: 0.45;           /* 6.18:1 worst */
   --cat-c: 0.075;
   --backdrop: rgb(0 0 0 / 0.5);   /* a --card dialog on the dimmed page: 3.64:1 by its fill */
+}
+
+/* INCREASE CONTRAST. A reader who asks the OS for more contrast gets muted text near the foreground
+   (the HIG asks for 7:1 on small text there; the muted values above clear 4.5:1) and a border as firm
+   as a control's edge. After the four theme blocks, so it wins on source order at equal weight. */
+@media (prefers-contrast: more) {
+  :root,
+  html[data-theme] {
+    --muted-foreground: color-mix(in srgb, var(--foreground) 85%, var(--background));
+    --border: var(--control-edge);
+  }
 }
 
 /*
@@ -298,9 +313,10 @@ html[data-theme="paper"] {
      `--muted-foreground` is for — never an opacity step, which is an alpha nobody measured
      (utilities.css). Colour and weight separate a label from its value far better than one pixel
      ever did, and they keep working at any zoom. */
-  --fs-base: 0.75rem;   /* 12px — ALL normal text: body, tables, labels, badges, notes, controls */
-  --fs-lg: 0.9375rem;   /* 15px — h3 / section heads */
-  --fs-xl: 1.125rem;    /* 18px — h2, a dialog title, a stat value */
+  --fs-base: 0.8125rem; /* 13px — ALL normal text: body, tables, labels, badges, notes, controls.
+                           The macOS Body size: 12px sat below every platform's default. */
+  --fs-lg: 1rem;        /* 16px — h3, a card title, a section head */
+  --fs-xl: 1.25rem;     /* 20px — h2, a dialog title */
 
   /* ── VERTICAL RHYTHM BETWEEN SECTIONS ──────────────────────────────────────
      The reset zeroes every margin (`* { margin: 0 }`) and nothing here ever put
@@ -313,11 +329,12 @@ html[data-theme="paper"] {
 
      2.5rem is cockpit's existing value, promoted rather than invented, so the
      surface that already had a considered answer does not move. */
-  --space-section: 2.5rem;
-  --fs-2xl: 1.5rem;     /* 24px — h1 and .page-title: an app page's title */
+  --space-section: 3.5rem; /* 56px: a new part of the page reads as one by space alone */
+  --fs-2xl: 1.625rem;   /* 26px — h1, .page-title and a stat value */
 
   --lh-tight: 1.3;      /* headings and single-line chrome */
-  --lh-base: 1.5;       /* body copy; matches base.css */
+  --lh-base: 1.6;       /* body copy; matches base.css */
+  --measure: 72ch;      /* the longest line of running prose: 50–75 characters read best */
 
   /* The label column of a .field-row. DECLARED here, not merely read with a fallback in
      components.css — that is the difference between a token and a phantom. A consumer that
@@ -377,7 +394,8 @@ html[data-theme="paper"] {
  */
 :root {
   --control-h: 1.75rem;   /* 28px — every single-line control */
-  --card-pad: 0.75rem;    /* 12px */
+  --card-pad: 1rem;       /* 16px — the inset of every card */
+  --card-gap: 1.25rem;    /* 20px — between cards and between stat tiles */
   --icon-sm: 0.75rem;     /* 12px — beside a label, in a tag, a clear button */
   --icon-size: 0.875rem;  /* 14px — the default glyph */
   --icon-lg: 1rem;        /* 16px */

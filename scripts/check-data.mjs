@@ -89,6 +89,7 @@ const open = async (query, width = 1280) => {
 };
 const css = (sel, prop, pseudo) => evaluate(`M.cs(${JSON.stringify(sel)}, ${JSON.stringify(pseudo || "")})[${JSON.stringify(prop)}]`);
 const tok = (expr) => evaluate(`M.tok(${JSON.stringify(expr)})`);
+const fontSize = (expr) => evaluate(`(() => { const p = document.createElement("span"); p.style.fontSize = ${JSON.stringify(expr)}; document.body.append(p); const v = getComputedStyle(p).fontSize; p.remove(); return v; })()`);
 const theme = (t) => evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(t)}; null`);
 const mouse = async (type, x, y) => send("Input.dispatchMouseEvent", { type, x, y, button: type === "mouseMoved" ? "none" : "left", clickCount: 1 });
 const clickAt = async (x, y) => { await mouse("mousePressed", x, y); await mouse("mouseReleased", x, y); await sleep(30); };
@@ -260,7 +261,7 @@ await check(".when--inline: one quiet line, the glyph and the short age", async 
 /* ── D6 / D7 · chart CSS ──────────────────────────────────────────────────────────────────────── */
 
 await check("chart text is --fs-base in --muted-foreground; marks are full-strength tokens",
-  async () => (await css("#trend text", "fontSize")) === "12px" && (await css("#trend text", "fill")) === (await tok("var(--muted-foreground)")) &&
+  async () => (await css("#trend text", "fontSize")) === (await fontSize("var(--fs-base)")) && (await css("#trend text", "fill")) === (await tok("var(--muted-foreground)")) &&
     (await css("#trend .chart-line", "stroke")) === (await tok("var(--primary)")) && (await css("#trend .chart-line", "strokeWidth")) === "1.5px" &&
     (await css("#trend .chart-line", "opacity")) === "1" && (await css("#bars .chart-bar", "fill")) === (await tok("var(--primary)")));
 await check("a hollow dot is filled with --chart-bg: the page, or the card it sits on",
@@ -279,7 +280,7 @@ await check("the key: an --icon-sm SQUARE swatch in its series' hue, set by `dat
 // A tab is `inline-flex`; inside the row (a flex container) that computes to `flex` — flex items are blockified.
 await check("a tab: a flex box, muted text on nothing, the one text size, no border",
   async () => ["flex", "inline-flex"].includes(await css("#tab-queue", "display")) && (await css("#tab-queue", "color")) === (await tok("var(--muted-foreground)")) &&
-    (await css("#tab-queue", "backgroundColor")) === "rgba(0, 0, 0, 0)" && (await css("#tab-queue", "fontSize")) === "12px" &&
+    (await css("#tab-queue", "backgroundColor")) === "rgba(0, 0, 0, 0)" && (await css("#tab-queue", "fontSize")) === (await fontSize("var(--fs-base)")) &&
     (await css("#tab-queue", "borderTopWidth")) === "0px" && (await css("#tab-queue", "padding")) === "8px 15.2px");
 await check("the selected tab is the one filled thing: --primary, the page colour as its text, 700",
   async () => (await css("#tab-activity", "backgroundColor")) === (await tok("var(--primary)")) && (await css("#tab-activity", "color")) === (await tok("var(--background)")) &&

@@ -25,9 +25,14 @@ Contents:
 
 ```html
 <p class="prompt">cat ~/about.txt</p>
-<h1 class="page-title">about<span class="cursor-block" aria-hidden="true"></span></h1>
+<h1 class="page-title">who builds this<span class="cursor-block" aria-hidden="true"></span></h1>
 <p class="lede">What this page is, in one or two sentences.</p>
 ```
+
+**The prompt is where, the title is what.** The path line is data (the file, the route), so the title
+never repeats its words: "$ cat ~/about.txt" over "about" says one thing twice, in two sizes.
+`check-content` refuses a `.prompt` followed by a heading with the same words. The lede stops at
+`--measure` (72 characters).
 
 **Two sizes, and which one is not a taste call** (the lead's ruling, 2026-09-28):
 
@@ -108,9 +113,10 @@ A section's name on the left and **one** thing on the right, one of three:
   with a typed ` →`: that one broke with its arrow alone on the next line.
 - **Baseline, except for a button.** Text beside text aligns on the baseline; a row that ends in an
   icon button centres, because a button has no baseline and would hang below the heading.
-- **The section's name is a heading.** `h2.prompt` keeps the prompt look (`.prompt` sets the size
-  over the heading step). pagr's and seedr's `p.prompt` section names become headings in the
-  migration.
+- **The section's name is ONE heading.** `<h2 class="prompt">steps</h2>`: a real `h2` at the heading
+  size and in `--foreground`, with the `$` in `--primary` before it. The words are plain, never a file
+  name ("cat steps.txt"), and no second heading under it repeats them. A bare `p.prompt` stays the
+  body size and muted: it is a path or a command, not a title.
 - The head's children lose their own margins, and the head keeps 1rem below itself.
 
 `.subhead` is a heading one level down inside a section: body size, bold, 1.4rem above and .3rem

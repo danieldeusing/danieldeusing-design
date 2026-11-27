@@ -26,7 +26,14 @@ export const THEME_BACKGROUNDS = {
 const STORAGE_KEY = "theme";
 const DEFAULT_THEME = "warm";
 
-/** The persisted theme, or "warm" if none/invalid. */
+/*
+ * NO STORED CHOICE FOLLOWS THE SYSTEM: a dark OS setting gets green, a light one warm. A reader who
+ * set Dark Mode once does not have to find the theme switch on every surface; a stored pick wins.
+ */
+const systemTheme = () =>
+  typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches ? "green" : DEFAULT_THEME;
+
+/** The persisted theme; with none (or an invalid one), green on a dark OS setting, else warm. */
 export function getStoredTheme() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -34,7 +41,7 @@ export function getStoredTheme() {
   } catch {
     /* localStorage can throw in private mode / sandboxed frames */
   }
-  return DEFAULT_THEME;
+  return systemTheme();
 }
 
 /**

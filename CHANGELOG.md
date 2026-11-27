@@ -51,6 +51,8 @@ a theme that follows the OS.
   derives the padding from `--control-h`, as the select does.
 - **The phone footer stays two rows.** At 13px the anim toggle wrapped to a third row at 375px; the
   path line is now `--lh-tight` and the controls are .75rem apart.
+- **A `.list-row-meta` of several tags wraps** once it has a line of its own, instead of running 3px
+  off a 320px screen.
 - **`.entry-title` on h1–h3 sets its heading step**, so it is the same with tokens.css alone.
 - **`.empty--inline` and `.callout` glyphs** align from the tokens instead of `1lh`, which Chromium
   rounds to 1/64px.

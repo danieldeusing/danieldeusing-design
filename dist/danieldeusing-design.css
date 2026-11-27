@@ -8251,10 +8251,12 @@ button.list-row {
   -webkit-line-clamp: var(--clamp-lines, 2);
   overflow: hidden;
 }
+/* The meta wraps only once it has a line of its own: a flex row places it at its full width first, so a
+   short meta stays one line beside the title, and a meta of several tags breaks between them instead
+   of running off a 320px screen (it did by 3px at 13px text on Linux's font metrics). */
 .list-row-meta {
   margin-inline-start: auto;
   color: var(--muted-foreground);
-  white-space: nowrap;
 }
 a.list-row:not([aria-disabled="true"]):hover .list-row-title {
   text-decoration: underline;

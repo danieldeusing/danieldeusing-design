@@ -581,7 +581,7 @@ const EXPECT = [
     ["#fx-row-title", "", "font-weight", { is: "700" }], ["#fx-row-title", "", "color", "var(--primary)"],
     ["#fx-row-title", "", "text-overflow", { is: "ellipsis" }], ["#fx-row-title", "", "white-space", { is: "nowrap" }],
     ["#fx-row-desc", "", "flex-basis", "100%"], ["#fx-row-desc", "", "color", "var(--muted-foreground)"], ["#fx-row-desc", "", "-webkit-line-clamp", { is: "2" }],
-    ["#fx-row-meta", "", "color", "var(--muted-foreground)"], ["#fx-row-meta", "", "white-space", { is: "nowrap" }],
+    ["#fx-row-meta", "", "color", "var(--muted-foreground)"], ["#fx-row-meta", "", "white-space", { is: "normal" }],
   ]],
   ["K6 selection list and the current row — the rail's marker; lead, meta and description turn --foreground", [
     ["#fx-sel", "", "padding-top", "0.25rem"], ["#fx-sel", "", "padding-left", "0.5rem"], ["#fx-sel", "", "column-gap", "0.75rem"],

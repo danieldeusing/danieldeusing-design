@@ -43,6 +43,15 @@ jobs:
       - name: Borrow mermaid 11.16.0 for check-integration and check-bake
         run: npm install --no-save --no-package-lock --ignore-scripts --prefix "$RUNNER_TEMP/mermaid" mermaid@11.16.0
 
+      # ONE PINNED BROWSER. The suites measure pixels, so a browser update can move them. The runner's
+      # system Chrome 158 painted check-controls' forced-colours words differently from their computed
+      # style, while Playwright's Chromium 1234 painted them as computed. Every suite that reads
+      # DD_CHROME runs on that pinned build, the first one the suites look for on a Mac.
+      - name: Install the pinned headless Chromium (Playwright 1.62.1, revision 1234)
+        run: |
+          npx -y playwright@1.62.1 install --with-deps --only-shell chromium
+          echo "DD_CHROME=$(find "$HOME/.cache/ms-playwright" -type f -name chrome-headless-shell | head -1)" >> "$GITHUB_ENV"
+
       # EVERY scripts/check-*.mjs, and none may skip (check-release-gate.mjs fails a suite that is
       # missing here or in release.yml, or a flag missing from its step):
       #   DD_REQUIRE_BROWSER     a DOM suite with no browser exits 0 with SKIPPED; this makes it a failure

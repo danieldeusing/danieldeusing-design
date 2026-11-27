@@ -102,7 +102,12 @@ jobs:
         if: steps.decide.outputs.publish == 'true'
         run: |
           npx -y playwright@1.62.1 install --with-deps --only-shell chromium
-          echo "DD_CHROME=$(find "$HOME/.cache/ms-playwright" -type f -name chrome-headless-shell | head -1)" >> "$GITHUB_ENV"
+          # Ubuntu 24.04 lets only a browser with its own AppArmor profile (the system Chrome) open the
+          # user namespace its sandbox needs; without this the pinned build never comes up.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          chrome="$(find "$HOME/.cache/ms-playwright" -type f -name chrome-headless-shell | head -1)"
+          "$chrome" --headless=new --no-first-run --disable-gpu --dump-dom about:blank > /dev/null
+          echo "DD_CHROME=$chrome" >> "$GITHUB_ENV"
 
       - name: Every suite must pass before publishing
         if: steps.decide.outputs.publish == 'true'

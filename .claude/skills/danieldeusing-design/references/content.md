@@ -24,15 +24,15 @@ Contents:
 ## `.page-title` and `.lede` — lit, and two sizes
 
 ```html
-<p class="prompt">cat ~/about.txt</p>
-<h1 class="page-title">who builds this<span class="cursor-block" aria-hidden="true"></span></h1>
+<h1 class="page-title prompt">who builds this<span class="cursor-block" aria-hidden="true"></span></h1>
 <p class="lede">What this page is, in one or two sentences.</p>
 ```
 
-**The prompt is where, the title is what.** The path line is data (the file, the route), so the title
-never repeats its words: "$ cat ~/about.txt" over "about" says one thing twice, in two sizes.
-`check-content` refuses a `.prompt` followed by a heading with the same words. The lede stops at
-`--measure` (72 characters).
+**A title is one element.** The page title is `<h1 class="page-title prompt">`, a section title
+`<h2 class="prompt">`: each draws its own `$`. No `$ path` line sits above a heading; the breadcrumb
+already says where the page is. `check-content` refuses a `.prompt` line directly before a heading.
+The one exception is a command whose output is the heading, the error page's `$ /no-such-path` over
+"404: command not found": that line carries `data-command`.
 
 **Two sizes, and which one is not a taste call** (the lead's ruling, 2026-09-28):
 
@@ -53,7 +53,7 @@ two-line title into two separate lines.
 - **It is lit**: `--primary` with the large glow, as seedr and danieldeusing.de draw it. Do not add
   `.glow-lg` or a colour — the class already has both. Cockpit's unlit `h1.title` and configr's
   `--foreground` title move to it. `--primary` is 5.59:1 at worst (warm, over `--muted`).
-- **The gaps are sibling rules**: 1.5rem under a `.prompt`, .5rem from the title to the `.lede`. A
+- **The gaps are sibling rules**: 1.5rem under an error page's `data-command` line, .5rem from the title to the `.lede`. A
   title with nothing above it carries no margin to strip. Do not add `mt-*` or a margin of your own.
 - **A leading glyph** is `<span class="ico" data-icon="home" aria-hidden="true"></span>` as the
   title's first child: it takes the 24px step, sits on the text, and is the title's colour.
@@ -116,7 +116,7 @@ A section's name on the left and **one** thing on the right, one of three:
 - **The section's name is ONE heading.** `<h2 class="prompt">steps</h2>`: a real `h2` at the heading
   size and in `--foreground`, with the `$` in `--primary` before it. The words are plain, never a file
   name ("cat steps.txt"), and no second heading under it repeats them. A bare `p.prompt` stays the
-  body size and muted: it is a path or a command, not a title.
+  body size and muted: it is a command inside a body, never a line above a heading.
 - The head's children lose their own margins, and the head keeps 1rem below itself.
 
 `.subhead` is a heading one level down inside a section: body size, bold, 1.4rem above and .3rem
@@ -401,7 +401,7 @@ and the way home. **Start from the template**; it carries the standard chrome
 
 ```html
 <main class="wrap error-page" id="main">
-  <p class="prompt" data-requested-path>page</p>
+  <p class="prompt" data-command data-requested-path>page</p>
   <h1 class="page-title page-title--display">404: command not found<span class="cursor-block" aria-hidden="true"></span></h1>
   <p class="lede">no such file or directory.</p>
   <p><a class="link-quiet" href="/">cd ~</a></p>

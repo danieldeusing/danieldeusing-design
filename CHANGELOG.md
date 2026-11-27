@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.66.0 (2026-11-27)
+
+### Changed
+
+- **The page title is one element too.** `<h1 class="page-title prompt">code review</h1>` draws
+  `$ code review` in the title's size and `--primary`; the `$ automation --review` line above the
+  title is gone, because the breadcrumb already says where the page is. `check-content` now refuses
+  any `.prompt` line directly before a heading. A command whose output is the heading (the error
+  page) marks its line `data-command`.
+
+### Removed
+
+- **Prose uses the column's full width again.** `--measure` and its 72-character cap on `.lede`,
+  `.markdown p` and a doc section's paragraphs are gone: a lede now runs as wide as the tables and
+  cards under it.
+
 ## 0.65.0 (2026-11-27)
 
 The ten proposals from the review against the Apple HIG and shadcn, plus one title per section and

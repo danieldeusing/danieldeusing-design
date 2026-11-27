@@ -33,7 +33,6 @@ Contents:
 | `--control-edge` | `--foreground` at 60% | the border of every FIELD — input, textarea, select and filter trigger, search field, bordered icon button — and of every popup and dialog |
 | `--card-pad` | 1rem · 16px | the inset of `.card-terminal` and anything card-shaped |
 | `--card-gap` | 1.25rem · 20px | between cards in a `.card-grid` and between stat tiles |
-| `--measure` | 72ch | the longest line of running prose: `.lede`, `.markdown p`, a doc section's paragraph |
 | `--icon-sm` · `--icon-size` · `--icon-lg` · `--icon-xl` | 12 · 14 · 16 · 24px | beside a label, in a tag, a clear button · the default inside a control · a larger control · an empty state, a page-level load |
 | `--dot-size` | 0.5rem · 8px | the status dot |
 | `--status-h` | 2rem · 32px | `footer.status`, so a page can reserve exactly that much room above it |

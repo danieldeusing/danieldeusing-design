@@ -132,14 +132,12 @@
         <div class="demo-grid">
           <div class="demo-frame" id="p1-app">
             <p class="demo-cap">app view — .page-title</p>
-            <p class="prompt">ls ~/automation/review</p>
-            <h1 class="page-title">pull requests<span class="cursor-block" aria-hidden="true"></span></h1>
+            <h1 class="page-title prompt">pull requests<span class="cursor-block" aria-hidden="true"></span></h1>
             <p class="lede">Every pull request the reviewers have seen, and what they said about it.</p>
           </div>
           <div class="demo-frame" id="p1-display">
             <p class="demo-cap">public page — .page-title--display</p>
-            <p class="prompt">cat ~/about.txt</p>
-            <h1 class="page-title page-title--display">who builds this<span class="cursor-block" aria-hidden="true"></span></h1>
+            <h1 class="page-title page-title--display prompt">who builds this<span class="cursor-block" aria-hidden="true"></span></h1>
             <p class="lede">Engineer in São Paulo. I build terminal-flavoured tools for my own infrastructure.</p>
           </div>
           <div class="demo-frame" id="p1-glyph" data-surface="card">
@@ -466,14 +464,14 @@ context: vu3
           <code>.page-title--display</code> (lead ruling), and the way out sits 1.5rem under the lede.</p>
         <div class="demo-grid">
           <div class="demo-frame error-page" id="s9-404">
-            <p class="prompt">articles/no-such-post</p>
+            <p class="prompt" data-command>articles/no-such-post</p>
             <h1 class="page-title page-title--display">404: command not found<span class="cursor-block" aria-hidden="true"></span></h1>
             <p class="lede">no such file or directory.</p>
             <p><a class="link-quiet" href="#s9">cd ~</a></p>
           </div>
           <div class="demo-frame error-page" id="s9-crash">
             <div role="alert">
-              <p class="prompt">skills/review</p>
+              <p class="prompt" data-command>skills/review</p>
               <h1 class="page-title page-title--display">something broke<span class="cursor-block" aria-hidden="true"></span></h1>
               <p class="lede">Cannot read properties of undefined (reading 'files')</p>
               <p><button type="button" class="btn-terminal btn-terminal--compact" data-reload>reload</button></p>

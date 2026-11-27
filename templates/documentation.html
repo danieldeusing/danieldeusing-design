@@ -85,13 +85,13 @@
          on docs.danieldeusing.de, NOT for a doc opened from disk over file://. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.65.0.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.66.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.66.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.65.0.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.66.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.66.0.fonts.css'"
     />
 
     <style>
@@ -280,8 +280,7 @@
 
     <main class="wrap" id="top">
       <div class="content">
-          <p class="prompt">cat {{FOLDER}}/README.md</p>
-          <h1 class="page-title">{{DOC_TITLE}}</h1>
+          <h1 class="page-title prompt">{{DOC_TITLE}}</h1>
           <p class="lede">{{TAGLINE}}</p>
 
           <!-- one <section> per topic, each with an id (the minimap builds itself from them).
@@ -409,7 +408,7 @@ flowchart TD
     <script type="module">
       // dd-runtime: scripts/bake.mjs swaps this import for the runtime it inlines.
       import { applyStoredTheme, initThemeSwitcher, initDropdowns, initSelects, initTerminal, initAnimToggle, initBurgerNav, initLsNav, initTableScroll, initDiagramZoom, initMinimap, initTooltips } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.66.0/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();

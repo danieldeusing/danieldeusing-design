@@ -304,12 +304,13 @@ await load("?theme=warm");
 
 /* ── P1 page title and lede ─────────────────────────────────────────────────────────────────── */
 
-await check("P1 .page-title: --fs-2xl, 700, tight, -0.025em, --primary, the large glow, 1.5rem under the prompt", () => expectAll([
+await check("P1 .page-title.prompt: --fs-2xl, 700, tight, -0.025em, --primary (not .prompt's --foreground), the large glow, its own $, no margin", () => expectAll([
   ["#p1-app .page-title", null, {
     "font-size": { calc: "var(--fs-2xl)" }, "font-weight": "700", "line-height": { calc: "calc(var(--fs-2xl) * var(--lh-tight))" }, "letter-spacing": { calc: "calc(var(--fs-2xl) * -0.025)" },
     color: { token: "--primary" }, "text-shadow": { re: "12px$" }, "overflow-wrap": "anywhere",
-    "margin-top": "24px", "margin-bottom": "0px", "margin-left": "0px", "margin-right": "0px",
+    "margin-top": "0px", "margin-bottom": "0px", "margin-left": "0px", "margin-right": "0px",
   }],
+  ["#p1-app .page-title", "::before", { content: '"$ "', color: { token: "--primary" } }],
 ]));
 // pagr's display titles lead at 1.2 (Tailwind's text-3xl/4xl, and ArticlePostPage's leading-[1.2]).
 await check("P1 .page-title--display is --fs-display at pagr's 1.2 leading: 36px on 43.2px from 40rem", () => expectAll([
@@ -1295,28 +1296,30 @@ await check("template: the crash variant is documented — alert, 'something bro
  * A section title is ONE element, `<h2 class="prompt">steps</h2>`. A `.prompt` followed by a
  * heading with the same words ("$ cat steps.txt", then "Steps") says the title twice, in two sizes.
  * The words are compared without "cat ", a folder, a file extension, case and punctuation. */
-const sayTwice = (html) => {
-  const words = (s) => s.replace(/<[^>]*>/g, "").trim().toLowerCase().replace(/^cat\s+/, "")
-    .replace(/^.*\//, "").replace(/\.[a-z0-9]+$/, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  const re = /<(\w+)\b[^>]*\bclass="[^"]*\bprompt\b[^"]*"[^>]*>([\s\S]*?)<\/\1>\s*(?:<!--[\s\S]*?-->\s*)*<(h[1-4])\b[^>]*>([\s\S]*?)<\/\3>/g;
-  return [...html.matchAll(re)].filter((m) => words(m[2]) && words(m[2]) === words(m[4])).map((m) => words(m[2]));
+// A `$` line that is not itself a heading, directly before a heading: the title is said in two
+// elements. `data-command` marks the one exception, a command whose output is the heading.
+const promptOverHeading = (html) => {
+  const text = (s) => s.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  const re = /<(?!h[1-6]\b)(\w+)\b([^>]*\bclass="[^"]*\bprompt\b[^"]*"[^>]*)>((?:(?!<\/\1>)[\s\S])*)<\/\1>\s*(?:<!--[\s\S]*?-->\s*)*<(h[1-4])\b[^>]*>([\s\S]*?)<\/\4>/g;
+  return [...html.matchAll(re)].filter((m) => !/\bdata-command\b/.test(m[2])).map((m) => `${text(m[3])} / ${text(m[5])}`);
 };
-await check("one title: no .prompt in templates/ or examples/ is followed by a heading that repeats its words", async () => {
+await check("one title: no .prompt line in templates/ or examples/ sits directly before a heading", async () => {
   const { readdirSync } = await import("node:fs");
   const out = [];
   for (const dir of ["templates", "examples"]) {
     for (const f of readdirSync(join(root, dir)).filter((n) => n.endsWith(".html"))) {
-      for (const w of sayTwice(readFileSync(join(root, dir, f), "utf8"))) out.push(`${dir}/${f}: "$ ${w}" and a heading "${w}"`);
+      for (const w of promptOverHeading(readFileSync(join(root, dir, f), "utf8"))) out.push(`${dir}/${f}: "$ ${w}" is two elements`);
     }
   }
   return out;
 });
-await check("...and it CAN fail: it names cat steps.txt + <h2>Steps</h2>, and passes a path over a different title", () => {
+await check("...and it CAN fail: it names a path over a title and a command over a section, and passes h1.prompt, h2.prompt and data-command", () => {
   const out = [];
-  if (sayTwice(`<p class="prompt">cat steps.txt</p>\n<h2>Steps</h2>`).join() !== "steps") out.push("missed cat steps.txt + h2 Steps");
-  if (sayTwice(`<p class="prompt">cat notes/in-short.md</p><!-- x --><h3 class="x">In short</h3>`).join() !== "in short") out.push("missed a folder, a comment and a hyphen");
-  if (sayTwice(`<p class="prompt">cat {{FOLDER}}/README.md</p><h1 class="page-title">{{DOC_TITLE}}</h1>`).length) out.push("flagged a path over a different title");
-  if (sayTwice(`<h2 class="prompt">steps</h2><ol class="steps"><li>a</li></ol>`).length) out.push("flagged a single h2.prompt");
+  if (promptOverHeading(`<p class="prompt">automation --review</p>\n<h1 class="page-title">code review</h1>`).length !== 1) out.push("missed a path line over h1.page-title");
+  if (promptOverHeading(`<p class="prompt">cat steps.txt</p><!-- x --><h3 class="x">In short</h3>`).length !== 1) out.push("missed a command, a comment and an h3");
+  if (promptOverHeading(`<p class="prompt">ls registry/</p><p>no skills yet</p><h2>tones</h2>`).length) out.push("matched a prompt across a later paragraph");
+  if (promptOverHeading(`<h1 class="page-title prompt">code review</h1><h2 class="prompt">steps</h2><ol class="steps"><li>a</li></ol>`).length) out.push("flagged h1.prompt or h2.prompt");
+  if (promptOverHeading(`<p class="prompt" data-command>/no-such-path</p><h1 class="page-title">404: command not found</h1>`).length) out.push("flagged a data-command line");
   return out;
 });
 

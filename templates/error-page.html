@@ -83,13 +83,13 @@
          reader with no route to the CDN, as documentation.html does. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/dist/danieldeusing-design.min.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.65.0.min.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.66.0/dist/danieldeusing-design.min.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.66.0.min.css'"
     />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/src/fonts.css"
-      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.65.0.fonts.css'"
+      href="https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.66.0/src/fonts.css"
+      onerror="this.onerror=null;this.href='/_design/danieldeusing-design-0.66.0.fonts.css'"
     />
   </head>
 
@@ -151,7 +151,7 @@
          under the lede — a separate thought from the error, not its last line. No style attribute
          anywhere: a strict CSP refuses them. -->
     <main class="wrap error-page" id="main">
-      <p class="prompt" data-requested-path>{{REQUESTED_PATH}}</p>
+      <p class="prompt" data-command data-requested-path>{{REQUESTED_PATH}}</p>
       <h1 class="page-title page-title--display">404: command not found<span class="cursor-block" aria-hidden="true"></span></h1>
       <p class="lede">no such file or directory.</p>
       <p><a class="link-quiet" href="/">cd ~</a></p>
@@ -161,7 +161,7 @@
 
     <main class="wrap error-page" id="main">
       <div role="alert">
-        <p class="prompt">{{FAILING_ROUTE}}</p>
+        <p class="prompt" data-command>{{FAILING_ROUTE}}</p>
         <h1 class="page-title page-title--display">something broke<span class="cursor-block" aria-hidden="true"></span></h1>
         <p class="lede">{{ERROR_MESSAGE}}</p>
         <p><button type="button" class="btn-terminal btn-terminal--compact" data-reload>reload</button></p>
@@ -205,7 +205,7 @@
 
     <script type="module">
       import { applyStoredTheme, initThemeSwitcher, initDropdowns, initAnimToggle, initBurgerNav, initLsNav, initTooltips } from
-        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.65.0/runtime/index.js";
+        "https://cdn.jsdelivr.net/npm/@danieldeusing/design@0.66.0/runtime/index.js";
       applyStoredTheme();
       initThemeSwitcher();
       initDropdowns();

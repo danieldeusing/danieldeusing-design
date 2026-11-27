@@ -153,7 +153,6 @@ inherit picks its own width and size, and the surfaces drift apart.
 --fs-2xl: 1.625rem;     /* 26px — h1, an app's .page-title, a stat value */
 --fs-display: 1.875rem; /* 30px, 36px from 40rem — a public page title and an error code, nothing else (0.60.0) */
 --lh-tight: 1.3;        --lh-base: 1.6;        --lh-display: 1.2;  /* the display step's leading */
---measure: 72ch;        /* the longest line of running prose (.lede, .markdown p) */
 ```
 
 `--fs-display` is not a text size. It is danieldeusing.de's page title (`.page-title--display`,

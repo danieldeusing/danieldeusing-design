@@ -106,19 +106,18 @@ already carries two, and if you cannot write the sentence you do not have an exc
      this: a baked page loads nothing, so it needs no fallback and no warning in the report.
 
 4. **Fill the placeholders.** Replace every `{{PLACEHOLDER}}`:
-   - `{{FOLDER}}` — the project / folder slug (e.g. `pagr`); used in the `cat …/README.md` prompt
-     and the footer status line.
+   - `{{FOLDER}}` — the project / folder slug (e.g. `pagr`); used in the footer status line.
    - `{{DOC_TITLE}}` — the document title (e.g. `Source Code documentation`); fills the `<title>`,
      the `<h1>`, and the footer, which renders `[{{FOLDER}}] {{DOC_TITLE}}` (e.g.
      `[pagr] Source Code documentation`).
    - `{{DOC_DESCRIPTION}}` — the `<meta name="description">`.
-   - `{{TAGLINE}}` — the lede under the title. It stops at `--measure` (72 characters), a readable line.
+   - `{{TAGLINE}}` — the lede under the title.
    - **Sections** — one `<section class="doc" id="SLUG" data-term>` per topic, each with an
      `<h2 class="prompt">` title and a `[data-term-out]` body. The title is ONE element: a real
      heading at the heading size, with `$` before it. Its words are plain (`steps`, `proof`), never a
      file name (`cat steps.txt`), and no second heading repeats them: `.prompt` + `h2` with the same
-     words reads twice and `check-content` refuses it. The path line above the page title stays a
-     `p.prompt`, because a path is data, not a title. Add/remove sections to fit the subject; give each a unique
+     words reads twice. The page title is one element too, `h1.page-title.prompt`, with no `$ path`
+     line above it; `check-content` refuses a `.prompt` line directly before any heading. Add/remove sections to fit the subject; give each a unique
      `id`. Every component below is the design system's, and the template declares none of them
      (0.61.0): `h2.prompt` for section titles, `ol.steps` for ordered steps, `ul.plain` for lists,
      `table.kv` (see below) for key/value specs, a bare `<pre>` for a code block and a bare `<code>`

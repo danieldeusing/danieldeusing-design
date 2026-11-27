@@ -23,14 +23,14 @@
 
 
 /* ── PAGE TITLE AND LEDE (P1) ─────────────────────────────────────────────────────────────────
-   <p class="prompt">cat ~/about.txt</p>
-   <h1 class="page-title">who builds this<span class="cursor-block" aria-hidden="true"></span></h1>
+   <h1 class="page-title prompt">who builds this<span class="cursor-block" aria-hidden="true"></span></h1>
    <p class="lede">…</p>
 
-   THE PROMPT IS WHERE, THE TITLE IS WHAT. The path line is data (the file, the route), so the title
-   never repeats its last word: "$ cat ~/about.txt" over "about" says one thing twice in two sizes.
-   A section title is one element, `<h2 class="prompt">steps</h2>`; check-content refuses a
-   `.prompt` followed by a heading with the same words.
+   A TITLE IS ONE ELEMENT. The page title and a section title each carry the `$` themselves:
+   `h1.page-title.prompt`, `<h2 class="prompt">steps</h2>`. A separate `$ path` line above a heading
+   is gone; the breadcrumb already says where the page is. check-content refuses a `.prompt` line
+   directly before a heading. The one exception is a command whose OUTPUT is the heading (the error
+   page: `$ /no-such-path` over "404: command not found"); that line carries `data-command`.
 
    ONE TITLE, LIT. seedr and danieldeusing.de draw the page title in --primary with the large glow;
    cockpit's `h1.title` was unlit and configr's was --foreground. The lit one wins because it is the
@@ -66,6 +66,10 @@
   text-shadow: 0 0 12px var(--glow);
   overflow-wrap: anywhere;
 }
+/* A lit title stays lit: `:is(h1, h2, h3, h4).prompt` sets --foreground for a section title. */
+.page-title.prompt {
+  color: var(--primary);
+}
 .page-title--display {
   font-size: var(--fs-display);
   line-height: var(--lh-display, 1.2);
@@ -85,13 +89,6 @@
 .lede {
   margin: 0;
   color: var(--muted-foreground);
-}
-/* RUNNING PROSE STOPS AT --measure (72ch). A line of 13px monospace across a 90rem column is about
-   180 characters, and the eye loses the next line on the way back. Tables, code and cards keep the
-   column's full width; only paragraphs of reading text are capped. Zero weight, so a component that
-   sizes its own text wins. */
-:where(.lede, .markdown p, section.doc .body > p) {
-  max-inline-size: var(--measure);
 }
 .page-title + .lede {
   margin-block-start: 0.5rem;

@@ -1,4 +1,4 @@
-/*! danieldeusing-design v0.65.0 runtime | MIT | built by scripts/build.mjs from runtime/; a baked page carries it instead of importing runtime/index.js */
+/*! danieldeusing-design v0.66.0 runtime | MIT | built by scripts/build.mjs from runtime/; a baked page carries it instead of importing runtime/index.js */
 (() => {
 "use strict";
 const records = {};

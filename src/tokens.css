@@ -334,7 +334,6 @@ html[data-theme="paper"] {
 
   --lh-tight: 1.3;      /* headings and single-line chrome */
   --lh-base: 1.6;       /* body copy; matches base.css */
-  --measure: 72ch;      /* the longest line of running prose: 50–75 characters read best */
 
   /* The label column of a .field-row. DECLARED here, not merely read with a fallback in
      components.css — that is the difference between a token and a phantom. A consumer that

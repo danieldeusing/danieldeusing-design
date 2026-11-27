@@ -223,7 +223,7 @@ check("templates/documentation.html declares none of the system's components in 
   const style = (text.match(/<style>([\s\S]*?)<\/style>/) || ["", ""])[1].replace(/\/\*[\s\S]*?\*\//g, "");
   const forks = ["h1.title", ".lede", "ol.steps", "ul.plain", ".grid", ".pad", ".muted", "code.inline", "pre.block", "table.kv"]
     .filter((sel) => new RegExp(`(^|[\\s,}])${sel.replace(/\./g, "\\.")}(?![\\w-])[^{]*\\{`, "m").test(style)).map((sel) => `declares ${sel}`);
-  if (!/<h1 class="page-title">/.test(text)) forks.push("the title is not h1.page-title");
+  if (!/<h1 class="page-title prompt">/.test(text)) forks.push("the title is not h1.page-title.prompt");
   if (/class="title"|code class="inline"|pre class="block"/.test(text)) forks.push("markup still uses a retired local class");
   return forks;
 });
